@@ -3,6 +3,7 @@ use pyo3::types::PyString;
 
 use jiter::StringCacheMode;
 
+use crate::config::CoreConfig;
 use crate::recursion_guard::{ContainsRecursionState, RecursionState};
 use crate::tools::new_py_string;
 
@@ -25,6 +26,7 @@ pub struct ValidationState<'a, 'py> {
     pub fields_set_count: Option<usize>,
     // deliberately make Extra readonly
     extra: Extra<'a, 'py>,
+    pub config: CoreConfig,
 }
 
 impl<'a, 'py> ValidationState<'a, 'py> {
@@ -34,6 +36,17 @@ impl<'a, 'py> ValidationState<'a, 'py> {
             exactness: None,
             fields_set_count: None,
             extra,
+            config: CoreConfig::default(),
+        }
+    }
+
+    pub fn new_with_config(extra: Extra<'a, 'py>, recursion_guard: &'a mut RecursionState, config: CoreConfig) -> Self {
+        Self {
+            recursion_guard,
+            exactness: None,
+            fields_set_count: None,
+            extra,
+            config,
         }
     }
 
@@ -54,7 +67,7 @@ impl<'a, 'py> ValidationState<'a, 'py> {
     }
 
     pub fn strict_or(&self, default: bool) -> bool {
-        self.extra.strict.unwrap_or(default)
+        self.extra.strict.unwrap_or(self.config.strict.unwrap_or(default))
     }
 
     /// Sets the exactness to the lower of the current exactness

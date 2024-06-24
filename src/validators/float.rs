@@ -1,14 +1,15 @@
 use std::cmp::Ordering;
+use std::sync::Arc;
 
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use crate::build_tools::{is_strict, schema_or_config_same};
 use crate::errors::{ErrorType, ErrorTypeDefaults, ValError, ValResult};
 use crate::input::Input;
 use crate::tools::SchemaDict;
 
+use super::config::ConfigValidator;
 use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
 
 pub struct FloatBuilder;
@@ -26,38 +27,43 @@ impl BuildValidator for FloatBuilder {
             || schema.get_item(intern!(py, "lt"))?.is_some()
             || schema.get_item(intern!(py, "ge"))?.is_some()
             || schema.get_item(intern!(py, "gt"))?.is_some();
-        if use_constrained {
-            ConstrainedFloatValidator::build(schema, config, definitions)
+
+        let mut validator = if use_constrained {
+            ConstrainedFloatValidator::build(schema, config, definitions)?
         } else {
-            Ok(FloatValidator {
-                strict: is_strict(schema, config)?,
-                allow_inf_nan: schema_or_config_same(schema, config, intern!(py, "allow_inf_nan"))?.unwrap_or(true),
+            FloatValidator::build(schema, config, definitions)?
+        };
+
+        let strict: Option<bool> = schema.get_as(intern!(py, "strict"))?;
+        let allow_inf_nan: Option<bool> = schema.get_as(intern!(py, "allow_inf_nan"))?;
+
+        if strict.is_some() | allow_inf_nan.is_some() {
+            let config = PyDict::new_bound(py);
+            if let Some(strict) = strict {
+                config.set_item("strict", strict)?;
             }
-            .into())
+            if let Some(allow_inf_nan) = allow_inf_nan {
+                config.set_item("allow_inf_nan", allow_inf_nan)?;
+            }
+            validator = CombinedValidator::Config(ConfigValidator::try_new(config, Arc::new(validator))?);
         }
+
+        Ok(validator)
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct FloatValidator {
-    strict: bool,
-    allow_inf_nan: bool,
-}
+pub struct FloatValidator;
 
 impl BuildValidator for FloatValidator {
     const EXPECTED_TYPE: &'static str = "float";
 
     fn build(
-        schema: &Bound<'_, PyDict>,
-        config: Option<&Bound<'_, PyDict>>,
+        _schema: &Bound<'_, PyDict>,
+        _config: Option<&Bound<'_, PyDict>>,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
-        let py = schema.py();
-        Ok(Self {
-            strict: is_strict(schema, config)?,
-            allow_inf_nan: schema_or_config_same(schema, config, intern!(py, "allow_inf_nan"))?.unwrap_or(true),
-        }
-        .into())
+        Ok(Self.into())
     }
 }
 
@@ -70,8 +76,8 @@ impl Validator for FloatValidator {
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
-        let either_float = input.validate_float(state.strict_or(self.strict))?.unpack(state);
-        if !self.allow_inf_nan && !either_float.as_f64().is_finite() {
+        let either_float = input.validate_float(state.strict_or(false))?.unpack(state);
+        if !state.config.allow_inf_nan.unwrap_or(false) && !either_float.as_f64().is_finite() {
             return Err(ValError::new(ErrorTypeDefaults::FiniteNumber, input));
         }
         Ok(either_float.into_py(py))
@@ -84,8 +90,6 @@ impl Validator for FloatValidator {
 
 #[derive(Debug, Clone)]
 pub struct ConstrainedFloatValidator {
-    strict: bool,
-    allow_inf_nan: bool,
     multiple_of: Option<f64>,
     le: Option<f64>,
     lt: Option<f64>,
@@ -102,9 +106,9 @@ impl Validator for ConstrainedFloatValidator {
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
-        let either_float = input.validate_float(state.strict_or(self.strict))?.unpack(state);
+        let either_float = input.validate_float(state.strict_or(false))?.unpack(state);
         let float: f64 = either_float.as_f64();
-        if !self.allow_inf_nan && !float.is_finite() {
+        if !state.config.allow_inf_nan.unwrap_or(false) && !float.is_finite() {
             return Err(ValError::new(ErrorTypeDefaults::FiniteNumber, input));
         }
         if let Some(multiple_of) = self.multiple_of {
@@ -176,13 +180,11 @@ impl BuildValidator for ConstrainedFloatValidator {
     const EXPECTED_TYPE: &'static str = "float";
     fn build(
         schema: &Bound<'_, PyDict>,
-        config: Option<&Bound<'_, PyDict>>,
+        _config: Option<&Bound<'_, PyDict>>,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
         Ok(Self {
-            strict: is_strict(schema, config)?,
-            allow_inf_nan: schema_or_config_same(schema, config, intern!(py, "allow_inf_nan"))?.unwrap_or(true),
             multiple_of: schema.get_as(intern!(py, "multiple_of"))?,
             le: schema.get_as(intern!(py, "le"))?,
             lt: schema.get_as(intern!(py, "lt"))?,

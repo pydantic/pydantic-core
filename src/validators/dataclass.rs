@@ -6,7 +6,7 @@ use pyo3::types::{PyDict, PyList, PyString, PyTuple, PyType};
 use ahash::AHashSet;
 
 use crate::build_tools::py_schema_err;
-use crate::build_tools::{is_strict, schema_or_config_same, ExtraBehavior};
+use crate::build_tools::{schema_or_config_same, ExtraBehavior};
 use crate::errors::{ErrorType, ErrorTypeDefaults, ValError, ValLineError, ValResult};
 use crate::input::{
     input_as_python_instance, Arguments, BorrowInput, Input, InputType, KeywordArgs, PositionalArgs, ValidationMatch,
@@ -15,7 +15,7 @@ use crate::lookup_key::LookupKey;
 use crate::tools::SchemaDict;
 use crate::validators::function::convert_err;
 
-use super::model::{create_class, force_setattr, Revalidate};
+use super::model::{create_class, force_setattr};
 use super::validation_state::Exactness;
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
 
@@ -435,12 +435,10 @@ impl Validator for DataclassArgsValidator {
 
 #[derive(Debug)]
 pub struct DataclassValidator {
-    strict: bool,
     validator: Box<CombinedValidator>,
     class: Py<PyType>,
     fields: Vec<Py<PyString>>,
     post_init: Option<Py<PyString>>,
-    revalidate: Revalidate,
     name: String,
     frozen: bool,
     slots: bool,
@@ -481,17 +479,10 @@ impl BuildValidator for DataclassValidator {
             .collect::<PyResult<Vec<_>>>()?;
 
         Ok(Self {
-            strict: is_strict(schema, config)?,
             validator: Box::new(validator),
             class: class.into(),
             fields,
             post_init,
-            revalidate: Revalidate::from_str(
-                schema_or_config_same::<Bound<'_, PyString>>(schema, config, intern!(py, "revalidate_instances"))?
-                    .as_ref()
-                    .map(|s| s.to_str())
-                    .transpose()?,
-            )?,
             name,
             frozen: schema.get_as(intern!(py, "frozen"))?.unwrap_or(false),
             slots: schema.get_as(intern!(py, "slots"))?.unwrap_or(false),
@@ -517,7 +508,13 @@ impl Validator for DataclassValidator {
         // same logic as on models
         let class = self.class.bind(py);
         if let Some(py_input) = input_as_python_instance(input, class) {
-            if self.revalidate.should_revalidate(py_input, class) {
+            if state
+                .config
+                .revalidate_instances
+                .as_ref()
+                .unwrap_or(&crate::config::RevalidateInstances::Never)
+                .should_revalidate(py_input, class)
+            {
                 let input_dict = self.dataclass_to_dict(py_input)?;
                 let val_output = self.validator.validate(py, input_dict.as_any(), state)?;
                 let dc = create_class(self.class.bind(py))?;
@@ -526,7 +523,7 @@ impl Validator for DataclassValidator {
             } else {
                 Ok(input.to_object(py))
             }
-        } else if state.strict_or(self.strict) && state.extra().input_type == InputType::Python {
+        } else if state.strict_or(false) && state.extra().input_type == InputType::Python {
             Err(ValError::new(
                 ErrorType::DataclassExactType {
                     class_name: self.get_name().to_string(),

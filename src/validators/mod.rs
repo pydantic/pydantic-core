@@ -24,6 +24,7 @@ mod bytes;
 mod call;
 mod callable;
 mod chain;
+mod config;
 mod custom_error;
 mod dataclass;
 mod date;
@@ -732,6 +733,9 @@ pub enum CombinedValidator {
     DefinitionRef(definitions::DefinitionRefValidator),
     // input dependent
     JsonOrPython(json_or_python::JsonOrPython),
+    // config applies the a CoreConfig to the current validation context
+    // for example if we hit a Model that has an attached config this validator will apply that config
+    Config(config::ConfigValidator),
 }
 
 /// This trait must be implemented by all validators, it allows various validators to be accessed consistently,
