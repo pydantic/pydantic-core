@@ -572,7 +572,7 @@ impl PyLineError {
             let input_str = safe_repr(input_value);
             truncate_input_value!(output, &input_str.to_cow());
 
-            if let Ok(type_) = input_value.get_type().qualname() {
+            if let Ok(type_) = input_value.get_type().fully_qualified_name() {
                 write!(output, ", input_type={type_}")?;
             }
         }

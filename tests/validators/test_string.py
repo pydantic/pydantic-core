@@ -50,7 +50,9 @@ def test_str(py_and_json: PyAndJson, input_value, expected):
         (123, Err('Input should be a valid string [type=string_type, input_value=123, input_type=int]')),
         (
             Decimal('123'),
-            Err("Input should be a valid string [type=string_type, input_value=Decimal('123'), input_type=Decimal]"),
+            Err(
+                "Input should be a valid string [type=string_type, input_value=Decimal('123'), input_type=decimal.Decimal]"
+            ),
         ),
     ],
 )

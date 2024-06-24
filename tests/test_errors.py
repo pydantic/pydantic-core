@@ -730,7 +730,7 @@ def test_error_on_repr(pydantic_version):
     assert str(exc_info.value) == (
         '1 validation error for int\n'
         '  Input should be a valid integer '
-        '[type=int_type, input_value=<unprintable BadRepr object>, input_type=BadRepr]\n'
+        '[type=int_type, input_value=<unprintable BadRepr object>, input_type=tests.test_errors.BadRepr]\n'
         f'    For further information visit https://errors.pydantic.dev/{pydantic_version}/v/int_type'
     )
     assert exc_info.value.errors(include_url=False) == [
