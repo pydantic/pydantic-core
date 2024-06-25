@@ -95,8 +95,8 @@ async function main() {
     const pyodide = await loadPyodide();
     const {FS} = pyodide;
     setupStreams(FS, pyodide._module.TTY);
-    FS.mkdir('/test_dir');
-    FS.chdir('/test_dir');
+    FS.mkdir('/tests');
+    FS.chdir('/tests');
     await pyodide.loadPackage(['micropip', 'pytest', 'numpy']);
     if (pydantic_core_version < '2.0.0') await pyodide.loadPackage(['typing-extensions']);
     await pyodide.runPythonAsync(python_code, {globals: pyodide.toPy({pydantic_core_version, tests_zip})});
