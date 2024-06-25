@@ -358,7 +358,9 @@ def test_non_finite_json_values(py_and_json: PyAndJson, input_value, allow_inf_n
         (
             Decimal('nan'),
             False,
-            Err("Input should be a finite number [type=finite_number, input_value=Decimal('NaN'), input_type=Decimal]"),
+            Err(
+                "Input should be a finite number [type=finite_number, input_value=Decimal('NaN'), input_type=decimal.Decimal]"
+            ),
         ),
     ],
 )
@@ -379,21 +381,21 @@ def test_non_finite_decimal_values(strict, input_value, allow_inf_nan, expected)
             Decimal('+inf'),
             False,
             Err(
-                "Input should be a finite number [type=finite_number, input_value=Decimal('Infinity'), input_type=Decimal]"
+                "Input should be a finite number [type=finite_number, input_value=Decimal('Infinity'), input_type=decimal.Decimal]"
             ),
         ),
         (
             Decimal('-inf'),
             True,
             Err(
-                "Input should be greater than 0 [type=greater_than, input_value=Decimal('-Infinity'), input_type=Decimal]"
+                "Input should be greater than 0 [type=greater_than, input_value=Decimal('-Infinity'), input_type=decimal.Decimal]"
             ),
         ),
         (
             Decimal('-inf'),
             False,
             Err(
-                "Input should be a finite number [type=finite_number, input_value=Decimal('-Infinity'), input_type=Decimal]"
+                "Input should be a finite number [type=finite_number, input_value=Decimal('-Infinity'), input_type=decimal.Decimal]"
             ),
         ),
     ],
