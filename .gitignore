@@ -14,6 +14,7 @@ docs/_build/
 htmlcov/
 node_modules/
 
+.venv
 /.benchmarks/
 /.idea/
 /.pytest_cache/
