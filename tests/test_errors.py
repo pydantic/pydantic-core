@@ -385,6 +385,16 @@ all_errors = [
         'Decimal input should have no more than 1 digit before the decimal point',
         {'whole_digits': 1},
     ),
+    (
+        'complex_type',
+        'Input should be a valid complex number',
+        None,
+    ),
+    (
+        'complex_parsing',
+        'Input should be a valid complex string following the rule at https://docs.python.org/3/library/functions.html#complex',
+        None,
+    ),
 ]
 
 
