@@ -16,7 +16,7 @@ pub use shared::CombinedSerializer;
 use shared::{to_json_bytes, BuildSerializer, TypeSerializer};
 
 mod computed_fields;
-mod config;
+pub(crate) mod config;
 mod errors;
 mod extra;
 mod fields;

@@ -7,6 +7,7 @@ use crate::errors::{ErrorTypeDefaults, InputValue, LocItem, ValError, ValResult}
 use crate::input::py_string_str;
 use crate::lookup_key::{LookupKey, LookupPath};
 use crate::tools::safe_repr;
+use crate::validators::config::ValBytesMode;
 use crate::validators::decimal::create_decimal;
 
 use super::datetime::{
@@ -105,9 +106,16 @@ impl<'py> Input<'py> for StringMapping<'py> {
         }
     }
 
-    fn validate_bytes<'a>(&'a self, _strict: bool) -> ValResult<ValidationMatch<EitherBytes<'a, 'py>>> {
+    fn validate_bytes<'a>(
+        &'a self,
+        _strict: bool,
+        mode: ValBytesMode,
+    ) -> ValResult<ValidationMatch<EitherBytes<'a, 'py>>> {
         match self {
-            Self::String(s) => py_string_str(s).map(|b| ValidationMatch::strict(b.as_bytes().into())),
+            Self::String(s) => py_string_str(s).and_then(|b| match mode.deserialize_string(b) {
+                Ok(b) => Ok(ValidationMatch::strict(b)),
+                Err(e) => Err(ValError::new(e, self)),
+            }),
             Self::Mapping(_) => Err(ValError::new(ErrorTypeDefaults::BytesType, self)),
         }
     }
