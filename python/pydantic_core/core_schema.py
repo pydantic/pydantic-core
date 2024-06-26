@@ -1401,6 +1401,7 @@ class ListSchema(TypedDict, total=False):
     items_schema: CoreSchema
     min_length: int
     max_length: int
+    fail_fast: bool
     strict: bool
     ref: str
     metadata: Any
@@ -1412,6 +1413,7 @@ def list_schema(
     *,
     min_length: int | None = None,
     max_length: int | None = None,
+    fail_fast: bool | None = None,
     strict: bool | None = None,
     ref: str | None = None,
     metadata: Any = None,
@@ -1432,6 +1434,7 @@ def list_schema(
         items_schema: The value must be a list of items that match this schema
         min_length: The value must be a list with at least this many items
         max_length: The value must be a list with at most this many items
+        fail_fast: Stop validation on the first error
         strict: The value must be a list with exactly this many items
         ref: optional unique identifier of the schema, used to reference the schema in other places
         metadata: Any other information you want to include with the schema, not used by pydantic-core
@@ -1442,6 +1445,7 @@ def list_schema(
         items_schema=items_schema,
         min_length=min_length,
         max_length=max_length,
+        fail_fast=fail_fast,
         strict=strict,
         ref=ref,
         metadata=metadata,
@@ -1549,6 +1553,7 @@ class TupleSchema(TypedDict, total=False):
     variadic_item_index: int
     min_length: int
     max_length: int
+    fail_fast: bool
     strict: bool
     ref: str
     metadata: Any
@@ -1561,6 +1566,7 @@ def tuple_schema(
     variadic_item_index: int | None = None,
     min_length: int | None = None,
     max_length: int | None = None,
+    fail_fast: bool | None = None,
     strict: bool | None = None,
     ref: str | None = None,
     metadata: Any = None,
@@ -1585,6 +1591,7 @@ def tuple_schema(
         variadic_item_index: The index of the schema in `items_schema` to be treated as variadic (following PEP 646)
         min_length: The value must be a tuple with at least this many items
         max_length: The value must be a tuple with at most this many items
+        fail_fast: Stop validation on the first error
         strict: The value must be a tuple with exactly this many items
         ref: Optional unique identifier of the schema, used to reference the schema in other places
         metadata: Any other information you want to include with the schema, not used by pydantic-core
@@ -1596,6 +1603,7 @@ def tuple_schema(
         variadic_item_index=variadic_item_index,
         min_length=min_length,
         max_length=max_length,
+        fail_fast=fail_fast,
         strict=strict,
         ref=ref,
         metadata=metadata,
@@ -1608,6 +1616,7 @@ class SetSchema(TypedDict, total=False):
     items_schema: CoreSchema
     min_length: int
     max_length: int
+    fail_fast: bool
     strict: bool
     ref: str
     metadata: Any
@@ -1619,6 +1628,7 @@ def set_schema(
     *,
     min_length: int | None = None,
     max_length: int | None = None,
+    fail_fast: bool | None = None,
     strict: bool | None = None,
     ref: str | None = None,
     metadata: Any = None,
@@ -1641,6 +1651,7 @@ def set_schema(
         items_schema: The value must be a set with items that match this schema
         min_length: The value must be a set with at least this many items
         max_length: The value must be a set with at most this many items
+        fail_fast: Stop validation on the first error
         strict: The value must be a set with exactly this many items
         ref: optional unique identifier of the schema, used to reference the schema in other places
         metadata: Any other information you want to include with the schema, not used by pydantic-core
@@ -1651,6 +1662,7 @@ def set_schema(
         items_schema=items_schema,
         min_length=min_length,
         max_length=max_length,
+        fail_fast=fail_fast,
         strict=strict,
         ref=ref,
         metadata=metadata,
@@ -1663,6 +1675,7 @@ class FrozenSetSchema(TypedDict, total=False):
     items_schema: CoreSchema
     min_length: int
     max_length: int
+    fail_fast: bool
     strict: bool
     ref: str
     metadata: Any
@@ -1674,6 +1687,7 @@ def frozenset_schema(
     *,
     min_length: int | None = None,
     max_length: int | None = None,
+    fail_fast: bool | None = None,
     strict: bool | None = None,
     ref: str | None = None,
     metadata: Any = None,
@@ -1696,6 +1710,7 @@ def frozenset_schema(
         items_schema: The value must be a frozenset with items that match this schema
         min_length: The value must be a frozenset with at least this many items
         max_length: The value must be a frozenset with at most this many items
+        fail_fast: Stop validation on the first error
         strict: The value must be a frozenset with exactly this many items
         ref: optional unique identifier of the schema, used to reference the schema in other places
         metadata: Any other information you want to include with the schema, not used by pydantic-core
@@ -1706,6 +1721,7 @@ def frozenset_schema(
         items_schema=items_schema,
         min_length=min_length,
         max_length=max_length,
+        fail_fast=fail_fast,
         strict=strict,
         ref=ref,
         metadata=metadata,
@@ -2468,8 +2484,8 @@ class TaggedUnionSchema(TypedDict, total=False):
 
 
 def tagged_union_schema(
-    choices: Dict[Hashable, CoreSchema],
-    discriminator: str | list[str | int] | list[list[str | int]] | Callable[[Any], Hashable],
+    choices: Dict[Any, CoreSchema],
+    discriminator: str | list[str | int] | list[list[str | int]] | Callable[[Any], Any],
     *,
     custom_error_type: str | None = None,
     custom_error_message: str | None = None,

@@ -241,10 +241,11 @@ impl ModelValidator {
             } else {
                 PySet::new_bound(py, [&String::from(ROOT_FIELD)])?
             };
-            force_setattr(py, self_instance, intern!(py, DUNDER_FIELDS_SET_KEY), fields_set)?;
+            force_setattr(py, self_instance, intern!(py, DUNDER_FIELDS_SET_KEY), &fields_set)?;
             force_setattr(py, self_instance, intern!(py, ROOT_FIELD), &output)?;
         } else {
-            let (model_dict, model_extra, fields_set) = output.extract(py)?;
+            let (model_dict, model_extra, fields_set): (Bound<PyAny>, Bound<PyAny>, Bound<PyAny>) =
+                output.extract(py)?;
             set_model_attrs(self_instance, &model_dict, &model_extra, &fields_set)?;
         }
         self.call_post_init(py, self_instance.clone(), input, state.extra())
@@ -281,10 +282,11 @@ impl ModelValidator {
             } else {
                 PySet::new_bound(py, [&String::from(ROOT_FIELD)])?
             };
-            force_setattr(py, &instance, intern!(py, DUNDER_FIELDS_SET_KEY), fields_set)?;
+            force_setattr(py, &instance, intern!(py, DUNDER_FIELDS_SET_KEY), &fields_set)?;
             force_setattr(py, &instance, intern!(py, ROOT_FIELD), output)?;
         } else {
-            let (model_dict, model_extra, val_fields_set) = output.extract(py)?;
+            let (model_dict, model_extra, val_fields_set): (Bound<PyAny>, Bound<PyAny>, Bound<PyAny>) =
+                output.extract(py)?;
             let fields_set = existing_fields_set.unwrap_or(&val_fields_set);
             set_model_attrs(&instance, &model_dict, &model_extra, fields_set)?;
         }

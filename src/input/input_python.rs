@@ -326,7 +326,10 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
 
         Err(ValError::new(
             ErrorType::IsInstanceOf {
-                class: decimal_type.qualname().unwrap_or_else(|_| "Decimal".to_owned()),
+                class: decimal_type
+                    .qualname()
+                    .and_then(|name| name.extract())
+                    .unwrap_or_else(|_| "Decimal".to_owned()),
                 context: None,
             },
             self,
@@ -661,60 +664,6 @@ fn maybe_as_enum<'py>(v: &Bound<'py, PyAny>) -> Option<Bound<'py, PyAny>> {
     }
 }
 
-#[cfg(PyPy)]
-static DICT_KEYS_TYPE: pyo3::sync::GILOnceCell<Py<PyType>> = pyo3::sync::GILOnceCell::new();
-
-#[cfg(PyPy)]
-fn is_dict_keys_type(v: &Bound<'_, PyAny>) -> bool {
-    let py = v.py();
-    let keys_type = DICT_KEYS_TYPE
-        .get_or_init(py, || {
-            py.eval("type({}.keys())", None, None)
-                .unwrap()
-                .downcast::<PyType>()
-                .unwrap()
-                .into()
-        })
-        .bind(py);
-    v.is_instance(keys_type).unwrap_or(false)
-}
-
-#[cfg(PyPy)]
-static DICT_VALUES_TYPE: pyo3::sync::GILOnceCell<Py<PyType>> = pyo3::sync::GILOnceCell::new();
-
-#[cfg(PyPy)]
-fn is_dict_values_type(v: &Bound<'_, PyAny>) -> bool {
-    let py = v.py();
-    let values_type = DICT_VALUES_TYPE
-        .get_or_init(py, || {
-            py.eval("type({}.values())", None, None)
-                .unwrap()
-                .downcast::<PyType>()
-                .unwrap()
-                .into()
-        })
-        .bind(py);
-    v.is_instance(values_type).unwrap_or(false)
-}
-
-#[cfg(PyPy)]
-static DICT_ITEMS_TYPE: pyo3::sync::GILOnceCell<Py<PyType>> = pyo3::sync::GILOnceCell::new();
-
-#[cfg(PyPy)]
-fn is_dict_items_type(v: &Bound<'_, PyAny>) -> bool {
-    let py = v.py();
-    let items_type = DICT_ITEMS_TYPE
-        .get_or_init(py, || {
-            py.eval("type({}.items())", None, None)
-                .unwrap()
-                .downcast::<PyType>()
-                .unwrap()
-                .into()
-        })
-        .bind(py);
-    v.is_instance(items_type).unwrap_or(false)
-}
-
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub struct PyArgs<'py> {
     pub args: Option<PyPosArgs<'py>>,
@@ -834,7 +783,7 @@ impl<'py> ValidatedDict<'py> for GenericPyMapping<'_, 'py> {
         match self {
             Self::Dict(dict) => Ok(consumer.consume_iterator(dict.iter().map(Ok))),
             Self::Mapping(mapping) => Ok(consumer.consume_iterator(iterate_mapping_items(mapping)?)),
-            Self::GetAttr(obj, _) => Ok(consumer.consume_iterator(iterate_attributes(obj))),
+            Self::GetAttr(obj, _) => Ok(consumer.consume_iterator(iterate_attributes(obj)?)),
         }
     }
 }
