@@ -3906,6 +3906,7 @@ ErrorType = Literal[
     'bytes_type',
     'bytes_too_short',
     'bytes_too_long',
+    'bytes_invalid_encoding',
     'value_error',
     'assertion_error',
     'literal_error',

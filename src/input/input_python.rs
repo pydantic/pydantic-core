@@ -192,7 +192,7 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
                     let str = py_string_str(py_str)?;
                     match mode.deserialize_string(str) {
                         Ok(b) => Ok(b),
-                        Err(e) => Err(ValError::from(e)),
+                        Err(e) => Err(ValError::new(e, self)),
                     }
                 } else if let Ok(py_byte_array) = self.downcast::<PyByteArray>() {
                     Ok(py_byte_array.to_vec().into())

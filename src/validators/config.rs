@@ -2,10 +2,10 @@ use std::borrow::Cow;
 use std::str::FromStr;
 
 use base64::Engine;
-use pyo3::exceptions::PyValueError;
 use pyo3::types::{PyDict, PyString};
 use pyo3::{intern, prelude::*};
 
+use crate::errors::{ErrorType, ErrorTypeDefaults};
 use crate::input::EitherBytes;
 use crate::serializers::config::BytesMode;
 use crate::tools::SchemaDict;
@@ -25,14 +25,18 @@ impl ValBytesMode {
         Ok(Self { ser: ser_mode })
     }
 
-    pub fn deserialize_string<'py>(self, s: &str) -> PyResult<EitherBytes<'_, 'py>> {
+    pub fn deserialize_string<'py>(self, s: &str) -> Result<EitherBytes<'_, 'py>, ErrorType> {
         match self.ser {
             BytesMode::Utf8 => Ok(EitherBytes::Cow(Cow::Borrowed(s.as_bytes()))),
             BytesMode::Base64 => match base64::engine::general_purpose::URL_SAFE.decode(s) {
                 Ok(bytes) => Ok(EitherBytes::from(bytes)),
-                Err(err) => Err(PyValueError::new_err(format!("Base64 decode error: {err}"))),
+                Err(err) => Err(ErrorType::BytesInvalidEncoding {
+                    encoding: "base64".to_string(),
+                    encoding_error: err.to_string(),
+                    context: None,
+                }),
             },
-            BytesMode::Hex => Err(PyValueError::new_err("Hex deserialization is not supported")),
+            BytesMode::Hex => Err(ErrorTypeDefaults::BytesType),
         }
     }
 }

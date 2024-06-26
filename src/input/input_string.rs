@@ -114,7 +114,7 @@ impl<'py> Input<'py> for StringMapping<'py> {
         match self {
             Self::String(s) => py_string_str(s).and_then(|b| match mode.deserialize_string(b) {
                 Ok(b) => Ok(ValidationMatch::strict(b)),
-                Err(e) => Err(ValError::from(e)),
+                Err(e) => Err(ValError::new(e, self)),
             }),
             Self::Mapping(_) => Err(ValError::new(ErrorTypeDefaults::BytesType, self)),
         }

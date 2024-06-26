@@ -320,6 +320,16 @@ all_errors = [
     ('bytes_too_short', 'Data should have at least 1 byte', {'min_length': 1}),
     ('bytes_too_long', 'Data should have at most 42 bytes', {'max_length': 42}),
     ('bytes_too_long', 'Data should have at most 1 byte', {'max_length': 1}),
+    (
+        'bytes_invalid_encoding',
+        'Data should be valid base64, base64 error',
+        {'encoding': 'base64', 'encoding_error': 'base64 error'},
+    ),
+    (
+        'bytes_invalid_encoding',
+        'Data should be valid hex, hex error',
+        {'encoding': 'hex', 'encoding_error': 'hex error'},
+    ),
     ('value_error', 'Value error, foobar', {'error': ValueError('foobar')}),
     ('assertion_error', 'Assertion failed, foobar', {'error': AssertionError('foobar')}),
     ('literal_error', 'Input should be foo', {'expected': 'foo'}),

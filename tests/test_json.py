@@ -386,8 +386,17 @@ def test_json_bytes_base64_round_trip():
     v = SchemaValidator({'type': 'bytes'}, {'val_json_bytes': 'base64'})
     assert v.validate_json(encoded) == data
 
-    with pytest.raises(ValueError):
-        v.validate_json('"wrong!"')
+    wrong_input = 'wrong!'
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_json(json.dumps(wrong_input))
+    assert exc_info.value.errors(include_url=False, include_context=False) == [
+        {
+            'type': 'bytes_invalid_encoding',
+            'loc': (),
+            'msg': f'Data should be valid base64, Invalid byte {ord('!')}, offset {len(wrong_input)-1}.',
+            'input': wrong_input,
+        }
+    ]
 
     assert to_json({'key': data}, bytes_mode='base64') == b'{"key":"aGVsbG8="}'
     v = SchemaValidator(

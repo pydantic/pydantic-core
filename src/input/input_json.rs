@@ -115,7 +115,7 @@ impl<'py, 'data> Input<'py> for JsonValue<'data> {
         match self {
             JsonValue::Str(s) => match mode.deserialize_string(s) {
                 Ok(b) => Ok(ValidationMatch::strict(b)),
-                Err(e) => Err(ValError::from(e)),
+                Err(e) => Err(ValError::new(e, self)),
             },
             _ => Err(ValError::new(ErrorTypeDefaults::BytesType, self)),
         }
@@ -357,7 +357,7 @@ impl<'py> Input<'py> for str {
     ) -> ValResult<ValidationMatch<EitherBytes<'a, 'py>>> {
         match mode.deserialize_string(self) {
             Ok(b) => Ok(ValidationMatch::strict(b)),
-            Err(e) => Err(ValError::from(e)),
+            Err(e) => Err(ValError::new(e, self)),
         }
     }
 
