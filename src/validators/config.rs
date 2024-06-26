@@ -5,7 +5,7 @@ use base64::Engine;
 use pyo3::types::{PyDict, PyString};
 use pyo3::{intern, prelude::*};
 
-use crate::errors::{ErrorType, ErrorTypeDefaults};
+use crate::errors::ErrorType;
 use crate::input::EitherBytes;
 use crate::serializers::config::BytesMode;
 use crate::tools::SchemaDict;
@@ -36,7 +36,27 @@ impl ValBytesMode {
                     context: None,
                 }),
             },
-            BytesMode::Hex => Err(ErrorTypeDefaults::BytesType),
+            BytesMode::Hex => {
+                if s.len() % 2 != 0 {
+                    return Err(ErrorType::BytesInvalidEncoding {
+                        encoding: "hex".to_string(),
+                        encoding_error: "Hex string must have an even number of characters".to_string(),
+                        context: None,
+                    });
+                }
+                let bytes = (0..s.len())
+                    .step_by(2)
+                    .map(|i| u8::from_str_radix(&s[i..i + 2], 16))
+                    .collect::<Result<Vec<_>, _>>();
+                match bytes {
+                    Ok(vec) => Ok(EitherBytes::from(vec)),
+                    Err(err) => Err(ErrorType::BytesInvalidEncoding {
+                        encoding: "hex".to_string(),
+                        encoding_error: err.to_string(),
+                        context: None,
+                    }),
+                }
+            }
         }
     }
 }
