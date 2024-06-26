@@ -203,7 +203,7 @@ def test_invalid_constraint():
 
     with pytest.raises(
         SchemaError,
-        match='"Invalid Schema:\ntimedelta.le\n  Input should be a valid timedelta, invalid character in hour',
+        match='Invalid Schema:\ntimedelta.le\n  Input should be a valid timedelta, invalid character in hour',
     ):
         validate_core_schema({'type': 'timedelta', 'le': 'foobar'})
 
