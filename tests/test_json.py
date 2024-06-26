@@ -435,7 +435,7 @@ def test_json_bytes_hex_invalid():
         {
             'type': 'bytes_invalid_encoding',
             'loc': (),
-            'msg': 'Data should be valid hex, Hex string must have an even number of characters',
+            'msg': 'Data should be valid hex, Odd number of digits',
             'input': wrong_input,
         }
     ]
@@ -447,7 +447,7 @@ def test_json_bytes_hex_invalid():
         {
             'type': 'bytes_invalid_encoding',
             'loc': (),
-            'msg': 'Data should be valid hex, invalid digit found in string',
+            'msg': "Data should be valid hex, Invalid character 'g' at position 1",
             'input': wrong_input,
         }
     ]
