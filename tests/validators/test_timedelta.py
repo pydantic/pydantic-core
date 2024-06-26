@@ -45,8 +45,8 @@ except ImportError:
         (Decimal('-3601.2222222'), timedelta(hours=-2, seconds=3598, microseconds=777778)),
         (Decimal('-3601.2222227'), timedelta(hours=-2, seconds=3598, microseconds=777777)),
         (float('nan'), Err('Input should be a valid timedelta, NaN values not permitted')),
-        (float('inf'), Err('Input should be a valid timedelta, durations hours must less than 1,000,000,000')),
-        (float('-inf'), Err('Input should be a valid timedelta, durations hours must less than 1,000,000,000')),
+        (float('inf'), Err('Input should be a valid timedelta, durations may not exceed 999,999,999 days')),
+        (float('-inf'), Err('Input should be a valid timedelta, durations may not exceed 999,999,999 days')),
         (timedelta.max, timedelta.max),
         ('02:03:04.05', timedelta(hours=2, seconds=184, microseconds=50_000)),
         (
@@ -203,7 +203,7 @@ def test_invalid_constraint():
 
     with pytest.raises(
         SchemaError,
-        match='Invalid Schema:\ntimedelta.le\n  Input should be a valid timedelta, invalid character in hour',
+        match='"Invalid Schema:\ntimedelta.le\n  Input should be a valid timedelta, invalid character in hour',
     ):
         validate_core_schema({'type': 'timedelta', 'le': 'foobar'})
 
@@ -277,9 +277,7 @@ def test_large_value():
     v = SchemaValidator({'type': 'timedelta'})
     assert v.validate_python('123days, 12:34') == timedelta(days=123, hours=12, minutes=34)
     assert v.validate_python(f'{999_999_999}days, 12:34') == timedelta(days=999_999_999, hours=12, minutes=34)
-    with pytest.raises(
-        ValidationError, match='Input should be a valid timedelta, durations hours must less than 1,000,000,000'
-    ):
+    with pytest.raises(ValidationError, match='should be a valid timedelta, durations may not exceed 999,999,999 days'):
         v.validate_python(f'{999_999_999 + 1}days, 12:34')
 
 
