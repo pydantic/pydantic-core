@@ -52,8 +52,10 @@ impl ComputedFields {
             // Do not serialize computed fields
             return Ok(());
         }
-        for computed_fields in &self.0 {
-            computed_fields.to_python(model, output_dict, filter, include, exclude, extra)?;
+        for computed_field in &self.0 {
+            let mut _extra = extra.clone();
+            _extra.field_name = Some(computed_field.property_name.as_str());
+            computed_field.to_python(model, output_dict, filter, include, exclude, &_extra)?;
         }
         Ok(())
     }
