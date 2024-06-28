@@ -85,16 +85,18 @@ impl ComputedFields {
                 if extra.exclude_none && value.is_none() {
                     continue;
                 }
+                let key = match extra.by_alias {
+                    true => computed_field.alias.as_str(),
+                    false => computed_field.property_name.as_str(),
+                };
+                let mut field_extra = extra.clone();
+                field_extra.field_name = Some(key);
                 let cfs = ComputedFieldSerializer {
                     model,
                     computed_field,
                     include: next_include.as_ref(),
                     exclude: next_exclude.as_ref(),
-                    extra,
-                };
-                let key = match extra.by_alias {
-                    true => computed_field.alias.as_str(),
-                    false => computed_field.property_name.as_str(),
+                    extra: &field_extra,
                 };
                 map.serialize_entry(key, &cfs)?;
             }
