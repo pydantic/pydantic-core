@@ -1,3 +1,4 @@
+import sys
 from datetime import date, datetime, time, timedelta, timezone
 
 import pytest
@@ -107,3 +108,15 @@ def test_date_datetime_union():
     assert v.to_python(datetime(2022, 12, 2, 1)) == datetime(2022, 12, 2, 1)
     assert v.to_python(datetime(2022, 12, 2, 1), mode='json') == '2022-12-02T01:00:00'
     assert v.to_json(datetime(2022, 12, 2, 1)) == b'"2022-12-02T01:00:00"'
+
+
+@pytest.mark.skipif(sys.version_info < (3, 9), reason='zoneinfo was added in Python >= 3.9')
+def test_time_zoneinfo():
+    from zoneinfo import ZoneInfo
+
+    v = SchemaSerializer(core_schema.time_schema())
+    assert v.to_python(time(12, 13, 14, tzinfo=ZoneInfo('America/Fortaleza')), mode='json') == '12:13:14-03:00'
+
+    assert v.to_python(time(12, 13, 14, tzinfo=ZoneInfo('America/Los_Angeles')), mode='json') == '12:13:14-07:00'
+
+    assert v.to_python(time(12, 13, 14, tzinfo=ZoneInfo('Europe/Paris')), mode='json') == '12:13:14+02:00'

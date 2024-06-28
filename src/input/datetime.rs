@@ -3,7 +3,8 @@ use pyo3::prelude::*;
 
 use pyo3::exceptions::PyValueError;
 use pyo3::pyclass::CompareOp;
-use pyo3::types::{PyDate, PyDateTime, PyDelta, PyDeltaAccess, PyDict, PyTime, PyTzInfo};
+use pyo3::sync::GILOnceCell;
+use pyo3::types::{PyDate, PyDateTime, PyDelta, PyDeltaAccess, PyDict, PyTime, PyType, PyTzInfo};
 use speedate::MicrosecondsPrecisionOverflowBehavior;
 use speedate::{Date, DateTime, Duration, ParseError, Time, TimeConfig};
 use std::borrow::Cow;
@@ -17,6 +18,9 @@ use super::Input;
 use crate::errors::ToErrorValue;
 use crate::errors::{ErrorType, ValError, ValResult};
 use crate::tools::py_err;
+
+static ZONE_INFO: GILOnceCell<Py<PyType>> = GILOnceCell::new();
+static DATETIME_OBJECT: GILOnceCell<Py<PyAny>> = GILOnceCell::new();
 
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub enum EitherDate<'a> {
@@ -174,6 +178,46 @@ pub fn duration_as_pytimedelta<'py>(py: Python<'py>, duration: &Duration) -> PyR
     )
 }
 
+pub fn get_zone_info_type(py: Python) -> &Bound<'_, PyType> {
+    ZONE_INFO
+        .get_or_init(py, || {
+            py.import_bound("zoneinfo")
+                .and_then(|zone_info_module| zone_info_module.getattr("ZoneInfo"))
+                .unwrap()
+                .extract()
+                .unwrap()
+        })
+        .bind(py)
+}
+
+pub fn get_datetime_object(py: Python) -> &Bound<'_, PyAny> {
+    DATETIME_OBJECT
+        .get_or_init(py, || {
+            py.import_bound(intern!(py, "datetime"))
+                .and_then(|datetime_module| datetime_module.getattr(intern!(py, "datetime")))
+                .unwrap()
+                .into()
+        })
+        .bind(py)
+}
+
+fn calculate_zone_info_offset(
+    py: Python,
+    tzinfo: Bound<'_, PyAny>,
+    py_time: &Bound<'_, PyAny>,
+) -> PyResult<Option<i32>> {
+    let zone_info_type = get_zone_info_type(py);
+    if tzinfo.get_type().is(zone_info_type) {
+        let datetime_object = get_datetime_object(py);
+        let datetime_today = datetime_object.call_method0(intern!(py, "today"))?;
+        let dt = datetime_object.call_method1(intern!(py, "combine"), (datetime_today, py_time))?;
+        let offset_delta = dt.call_method0(intern!(py, "utcoffset"))?;
+        let offset_seconds: f64 = offset_delta.call_method0(intern!(py, "total_seconds"))?.extract()?;
+        Ok(Some(offset_seconds.round() as i32))
+    } else {
+        Ok(None)
+    }
+}
 pub fn pytime_as_time(py_time: &Bound<'_, PyAny>, py_dt: Option<&Bound<'_, PyAny>>) -> PyResult<Time> {
     let py = py_time.py();
 
@@ -184,7 +228,7 @@ pub fn pytime_as_time(py_time: &Bound<'_, PyAny>, py_dt: Option<&Bound<'_, PyAny
         let offset_delta = tzinfo.call_method1(intern!(py, "utcoffset"), (py_dt,))?;
         // as per the docs, utcoffset() can return None
         if PyAnyMethods::is_none(&offset_delta) {
-            None
+            calculate_zone_info_offset(py, tzinfo, py_time)?
         } else {
             let offset_seconds: f64 = offset_delta.call_method0(intern!(py, "total_seconds"))?.extract()?;
             Some(offset_seconds.round() as i32)
