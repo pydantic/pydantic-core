@@ -53,9 +53,11 @@ impl ComputedFields {
             return Ok(());
         }
         for computed_field in &self.0 {
-            let mut _extra = extra.clone();
-            _extra.field_name = Some(computed_field.property_name.as_str());
-            computed_field.to_python(model, output_dict, filter, include, exclude, &_extra)?;
+            let field_extra = Extra {
+                field_name: Some(computed_field.property_name.as_str()),
+                ..*extra
+            };
+            computed_field.to_python(model, output_dict, filter, include, exclude, &field_extra)?;
         }
         Ok(())
     }
@@ -89,8 +91,10 @@ impl ComputedFields {
                     true => computed_field.alias.as_str(),
                     false => computed_field.property_name.as_str(),
                 };
-                let mut field_extra = extra.clone();
-                field_extra.field_name = Some(key);
+                let field_extra = Extra {
+                    field_name: Some(key),
+                    ..*extra
+                };
                 let cfs = ComputedFieldSerializer {
                     model,
                     computed_field,
