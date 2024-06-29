@@ -574,7 +574,7 @@ def test_function_plain_field_serializer_with_computed_field():
         def computed_field_x(self) -> int:
             return self.x + 200
 
-        def ser_func(self, v: Any, serializer: core_schema.FieldSerializationInfo) -> str:
+        def ser_func(self, v: Any, info: core_schema.FieldSerializationInfo) -> str:
             return str(v * 2)
 
     field_str_with_field_serializer = core_schema.str_schema(
