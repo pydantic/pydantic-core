@@ -575,7 +575,7 @@ def test_function_plain_field_serializer_with_computed_field():
             return self.x + 200
 
         def ser_func(self, v: Any, info: core_schema.FieldSerializationInfo) -> str:
-            return str(v * 2)
+            return info.field_name + '_' + str(v * 2)
 
     field_str_with_field_serializer = core_schema.str_schema(
         serialization=core_schema.plain_serializer_function_ser_schema(
@@ -597,8 +597,8 @@ def test_function_plain_field_serializer_with_computed_field():
             ),
         )
     )
-    assert json.loads(s.to_json(Model(x=1000))) == {'x': '2000', 'computed_field_x': '2400'}
-    assert s.to_python(Model(x=2000)) == {'x': '4000', 'computed_field_x': '4400'}
+    assert json.loads(s.to_json(Model(x=1000))) == {'x': 'x_2000', 'computed_field_x': 'computed_field_x_2400'}
+    assert s.to_python(Model(x=2000)) == {'x': 'x_4000', 'computed_field_x': 'computed_field_x_4400'}
 
 
 def test_function_wrap_field_serializer_to_json():
