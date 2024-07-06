@@ -116,7 +116,5 @@ def test_time_zoneinfo():
 
     v = SchemaSerializer(core_schema.time_schema())
     assert v.to_python(time(12, 13, 14, tzinfo=ZoneInfo('America/Fortaleza')), mode='json') == '12:13:14-03:00'
-
     assert v.to_python(time(12, 13, 14, tzinfo=ZoneInfo('America/Los_Angeles')), mode='json') == '12:13:14-07:00'
-
     assert v.to_python(time(12, 13, 14, tzinfo=ZoneInfo('Europe/Paris')), mode='json') == '12:13:14+02:00'
