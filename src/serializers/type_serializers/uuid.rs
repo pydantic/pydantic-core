@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
-use pyo3::prelude::*;
 use pyo3::types::PyDict;
+use pyo3::{intern, prelude::*};
 use uuid::Uuid;
 
 use crate::definitions::DefinitionsBuilder;
@@ -12,7 +12,8 @@ use super::{
 };
 
 pub(crate) fn uuid_to_string(py_uuid: &Bound<'_, PyAny>) -> PyResult<String> {
-    let uuid_int_val: u128 = py_uuid.getattr("int")?.extract()?;
+    let py = py_uuid.py();
+    let uuid_int_val: u128 = py_uuid.getattr(intern!(py, "int"))?.extract()?;
     let uuid = Uuid::from_u128(uuid_int_val);
     Ok(uuid.to_string())
 }
