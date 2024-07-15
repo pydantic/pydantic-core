@@ -396,9 +396,17 @@ impl PyMultiHostUrl {
                 }
                 multi_url
             } else if host.is_some() {
+                let pw = match password.map(String::from) {
+                    Some(p) => Some(
+                        url::form_urlencoded::Serializer::new(String::new())
+                            .append_key_only(&p)
+                            .finish(),
+                    ),
+                    p => p,
+                };
                 let url_host = UrlHostParts {
                     username: username.map(Into::into),
-                    password: password.map(Into::into),
+                    password: pw,
                     host: host.map(Into::into),
                     port: port.map(Into::into),
                 };
