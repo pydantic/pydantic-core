@@ -1233,7 +1233,7 @@ def test_multi_url_build() -> None:
     assert str(url) == 'postgresql://testuser:testpassword@127.0.0.1:5432/database?sslmode=require#test'
 
 
-def test_multi_url_build_chars_in_password() -> None:
+def test_multi_url_build_password_encode() -> None:
     url = MultiHostUrl.build(
         scheme='postgresql',
         username='testuser',
