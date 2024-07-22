@@ -108,9 +108,23 @@ impl Validator for ConstrainedFloatValidator {
             return Err(ValError::new(ErrorTypeDefaults::FiniteNumber, input));
         }
         if let Some(multiple_of) = self.multiple_of {
-            let rem = float % multiple_of;
-            let threshold = float.abs() / 1e9;
-            if rem.abs() > threshold && (rem - multiple_of).abs() > threshold {
+            const EPSILON_FACTOR: f64 = 100.0;
+            let epsilon_threshold = f64::EPSILON * EPSILON_FACTOR;
+
+            // Round the result of dividing the input value by the multiple
+            let rounded = (float / multiple_of).round();
+
+            // Calculate the difference between the rounded value and the original value
+            let diff = (float - rounded * multiple_of).abs();
+
+            // Calculate the relative error (avoid division by zero)
+            let relative_error = if float != 0.0 { diff / float.abs() } else { 0.0 };
+
+            // Threshold (considering both relative and absolute error)
+            let threshold = epsilon_threshold.max(multiple_of * epsilon_threshold);
+
+            // Check if the difference exceeds the threshold and the relative error is significant
+            if diff > threshold && relative_error > epsilon_threshold {
                 return Err(ValError::new(
                     ErrorType::MultipleOf {
                         multiple_of: multiple_of.into(),
