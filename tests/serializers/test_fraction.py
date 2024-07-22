@@ -38,9 +38,6 @@ def test_fraction_key():
     'value,expected',
     [
         (Fraction('123.456'), '123.456'),
-        (Fraction('Infinity'), 'Infinity'),
-        (Fraction('-Infinity'), '-Infinity'),
-        (Fraction('NaN'), 'NaN'),
     ],
 )
 def test_fraction_json(value, expected):
