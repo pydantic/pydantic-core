@@ -161,7 +161,7 @@ impl SchemaValidator {
         Ok((cls, init_args))
     }
 
-    #[pyo3(signature = (input, *, strict=None, from_attributes=None, context=None, self_instance=None))]
+    #[pyo3(signature = (input, *, strict=None, from_attributes=None, context=None, self_instance=None, skip_serialization_exclude=None))]
     pub fn validate_python(
         &self,
         py: Python,
@@ -170,6 +170,7 @@ impl SchemaValidator {
         from_attributes: Option<bool>,
         context: Option<&Bound<'_, PyAny>>,
         self_instance: Option<&Bound<'_, PyAny>>,
+        skip_serialization_exclude: Option<bool>,
     ) -> PyResult<PyObject> {
         self._validate(
             py,
@@ -179,6 +180,7 @@ impl SchemaValidator {
             from_attributes,
             context,
             self_instance,
+            skip_serialization_exclude,
         )
         .map_err(|e| self.prepare_validation_err(py, e, InputType::Python))
     }
@@ -201,6 +203,7 @@ impl SchemaValidator {
             from_attributes,
             context,
             self_instance,
+            None,
         ) {
             Ok(_) => Ok(true),
             Err(ValError::InternalErr(err)) => Err(err),
@@ -244,7 +247,7 @@ impl SchemaValidator {
         let t = InputType::String;
         let string_mapping = StringMapping::new_value(input).map_err(|e| self.prepare_validation_err(py, e, t))?;
 
-        match self._validate(py, &string_mapping, t, strict, None, context, None) {
+        match self._validate(py, &string_mapping, t, strict, None, context, None, None) {
             Ok(r) => Ok(r),
             Err(e) => Err(self.prepare_validation_err(py, e, t)),
         }
@@ -270,6 +273,7 @@ impl SchemaValidator {
             context,
             self_instance: None,
             cache_str: self.cache_str,
+            skip_serialization_exclude: None,
         };
 
         let guard = &mut RecursionState::default();
@@ -294,6 +298,7 @@ impl SchemaValidator {
             context,
             self_instance: None,
             cache_str: self.cache_str,
+            skip_serialization_exclude: None,
         };
         let recursion_guard = &mut RecursionState::default();
         let mut state = ValidationState::new(extra, recursion_guard);
@@ -342,6 +347,7 @@ impl SchemaValidator {
         from_attributes: Option<bool>,
         context: Option<&Bound<'py, PyAny>>,
         self_instance: Option<&Bound<'py, PyAny>>,
+        skip_serialization_exclude: Option<bool>,
     ) -> ValResult<PyObject> {
         let mut recursion_guard = RecursionState::default();
         let mut state = ValidationState::new(
@@ -352,6 +358,7 @@ impl SchemaValidator {
                 self_instance,
                 input_type,
                 self.cache_str,
+                skip_serialization_exclude,
             ),
             &mut recursion_guard,
         );
@@ -369,7 +376,7 @@ impl SchemaValidator {
     ) -> ValResult<PyObject> {
         let json_value =
             jiter::JsonValue::parse(json_data, true).map_err(|e| json::map_json_err(input, e, json_data))?;
-        self._validate(py, &json_value, InputType::Json, strict, None, context, self_instance)
+        self._validate(py, &json_value, InputType::Json, strict, None, context, self_instance, None)
     }
 
     fn prepare_validation_err(&self, py: Python, error: ValError, input_type: InputType) -> PyErr {
@@ -405,7 +412,7 @@ impl<'py> SelfValidator<'py> {
         let py = schema.py();
         let mut recursion_guard = RecursionState::default();
         let mut state = ValidationState::new(
-            Extra::new(strict, None, None, None, InputType::Python, true.into()),
+            Extra::new(strict, None, None, None, InputType::Python, true.into(), None),
             &mut recursion_guard,
         );
         match self.validator.validator.validate(py, schema, &mut state) {
@@ -601,6 +608,8 @@ pub struct Extra<'a, 'py> {
     self_instance: Option<&'a Bound<'py, PyAny>>,
     /// Whether to use a cache of short strings to accelerate python string construction
     cache_str: StringCacheMode,
+    /// Whether to skip the field specified as serialization_exclude
+    skip_serialization_exclude: Option<bool>,
 }
 
 impl<'a, 'py> Extra<'a, 'py> {
@@ -611,6 +620,7 @@ impl<'a, 'py> Extra<'a, 'py> {
         self_instance: Option<&'a Bound<'py, PyAny>>,
         input_type: InputType,
         cache_str: StringCacheMode,
+        skip_serialization_exclude: Option<bool>,
     ) -> Self {
         Extra {
             input_type,
@@ -620,6 +630,7 @@ impl<'a, 'py> Extra<'a, 'py> {
             context,
             self_instance,
             cache_str,
+            skip_serialization_exclude,
         }
     }
 }
@@ -634,6 +645,7 @@ impl Extra<'_, '_> {
             context: self.context,
             self_instance: self.self_instance,
             cache_str: self.cache_str,
+            skip_serialization_exclude: self.skip_serialization_exclude,
         }
     }
 }

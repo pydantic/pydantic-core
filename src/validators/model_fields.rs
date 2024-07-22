@@ -23,6 +23,7 @@ struct Field {
     name_py: Py<PyString>,
     validator: CombinedValidator,
     frozen: bool,
+    serialization_exclude: bool,
 }
 
 impl_py_gc_traverse!(Field { validator });
@@ -92,6 +93,7 @@ impl BuildValidator for ModelFieldsValidator {
                 name_py: field_name_py.into(),
                 validator,
                 frozen: field_info.get_as::<bool>(intern!(py, "frozen"))?.unwrap_or(false),
+                serialization_exclude: field_info.get_as(intern!(py, "serialization_exclude"))?.unwrap_or(false),
             });
         }
 
@@ -163,8 +165,12 @@ impl Validator for ModelFieldsValidator {
 
         {
             let state = &mut state.rebind_extra(|extra| extra.data = Some(model_dict.clone()));
+            let skip_serialization_exclude = state.extra().skip_serialization_exclude.unwrap_or(false);
 
             for field in &self.fields {
+                if skip_serialization_exclude && field.serialization_exclude {
+                    continue;
+                }
                 let op_key_value = match dict.get_item(&field.lookup_key) {
                     Ok(v) => v,
                     Err(ValError::LineErrors(line_errors)) => {

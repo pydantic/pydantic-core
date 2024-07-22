@@ -91,6 +91,7 @@ class SchemaValidator:
         from_attributes: bool | None = None,
         context: Any | None = None,
         self_instance: Any | None = None,
+        skip_serialization_exclude: bool | None = None,
     ) -> Any:
         """
         Validate a Python object against the schema and return the validated object.
@@ -105,7 +106,7 @@ class SchemaValidator:
                 [`info.context`][pydantic_core.core_schema.ValidationInfo.context].
             self_instance: An instance of a model set attributes on from validation, this is used when running
                 validation from the `__init__` method of a model.
-
+            skip_serialization_exclude: Whether to skip the field specified as `serialization_exclude`
         Raises:
             ValidationError: If validation fails.
             Exception: Other error types maybe raised if internal errors occur.
