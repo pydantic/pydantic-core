@@ -93,7 +93,9 @@ impl BuildValidator for ModelFieldsValidator {
                 name_py: field_name_py.into(),
                 validator,
                 frozen: field_info.get_as::<bool>(intern!(py, "frozen"))?.unwrap_or(false),
-                serialization_exclude: field_info.get_as(intern!(py, "serialization_exclude"))?.unwrap_or(false),
+                serialization_exclude: field_info
+                    .get_as(intern!(py, "serialization_exclude"))?
+                    .unwrap_or(false),
             });
         }
 

@@ -376,7 +376,16 @@ impl SchemaValidator {
     ) -> ValResult<PyObject> {
         let json_value =
             jiter::JsonValue::parse(json_data, true).map_err(|e| json::map_json_err(input, e, json_data))?;
-        self._validate(py, &json_value, InputType::Json, strict, None, context, self_instance, None)
+        self._validate(
+            py,
+            &json_value,
+            InputType::Json,
+            strict,
+            None,
+            context,
+            self_instance,
+            None,
+        )
     }
 
     fn prepare_validation_err(&self, py: Python, error: ValError, input_type: InputType) -> PyErr {
