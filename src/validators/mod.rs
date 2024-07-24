@@ -161,6 +161,7 @@ impl SchemaValidator {
         Ok((cls, init_args))
     }
 
+    #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (input, *, strict=None, from_attributes=None, context=None, self_instance=None, skip_serialization_exclude=None))]
     pub fn validate_python(
         &self,
