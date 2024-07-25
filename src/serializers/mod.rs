@@ -8,6 +8,7 @@ use pyo3::{PyTraverseError, PyVisit};
 use crate::definitions::{Definitions, DefinitionsBuilder};
 use crate::py_gc::PyGcTraverse;
 
+pub(crate) use config::BytesMode;
 use config::SerializationConfig;
 pub use errors::{PydanticSerializationError, PydanticSerializationUnexpectedValue};
 use extra::{CollectWarnings, SerRecursionState, WarningsMode};
@@ -16,7 +17,7 @@ pub use shared::CombinedSerializer;
 use shared::{to_json_bytes, BuildSerializer, TypeSerializer};
 
 mod computed_fields;
-pub(crate) mod config;
+mod config;
 mod errors;
 mod extra;
 mod fields;

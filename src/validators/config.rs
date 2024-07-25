@@ -7,7 +7,7 @@ use pyo3::{intern, prelude::*};
 
 use crate::errors::ErrorType;
 use crate::input::EitherBytes;
-use crate::serializers::config::BytesMode;
+use crate::serializers::BytesMode;
 use crate::tools::SchemaDict;
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]

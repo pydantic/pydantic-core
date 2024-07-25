@@ -9,7 +9,7 @@ use strum::EnumMessage;
 
 use crate::errors::{ErrorType, ErrorTypeDefaults, InputValue, LocItem, ValError, ValResult};
 use crate::lookup_key::{LookupKey, LookupPath};
-use crate::validators::config::ValBytesMode;
+use crate::validators::ValBytesMode;
 use crate::validators::decimal::create_decimal;
 
 use super::datetime::{

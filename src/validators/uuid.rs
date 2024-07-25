@@ -13,7 +13,7 @@ use crate::input::input_as_python_instance;
 use crate::input::Input;
 use crate::input::InputType;
 use crate::input::ValidationMatch;
-use crate::serializers::config::BytesMode;
+use crate::serializers::BytesMode;
 use crate::tools::SchemaDict;
 
 use super::config::ValBytesMode;

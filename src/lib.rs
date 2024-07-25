@@ -7,8 +7,8 @@ use std::sync::OnceLock;
 use jiter::{map_json_error, PartialMode, PythonParse, StringCacheMode};
 use pyo3::exceptions::PyTypeError;
 use pyo3::{prelude::*, sync::GILOnceCell};
-use serializers::config::BytesMode;
-use validators::config::ValBytesMode;
+use serializers::BytesMode;
+use validators::ValBytesMode;
 
 // parse this first to get access to the contained macro
 #[macro_use]

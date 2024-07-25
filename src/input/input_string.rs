@@ -7,7 +7,7 @@ use crate::errors::{ErrorTypeDefaults, InputValue, LocItem, ValError, ValResult}
 use crate::input::py_string_str;
 use crate::lookup_key::{LookupKey, LookupPath};
 use crate::tools::safe_repr;
-use crate::validators::config::ValBytesMode;
+use crate::validators::ValBytesMode;
 use crate::validators::decimal::create_decimal;
 
 use super::datetime::{

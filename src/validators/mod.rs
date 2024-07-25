@@ -10,6 +10,7 @@ use pyo3::types::{PyAny, PyDict, PyString, PyTuple, PyType};
 use pyo3::{intern, PyTraverseError, PyVisit};
 
 use crate::build_tools::{py_schema_err, py_schema_error_type, SchemaError};
+pub(crate) use config::ValBytesMode;
 use crate::definitions::{Definitions, DefinitionsBuilder};
 use crate::errors::{LocItem, ValError, ValResult, ValidationError};
 use crate::input::{Input, InputType, StringMapping};
@@ -24,7 +25,7 @@ mod bytes;
 mod call;
 mod callable;
 mod chain;
-pub(crate) mod config;
+mod config;
 mod custom_error;
 mod dataclass;
 mod date;

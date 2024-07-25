@@ -6,7 +6,7 @@ use jiter::{JsonValue, PartialMode, PythonParse};
 
 use crate::errors::{ErrorType, ErrorTypeDefaults, ValError, ValLineError, ValResult};
 use crate::input::{EitherBytes, Input, InputType, ValidationMatch};
-use crate::serializers::config::BytesMode;
+use crate::serializers::BytesMode;
 use crate::tools::SchemaDict;
 
 use super::config::ValBytesMode;
