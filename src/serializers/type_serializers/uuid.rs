@@ -1,7 +1,8 @@
 use std::borrow::Cow;
 
-use pyo3::prelude::*;
 use pyo3::types::PyDict;
+use pyo3::{intern, prelude::*};
+use uuid::Uuid;
 
 use crate::definitions::DefinitionsBuilder;
 
@@ -11,7 +12,11 @@ use super::{
 };
 
 pub(crate) fn uuid_to_string(py_uuid: &Bound<'_, PyAny>) -> PyResult<String> {
-    Ok(py_uuid.str()?.to_string())
+    let py = py_uuid.py();
+    let uuid_int_val: u128 = py_uuid.getattr(intern!(py, "int"))?.extract()?;
+    // we use a little endian conversion for compatibility across platforms, see https://github.com/pydantic/pydantic-core/pull/1372
+    let uuid = Uuid::from_u128(uuid_int_val.to_le());
+    Ok(uuid.to_string())
 }
 
 #[derive(Debug, Clone)]
