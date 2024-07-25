@@ -403,7 +403,7 @@ def test_json_bytes_base64_invalid():
         {
             'type': 'bytes_invalid_encoding',
             'loc': (),
-            'msg': f'Data should be valid base64, Invalid byte {ord("!")}, offset {len(wrong_input)-1}.',
+            'msg': f'Data should be valid base64: Invalid byte {ord("!")}, offset {len(wrong_input)-1}.',
             'input': wrong_input,
         }
     ]
@@ -435,7 +435,7 @@ def test_json_bytes_hex_invalid():
         {
             'type': 'bytes_invalid_encoding',
             'loc': (),
-            'msg': 'Data should be valid hex, Odd number of digits',
+            'msg': 'Data should be valid hex: Odd number of digits',
             'input': wrong_input,
         }
     ]
@@ -447,7 +447,7 @@ def test_json_bytes_hex_invalid():
         {
             'type': 'bytes_invalid_encoding',
             'loc': (),
-            'msg': "Data should be valid hex, Invalid character 'g' at position 1",
+            'msg': "Data should be valid hex: Invalid character 'g' at position 1",
             'input': wrong_input,
         }
     ]

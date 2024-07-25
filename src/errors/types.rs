@@ -519,7 +519,7 @@ impl ErrorType {
             Self::BytesType {..} => "Input should be a valid bytes",
             Self::BytesTooShort {..} => "Data should have at least {min_length} byte{expected_plural}",
             Self::BytesTooLong {..} => "Data should have at most {max_length} byte{expected_plural}",
-            Self::BytesInvalidEncoding { .. } => "Data should be valid {encoding}, {encoding_error}",
+            Self::BytesInvalidEncoding { .. } => "Data should be valid {encoding}: {encoding_error}",
             Self::ValueError {..} => "Value error, {error}",
             Self::AssertionError {..} => "Assertion failed, {error}",
             Self::CustomError {..} => "",  // custom errors are handled separately

@@ -322,13 +322,13 @@ all_errors = [
     ('bytes_too_long', 'Data should have at most 1 byte', {'max_length': 1}),
     (
         'bytes_invalid_encoding',
-        'Data should be valid base64, base64 error',
-        {'encoding': 'base64', 'encoding_error': 'base64 error'},
+        'Data should be valid base64: Invalid byte 1, offset 1',
+        {'encoding': 'base64', 'encoding_error': 'Invalid byte 1, offset 1'},
     ),
     (
         'bytes_invalid_encoding',
-        'Data should be valid hex, hex error',
-        {'encoding': 'hex', 'encoding_error': 'hex error'},
+        'Data should be valid hex: Odd number of digits',
+        {'encoding': 'hex', 'encoding_error': 'Odd number of digits'},
     ),
     ('value_error', 'Value error, foobar', {'error': ValueError('foobar')}),
     ('assertion_error', 'Assertion failed, foobar', {'error': AssertionError('foobar')}),

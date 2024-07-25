@@ -9,8 +9,8 @@ use strum::EnumMessage;
 
 use crate::errors::{ErrorType, ErrorTypeDefaults, InputValue, LocItem, ValError, ValResult};
 use crate::lookup_key::{LookupKey, LookupPath};
-use crate::validators::ValBytesMode;
 use crate::validators::decimal::create_decimal;
+use crate::validators::ValBytesMode;
 
 use super::datetime::{
     bytes_as_date, bytes_as_datetime, bytes_as_time, bytes_as_timedelta, float_as_datetime, float_as_duration,

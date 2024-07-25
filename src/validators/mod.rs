@@ -10,13 +10,13 @@ use pyo3::types::{PyAny, PyDict, PyString, PyTuple, PyType};
 use pyo3::{intern, PyTraverseError, PyVisit};
 
 use crate::build_tools::{py_schema_err, py_schema_error_type, SchemaError};
-pub(crate) use config::ValBytesMode;
 use crate::definitions::{Definitions, DefinitionsBuilder};
 use crate::errors::{LocItem, ValError, ValResult, ValidationError};
 use crate::input::{Input, InputType, StringMapping};
 use crate::py_gc::PyGcTraverse;
 use crate::recursion_guard::RecursionState;
 use crate::tools::SchemaDict;
+pub(crate) use config::ValBytesMode;
 
 mod any;
 mod arguments;
