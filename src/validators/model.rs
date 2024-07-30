@@ -1,17 +1,17 @@
 use std::ptr::null_mut;
+use std::sync::Arc;
 
 use pyo3::exceptions::PyTypeError;
 use pyo3::ffi;
 use pyo3::types::{PyDict, PySet, PyString, PyTuple, PyType};
 use pyo3::{intern, prelude::*};
 
+use super::config::ConfigValidator;
 use super::function::convert_err;
 use super::validation_state::Exactness;
 use super::{
     build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, ValidationState, Validator,
 };
-use crate::build_tools::py_schema_err;
-use crate::build_tools::schema_or_config_same;
 use crate::errors::{ErrorType, ErrorTypeDefaults, ValError, ValResult};
 use crate::input::{input_as_python_instance, py_error_on_minusone, Input};
 use crate::tools::{py_err, SchemaDict};
@@ -23,36 +23,8 @@ const DUNDER_FIELDS_SET_KEY: &str = "__pydantic_fields_set__";
 const DUNDER_MODEL_EXTRA_KEY: &str = "__pydantic_extra__";
 const DUNDER_MODEL_PRIVATE_KEY: &str = "__pydantic_private__";
 
-#[derive(Debug, Clone)]
-pub(super) enum Revalidate {
-    Always,
-    Never,
-    SubclassInstances,
-}
-
-impl Revalidate {
-    pub fn from_str(s: Option<&str>) -> PyResult<Self> {
-        match s {
-            None => Ok(Self::Never),
-            Some("always") => Ok(Self::Always),
-            Some("never") => Ok(Self::Never),
-            Some("subclass-instances") => Ok(Self::SubclassInstances),
-            Some(s) => py_schema_err!("Invalid revalidate_instances value: {}", s),
-        }
-    }
-
-    pub fn should_revalidate(&self, input: &Bound<'_, PyAny>, class: &Bound<'_, PyType>) -> bool {
-        match self {
-            Revalidate::Always => true,
-            Revalidate::Never => false,
-            Revalidate::SubclassInstances => !input.is_exact_instance(class),
-        }
-    }
-}
-
 #[derive(Debug)]
 pub struct ModelValidator {
-    revalidate: Revalidate,
     validator: Box<CombinedValidator>,
     class: Py<PyType>,
     post_init: Option<Py<PyString>>,
@@ -80,17 +52,7 @@ impl BuildValidator for ModelValidator {
         let validator = build_validator(&sub_schema, config.as_ref(), definitions)?;
         let name = class.getattr(intern!(py, "__name__"))?.extract()?;
 
-        Ok(Self {
-            revalidate: Revalidate::from_str(
-                schema_or_config_same::<Bound<'_, PyString>>(
-                    schema,
-                    config.as_ref(),
-                    intern!(py, "revalidate_instances"),
-                )?
-                .as_ref()
-                .map(|s| s.to_str())
-                .transpose()?,
-            )?,
+        let mut validator = Self {
             validator: Box::new(validator),
             class: class.into(),
             post_init: schema.get_as(intern!(py, "post_init"))?,
@@ -101,7 +63,13 @@ impl BuildValidator for ModelValidator {
             // Get the class's `__name__`, not using `class.qualname()`
             name,
         }
-        .into())
+        .into();
+
+        if let Some(config) = config {
+            validator = CombinedValidator::Config(ConfigValidator::try_new(config, Arc::new(validator))?);
+        }
+
+        Ok(validator)
     }
 }
 
@@ -125,7 +93,13 @@ impl Validator for ModelValidator {
         // but use from attributes to create a new instance of the model field type
         let class = self.class.bind(py);
         if let Some(py_input) = input_as_python_instance(input, class) {
-            if self.revalidate.should_revalidate(py_input, class) {
+            if state
+                .config
+                .revalidate_instances
+                .as_ref()
+                .unwrap_or(&crate::config::RevalidateInstances::Never)
+                .should_revalidate(py_input, class)
+            {
                 let fields_set = py_input.getattr(intern!(py, DUNDER_FIELDS_SET_KEY))?;
                 if self.root_model {
                     let inner_input = py_input.getattr(intern!(py, ROOT_FIELD))?;

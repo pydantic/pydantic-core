@@ -630,11 +630,10 @@ def test_model_class_strict():
             },
         }
     )
-    assert re.search(r'revalidate: \w+', repr(v)).group(0) == 'revalidate: Never'
     m = MyModel()
     m2 = v.validate_python(m)
     assert isinstance(m, MyModel)
-    assert m is m2
+    assert m is m2  # revalidate_instances should default to `Never`
     assert m.field_a == 'init_a'
     # note that since dict validation was not run here, there has been no check this is an int
     assert m.field_b == 'init_b'
