@@ -15,6 +15,7 @@ use crate::recursion_guard::ContainsRecursionState;
 use crate::recursion_guard::RecursionError;
 use crate::recursion_guard::RecursionGuard;
 use crate::recursion_guard::RecursionState;
+use crate::tools::safe_repr;
 use crate::PydanticSerializationError;
 
 /// this is ugly, would be much better if extra could be stored in `SerializationState`
@@ -424,8 +425,19 @@ impl CollectWarnings {
                 .get_type()
                 .qualname()
                 .unwrap_or_else(|_| PyString::new_bound(value.py(), "<unknown python object>"));
+
+            let input_str = safe_repr(value);
+            let mut value_str = String::with_capacity(100);
+            value_str.push_str("with value `");
+            match crate::errors::truncate_large_string(&mut value_str, input_str.to_cow()) {
+                Err(_) => value_str.clear(),
+                Ok(()) => {
+                    value_str.push_str("` ");
+                }
+            };
+
             self.add_warning(format!(
-                "Expected `{field_type}` but got `{type_name}` - serialized value may not be as expected"
+                "Expected `{field_type}` but got `{type_name}` {value_str}- serialized value may not be as expected"
             ));
         }
     }
