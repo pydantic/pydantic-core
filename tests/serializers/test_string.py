@@ -23,6 +23,18 @@ def test_str():
     assert json.loads(json_emoji) == 'emoji 💩'
 
 
+def test_huge_str():
+    v = SchemaSerializer(core_schema.int_schema())
+    msg = "Expected `int` but got `str` with value `'123456789012345678901234...89012345678901234567890'` - serialized value may not be as expected"
+    with pytest.warns(UserWarning, match=msg):
+        v.to_python(
+            '12345678901234567890123456789012345678901234567890123456789012345678901234567890\
+                           12345678901234567890123456789012345678901234567890123456789012345678901234567890\
+                           12345678901234567890123456789012345678901234567890123456789012345678901234567890\
+                           12345678901234567890123456789012345678901234567890123456789012345678901234567890'
+        )
+
+
 def test_str_fallback():
     s = SchemaSerializer(core_schema.str_schema())
     assert s.to_python(None) is None
