@@ -595,18 +595,33 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
         Err(ValError::new(ErrorTypeDefaults::TimeDeltaType, self))
     }
 
-    fn validate_complex<'a>(&'a self, _py: Python<'py>) -> ValResult<ValidationMatch<EitherComplex<'py>>> {
+    fn validate_complex<'a>(
+        &'a self,
+        strict: bool,
+        _py: Python<'py>,
+    ) -> ValResult<ValidationMatch<EitherComplex<'py>>> {
         if let Ok(complex) = self.downcast::<PyComplex>() {
-            return Ok(ValidationMatch::exact(EitherComplex::Py(complex.to_owned())));
-        } else if let Ok(s) = self.downcast::<PyString>() {
-            return Ok(ValidationMatch::exact(EitherComplex::Py(string_to_complex(s, self)?)));
+            return Ok(ValidationMatch::strict(EitherComplex::Py(complex.to_owned())));
+        }
+        if strict {
+            return Err(ValError::new(ErrorTypeDefaults::ComplexTypePyStrict, self));
+        }
+
+        if let Ok(s) = self.downcast::<PyString>() {
+            // If input is not a valid complex string, instead of telling users to correct
+            // the string, it makes more sense to tell them to provide any acceptable value
+            // since they might have just given values of some incorrect types instead
+            // of actually trying some complex strings.
+            if let Ok(c) = string_to_complex(s, self) {
+                return Ok(ValidationMatch::lax(EitherComplex::Py(c)));
+            }
         } else if self.is_exact_instance_of::<PyFloat>() {
-            return Ok(ValidationMatch::exact(EitherComplex::Complex([
+            return Ok(ValidationMatch::lax(EitherComplex::Complex([
                 self.extract::<f64>().unwrap(),
                 0.0,
             ])));
         } else if self.is_exact_instance_of::<PyInt>() {
-            return Ok(ValidationMatch::exact(EitherComplex::Complex([
+            return Ok(ValidationMatch::lax(EitherComplex::Complex([
                 self.extract::<i64>().unwrap() as f64,
                 0.0,
             ])));

@@ -423,8 +423,9 @@ error_types! {
         whole_digits: {ctx_type: u64, ctx_fn: field_from_context},
     },
     // Complex errors
-    ComplexParsing {},
     ComplexType {},
+    ComplexTypePyStrict {},
+    ComplexStrParsing {},
 }
 
 macro_rules! render {
@@ -567,8 +568,9 @@ impl ErrorType {
             Self::DecimalMaxDigits {..} => "Decimal input should have no more than {max_digits} digit{expected_plural} in total",
             Self::DecimalMaxPlaces {..} => "Decimal input should have no more than {decimal_places} decimal place{expected_plural}",
             Self::DecimalWholeDigits {..} => "Decimal input should have no more than {whole_digits} digit{expected_plural} before the decimal point",
-            Self::ComplexParsing {..} => "Input should be a valid complex string following the rule at https://docs.python.org/3/library/functions.html#complex",
-            Self::ComplexType {..} => "Input should be a valid complex number",
+            Self::ComplexType {..} => "Input should be a valid python complex object, a number, or a valid complex string following the rules at https://docs.python.org/3/library/functions.html#complex",
+            Self::ComplexTypePyStrict {..} => "Input should be a valid Python complex object",
+            Self::ComplexStrParsing {..} => "Input should be a valid complex string following the rules at https://docs.python.org/3/library/functions.html#complex",
         }
     }
 

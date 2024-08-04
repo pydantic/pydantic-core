@@ -220,7 +220,7 @@ impl<'py> Input<'py> for StringMapping<'py> {
         }
     }
 
-    fn validate_complex(&self, _py: Python<'py>) -> ValResult<ValidationMatch<EitherComplex<'py>>> {
+    fn validate_complex(&self, _strict: bool, _py: Python<'py>) -> ValResult<ValidationMatch<EitherComplex<'py>>> {
         match self {
             Self::String(s) => Ok(ValidationMatch::strict(EitherComplex::Py(string_to_complex(s, self)?))),
             Self::Mapping(_) => Err(ValError::new(ErrorTypeDefaults::ComplexType, self)),

@@ -8,8 +8,9 @@ from pydantic_core import SchemaValidator, ValidationError
 
 from ..conftest import Err
 
-EXPECTED_PARSE_ERROR_MESSAGE = 'Input should be a valid complex string following the rule at https://docs.python.org/3/library/functions.html#complex'
-EXPECTED_TYPE_ERROR_MESSAGE = 'Input should be a valid complex number'
+EXPECTED_PARSE_ERROR_MESSAGE = 'Input should be a valid complex string following the rules at https://docs.python.org/3/library/functions.html#complex'
+EXPECTED_TYPE_ERROR_MESSAGE = 'Input should be a valid python complex object, a number, or a valid complex string following the rules at https://docs.python.org/3/library/functions.html#complex'
+EXPECTED_TYPE_ERROR_PY_STRICT_MESSAGE = 'Input should be a valid Python complex object'
 
 
 @pytest.mark.parametrize(
@@ -25,12 +26,12 @@ EXPECTED_TYPE_ERROR_MESSAGE = 'Input should be a valid complex number'
         (3, complex(3, 0)),
         (2.0, complex(2, 0)),
         ('1e-700j', complex(0, 0)),
-        ('', Err(EXPECTED_PARSE_ERROR_MESSAGE)),
-        ('\t( -1.23+4.5J   \n', Err(EXPECTED_PARSE_ERROR_MESSAGE)),
+        ('', Err(EXPECTED_TYPE_ERROR_MESSAGE)),
+        ('\t( -1.23+4.5J   \n', Err(EXPECTED_TYPE_ERROR_MESSAGE)),
         ({'real': 2, 'imag': 4}, Err(EXPECTED_TYPE_ERROR_MESSAGE)),
         ({'real': 'test', 'imag': 1}, Err(EXPECTED_TYPE_ERROR_MESSAGE)),
         ({'real': True, 'imag': 1}, Err(EXPECTED_TYPE_ERROR_MESSAGE)),
-        ('foobar', Err(EXPECTED_PARSE_ERROR_MESSAGE)),
+        ('foobar', Err(EXPECTED_TYPE_ERROR_MESSAGE)),
         ([], Err(EXPECTED_TYPE_ERROR_MESSAGE)),
         ([('x', 'y')], Err(EXPECTED_TYPE_ERROR_MESSAGE)),
         ((), Err(EXPECTED_TYPE_ERROR_MESSAGE)),
@@ -44,6 +45,37 @@ EXPECTED_TYPE_ERROR_MESSAGE = 'Input should be a valid complex number'
 )
 def test_complex_cases(input_value, expected):
     v = SchemaValidator({'type': 'complex'})
+    if isinstance(expected, Err):
+        with pytest.raises(ValidationError, match=re.escape(expected.message)):
+            v.validate_python(input_value)
+    else:
+        assert v.validate_python(input_value) == expected
+
+
+@pytest.mark.parametrize(
+    'input_value,expected',
+    [
+        (complex(2, 4), complex(2, 4)),
+        ('2', Err(EXPECTED_TYPE_ERROR_PY_STRICT_MESSAGE)),
+        ('2j', Err(EXPECTED_TYPE_ERROR_PY_STRICT_MESSAGE)),
+        ('+1.23e-4-5.67e+8J', Err(EXPECTED_TYPE_ERROR_PY_STRICT_MESSAGE)),
+        ('1.5-j', Err(EXPECTED_TYPE_ERROR_PY_STRICT_MESSAGE)),
+        ('-j', Err(EXPECTED_TYPE_ERROR_PY_STRICT_MESSAGE)),
+        ('j', Err(EXPECTED_TYPE_ERROR_PY_STRICT_MESSAGE)),
+        (3, Err(EXPECTED_TYPE_ERROR_PY_STRICT_MESSAGE)),
+        (2.0, Err(EXPECTED_TYPE_ERROR_PY_STRICT_MESSAGE)),
+        ('1e-700j', Err(EXPECTED_TYPE_ERROR_PY_STRICT_MESSAGE)),
+        ('', Err(EXPECTED_TYPE_ERROR_PY_STRICT_MESSAGE)),
+        ('\t( -1.23+4.5J   \n', Err(EXPECTED_TYPE_ERROR_PY_STRICT_MESSAGE)),
+        ({'real': 2, 'imag': 4}, Err(EXPECTED_TYPE_ERROR_PY_STRICT_MESSAGE)),
+        ({'real': 'test', 'imag': 1}, Err(EXPECTED_TYPE_ERROR_PY_STRICT_MESSAGE)),
+        ({'real': True, 'imag': 1}, Err(EXPECTED_TYPE_ERROR_PY_STRICT_MESSAGE)),
+        ('foobar', Err(EXPECTED_TYPE_ERROR_PY_STRICT_MESSAGE)),
+    ],
+    ids=repr,
+)
+def test_complex_strict(input_value, expected):
+    v = SchemaValidator({'type': 'complex', 'strict': True})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
@@ -93,12 +125,26 @@ def test_json_complex():
         v.validate_json('{"real": 2, "imag": 4}')
     assert exc_info.value.errors(include_url=False) == [
         {
-            'type': 'complex_parsing',
+            'type': 'complex_type',
             'loc': (),
-            'msg': EXPECTED_PARSE_ERROR_MESSAGE,
+            'msg': EXPECTED_TYPE_ERROR_MESSAGE,
             'input': {'real': 2, 'imag': 4},
         }
     ]
+
+
+def test_json_complex_strict():
+    v = SchemaValidator({'type': 'complex', 'strict': True})
+    assert v.validate_json('"-1.23e+4+5.67e-8J"') == complex(-1.23e4, 5.67e-8)
+    # "1" is a valid complex string
+    assert v.validate_json('"1"') == complex(1, 0)
+
+    with pytest.raises(ValidationError, match=re.escape(EXPECTED_PARSE_ERROR_MESSAGE)):
+        assert v.validate_json('1') == complex(1, 0)
+    with pytest.raises(ValidationError, match=re.escape(EXPECTED_PARSE_ERROR_MESSAGE)):
+        assert v.validate_json('1.0') == complex(1, 0)
+    with pytest.raises(ValidationError, match=re.escape(EXPECTED_TYPE_ERROR_MESSAGE)):
+        v.validate_json('{"real": 2, "imag": 4}')
 
 
 def test_string_complex():

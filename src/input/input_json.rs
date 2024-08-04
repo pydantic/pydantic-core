@@ -299,15 +299,27 @@ impl<'py, 'data> Input<'py> for JsonValue<'data> {
         }
     }
 
-    fn validate_complex(&self, py: Python<'py>) -> ValResult<ValidationMatch<EitherComplex<'py>>> {
+    fn validate_complex(&self, strict: bool, py: Python<'py>) -> ValResult<ValidationMatch<EitherComplex<'py>>> {
         match self {
             JsonValue::Str(s) => Ok(ValidationMatch::strict(EitherComplex::Py(string_to_complex(
                 &PyString::new_bound(py, s),
                 self,
             )?))),
-            JsonValue::Float(f) => Ok(ValidationMatch::strict(EitherComplex::Complex([*f, 0.0]))),
-            JsonValue::Int(f) => Ok(ValidationMatch::strict(EitherComplex::Complex([(*f) as f64, 0.0]))),
-            _ => Err(ValError::new(ErrorTypeDefaults::ComplexParsing, self)),
+            JsonValue::Float(f) => {
+                if !strict {
+                    Ok(ValidationMatch::lax(EitherComplex::Complex([*f, 0.0])))
+                } else {
+                    Err(ValError::new(ErrorTypeDefaults::ComplexStrParsing, self))
+                }
+            }
+            JsonValue::Int(f) => {
+                if !strict {
+                    Ok(ValidationMatch::lax(EitherComplex::Complex([(*f) as f64, 0.0])))
+                } else {
+                    Err(ValError::new(ErrorTypeDefaults::ComplexStrParsing, self))
+                }
+            }
+            _ => Err(ValError::new(ErrorTypeDefaults::ComplexType, self)),
         }
     }
 }
@@ -440,8 +452,11 @@ impl<'py> Input<'py> for str {
         bytes_as_timedelta(self, self.as_bytes(), microseconds_overflow_behavior).map(ValidationMatch::lax)
     }
 
-    fn validate_complex(&self, _py: Python<'py>) -> ValResult<ValidationMatch<EitherComplex<'py>>> {
-        Err(ValError::new(ErrorTypeDefaults::ComplexType, self))
+    fn validate_complex(&self, _strict: bool, py: Python<'py>) -> ValResult<ValidationMatch<EitherComplex<'py>>> {
+        Ok(ValidationMatch::strict(EitherComplex::Py(string_to_complex(
+            self.to_object(py).downcast_bound::<PyString>(py)?,
+            self,
+        )?)))
     }
 }
 

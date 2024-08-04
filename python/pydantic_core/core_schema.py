@@ -744,6 +744,7 @@ def decimal_schema(
 
 class ComplexSchema(TypedDict, total=False):
     type: Required[Literal['complex']]
+    strict: bool
     ref: str
     metadata: Any
     serialization: SerSchema
@@ -751,6 +752,7 @@ class ComplexSchema(TypedDict, total=False):
 
 def complex_schema(
     *,
+    strict: bool | None = None,
     ref: str | None = None,
     metadata: Any = None,
     serialization: SerSchema | None = None,
@@ -768,12 +770,14 @@ def complex_schema(
     ```
 
     Args:
+        strict: Whether the value should be a complex object instance or a value that can be converted to a complex object
         ref: optional unique identifier of the schema, used to reference the schema in other places
         metadata: Any other information you want to include with the schema, not used by pydantic-core
         serialization: Custom serialization schema
     """
     return _dict_not_none(
         type='complex',
+        strict=strict,
         ref=ref,
         metadata=metadata,
         serialization=serialization,

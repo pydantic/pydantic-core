@@ -3,6 +3,7 @@ use pyo3::prelude::*;
 use pyo3::sync::GILOnceCell;
 use pyo3::types::{PyComplex, PyDict, PyString, PyType};
 
+use crate::build_tools::is_strict;
 use crate::errors::{ErrorTypeDefaults, ToErrorValue, ValError, ValResult};
 use crate::input::Input;
 
@@ -17,16 +18,21 @@ pub fn get_complex_type(py: Python) -> &Bound<'_, PyType> {
 }
 
 #[derive(Debug)]
-pub struct ComplexValidator {}
+pub struct ComplexValidator {
+    strict: bool,
+}
 
 impl BuildValidator for ComplexValidator {
     const EXPECTED_TYPE: &'static str = "complex";
     fn build(
-        _schema: &Bound<'_, PyDict>,
-        _config: Option<&Bound<'_, PyDict>>,
+        schema: &Bound<'_, PyDict>,
+        config: Option<&Bound<'_, PyDict>>,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
-        Ok(Self {}.into())
+        Ok(Self {
+            strict: is_strict(schema, config)?,
+        }
+        .into())
     }
 }
 
@@ -39,7 +45,7 @@ impl Validator for ComplexValidator {
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
-        let res = input.validate_complex(py)?.unpack(state);
+        let res = input.validate_complex(self.strict, py)?.unpack(state);
         Ok(res.into_py(py))
     }
 
@@ -59,7 +65,7 @@ pub(crate) fn string_to_complex<'py>(
             // Since arg is a string, the only possible error here is ValueError
             // triggered by invalid complex strings and thus only this case is handled.
             if err.is_instance_of::<PyValueError>(py) {
-                ValError::new(ErrorTypeDefaults::ComplexParsing, input)
+                ValError::new(ErrorTypeDefaults::ComplexStrParsing, input)
             } else {
                 ValError::InternalErr(err)
             }

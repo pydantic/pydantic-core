@@ -173,7 +173,7 @@ pub trait Input<'py>: fmt::Debug + ToPyObject {
         microseconds_overflow_behavior: speedate::MicrosecondsPrecisionOverflowBehavior,
     ) -> ValMatch<EitherTimedelta<'py>>;
 
-    fn validate_complex(&self, py: Python<'py>) -> ValMatch<EitherComplex<'py>>;
+    fn validate_complex(&self, strict: bool, py: Python<'py>) -> ValMatch<EitherComplex<'py>>;
 }
 
 /// The problem to solve here is that iterating collections often returns owned
