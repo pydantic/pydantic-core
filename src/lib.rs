@@ -48,13 +48,13 @@ pub enum CacheStringsArg {
     Literal(StringCacheMode),
 }
 
-#[pyfunction(signature = (data, *, allow_inf_nan=true, cache_strings=CacheStringsArg::Bool(true), allow_partial=false))]
+#[pyfunction(signature = (data, *, allow_inf_nan=true, cache_strings=CacheStringsArg::Bool(true), allow_partial=PartialMode::Off))]
 pub fn from_json<'py>(
     py: Python<'py>,
     data: &Bound<'_, PyAny>,
     allow_inf_nan: bool,
     cache_strings: CacheStringsArg,
-    allow_partial: bool,
+    allow_partial: PartialMode,
 ) -> PyResult<Bound<'py, PyAny>> {
     let v_match = data
         .validate_bytes(false, ValBytesMode { ser: BytesMode::Utf8 })
@@ -65,15 +65,10 @@ pub fn from_json<'py>(
         CacheStringsArg::Bool(b) => b.into(),
         CacheStringsArg::Literal(mode) => mode,
     };
-    let partial_mode = if allow_partial {
-        PartialMode::On
-    } else {
-        PartialMode::Off
-    };
     let parse_builder = PythonParse {
         allow_inf_nan,
         cache_mode,
-        partial_mode,
+        partial_mode: allow_partial,
         catch_duplicate_keys: false,
         lossless_floats: false,
     };
