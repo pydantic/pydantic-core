@@ -526,7 +526,7 @@ impl PyLineError {
             let input_value = self.input_value.bind(py);
             let input_str = safe_repr(input_value);
             write!(output, ", input_value=")?;
-            super::truncate_large_string(&mut output, input_str.to_cow())?;
+            super::write_truncated_to_50_bytes(&mut output, input_str.to_cow())?;
 
             if let Ok(type_) = input_value.get_type().qualname() {
                 write!(output, ", input_type={type_}")?;

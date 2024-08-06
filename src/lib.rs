@@ -14,11 +14,10 @@ use validators::ValBytesMode;
 #[macro_use]
 mod py_gc;
 
-pub mod errors;
-
 mod argument_markers;
 mod build_tools;
 mod definitions;
+mod errors;
 mod input;
 mod lookup_key;
 mod recursion_guard;

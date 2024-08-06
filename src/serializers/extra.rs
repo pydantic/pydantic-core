@@ -429,15 +429,12 @@ impl CollectWarnings {
             let input_str = safe_repr(value);
             let mut value_str = String::with_capacity(100);
             value_str.push_str("with value `");
-            match crate::errors::truncate_large_string(&mut value_str, input_str.to_cow()) {
-                Err(_) => value_str.clear(),
-                Ok(()) => {
-                    value_str.push_str("` ");
-                }
-            };
+            crate::errors::write_truncated_to_50_bytes(&mut value_str, input_str.to_cow())
+                .expect("Writing to a `String` failed");
+            value_str.push_str("`");
 
             self.add_warning(format!(
-                "Expected `{field_type}` but got `{type_name}` {value_str}- serialized value may not be as expected"
+                "Expected `{field_type}` but got `{type_name}` {value_str} - serialized value may not be as expected"
             ));
         }
     }

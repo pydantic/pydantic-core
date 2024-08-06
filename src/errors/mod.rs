@@ -64,7 +64,7 @@ pub fn ceil_char_boundary(value: &str, index: usize) -> usize {
         .map_or(upper_bound, |pos| pos + index)
 }
 
-pub fn truncate_large_string<F: fmt::Write>(f: &mut F, val: Cow<'_, str>) -> std::fmt::Result {
+pub fn write_truncated_to_50_bytes<F: fmt::Write>(f: &mut F, val: Cow<'_, str>) -> std::fmt::Result {
     if val.len() > 50 {
         write!(
             f,
