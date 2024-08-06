@@ -140,9 +140,9 @@ def test_json_complex_strict():
     assert v.validate_json('"1"') == complex(1, 0)
 
     with pytest.raises(ValidationError, match=re.escape(EXPECTED_PARSE_ERROR_MESSAGE)):
-        assert v.validate_json('1') == complex(1, 0)
+        v.validate_json('1')
     with pytest.raises(ValidationError, match=re.escape(EXPECTED_PARSE_ERROR_MESSAGE)):
-        assert v.validate_json('1.0') == complex(1, 0)
+        v.validate_json('1.0')
     with pytest.raises(ValidationError, match=re.escape(EXPECTED_TYPE_ERROR_MESSAGE)):
         v.validate_json('{"real": 2, "imag": 4}')
 
