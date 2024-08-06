@@ -4000,8 +4000,9 @@ ErrorType = Literal[
     'decimal_max_digits',
     'decimal_max_places',
     'decimal_whole_digits',
-    'complex_parsing',
     'complex_type',
+    'complex_type_py_strict',
+    'complex_str_parsing',
 ]
 
 

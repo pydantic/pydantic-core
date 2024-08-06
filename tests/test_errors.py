@@ -397,12 +397,17 @@ all_errors = [
     ),
     (
         'complex_type',
-        'Input should be a valid complex number',
+        'Input should be a valid python complex object, a number, or a valid complex string following the rules at https://docs.python.org/3/library/functions.html#complex',
         None,
     ),
     (
-        'complex_parsing',
-        'Input should be a valid complex string following the rule at https://docs.python.org/3/library/functions.html#complex',
+        'complex_type_py_strict',
+        'Input should be a valid Python complex object',
+        None,
+    ),
+    (
+        'complex_str_parsing',
+        'Input should be a valid complex string following the rules at https://docs.python.org/3/library/functions.html#complex',
         None,
     ),
 ]
