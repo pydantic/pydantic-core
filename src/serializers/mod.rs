@@ -8,6 +8,7 @@ use pyo3::{PyTraverseError, PyVisit};
 use crate::definitions::{Definitions, DefinitionsBuilder};
 use crate::py_gc::PyGcTraverse;
 
+pub(crate) use config::BytesMode;
 use config::SerializationConfig;
 pub use errors::{PydanticSerializationError, PydanticSerializationUnexpectedValue};
 use extra::{CollectWarnings, SerRecursionState, WarningsMode};
@@ -86,6 +87,7 @@ impl SchemaSerializer {
 #[pymethods]
 impl SchemaSerializer {
     #[new]
+    #[pyo3(signature = (schema, config=None))]
     pub fn py_new(schema: Bound<'_, PyDict>, config: Option<&Bound<'_, PyDict>>) -> PyResult<Self> {
         let mut definitions_builder = DefinitionsBuilder::new();
         let serializer = CombinedSerializer::build(schema.downcast()?, config, &mut definitions_builder)?;

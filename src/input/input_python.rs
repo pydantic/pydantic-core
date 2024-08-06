@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::str::from_utf8;
 
 use pyo3::intern;
@@ -18,6 +17,7 @@ use crate::tools::{extract_i64, safe_repr};
 use crate::validators::complex::string_to_complex;
 use crate::validators::decimal::{create_decimal, get_decimal_type};
 use crate::validators::Exactness;
+use crate::validators::ValBytesMode;
 use crate::ArgsKwargs;
 
 use super::datetime::{
@@ -146,12 +146,8 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
                         Err(_) => Err(ValError::new(ErrorTypeDefaults::StringUnicode, self)),
                     }
                 } else if let Ok(py_byte_array) = self.downcast::<PyByteArray>() {
-                    // Safety: the gil is held while from_utf8 is running so py_byte_array is not mutated,
-                    // and we immediately copy the bytes into a new Python string
-                    match from_utf8(unsafe { py_byte_array.as_bytes() }) {
-                        // Why Python not Rust? to avoid an unnecessary allocation on the Rust side, the
-                        // final output needs to be Python anyway.
-                        Ok(s) => Ok(PyString::new_bound(self.py(), s).into()),
+                    match bytearray_to_str(py_byte_array) {
+                        Ok(py_str) => Ok(py_str.into()),
                         Err(_) => Err(ValError::new(ErrorTypeDefaults::StringUnicode, self)),
                     }
                 } else if coerce_numbers_to_str && !self.is_exact_instance_of::<PyBool>() && {
@@ -176,7 +172,11 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
         Err(ValError::new(ErrorTypeDefaults::StringType, self))
     }
 
-    fn validate_bytes<'a>(&'a self, strict: bool) -> ValResult<ValidationMatch<EitherBytes<'a, 'py>>> {
+    fn validate_bytes<'a>(
+        &'a self,
+        strict: bool,
+        mode: ValBytesMode,
+    ) -> ValResult<ValidationMatch<EitherBytes<'a, 'py>>> {
         if let Ok(py_bytes) = self.downcast_exact::<PyBytes>() {
             return Ok(ValidationMatch::exact(py_bytes.into()));
         } else if let Ok(py_bytes) = self.downcast::<PyBytes>() {
@@ -187,7 +187,10 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
             if !strict {
                 return if let Ok(py_str) = self.downcast::<PyString>() {
                     let str = py_string_str(py_str)?;
-                    Ok(str.as_bytes().into())
+                    match mode.deserialize_string(str) {
+                        Ok(b) => Ok(b),
+                        Err(e) => Err(ValError::new(e, self)),
+                    }
                 } else if let Ok(py_byte_array) = self.downcast::<PyByteArray>() {
                     Ok(py_byte_array.to_vec().into())
                 } else {
@@ -206,8 +209,8 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
         }
 
         if !strict {
-            if let Some(cow_str) = maybe_as_string(self, ErrorTypeDefaults::BoolParsing)? {
-                return str_as_bool(self, &cow_str).map(ValidationMatch::lax);
+            if let Some(s) = maybe_as_string(self, ErrorTypeDefaults::BoolParsing)? {
+                return str_as_bool(self, s).map(ValidationMatch::lax);
             } else if let Some(int) = extract_i64(self) {
                 return int_as_bool(self, int).map(ValidationMatch::lax);
             } else if let Ok(float) = self.extract::<f64>() {
@@ -243,8 +246,8 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
 
         'lax: {
             if !strict {
-                return if let Some(cow_str) = maybe_as_string(self, ErrorTypeDefaults::IntParsing)? {
-                    str_as_int(self, &cow_str)
+                return if let Some(s) = maybe_as_string(self, ErrorTypeDefaults::IntParsing)? {
+                    str_as_int(self, s)
                 } else if self.is_exact_instance_of::<PyFloat>() {
                     float_as_int(self, self.extract::<f64>()?)
                 } else if let Ok(decimal) = self.strict_decimal(self.py()) {
@@ -285,9 +288,9 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
         }
 
         if !strict {
-            if let Some(cow_str) = maybe_as_string(self, ErrorTypeDefaults::FloatParsing)? {
+            if let Some(s) = maybe_as_string(self, ErrorTypeDefaults::FloatParsing)? {
                 // checking for bytes and string is fast, so do this before isinstance(float)
-                return str_as_float(self, &cow_str).map(ValidationMatch::lax);
+                return str_as_float(self, s).map(ValidationMatch::lax);
             }
         }
 
@@ -320,7 +323,10 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
 
         Err(ValError::new(
             ErrorType::IsInstanceOf {
-                class: decimal_type.qualname().unwrap_or_else(|_| "Decimal".to_owned()),
+                class: decimal_type
+                    .qualname()
+                    .and_then(|name| name.extract())
+                    .unwrap_or_else(|_| "Decimal".to_owned()),
                 context: None,
             },
             self,
@@ -663,18 +669,29 @@ fn from_attributes_applicable(obj: &Bound<'_, PyAny>) -> bool {
 }
 
 /// Utility for extracting a string from a PyAny, if possible.
-fn maybe_as_string<'a>(v: &'a Bound<'_, PyAny>, unicode_error: ErrorType) -> ValResult<Option<Cow<'a, str>>> {
+fn maybe_as_string<'a>(v: &'a Bound<'_, PyAny>, unicode_error: ErrorType) -> ValResult<Option<&'a str>> {
     if let Ok(py_string) = v.downcast::<PyString>() {
-        let str = py_string_str(py_string)?;
-        Ok(Some(Cow::Borrowed(str)))
+        py_string_str(py_string).map(Some)
     } else if let Ok(bytes) = v.downcast::<PyBytes>() {
         match from_utf8(bytes.as_bytes()) {
-            Ok(s) => Ok(Some(Cow::Owned(s.to_string()))),
+            Ok(s) => Ok(Some(s)),
             Err(_) => Err(ValError::new(unicode_error, v)),
         }
     } else {
         Ok(None)
     }
+}
+
+/// Decode a Python bytearray to a Python string.
+///
+/// Using Python's built-in machinery for this should be efficient and avoids questions around
+/// safety of concurrent mutation of the bytearray (by leaving that to the Python interpreter).
+fn bytearray_to_str<'py>(bytearray: &Bound<'py, PyByteArray>) -> PyResult<Bound<'py, PyString>> {
+    let py = bytearray.py();
+    let py_string = bytearray
+        .call_method1(intern!(py, "decode"), (intern!(py, "utf-8"),))?
+        .downcast_into()?;
+    Ok(py_string)
 }
 
 /// Utility for extracting an enum value, if possible.
@@ -808,7 +825,7 @@ impl<'py> ValidatedDict<'py> for GenericPyMapping<'_, 'py> {
         match self {
             Self::Dict(dict) => Ok(consumer.consume_iterator(dict.iter().map(Ok))),
             Self::Mapping(mapping) => Ok(consumer.consume_iterator(iterate_mapping_items(mapping)?)),
-            Self::GetAttr(obj, _) => Ok(consumer.consume_iterator(iterate_attributes(obj))),
+            Self::GetAttr(obj, _) => Ok(consumer.consume_iterator(iterate_attributes(obj)?)),
         }
     }
 }
