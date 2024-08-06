@@ -49,7 +49,7 @@ impl ValBytesMode {
 }
 
 fn to_base64_urlsafe(s: &str) -> String {
-    if s.contains('+') || s.contains('/') {
+    if s.contains(|c| c == '+' || c == '/') {
         s.replace('+', "-").replace('/', "_")
     } else {
         s.to_string()

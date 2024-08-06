@@ -379,9 +379,9 @@ def test_partial_parse():
 
 
 def test_json_bytes_base64_round_trip():
-    data = b'TDR3\xbe\x11J\xe9\x9f\xa4&\x91\xff\xc8\xef4\xdf\xd3$\xf3^\xca\xb5\x14V \xdeDH\n\x85\x8b'
-    encoded_std = b'"VERSM74RSumfpCaR/8jvNN/TJPNeyrUUViDeREgKhYs="'
-    encoded_url = b'"VERSM74RSumfpCaR_8jvNN_TJPNeyrUUViDeREgKhYs="'
+    data = b'\xd8\x07\xc1Tx$\x91F%\xf3\xf3I\xca\xd8@\x0c\xee\xc3\xab\xff\x7f\xd3\xcd\xcd\xf9\xc2\x10\xe4\xa1\xb01e'
+    encoded_std = b'"2AfBVHgkkUYl8/NJythADO7Dq/9/083N+cIQ5KGwMWU="'
+    encoded_url = b'"2AfBVHgkkUYl8_NJythADO7Dq_9_083N-cIQ5KGwMWU="'
     assert to_json(data, bytes_mode='base64') == encoded_url
 
     v = SchemaValidator({'type': 'bytes'}, {'val_json_bytes': 'base64'})
