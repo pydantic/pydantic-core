@@ -431,7 +431,7 @@ impl CollectWarnings {
             value_str.push_str("with value `");
             crate::errors::write_truncated_to_50_bytes(&mut value_str, input_str.to_cow())
                 .expect("Writing to a `String` failed");
-            value_str.push_str("`");
+            value_str.push('`');
 
             self.add_warning(format!(
                 "Expected `{field_type}` but got `{type_name}` {value_str} - serialized value may not be as expected"
