@@ -32,7 +32,7 @@ impl BuildValidator for DefinitionsValidatorBuilder {
                 .extract::<Bound<'_, PyDict>>()?
                 .get_as_req::<String>(intern!(py, "ref"))?;
             let validator = build_validator(&schema_definition, config, definitions)?;
-            definitions.add_definition(reference, validator)?;
+            definitions.add_definition(reference, validator);
         }
 
         let inner_schema = schema.get_as_req(intern!(py, "schema"))?;

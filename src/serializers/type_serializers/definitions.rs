@@ -31,7 +31,7 @@ impl BuildSerializer for DefinitionsSerializerBuilder {
             let schema = schema_definition.downcast()?;
             let reference = schema.get_as_req::<String>(intern!(py, "ref"))?;
             let serializer = CombinedSerializer::build(schema, config, definitions)?;
-            definitions.add_definition(reference, serializer)?;
+            definitions.add_definition(reference, serializer);
         }
 
         let inner_schema = schema.get_as_req(intern!(py, "schema"))?;

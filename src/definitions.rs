@@ -162,26 +162,29 @@ impl<T: std::fmt::Debug> DefinitionsBuilder<T> {
     }
 
     /// Add a definition, returning the ReferenceId that maps to it
-    pub fn add_definition(&mut self, reference: String, value: T) -> PyResult<DefinitionRef<T>> {
+    pub fn add_definition(&mut self, reference: String, value: T) -> DefinitionRef<T> {
         let reference = Arc::new(reference);
-        let value = match self.definitions.0.entry(reference.clone()) {
+        match self.definitions.0.entry(reference.clone()) {
             Entry::Occupied(entry) => {
-                let definition = entry.into_mut();
-                match definition.value.set(value) {
-                    Ok(()) => definition,
-                    Err(_) => return py_schema_err!("Duplicate ref: `{}`", reference),
+                let existing_entry = entry.get();
+                DefinitionRef {
+                    reference,
+                    value: Arc::downgrade(&existing_entry.value),
+                    name: existing_entry.name.clone(),
                 }
             }
-            Entry::Vacant(entry) => entry.insert(Definition {
-                value: Arc::new(OnceLock::from(value)),
-                name: Arc::new(LazyName::new()),
-            }),
-        };
-        Ok(DefinitionRef {
-            reference,
-            value: Arc::downgrade(&value.value),
-            name: value.name.clone(),
-        })
+            Entry::Vacant(entry) => {
+                let inserted_entry = entry.insert(Definition {
+                    value: Arc::new(OnceLock::from(value)),
+                    name: Arc::new(LazyName::new()),
+                });
+                DefinitionRef {
+                    reference,
+                    value: Arc::downgrade(&inserted_entry.value),
+                    name: inserted_entry.name.clone(),
+                }
+            }
+        }
     }
 
     /// Consume this Definitions into a vector of items, indexed by each items ReferenceId
