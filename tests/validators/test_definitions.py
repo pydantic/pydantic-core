@@ -74,36 +74,38 @@ def test_dict_repeat():
 
 
 def test_repeated_ref():
-    with pytest.raises(SchemaError, match='SchemaError: Duplicate ref: `foobar`'):
-        SchemaValidator(
-            core_schema.tuple_positional_schema(
-                [
-                    core_schema.definitions_schema(
-                        core_schema.definition_reference_schema('foobar'), [core_schema.int_schema(ref='foobar')]
-                    ),
-                    core_schema.definitions_schema(
-                        core_schema.definition_reference_schema('foobar'), [core_schema.int_schema(ref='foobar')]
-                    ),
-                ]
-            )
+    """When we encounter repeated refs, we keep the first one found. If they are at the same "level" this should be first to last in a list."""
+    s = SchemaValidator(
+        core_schema.tuple_positional_schema(
+            [
+                core_schema.definitions_schema(
+                    core_schema.definition_reference_schema('foobar'), [core_schema.int_schema(ref='foobar')]
+                ),
+                core_schema.definitions_schema(
+                    core_schema.definition_reference_schema('foobar'), [core_schema.str_schema(ref='foobar')]
+                ),
+            ]
         )
+    )
+    assert s.validate_python(('1', '2')) == (1, 2)
 
 
 def test_repeat_after():
-    with pytest.raises(SchemaError, match='SchemaError: Duplicate ref: `foobar`'):
-        SchemaValidator(
-            core_schema.definitions_schema(
-                core_schema.tuple_positional_schema(
-                    [
-                        core_schema.definitions_schema(
-                            core_schema.definition_reference_schema('foobar'), [core_schema.int_schema(ref='foobar')]
-                        ),
-                        core_schema.definition_reference_schema('foobar'),
-                    ]
-                ),
-                [core_schema.int_schema(ref='foobar')],
-            )
+    """When we encounter repeated refs, we keep the first one found. If they are at different "levels" the outermost one should be kept."""
+    s = SchemaValidator(
+        core_schema.definitions_schema(
+            core_schema.tuple_positional_schema(
+                [
+                    core_schema.definitions_schema(
+                        core_schema.definition_reference_schema('foobar'), [core_schema.str_schema(ref='foobar')]
+                    ),
+                    core_schema.definition_reference_schema('foobar'),
+                ]
+            ),
+            [core_schema.int_schema(ref='foobar')],
         )
+    )
+    assert s.validate_python(('1', '2')) == (1, 2)
 
 
 def test_deep():

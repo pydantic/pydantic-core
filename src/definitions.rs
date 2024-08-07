@@ -164,13 +164,14 @@ impl<T: std::fmt::Debug> DefinitionsBuilder<T> {
     /// Add a definition, returning the ReferenceId that maps to it
     pub fn add_definition(&mut self, reference: String, value: T) -> DefinitionRef<T> {
         let reference = Arc::new(reference);
-        match self.definitions.0.entry(reference.clone()) {
+        let res = match self.definitions.0.entry(reference.clone()) {
             Entry::Occupied(entry) => {
-                let existing_entry = entry.get();
+                let definition = entry.into_mut();
+                let _ = definition.value.get_or_init(|| value);
                 DefinitionRef {
-                    reference,
-                    value: Arc::downgrade(&existing_entry.value),
-                    name: existing_entry.name.clone(),
+                    reference: reference.clone(),
+                    value: Arc::downgrade(&definition.value),
+                    name: definition.name.clone(),
                 }
             }
             Entry::Vacant(entry) => {
@@ -179,12 +180,16 @@ impl<T: std::fmt::Debug> DefinitionsBuilder<T> {
                     name: Arc::new(LazyName::new()),
                 });
                 DefinitionRef {
-                    reference,
+                    reference: reference.clone(),
                     value: Arc::downgrade(&inserted_entry.value),
                     name: inserted_entry.name.clone(),
                 }
             }
-        }
+        };
+        // sanity check: the value should be set
+        let value = &self.definitions.0.get(&reference).unwrap().value;
+        assert!(value.get().is_some());
+        res
     }
 
     /// Consume this Definitions into a vector of items, indexed by each items ReferenceId
