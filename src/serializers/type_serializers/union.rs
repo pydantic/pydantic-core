@@ -290,18 +290,6 @@ impl TypeSerializer for TaggedUnionSerializer {
                     return s.to_python(value, include, exclude, extra);
                 }
             }
-            Discriminator::SelfSchema => {
-                // not really sure about this case, but it's here for completeness
-                for comb_serializer in &self.choices {
-                    match comb_serializer.to_python(value, include, exclude, &new_extra) {
-                        Ok(v) => return Ok(v),
-                        Err(err) => match err.is_instance_of::<PydanticSerializationUnexpectedValue>(value.py()) {
-                            true => (),
-                            false => return Err(err),
-                        },
-                    }
-                }
-            }
         }
 
         extra.warnings.on_fallback_py(self.get_name(), value, extra)?;

@@ -345,11 +345,6 @@ impl BuildValidator for TaggedUnionValidator {
         let key = intern!(py, "from_attributes");
         let from_attributes = schema_or_config(schema, config, key, key)?.unwrap_or(true);
 
-        let descr = match discriminator {
-            Discriminator::SelfSchema => "self-schema".to_string(),
-            _ => descr,
-        };
-
         Ok(Self {
             discriminator,
             lookup,
@@ -393,9 +388,6 @@ impl Validator for TaggedUnionValidator {
                     self.find_call_validator(py, tag.bind(py), input, state)
                 }
             }
-            Discriminator::SelfSchema => {
-                self.find_call_validator(py, self.self_schema_tag(py, input, state)?.as_any(), input, state)
-            }
         }
     }
 
@@ -405,35 +397,6 @@ impl Validator for TaggedUnionValidator {
 }
 
 impl TaggedUnionValidator {
-    fn self_schema_tag<'py>(
-        &self,
-        py: Python<'py>,
-        input: &(impl Input<'py> + ?Sized),
-        state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<Bound<'py, PyString>> {
-        let dict = input.strict_dict()?;
-        let dict = dict.as_py_dict().expect("self schema is always a Python dictionary");
-        let tag = match dict.get_item(intern!(py, "type"))? {
-            Some(t) => t.downcast_into::<PyString>()?,
-            None => return Err(self.tag_not_found(input)),
-        };
-        let tag = tag.to_str()?;
-        // custom logic to distinguish between different function and tuple schemas
-        if tag == "function" {
-            let Some(mode) = dict.get_item(intern!(py, "mode"))? else {
-                return Err(self.tag_not_found(input));
-            };
-            let tag = match mode.validate_str(true, false)?.into_inner().as_cow()?.as_ref() {
-                "plain" => Ok(intern!(py, "function-plain").to_owned()),
-                "wrap" => Ok(intern!(py, "function-wrap").to_owned()),
-                _ => Ok(intern!(py, "function").to_owned()),
-            };
-            tag
-        } else {
-            Ok(state.maybe_cached_str(py, tag))
-        }
-    }
-
     fn find_call_validator<'py>(
         &self,
         py: Python<'py>,

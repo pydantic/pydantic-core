@@ -775,13 +775,6 @@ impl<'py> ValidatedDict<'py> for GenericPyMapping<'_, 'py> {
         matches!(self, Self::GetAttr(..))
     }
 
-    fn as_py_dict(&self) -> Option<&Bound<'py, PyDict>> {
-        match self {
-            Self::Dict(dict) => Some(dict),
-            _ => None,
-        }
-    }
-
     fn iterate<'a, R>(
         &'a self,
         consumer: impl ConsumeIterator<ValResult<(Self::Key<'a>, Self::Item<'a>)>, Output = R>,
