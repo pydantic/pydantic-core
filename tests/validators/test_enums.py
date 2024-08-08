@@ -1,5 +1,6 @@
 import re
 import sys
+from decimal import Decimal
 from enum import Enum, IntEnum, IntFlag
 
 import pytest
@@ -344,3 +345,130 @@ def test_big_int():
 
     assert v.validate_python(ColorEnum.GREEN) is ColorEnum.GREEN
     assert v.validate_python(1 << 63) is ColorEnum.GREEN
+
+
+@pytest.mark.parametrize(
+    'value',
+    [-1, 0, 1],
+)
+def test_enum_int_validation_should_succeed_for_decimal(value: int):
+    # GIVEN
+    class MyEnum(Enum):
+        VALUE = value
+
+    class MyIntEnum(IntEnum):
+        VALUE = value
+
+    # WHEN
+    v = SchemaValidator(
+        core_schema.with_default_schema(
+            schema=core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())),
+            default=MyEnum.VALUE,
+        )
+    )
+
+    v_int = SchemaValidator(
+        core_schema.with_default_schema(
+            schema=core_schema.enum_schema(MyIntEnum, list(MyIntEnum.__members__.values())),
+            default=MyIntEnum.VALUE,
+        )
+    )
+
+    # THEN
+    assert v.validate_python(Decimal(value)) is MyEnum.VALUE
+    assert v.validate_python(Decimal(float(value))) is MyEnum.VALUE
+
+    assert v_int.validate_python(Decimal(value)) is MyIntEnum.VALUE
+    assert v_int.validate_python(Decimal(float(value))) is MyIntEnum.VALUE
+
+
+def test_enum_int_validation_should_succeed_for_custom_type():
+    # GIVEN
+    class AnyWrapper:
+        def __init__(self, value):
+            self.value = value
+
+        def __eq__(self, other: object) -> bool:
+            return self.value == other
+
+    class MyEnum(Enum):
+        VALUE = 999
+        SECOND_VALUE = 1000000
+        THIRD_VALUE = 'Py03'
+
+    # WHEN
+    v = SchemaValidator(
+        core_schema.with_default_schema(
+            schema=core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())),
+            default=MyEnum.VALUE,
+        )
+    )
+
+    # THEN
+    assert v.validate_python(AnyWrapper(999)) is MyEnum.VALUE
+    assert v.validate_python(AnyWrapper(1000000)) is MyEnum.SECOND_VALUE
+    assert v.validate_python(AnyWrapper('Py03')) is MyEnum.THIRD_VALUE
+
+
+def test_enum_str_validation_should_fail_for_decimal_when_expecting_str_value():
+    # GIVEN
+    class MyEnum(Enum):
+        VALUE = '1'
+
+    # WHEN
+    v = SchemaValidator(
+        core_schema.with_default_schema(
+            schema=core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())),
+            default=MyEnum.VALUE,
+        )
+    )
+
+    # THEN
+    with pytest.raises(ValidationError):
+        v.validate_python(Decimal(1))
+
+
+def test_enum_int_validation_should_fail_for_incorrect_decimal_value():
+    # GIVEN
+    class MyEnum(Enum):
+        VALUE = 1
+
+    # WHEN
+    v = SchemaValidator(
+        core_schema.with_default_schema(
+            schema=core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())),
+            default=MyEnum.VALUE,
+        )
+    )
+
+    # THEN
+    with pytest.raises(ValidationError):
+        v.validate_python(Decimal(2))
+
+    with pytest.raises(ValidationError):
+        v.validate_python((1, 2))
+
+    with pytest.raises(ValidationError):
+        v.validate_python(Decimal(1.1))
+
+
+def test_enum_int_validation_should_fail_for_plain_type_without_eq_checking():
+    # GIVEN
+    class MyEnum(Enum):
+        VALUE = 1
+
+    class MyClass:
+        def __init__(self, value):
+            self.value = value
+
+    # WHEN
+    v = SchemaValidator(
+        core_schema.with_default_schema(
+            schema=core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())),
+            default=MyEnum.VALUE,
+        )
+    )
+
+    # THEN
+    with pytest.raises(ValidationError):
+        v.validate_python(MyClass(1))

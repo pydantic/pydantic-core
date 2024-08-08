@@ -123,6 +123,7 @@ impl<T: Debug> LiteralLookup<T> {
                 }
             }
         }
+
         if let Some(expected_strings) = &self.expected_str {
             let validation_result = if input.as_python().is_some() {
                 input.exact_str()
@@ -162,6 +163,7 @@ impl<T: Debug> LiteralLookup<T> {
                 }
             }
         };
+
         Ok(None)
     }
 
