@@ -206,10 +206,10 @@ impl BuildSerializer for TaggedUnionSerializer {
         let mut lookup: HashMap<String, CombinedSerializer> = HashMap::with_capacity(choice_list.len());
         let mut choices: Vec<CombinedSerializer> = Vec::with_capacity(choice_list.len());
 
-        for (choice_key, chice_schema) in choice_list {
-            let serializer = CombinedSerializer::build(chice_schema.downcast()?, config, definitions).unwrap();
+        for (choice_key, choice_schema) in choice_list {
+            let serializer = CombinedSerializer::build(choice_schema.downcast()?, config, definitions).unwrap();
             choices.push(serializer.clone());
-            lookup.insert(choice_key.extract::<String>()?, serializer);
+            lookup.insert(choice_key.to_string(), serializer);
         }
 
         let descr = choices
@@ -246,22 +246,19 @@ impl TypeSerializer for TaggedUnionSerializer {
         let discriminator_value = self.get_discriminator_value(value);
 
         if let Some(tag) = discriminator_value {
-            if let Ok(tag_str) = tag.extract::<String>(py) {
-                if let Some(serializer) = self.lookup.get(&tag_str) {
-                    match serializer.to_python(value, include, exclude, &new_extra) {
-                        Ok(v) => return Ok(v),
-                        Err(err) => match err.is_instance_of::<PydanticSerializationUnexpectedValue>(py) {
-                            true => {
-                                if self.retry_with_lax_check() {
-                                    new_extra.check = SerCheck::Lax;
-                                    return serializer.to_python(value, include, exclude, &new_extra);
-                                }
+            let tag_str = tag.to_string();
+            if let Some(serializer) = self.lookup.get(&tag_str) {
+                match serializer.to_python(value, include, exclude, &new_extra) {
+                    Ok(v) => return Ok(v),
+                    Err(err) => match err.is_instance_of::<PydanticSerializationUnexpectedValue>(py) {
+                        true => {
+                            if self.retry_with_lax_check() {
+                                new_extra.check = SerCheck::Lax;
+                                return serializer.to_python(value, include, exclude, &new_extra);
                             }
-                            false => return Err(err),
-                        },
-                    }
-                } else {
-                    return Err(self.tag_not_found());
+                        }
+                        false => return Err(err),
+                    },
                 }
             } else {
                 return Err(self.tag_not_found());
@@ -282,24 +279,19 @@ impl TypeSerializer for TaggedUnionSerializer {
         let mut new_extra = extra.clone();
         new_extra.check = SerCheck::Strict;
 
-        let py = key.py();
-
         let discriminator_value = self.get_discriminator_value(key);
 
         if let Some(tag) = discriminator_value {
-            if let Ok(tag_str) = tag.extract::<String>(py) {
-                if let Some(serializer) = self.lookup.get(&tag_str) {
-                    match serializer.json_key(key, &new_extra) {
-                        Ok(v) => return Ok(v),
-                        Err(_) => {
-                            if self.retry_with_lax_check() {
-                                new_extra.check = SerCheck::Lax;
-                                return serializer.json_key(key, &new_extra);
-                            }
+            let tag_str = tag.to_string();
+            if let Some(serializer) = self.lookup.get(&tag_str) {
+                match serializer.json_key(key, &new_extra) {
+                    Ok(v) => return Ok(v),
+                    Err(_) => {
+                        if self.retry_with_lax_check() {
+                            new_extra.check = SerCheck::Lax;
+                            return serializer.json_key(key, &new_extra);
                         }
                     }
-                } else {
-                    return Err(self.tag_not_found());
                 }
             } else {
                 return Err(self.tag_not_found());
@@ -331,22 +323,19 @@ impl TypeSerializer for TaggedUnionSerializer {
         let discriminator_value = self.get_discriminator_value(value);
 
         if let Some(tag) = discriminator_value {
-            if let Ok(tag_str) = tag.extract::<String>(py) {
-                if let Some(selected_serializer) = self.lookup.get(&tag_str) {
-                    match selected_serializer.to_python(value, include, exclude, &new_extra) {
-                        Ok(v) => return infer_serialize(v.bind(py), serializer, None, None, extra),
-                        Err(_) => {
-                            if self.retry_with_lax_check() {
-                                new_extra.check = SerCheck::Lax;
-                                match selected_serializer.to_python(value, include, exclude, &new_extra) {
-                                    Ok(v) => return infer_serialize(v.bind(py), serializer, None, None, extra),
-                                    Err(err) => return Err(py_err_se_err(err)),
-                                }
+            let tag_str = tag.to_string();
+            if let Some(selected_serializer) = self.lookup.get(&tag_str) {
+                match selected_serializer.to_python(value, include, exclude, &new_extra) {
+                    Ok(v) => return infer_serialize(v.bind(py), serializer, None, None, extra),
+                    Err(_) => {
+                        if self.retry_with_lax_check() {
+                            new_extra.check = SerCheck::Lax;
+                            match selected_serializer.to_python(value, include, exclude, &new_extra) {
+                                Ok(v) => return infer_serialize(v.bind(py), serializer, None, None, extra),
+                                Err(err) => return Err(py_err_se_err(err)),
                             }
                         }
                     }
-                } else {
-                    return Err(py_err_se_err(self.tag_not_found()));
                 }
             } else {
                 return Err(py_err_se_err(self.tag_not_found()));
