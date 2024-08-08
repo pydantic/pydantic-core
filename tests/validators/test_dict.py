@@ -242,7 +242,7 @@ def test_dict_complex_key():
         {'type': 'dict', 'keys_schema': {'type': 'complex', 'strict': True}, 'values_schema': {'type': 'str'}}
     )
     assert v.validate_python({complex(1, 2): '1'}) == {complex(1, 2): '1'}
-    with pytest.raises(ValidationError, match='Input should be a valid Python complex object'):
+    with pytest.raises(ValidationError, match='Input should be an instance of complex'):
         assert v.validate_python({'1+2j': b'1'}) == {complex(1, 2): '1'}
 
     v = SchemaValidator({'type': 'dict', 'keys_schema': {'type': 'complex'}, 'values_schema': {'type': 'str'}})

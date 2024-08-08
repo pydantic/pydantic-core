@@ -401,11 +401,6 @@ all_errors = [
         None,
     ),
     (
-        'complex_type_py_strict',
-        'Input should be a valid Python complex object',
-        None,
-    ),
-    (
         'complex_str_parsing',
         'Input should be a valid complex string following the rules at https://docs.python.org/3/library/functions.html#complex',
         None,

@@ -10,7 +10,7 @@ from ..conftest import Err
 
 EXPECTED_PARSE_ERROR_MESSAGE = 'Input should be a valid complex string following the rules at https://docs.python.org/3/library/functions.html#complex'
 EXPECTED_TYPE_ERROR_MESSAGE = 'Input should be a valid python complex object, a number, or a valid complex string following the rules at https://docs.python.org/3/library/functions.html#complex'
-EXPECTED_TYPE_ERROR_PY_STRICT_MESSAGE = 'Input should be a valid Python complex object'
+EXPECTED_TYPE_ERROR_PY_STRICT_MESSAGE = 'Input should be an instance of complex'
 
 
 @pytest.mark.parametrize(

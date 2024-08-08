@@ -10,6 +10,7 @@ use pyo3::types::{
 };
 
 use pyo3::PyTypeCheck;
+use pyo3::PyTypeInfo;
 use speedate::MicrosecondsPrecisionOverflowBehavior;
 
 use crate::errors::{ErrorType, ErrorTypeDefaults, InputValue, LocItem, ValError, ValResult};
@@ -601,16 +602,21 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
         Err(ValError::new(ErrorTypeDefaults::TimeDeltaType, self))
     }
 
-    fn validate_complex<'a>(
-        &'a self,
-        strict: bool,
-        _py: Python<'py>,
-    ) -> ValResult<ValidationMatch<EitherComplex<'py>>> {
+    fn validate_complex<'a>(&'a self, strict: bool, py: Python<'py>) -> ValResult<ValidationMatch<EitherComplex<'py>>> {
         if let Ok(complex) = self.downcast::<PyComplex>() {
             return Ok(ValidationMatch::strict(EitherComplex::Py(complex.to_owned())));
         }
         if strict {
-            return Err(ValError::new(ErrorTypeDefaults::ComplexTypePyStrict, self));
+            return Err(ValError::new(
+                ErrorType::IsInstanceOf {
+                    class: PyComplex::type_object_bound(py)
+                        .qualname()
+                        .and_then(|name| name.extract())
+                        .unwrap_or_else(|_| "complex".to_owned()),
+                    context: None,
+                },
+                self,
+            ));
         }
 
         if let Ok(s) = self.downcast::<PyString>() {
