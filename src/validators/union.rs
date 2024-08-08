@@ -1,6 +1,7 @@
 use std::fmt::Write;
 use std::str::FromStr;
 
+use crate::py_gc::PyGcTraverse;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyString, PyTuple};
 use pyo3::{intern, PyTraverseError, PyVisit};
@@ -8,10 +9,9 @@ use smallvec::SmallVec;
 
 use crate::build_tools::py_schema_err;
 use crate::build_tools::{is_strict, schema_or_config};
+use crate::common::discriminator::Discriminator;
 use crate::errors::{ErrorType, ToErrorValue, ValError, ValLineError, ValResult};
 use crate::input::{BorrowInput, Input, ValidatedDict};
-use crate::lookup_key::LookupKey;
-use crate::py_gc::PyGcTraverse;
 use crate::tools::SchemaDict;
 
 use super::custom_error::CustomError;
@@ -292,49 +292,6 @@ impl<'a> MaybeErrors<'a> {
                     .collect(),
             ),
         }
-    }
-}
-
-#[derive(Debug, Clone)]
-enum Discriminator {
-    /// use `LookupKey` to find the tag, same as we do to find values in typed_dict aliases
-    LookupKey(LookupKey),
-    /// call a function to find the tag to use
-    Function(PyObject),
-    /// Custom discriminator specifically for the root `Schema` union in self-schema
-    SelfSchema,
-}
-
-impl Discriminator {
-    fn new(py: Python, raw: &Bound<'_, PyAny>) -> PyResult<Self> {
-        if raw.is_callable() {
-            return Ok(Self::Function(raw.to_object(py)));
-        } else if let Ok(py_str) = raw.downcast::<PyString>() {
-            if py_str.to_str()? == "self-schema-discriminator" {
-                return Ok(Self::SelfSchema);
-            }
-        }
-
-        let lookup_key = LookupKey::from_py(py, raw, None)?;
-        Ok(Self::LookupKey(lookup_key))
-    }
-
-    fn to_string_py(&self, py: Python) -> PyResult<String> {
-        match self {
-            Self::Function(f) => Ok(format!("{}()", f.getattr(py, "__name__")?)),
-            Self::LookupKey(lookup_key) => Ok(lookup_key.to_string()),
-            Self::SelfSchema => Ok("self-schema".to_string()),
-        }
-    }
-}
-
-impl PyGcTraverse for Discriminator {
-    fn py_gc_traverse(&self, visit: &PyVisit<'_>) -> Result<(), PyTraverseError> {
-        match self {
-            Self::Function(obj) => visit.call(obj)?,
-            Self::LookupKey(_) | Self::SelfSchema => {}
-        }
-        Ok(())
     }
 }
 
