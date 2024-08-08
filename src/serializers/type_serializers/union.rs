@@ -243,53 +243,35 @@ impl TypeSerializer for TaggedUnionSerializer {
         let mut new_extra = extra.clone();
         new_extra.check = SerCheck::Strict;
 
-        match &self.discriminator {
-            Discriminator::LookupKey(lookup_key) => {
-                let discriminator_value = match lookup_key {
-                    LookupKey::Simple { py_key, .. } => value.getattr(py_key).ok(),
-                    _ => None,
-                };
+        let discriminator_value = self.get_discriminator_value(value);
 
-                if let Some(tag) = discriminator_value {
-                    if let Ok(tag_str) = tag.extract::<String>() {
-                        if let Some(serializer) = self.lookup.get(&tag_str) {
-                            return serializer.to_python(value, include, exclude, &new_extra);
-                        }
-                    } else {
-                        return Err(self.tag_not_found());
+        if let Some(tag) = discriminator_value {
+            if let Ok(tag_str) = tag.extract::<String>(py) {
+                if let Some(serializer) = self.lookup.get(&tag_str) {
+                    match serializer.to_python(value, include, exclude, &new_extra) {
+                        Ok(v) => return Ok(v),
+                        Err(err) => match err.is_instance_of::<PydanticSerializationUnexpectedValue>(py) {
+                            true => {
+                                if self.retry_with_lax_check() {
+                                    new_extra.check = SerCheck::Lax;
+                                    return serializer.to_python(value, include, exclude, &new_extra);
+                                }
+                            }
+                            false => return Err(err),
+                        },
                     }
+                } else {
+                    return Err(self.tag_not_found());
                 }
-
-                let basic_union_ser = UnionSerializer::from_choices(self.choices.clone());
-                if let Ok(s) = basic_union_ser {
-                    return s.to_python(value, include, exclude, extra);
-                }
+            } else {
+                return Err(self.tag_not_found());
             }
-            Discriminator::Function(func) => {
-                // try calling the method directly on the object
-                let discriminator_value = func.call1(py, (value,)).ok().or_else(|| {
-                    // Try converting object to a dict, might be more compatible with poorly defined callable discriminator
-                    value
-                        .call_method0(intern!(py, "dict"))
-                        .and_then(|v| func.call1(py, (v.to_object(py),)))
-                        .ok()
-                });
+        }
 
-                if let Some(tag) = discriminator_value {
-                    if let Ok(tag_str) = tag.extract::<String>(py) {
-                        if let Some(serializer) = self.lookup.get(&tag_str) {
-                            return serializer.to_python(value, include, exclude, &new_extra);
-                        }
-                    } else {
-                        return Err(self.tag_not_found());
-                    }
-                }
-
-                let basic_union_ser = UnionSerializer::from_choices(self.choices.clone());
-                if let Ok(s) = basic_union_ser {
-                    return s.to_python(value, include, exclude, extra);
-                }
-            }
+        // Fallback processing
+        let basic_union_ser = UnionSerializer::from_choices(self.choices.clone());
+        if let Ok(s) = basic_union_ser {
+            return s.to_python(value, include, exclude, extra);
         }
 
         extra.warnings.on_fallback_py(self.get_name(), value, extra)?;
@@ -297,29 +279,37 @@ impl TypeSerializer for TaggedUnionSerializer {
     }
 
     fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
-        // TODO: implement this
         let mut new_extra = extra.clone();
         new_extra.check = SerCheck::Strict;
-        for comb_serializer in &self.choices {
-            match comb_serializer.json_key(key, &new_extra) {
-                Ok(v) => return Ok(v),
-                Err(err) => match err.is_instance_of::<PydanticSerializationUnexpectedValue>(key.py()) {
-                    true => (),
-                    false => return Err(err),
-                },
+
+        let py = key.py();
+
+        let discriminator_value = self.get_discriminator_value(key);
+
+        if let Some(tag) = discriminator_value {
+            if let Ok(tag_str) = tag.extract::<String>(py) {
+                if let Some(serializer) = self.lookup.get(&tag_str) {
+                    match serializer.json_key(key, &new_extra) {
+                        Ok(v) => return Ok(v),
+                        Err(_) => {
+                            if self.retry_with_lax_check() {
+                                new_extra.check = SerCheck::Lax;
+                                return serializer.json_key(key, &new_extra);
+                            }
+                        }
+                    }
+                } else {
+                    return Err(self.tag_not_found());
+                }
+            } else {
+                return Err(self.tag_not_found());
             }
         }
-        if self.retry_with_lax_check() {
-            new_extra.check = SerCheck::Lax;
-            for comb_serializer in &self.choices {
-                match comb_serializer.json_key(key, &new_extra) {
-                    Ok(v) => return Ok(v),
-                    Err(err) => match err.is_instance_of::<PydanticSerializationUnexpectedValue>(key.py()) {
-                        true => (),
-                        false => return Err(err),
-                    },
-                }
-            }
+
+        // Fallback processing
+        let basic_union_ser = UnionSerializer::from_choices(self.choices.clone());
+        if let Ok(s) = basic_union_ser {
+            return s.json_key(key, extra);
         }
 
         extra.warnings.on_fallback_py(self.get_name(), key, extra)?;
@@ -334,31 +324,39 @@ impl TypeSerializer for TaggedUnionSerializer {
         exclude: Option<&Bound<'_, PyAny>>,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
-        // TODO: implement this
-
         let py = value.py();
         let mut new_extra = extra.clone();
         new_extra.check = SerCheck::Strict;
-        for comb_serializer in &self.choices {
-            match comb_serializer.to_python(value, include, exclude, &new_extra) {
-                Ok(v) => return infer_serialize(v.bind(py), serializer, None, None, extra),
-                Err(err) => match err.is_instance_of::<PydanticSerializationUnexpectedValue>(py) {
-                    true => (),
-                    false => return Err(py_err_se_err(err)),
-                },
+
+        let discriminator_value = self.get_discriminator_value(value);
+
+        if let Some(tag) = discriminator_value {
+            if let Ok(tag_str) = tag.extract::<String>(py) {
+                if let Some(selected_serializer) = self.lookup.get(&tag_str) {
+                    match selected_serializer.to_python(value, include, exclude, &new_extra) {
+                        Ok(v) => return infer_serialize(v.bind(py), serializer, None, None, extra),
+                        Err(_) => {
+                            if self.retry_with_lax_check() {
+                                new_extra.check = SerCheck::Lax;
+                                match selected_serializer.to_python(value, include, exclude, &new_extra) {
+                                    Ok(v) => return infer_serialize(v.bind(py), serializer, None, None, extra),
+                                    Err(err) => return Err(py_err_se_err(err)),
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    return Err(py_err_se_err(self.tag_not_found()));
+                }
+            } else {
+                return Err(py_err_se_err(self.tag_not_found()));
             }
         }
-        if self.retry_with_lax_check() {
-            new_extra.check = SerCheck::Lax;
-            for comb_serializer in &self.choices {
-                match comb_serializer.to_python(value, include, exclude, &new_extra) {
-                    Ok(v) => return infer_serialize(v.bind(py), serializer, None, None, extra),
-                    Err(err) => match err.is_instance_of::<PydanticSerializationUnexpectedValue>(py) {
-                        true => (),
-                        false => return Err(py_err_se_err(err)),
-                    },
-                }
-            }
+
+        // Fallback processing
+        let basic_union_ser = UnionSerializer::from_choices(self.choices.clone());
+        if let Ok(s) = basic_union_ser {
+            return s.serde_serialize(value, serializer, include, exclude, extra);
         }
 
         extra.warnings.on_fallback_ser::<S>(self.get_name(), value, extra)?;
@@ -371,6 +369,23 @@ impl TypeSerializer for TaggedUnionSerializer {
 }
 
 impl TaggedUnionSerializer {
+    fn get_discriminator_value(&self, value: &Bound<'_, PyAny>) -> Option<Py<PyAny>> {
+        let py = value.py();
+        match &self.discriminator {
+            Discriminator::LookupKey(lookup_key) => match lookup_key {
+                LookupKey::Simple { py_key, .. } => value.getattr(py_key).ok().map(|obj| obj.to_object(py)),
+                _ => None,
+            },
+            Discriminator::Function(func) => func.call1(py, (value,)).ok().or_else(|| {
+                // Try converting object to a dict, might be more compatible with poorly defined callable discriminator
+                value
+                    .call_method0(intern!(py, "dict"))
+                    .and_then(|v| func.call1(py, (v.to_object(py),)))
+                    .ok()
+            }),
+        }
+    }
+
     fn tag_not_found(&self) -> PyErr {
         PydanticSerializationUnexpectedValue::new_err(Some("Tag not found in tagged union for value: {:?}".to_string()))
     }
