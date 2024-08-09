@@ -260,12 +260,9 @@ impl TypeSerializer for TaggedUnionSerializer {
                         false => return Err(err),
                     },
                 }
-            } else {
-                return Err(self.tag_not_found());
             }
         }
 
-        // Fallback processing
         let basic_union_ser = UnionSerializer::from_choices(self.choices.clone());
         if let Ok(s) = basic_union_ser {
             return s.to_python(value, include, exclude, extra);
@@ -293,12 +290,9 @@ impl TypeSerializer for TaggedUnionSerializer {
                         }
                     }
                 }
-            } else {
-                return Err(self.tag_not_found());
             }
         }
 
-        // Fallback processing
         let basic_union_ser = UnionSerializer::from_choices(self.choices.clone());
         if let Ok(s) = basic_union_ser {
             return s.json_key(key, extra);
@@ -337,12 +331,9 @@ impl TypeSerializer for TaggedUnionSerializer {
                         }
                     }
                 }
-            } else {
-                return Err(py_err_se_err(self.tag_not_found()));
             }
         }
 
-        // Fallback processing
         let basic_union_ser = UnionSerializer::from_choices(self.choices.clone());
         if let Ok(s) = basic_union_ser {
             return s.serde_serialize(value, serializer, include, exclude, extra);
@@ -373,9 +364,5 @@ impl TaggedUnionSerializer {
                     .ok()
             }),
         }
-    }
-
-    fn tag_not_found(&self) -> PyErr {
-        PydanticSerializationUnexpectedValue::new_err(Some("Tag not found in tagged union for value: {:?}".to_string()))
     }
 }
