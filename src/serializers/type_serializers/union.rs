@@ -103,7 +103,6 @@ impl TypeSerializer for UnionSerializer {
 
         extra.warnings.on_fallback_py(self.get_name(), value, extra)?;
         infer_to_python(value, include, exclude, extra)
-        // Need to push all other errors if serialization didn't succeed
     }
 
     fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
