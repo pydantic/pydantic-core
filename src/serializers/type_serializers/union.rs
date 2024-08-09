@@ -9,8 +9,8 @@ use crate::tools::SchemaDict;
 use crate::PydanticSerializationUnexpectedValue;
 
 use super::{
-    infer_json_key, infer_serialize, infer_to_python, py_err_se_err, BuildSerializer, CombinedSerializer, Extra,
-    SerCheck, TypeSerializer,
+    infer_json_key, infer_serialize, infer_to_python, BuildSerializer, CombinedSerializer, Extra, SerCheck,
+    TypeSerializer,
 };
 
 #[derive(Debug, Clone)]
@@ -84,7 +84,7 @@ impl TypeSerializer for UnionSerializer {
                 Ok(v) => return Ok(v),
                 Err(err) => match err.is_instance_of::<PydanticSerializationUnexpectedValue>(value.py()) {
                     true => (),
-                    false => return Err(err),
+                    false => extra.warnings.custom_warning(err.to_string()),
                 },
             }
         }
@@ -95,7 +95,7 @@ impl TypeSerializer for UnionSerializer {
                     Ok(v) => return Ok(v),
                     Err(err) => match err.is_instance_of::<PydanticSerializationUnexpectedValue>(value.py()) {
                         true => (),
-                        false => return Err(err),
+                        false => extra.warnings.custom_warning(err.to_string()),
                     },
                 }
             }
@@ -103,6 +103,7 @@ impl TypeSerializer for UnionSerializer {
 
         extra.warnings.on_fallback_py(self.get_name(), value, extra)?;
         infer_to_python(value, include, exclude, extra)
+        // Need to push all other errors if serialization didn't succeed
     }
 
     fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
@@ -111,10 +112,7 @@ impl TypeSerializer for UnionSerializer {
         for comb_serializer in &self.choices {
             match comb_serializer.json_key(key, &new_extra) {
                 Ok(v) => return Ok(v),
-                Err(err) => match err.is_instance_of::<PydanticSerializationUnexpectedValue>(key.py()) {
-                    true => (),
-                    false => return Err(err),
-                },
+                Err(err) => extra.warnings.custom_warning(err.to_string()),
             }
         }
         if self.retry_with_lax_check() {
@@ -122,10 +120,7 @@ impl TypeSerializer for UnionSerializer {
             for comb_serializer in &self.choices {
                 match comb_serializer.json_key(key, &new_extra) {
                     Ok(v) => return Ok(v),
-                    Err(err) => match err.is_instance_of::<PydanticSerializationUnexpectedValue>(key.py()) {
-                        true => (),
-                        false => return Err(err),
-                    },
+                    Err(err) => extra.warnings.custom_warning(err.to_string()),
                 }
             }
         }
@@ -145,13 +140,11 @@ impl TypeSerializer for UnionSerializer {
         let py = value.py();
         let mut new_extra = extra.clone();
         new_extra.check = SerCheck::Strict;
+
         for comb_serializer in &self.choices {
             match comb_serializer.to_python(value, include, exclude, &new_extra) {
                 Ok(v) => return infer_serialize(v.bind(py), serializer, None, None, extra),
-                Err(err) => match err.is_instance_of::<PydanticSerializationUnexpectedValue>(py) {
-                    true => (),
-                    false => return Err(py_err_se_err(err)),
-                },
+                Err(err) => extra.warnings.custom_warning(err.to_string()),
             }
         }
         if self.retry_with_lax_check() {
@@ -159,10 +152,7 @@ impl TypeSerializer for UnionSerializer {
             for comb_serializer in &self.choices {
                 match comb_serializer.to_python(value, include, exclude, &new_extra) {
                     Ok(v) => return infer_serialize(v.bind(py), serializer, None, None, extra),
-                    Err(err) => match err.is_instance_of::<PydanticSerializationUnexpectedValue>(py) {
-                        true => (),
-                        false => return Err(py_err_se_err(err)),
-                    },
+                    Err(err) => extra.warnings.custom_warning(err.to_string()),
                 }
             }
         }
