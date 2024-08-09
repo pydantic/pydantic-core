@@ -112,7 +112,10 @@ impl TypeSerializer for UnionSerializer {
         for comb_serializer in &self.choices {
             match comb_serializer.json_key(key, &new_extra) {
                 Ok(v) => return Ok(v),
-                Err(err) => extra.warnings.custom_warning(err.to_string()),
+                Err(err) => match err.is_instance_of::<PydanticSerializationUnexpectedValue>(key.py()) {
+                    true => (),
+                    false => extra.warnings.custom_warning(err.to_string()),
+                },
             }
         }
         if self.retry_with_lax_check() {
@@ -120,7 +123,10 @@ impl TypeSerializer for UnionSerializer {
             for comb_serializer in &self.choices {
                 match comb_serializer.json_key(key, &new_extra) {
                     Ok(v) => return Ok(v),
-                    Err(err) => extra.warnings.custom_warning(err.to_string()),
+                    Err(err) => match err.is_instance_of::<PydanticSerializationUnexpectedValue>(key.py()) {
+                        true => (),
+                        false => extra.warnings.custom_warning(err.to_string()),
+                    },
                 }
             }
         }
@@ -144,7 +150,10 @@ impl TypeSerializer for UnionSerializer {
         for comb_serializer in &self.choices {
             match comb_serializer.to_python(value, include, exclude, &new_extra) {
                 Ok(v) => return infer_serialize(v.bind(py), serializer, None, None, extra),
-                Err(err) => extra.warnings.custom_warning(err.to_string()),
+                Err(err) => match err.is_instance_of::<PydanticSerializationUnexpectedValue>(value.py()) {
+                    true => (),
+                    false => extra.warnings.custom_warning(err.to_string()),
+                },
             }
         }
         if self.retry_with_lax_check() {
@@ -152,7 +161,10 @@ impl TypeSerializer for UnionSerializer {
             for comb_serializer in &self.choices {
                 match comb_serializer.to_python(value, include, exclude, &new_extra) {
                     Ok(v) => return infer_serialize(v.bind(py), serializer, None, None, extra),
-                    Err(err) => extra.warnings.custom_warning(err.to_string()),
+                    Err(err) => match err.is_instance_of::<PydanticSerializationUnexpectedValue>(value.py()) {
+                        true => (),
+                        false => extra.warnings.custom_warning(err.to_string()),
+                    },
                 }
             }
         }
