@@ -626,3 +626,52 @@ def test_union_serializer_picks_exact_type_over_subclass_json(
     )
     assert s.to_python(input_value, mode='json') == expected_value
     assert s.to_json(input_value) == json.dumps(expected_value).encode()
+
+
+def test_tagged_union() -> None:
+    @dataclasses.dataclass
+    class ModelA:
+        field: int
+        tag: Literal['a'] = 'a'
+
+    @dataclasses.dataclass
+    class ModelB:
+        field: int
+        tag: Literal['b'] = 'b'
+
+    s = SchemaSerializer(
+        core_schema.tagged_union_schema(
+            choices={
+                'a': core_schema.dataclass_schema(
+                    ModelA,
+                    core_schema.dataclass_args_schema(
+                        'ModelA',
+                        [
+                            core_schema.dataclass_field(name='field', schema=core_schema.int_schema()),
+                            core_schema.dataclass_field(name='tag', schema=core_schema.literal_schema(['a'])),
+                        ],
+                    ),
+                    ['field', 'tag'],
+                ),
+                'b': core_schema.dataclass_schema(
+                    ModelB,
+                    core_schema.dataclass_args_schema(
+                        'ModelB',
+                        [
+                            core_schema.dataclass_field(name='field', schema=core_schema.int_schema()),
+                            core_schema.dataclass_field(name='tag', schema=core_schema.literal_schema(['b'])),
+                        ],
+                    ),
+                    ['field', 'tag'],
+                ),
+            },
+            discriminator='tag',
+        )
+    )
+
+    assert 'TaggedUnionSerializer' in repr(s)
+
+    model_a = ModelA(field=1)
+    model_b = ModelB(field=1)
+    assert s.to_python(model_a) == {'field': 1, 'tag': 'a'}
+    assert s.to_python(model_b) == {'field': 1, 'tag': 'b'}
