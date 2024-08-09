@@ -647,5 +647,6 @@ def test_custom_serializer() -> None:
             ]
         )
     )
+    print(s)
     assert s.to_python([{'id': 1}, {'id': 2}]) == [1, 2]
     assert s.to_python({'id': 1}) == 1
