@@ -243,9 +243,7 @@ impl TypeSerializer for TaggedUnionSerializer {
         let mut new_extra = extra.clone();
         new_extra.check = SerCheck::Strict;
 
-        let discriminator_value = self.get_discriminator_value(value);
-
-        if let Some(tag) = discriminator_value {
+        if let Some(tag) = self.get_discriminator_value(value) {
             let tag_str = tag.to_string();
             if let Some(serializer) = self.lookup.get(&tag_str) {
                 match serializer.to_python(value, include, exclude, &new_extra) {
@@ -276,9 +274,7 @@ impl TypeSerializer for TaggedUnionSerializer {
         let mut new_extra = extra.clone();
         new_extra.check = SerCheck::Strict;
 
-        let discriminator_value = self.get_discriminator_value(key);
-
-        if let Some(tag) = discriminator_value {
+        if let Some(tag) = self.get_discriminator_value(key) {
             let tag_str = tag.to_string();
             if let Some(serializer) = self.lookup.get(&tag_str) {
                 match serializer.json_key(key, &new_extra) {
@@ -314,9 +310,7 @@ impl TypeSerializer for TaggedUnionSerializer {
         let mut new_extra = extra.clone();
         new_extra.check = SerCheck::Strict;
 
-        let discriminator_value = self.get_discriminator_value(value);
-
-        if let Some(tag) = discriminator_value {
+        if let Some(tag) = self.get_discriminator_value(value) {
             let tag_str = tag.to_string();
             if let Some(selected_serializer) = self.lookup.get(&tag_str) {
                 match selected_serializer.to_python(value, include, exclude, &new_extra) {
