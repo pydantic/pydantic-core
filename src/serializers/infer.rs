@@ -106,6 +106,7 @@ pub(crate) fn infer_to_python_known(
             extra.fallback,
             extra.duck_typing_ser_mode,
             extra.context,
+            extra.serialize_generators,
         );
         serializer.serializer.to_python(value, include, exclude, &extra)
     };
@@ -207,7 +208,7 @@ pub(crate) fn infer_to_python_known(
                 let v = value.getattr(intern!(py, "value"))?;
                 infer_to_python(&v, include, exclude, extra)?.into_py(py)
             }
-            ObType::Generator => {
+            ObType::Generator if extra.serialize_generators => {
                 let py_seq = value.downcast::<PyIterator>()?;
                 let mut items = Vec::new();
                 let filter = AnyFilter::new();
@@ -228,7 +229,7 @@ pub(crate) fn infer_to_python_known(
             }
             ObType::Path => value.str()?.into_py(py),
             ObType::Pattern => value.getattr(intern!(py, "pattern"))?.into_py(py),
-            ObType::Unknown => {
+            _ => {
                 if let Some(fallback) = extra.fallback {
                     let next_value = fallback.call1((value,))?;
                     let next_result = infer_to_python(&next_value, include, exclude, extra);
@@ -263,7 +264,7 @@ pub(crate) fn infer_to_python_known(
             }
             ObType::PydanticSerializable => serialize_with_serializer()?,
             ObType::Dataclass => serialize_pairs_python(py, any_dataclass_iter(value)?.0, include, exclude, extra, Ok)?,
-            ObType::Generator => {
+            ObType::Generator if extra.serialize_generators => {
                 let iter = super::type_serializers::generator::SerializationIterator::new(
                     value.downcast()?,
                     super::type_serializers::any::AnySerializer.into(),
@@ -274,7 +275,8 @@ pub(crate) fn infer_to_python_known(
                 );
                 iter.into_py(py)
             }
-            ObType::Unknown => {
+            ObType::Unknown | ObType::Generator => {
+                // if !extra.serialize_generators
                 if let Some(fallback) = extra.fallback {
                     let next_value = fallback.call1((value,))?;
                     let next_result = infer_to_python(&next_value, include, exclude, extra);
@@ -482,6 +484,7 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
                 extra.fallback,
                 extra.duck_typing_ser_mode,
                 extra.context,
+                extra.serialize_generators,
             );
             let pydantic_serializer =
                 PydanticSerializer::new(value, &extracted_serializer.serializer, include, exclude, &extra);
@@ -499,7 +502,7 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
             let v = value.getattr(intern!(value.py(), "value")).map_err(py_err_se_err)?;
             infer_serialize(&v, serializer, include, exclude, extra)
         }
-        ObType::Generator => {
+        ObType::Generator if extra.serialize_generators => {
             let py_seq = value.downcast::<PyIterator>().map_err(py_err_se_err)?;
             let mut seq = serializer.serialize_seq(None)?;
             let filter = AnyFilter::new();
@@ -530,7 +533,7 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
                 .map_err(py_err_se_err)?;
             serializer.serialize_str(&s)
         }
-        ObType::Unknown => {
+        ObType::Unknown | ObType::Generator => {
             if let Some(fallback) = extra.fallback {
                 let next_value = fallback.call1((value,)).map_err(py_err_se_err)?;
                 let next_result = infer_serialize(&next_value, serializer, include, exclude, extra);
@@ -550,14 +553,14 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
     ser_result
 }
 
-fn unknown_type_error(value: &Bound<'_, PyAny>) -> PyErr {
+pub(crate) fn unknown_type_error(value: &Bound<'_, PyAny>) -> PyErr {
     PydanticSerializationError::new_err(format!(
         "Unable to serialize unknown type: {}",
         safe_repr(&value.get_type())
     ))
 }
 
-fn serialize_unknown<'py>(value: &Bound<'py, PyAny>) -> Cow<'py, str> {
+pub(crate) fn serialize_unknown<'py>(value: &Bound<'py, PyAny>) -> Cow<'py, str> {
     if let Ok(s) = value.str() {
         s.to_string_lossy().into_owned().into()
     } else if let Ok(name) = value.get_type().qualname() {

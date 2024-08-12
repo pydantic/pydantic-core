@@ -99,6 +99,7 @@ a = A()
                     None,
                     false,
                     None,
+                    true,
                 )
                 .unwrap();
             let serialized: &[u8] = serialized.extract(py).unwrap();
@@ -203,6 +204,7 @@ dump_json_input_2 = {'a': 'something'}
                     None,
                     false,
                     None,
+                    true,
                 )
                 .unwrap();
             let repr = format!("{}", serialization_result.bind(py).repr().unwrap());
@@ -224,6 +226,7 @@ dump_json_input_2 = {'a': 'something'}
                     None,
                     false,
                     None,
+                    true,
                 )
                 .unwrap();
             let repr = format!("{}", serialization_result.bind(py).repr().unwrap());

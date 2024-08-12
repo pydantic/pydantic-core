@@ -89,6 +89,7 @@ impl SerializationState {
         fallback: Option<&'py Bound<'_, PyAny>>,
         duck_typing_ser_mode: DuckTypingSerMode,
         context: Option<&'py Bound<'_, PyAny>>,
+        serialize_generators: bool,
     ) -> Extra<'py> {
         Extra::new(
             py,
@@ -105,6 +106,7 @@ impl SerializationState {
             fallback,
             duck_typing_ser_mode,
             context,
+            serialize_generators,
         )
     }
 
@@ -138,6 +140,7 @@ pub(crate) struct Extra<'a> {
     pub fallback: Option<&'a Bound<'a, PyAny>>,
     pub duck_typing_ser_mode: DuckTypingSerMode,
     pub context: Option<&'a Bound<'a, PyAny>>,
+    pub serialize_generators: bool,
 }
 
 impl<'a> Extra<'a> {
@@ -157,6 +160,7 @@ impl<'a> Extra<'a> {
         fallback: Option<&'a Bound<'a, PyAny>>,
         duck_typing_ser_mode: DuckTypingSerMode,
         context: Option<&'a Bound<'a, PyAny>>,
+        serialize_generators: bool,
     ) -> Self {
         Self {
             mode,
@@ -176,6 +180,7 @@ impl<'a> Extra<'a> {
             fallback,
             duck_typing_ser_mode,
             context,
+            serialize_generators,
         }
     }
 
@@ -236,6 +241,7 @@ pub(crate) struct ExtraOwned {
     pub fallback: Option<PyObject>,
     duck_typing_ser_mode: DuckTypingSerMode,
     pub context: Option<PyObject>,
+    serialize_generators: bool,
 }
 
 impl ExtraOwned {
@@ -257,6 +263,7 @@ impl ExtraOwned {
             fallback: extra.fallback.map(|model| model.clone().into()),
             duck_typing_ser_mode: extra.duck_typing_ser_mode,
             context: extra.context.map(|model| model.clone().into()),
+            serialize_generators: extra.serialize_generators,
         }
     }
 
@@ -279,6 +286,7 @@ impl ExtraOwned {
             fallback: self.fallback.as_ref().map(|m| m.bind(py)),
             duck_typing_ser_mode: self.duck_typing_ser_mode,
             context: self.context.as_ref().map(|m| m.bind(py)),
+            serialize_generators: self.serialize_generators,
         }
     }
 }

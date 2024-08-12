@@ -16,6 +16,7 @@ use super::{
     infer_serialize, infer_to_python, py_err_se_err, BuildSerializer, CombinedSerializer, Extra, ExtraOwned,
     PydanticSerializer, SchemaFilter, SerMode, TypeSerializer,
 };
+use crate::serializers::infer::{serialize_unknown, unknown_type_error};
 
 #[derive(Debug, Clone)]
 pub struct GeneratorSerializer {
@@ -57,8 +58,8 @@ impl TypeSerializer for GeneratorSerializer {
         match value.downcast::<PyIterator>() {
             Ok(py_iter) => {
                 let py = value.py();
-                match extra.mode {
-                    SerMode::Json => {
+                match (extra.serialize_generators, extra.mode) {
+                    (true, SerMode::Json) => {
                         let item_serializer = self.item_serializer.as_ref();
 
                         let mut items = match value.len() {
@@ -79,7 +80,7 @@ impl TypeSerializer for GeneratorSerializer {
                         }
                         Ok(items.into_py(py))
                     }
-                    _ => {
+                    (true, _) => {
                         let iter = SerializationIterator::new(
                             py_iter,
                             self.item_serializer.as_ref().clone(),
@@ -89,6 +90,24 @@ impl TypeSerializer for GeneratorSerializer {
                             extra,
                         );
                         Ok(iter.into_py(py))
+                    }
+                    (false, SerMode::Json) => {
+                        if let Some(fallback) = extra.fallback {
+                            let next_value = fallback.call1((value,))?;
+                            infer_to_python(&next_value, include, exclude, extra)
+                        } else if extra.serialize_unknown {
+                            Ok(serialize_unknown(value).into_py(py))
+                        } else {
+                            return Err(unknown_type_error(value));
+                        }
+                    }
+                    (false, _) => {
+                        if let Some(fallback) = extra.fallback {
+                            let next_value = fallback.call1((value,))?;
+                            let next_result = infer_to_python(&next_value, include, exclude, extra);
+                            return next_result;
+                        }
+                        Ok(value.into_py(py))
                     }
                 }
             }
@@ -111,6 +130,12 @@ impl TypeSerializer for GeneratorSerializer {
         exclude: Option<&Bound<'_, PyAny>>,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
+        if !extra.serialize_generators {
+            if extra.fallback.is_none() {
+                extra.warnings.on_fallback_ser::<S>(self.get_name(), value, extra)?;
+            }
+            return infer_serialize(value, serializer, include, exclude, extra);
+        }
         match value.downcast::<PyIterator>() {
             Ok(py_iter) => {
                 let len = match value.len() {
