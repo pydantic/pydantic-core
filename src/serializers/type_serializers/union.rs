@@ -6,7 +6,7 @@ use std::borrow::Cow;
 
 use crate::build_tools::py_schema_err;
 use crate::definitions::DefinitionsBuilder;
-use crate::tools::SchemaDict;
+use crate::tools::{SchemaDict, UNION_ERR_SMALLVEC_CAPACITY};
 use crate::PydanticSerializationUnexpectedValue;
 
 use super::{
@@ -79,7 +79,7 @@ impl TypeSerializer for UnionSerializer {
         // try the serializers in left to right order with error_on fallback=true
         let mut new_extra = extra.clone();
         new_extra.check = SerCheck::Strict;
-        let mut errors: SmallVec<[PyErr; 16]> = SmallVec::new();
+        let mut errors: SmallVec<[PyErr; UNION_ERR_SMALLVEC_CAPACITY]> = SmallVec::new();
 
         for comb_serializer in &self.choices {
             match comb_serializer.to_python(value, include, exclude, &new_extra) {
@@ -114,7 +114,7 @@ impl TypeSerializer for UnionSerializer {
     fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
         let mut new_extra = extra.clone();
         new_extra.check = SerCheck::Strict;
-        let mut errors: SmallVec<[PyErr; 16]> = SmallVec::new();
+        let mut errors: SmallVec<[PyErr; UNION_ERR_SMALLVEC_CAPACITY]> = SmallVec::new();
 
         for comb_serializer in &self.choices {
             match comb_serializer.json_key(key, &new_extra) {
@@ -157,7 +157,7 @@ impl TypeSerializer for UnionSerializer {
         let py = value.py();
         let mut new_extra = extra.clone();
         new_extra.check = SerCheck::Strict;
-        let mut errors: SmallVec<[PyErr; 16]> = SmallVec::new();
+        let mut errors: SmallVec<[PyErr; UNION_ERR_SMALLVEC_CAPACITY]> = SmallVec::new();
 
         for comb_serializer in &self.choices {
             match comb_serializer.to_python(value, include, exclude, &new_extra) {
