@@ -32,7 +32,7 @@ def test_union_bool_int(input_value, expected_value, bool_case_label, int_case_l
 
 def test_union_error():
     s = SchemaSerializer(core_schema.union_schema([core_schema.bool_schema(), core_schema.int_schema()]))
-    msg = 'Expected `Union[bool, int]` but got `str` - serialized value may not be as expected'
+    msg = "Expected `Union[bool, int]` but got `str` with value `'a string'` - serialized value may not be as expected"
     with pytest.warns(UserWarning, match=re.escape(msg)):
         assert s.to_python('a string') == 'a string'
 
@@ -675,3 +675,27 @@ def test_tagged_union() -> None:
     model_b = ModelB(field=1)
     assert s.to_python(model_a) == {'field': 1, 'tag': 'a'}
     assert s.to_python(model_b) == {'field': 1, 'tag': 'b'}
+
+
+def test_custom_serializer() -> None:
+    s = SchemaSerializer(
+        core_schema.union_schema(
+            [
+                core_schema.dict_schema(
+                    keys_schema=core_schema.any_schema(),
+                    values_schema=core_schema.any_schema(),
+                    serialization=core_schema.plain_serializer_function_ser_schema(lambda x: x['id']),
+                ),
+                core_schema.list_schema(
+                    items_schema=core_schema.dict_schema(
+                        keys_schema=core_schema.any_schema(),
+                        values_schema=core_schema.any_schema(),
+                        serialization=core_schema.plain_serializer_function_ser_schema(lambda x: x['id']),
+                    )
+                ),
+            ]
+        )
+    )
+    print(s)
+    assert s.to_python([{'id': 1}, {'id': 2}]) == [1, 2]
+    assert s.to_python({'id': 1}) == 1
