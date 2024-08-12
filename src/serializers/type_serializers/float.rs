@@ -12,7 +12,7 @@ use crate::tools::SchemaDict;
 use super::simple::to_str_json_key;
 use super::{
     infer_json_key, infer_serialize, infer_to_python, BuildSerializer, CombinedSerializer, Extra, IsType, ObType,
-    SerMode, TypeSerializer,
+    SerCheck, SerMode, TypeSerializer,
 };
 
 #[derive(Debug, Clone)]
@@ -73,12 +73,18 @@ impl TypeSerializer for FloatSerializer {
         let py = value.py();
         match extra.ob_type_lookup.is_type(value, ObType::Float) {
             IsType::Exact => Ok(value.into_py(py)),
-            IsType::Subclass => match extra.mode {
-                SerMode::Json => {
-                    let rust_value = value.extract::<f64>()?;
-                    Ok(rust_value.to_object(py))
+            IsType::Subclass => match extra.check {
+                SerCheck::Strict => {
+                    extra.warnings.on_fallback_py(self.get_name(), value, extra)?;
+                    infer_to_python(value, include, exclude, extra)
                 }
-                _ => infer_to_python(value, include, exclude, extra),
+                SerCheck::Lax | SerCheck::None => match extra.mode {
+                    SerMode::Json => {
+                        let rust_value = value.extract::<f64>()?;
+                        Ok(rust_value.to_object(py))
+                    }
+                    _ => infer_to_python(value, include, exclude, extra),
+                },
             },
             IsType::False => {
                 extra.warnings.on_fallback_py(self.get_name(), value, extra)?;
