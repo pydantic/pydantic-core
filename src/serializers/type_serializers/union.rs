@@ -1,6 +1,7 @@
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
+use smallvec::SmallVec;
 use std::borrow::Cow;
 
 use crate::build_tools::py_schema_err;
@@ -78,7 +79,7 @@ impl TypeSerializer for UnionSerializer {
         // try the serializers in left to right order with error_on fallback=true
         let mut new_extra = extra.clone();
         new_extra.check = SerCheck::Strict;
-        let mut errors: Vec<PyErr> = Vec::new();
+        let mut errors: SmallVec<[PyErr; 16]> = SmallVec::new();
 
         for comb_serializer in &self.choices {
             match comb_serializer.to_python(value, include, exclude, &new_extra) {
@@ -113,7 +114,7 @@ impl TypeSerializer for UnionSerializer {
     fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
         let mut new_extra = extra.clone();
         new_extra.check = SerCheck::Strict;
-        let mut errors: Vec<PyErr> = Vec::new();
+        let mut errors: SmallVec<[PyErr; 16]> = SmallVec::new();
 
         for comb_serializer in &self.choices {
             match comb_serializer.json_key(key, &new_extra) {
@@ -156,7 +157,7 @@ impl TypeSerializer for UnionSerializer {
         let py = value.py();
         let mut new_extra = extra.clone();
         new_extra.check = SerCheck::Strict;
-        let mut errors: Vec<PyErr> = Vec::new();
+        let mut errors: SmallVec<[PyErr; 16]> = SmallVec::new();
 
         for comb_serializer in &self.choices {
             match comb_serializer.to_python(value, include, exclude, &new_extra) {
