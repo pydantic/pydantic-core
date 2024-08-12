@@ -8,6 +8,8 @@ use std::borrow::Cow;
 use crate::build_tools::py_schema_err;
 use crate::common::discriminator::Discriminator;
 use crate::definitions::DefinitionsBuilder;
+use crate::lookup_key::LookupKey;
+use crate::serializers::type_serializers::py_err_se_err;
 use crate::tools::{SchemaDict, UNION_ERR_SMALLVEC_CAPACITY};
 use crate::PydanticSerializationUnexpectedValue;
 
