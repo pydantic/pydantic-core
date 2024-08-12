@@ -39,3 +39,5 @@ impl PyGcTraverse for Discriminator {
         Ok(())
     }
 }
+
+pub(crate) const SMALL_UNION_THRESHOLD: usize = 4;

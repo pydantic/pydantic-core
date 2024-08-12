@@ -9,10 +9,10 @@ use smallvec::SmallVec;
 
 use crate::build_tools::py_schema_err;
 use crate::build_tools::{is_strict, schema_or_config};
-use crate::common::discriminator::Discriminator;
+use crate::common::union::{Discriminator, SMALL_UNION_THRESHOLD};
 use crate::errors::{ErrorType, ToErrorValue, ValError, ValLineError, ValResult};
 use crate::input::{BorrowInput, Input, ValidatedDict};
-use crate::tools::{SchemaDict, UNION_ERR_SMALLVEC_CAPACITY};
+use crate::tools::SchemaDict;
 
 use super::custom_error::CustomError;
 use super::literal::LiteralLookup;
@@ -249,7 +249,7 @@ struct ChoiceLineErrors<'a> {
 
 enum MaybeErrors<'a> {
     Custom(&'a CustomError),
-    Errors(SmallVec<[ChoiceLineErrors<'a>; UNION_ERR_SMALLVEC_CAPACITY]>),
+    Errors(SmallVec<[ChoiceLineErrors<'a>; SMALL_UNION_THRESHOLD]>),
 }
 
 impl<'a> MaybeErrors<'a> {

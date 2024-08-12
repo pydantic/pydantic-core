@@ -6,11 +6,11 @@ use smallvec::SmallVec;
 use std::borrow::Cow;
 
 use crate::build_tools::py_schema_err;
-use crate::common::discriminator::Discriminator;
+use crate::common::union::{Discriminator, SMALL_UNION_THRESHOLD};
 use crate::definitions::DefinitionsBuilder;
 use crate::lookup_key::LookupKey;
 use crate::serializers::type_serializers::py_err_se_err;
-use crate::tools::{SchemaDict, UNION_ERR_SMALLVEC_CAPACITY};
+use crate::tools::SchemaDict;
 use crate::PydanticSerializationUnexpectedValue;
 
 use super::{
@@ -83,7 +83,7 @@ impl TypeSerializer for UnionSerializer {
         // try the serializers in left to right order with error_on fallback=true
         let mut new_extra = extra.clone();
         new_extra.check = SerCheck::Strict;
-        let mut errors: SmallVec<[PyErr; UNION_ERR_SMALLVEC_CAPACITY]> = SmallVec::new();
+        let mut errors: SmallVec<[PyErr; SMALL_UNION_THRESHOLD]> = SmallVec::new();
 
         for comb_serializer in &self.choices {
             match comb_serializer.to_python(value, include, exclude, &new_extra) {
@@ -118,7 +118,7 @@ impl TypeSerializer for UnionSerializer {
     fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
         let mut new_extra = extra.clone();
         new_extra.check = SerCheck::Strict;
-        let mut errors: SmallVec<[PyErr; UNION_ERR_SMALLVEC_CAPACITY]> = SmallVec::new();
+        let mut errors: SmallVec<[PyErr; SMALL_UNION_THRESHOLD]> = SmallVec::new();
 
         for comb_serializer in &self.choices {
             match comb_serializer.json_key(key, &new_extra) {
@@ -161,7 +161,7 @@ impl TypeSerializer for UnionSerializer {
         let py = value.py();
         let mut new_extra = extra.clone();
         new_extra.check = SerCheck::Strict;
-        let mut errors: SmallVec<[PyErr; UNION_ERR_SMALLVEC_CAPACITY]> = SmallVec::new();
+        let mut errors: SmallVec<[PyErr; SMALL_UNION_THRESHOLD]> = SmallVec::new();
 
         for comb_serializer in &self.choices {
             match comb_serializer.to_python(value, include, exclude, &new_extra) {
