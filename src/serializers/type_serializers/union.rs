@@ -359,6 +359,10 @@ impl TypeSerializer for TaggedUnionSerializer {
     fn get_name(&self) -> &str {
         &self.name
     }
+
+    fn retry_with_lax_check(&self) -> bool {
+        self.choices.iter().any(CombinedSerializer::retry_with_lax_check)
+    }
 }
 
 impl TaggedUnionSerializer {
