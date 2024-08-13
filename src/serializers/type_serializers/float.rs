@@ -14,6 +14,7 @@ use super::{
     infer_json_key, infer_serialize, infer_to_python, BuildSerializer, CombinedSerializer, Extra, IsType, ObType,
     SerCheck, SerMode, TypeSerializer,
 };
+use crate::serializers::errors::PydanticSerializationUnexpectedValue;
 
 #[derive(Debug, Clone)]
 pub struct FloatSerializer {
@@ -74,10 +75,7 @@ impl TypeSerializer for FloatSerializer {
         match extra.ob_type_lookup.is_type(value, ObType::Float) {
             IsType::Exact => Ok(value.into_py(py)),
             IsType::Subclass => match extra.check {
-                SerCheck::Strict => {
-                    extra.warnings.on_fallback_py(self.get_name(), value, extra)?;
-                    infer_to_python(value, include, exclude, extra)
-                }
+                SerCheck::Strict => Err(PydanticSerializationUnexpectedValue::new_err(None)),
                 SerCheck::Lax | SerCheck::None => match extra.mode {
                     SerMode::Json => {
                         let rust_value = value.extract::<f64>()?;
