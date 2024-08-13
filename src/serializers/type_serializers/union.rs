@@ -221,11 +221,11 @@ impl BuildSerializer for TaggedUnionSerializer {
         let py = schema.py();
         let discriminator = Discriminator::new(py, &schema.get_as_req(intern!(py, "discriminator"))?)?;
 
-        let choice_list: Bound<PyDict> = schema.get_as_req(intern!(py, "choices"))?;
-        let mut lookup: HashMap<String, CombinedSerializer> = HashMap::with_capacity(choice_list.len());
-        let mut choices: Vec<CombinedSerializer> = Vec::with_capacity(choice_list.len());
+        let choices_map: Bound<PyDict> = schema.get_as_req(intern!(py, "choices"))?;
+        let mut lookup: HashMap<String, CombinedSerializer> = HashMap::with_capacity(choices_map.len());
+        let mut choices: Vec<CombinedSerializer> = Vec::with_capacity(choices_map.len());
 
-        for (choice_key, choice_schema) in choice_list {
+        for (choice_key, choice_schema) in choices_map {
             let serializer = CombinedSerializer::build(choice_schema.downcast()?, config, definitions).unwrap();
             choices.push(serializer.clone());
             lookup.insert(choice_key.to_string(), serializer);
