@@ -638,3 +638,27 @@ def test_union_float_int() -> None:
 
     assert s.to_python(1) == 1
     assert json.loads(s.to_json(1)) == 1
+
+
+def test_custom_serializer() -> None:
+    s = SchemaSerializer(
+        core_schema.union_schema(
+            [
+                core_schema.dict_schema(
+                    keys_schema=core_schema.any_schema(),
+                    values_schema=core_schema.any_schema(),
+                    serialization=core_schema.plain_serializer_function_ser_schema(lambda x: x['id']),
+                ),
+                core_schema.list_schema(
+                    items_schema=core_schema.dict_schema(
+                        keys_schema=core_schema.any_schema(),
+                        values_schema=core_schema.any_schema(),
+                        serialization=core_schema.plain_serializer_function_ser_schema(lambda x: x['id']),
+                    )
+                ),
+            ]
+        )
+    )
+    print(s)
+    assert s.to_python([{'id': 1}, {'id': 2}]) == [1, 2]
+    assert s.to_python({'id': 1}) == 1
