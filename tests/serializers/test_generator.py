@@ -1,6 +1,7 @@
 import pytest
 from dirty_equals import IsStr
 
+import pydantic_core
 from pydantic_core import SchemaSerializer, core_schema
 
 
@@ -137,3 +138,77 @@ def test_custom_serializer():
     s = SchemaSerializer(core_schema.any_schema(serialization=core_schema.simple_ser_schema('generator')))
     assert s.to_python(gen_ok(1, 2), mode='json') == [1, 2]
     assert s.to_json(gen_ok(1, 2)) == b'[1,2]'
+
+
+def test_generator_no_ser_any_iter():
+    s = SchemaSerializer(core_schema.generator_schema(core_schema.any_schema()))
+    gen_inner = gen_ok('a', b'b', 3)
+    gen = s.to_python(gen_inner, serialize_generators=False)
+    assert gen_inner is gen
+
+
+def test_any_no_ser_iter():
+    s = SchemaSerializer(core_schema.any_schema())
+    gen_inner = gen_ok('a', b'b', 3)
+    gen = s.to_python(gen_inner, serialize_generators=False)
+    assert gen is gen_inner
+
+    with pytest.raises(ValueError, match='Unable to serialize unknown type'):
+        assert s.to_json(iter(['a', b'b', 3]), serialize_generators=False) == b'["a","b",3]'
+
+
+def test_generator_no_ser_any():
+    # todo
+    s = SchemaSerializer(core_schema.generator_schema(core_schema.any_schema()))
+    assert list(s.to_python(iter(['a', b'b', 3]), serialize_generators=False)) == ['a', b'b', 3]
+    assert list(s.to_python(gen_ok('a', b'b', 3), serialize_generators=False)) == ['a', b'b', 3]
+
+    with pytest.raises(ValueError, match='Unable to serialize unknown type'):
+        assert s.to_python(iter(['a', b'b', 3]), mode='json', serialize_generators=False) == ['a', 'b', 3]
+
+    with pytest.raises(ValueError, match='Unable to serialize unknown type'):
+        assert s.to_json(iter(['a', b'b', 3]), serialize_generators=False) == b'["a","b",3]'
+    assert s.to_json(iter(['a', b'b', 3]), serialize_generators=False, fallback=list) == b'["a","b",3]'
+    assert s.to_json(gen_ok('a', b'b', 3), serialize_generators=False, fallback=list) == b'["a","b",3]'
+    assert s.to_python(gen_ok('a', b'b', 3), serialize_generators=False, fallback=list) == ['a', b'b', 3]
+
+    msg = 'Expected `generator` but got `int` with value `4` - serialized value may not be as expected'
+    with pytest.warns(UserWarning, match=msg):
+        assert s.to_python(4, serialize_generators=False) == 4
+    with pytest.warns(UserWarning, match="Expected `generator` but got `tuple` with value `\\('a', b'b', 3\\)`"):
+        assert s.to_python(('a', b'b', 3), serialize_generators=False) == ('a', b'b', 3)
+    with pytest.warns(UserWarning, match="Expected `generator` but got `str` with value `'abc'`"):
+        assert s.to_python('abc', serialize_generators=False) == 'abc'
+
+    with pytest.raises(ValueError, match='oops'):
+        list(s.to_python(gen_error(1, 2), serialize_generators=False))
+
+    with pytest.raises(ValueError, match='Unable to serialize unknown type'):
+        s.to_python(gen_error(1, 2), mode='json', serialize_generators=False)
+
+    with pytest.raises(ValueError, match='Unable to serialize unknown type'):
+        s.to_json(gen_error(1, 2), serialize_generators=False)
+
+
+def test_no_ser_custom_serializer():
+    s = SchemaSerializer(core_schema.any_schema(serialization=core_schema.simple_ser_schema('generator')))
+    with pytest.raises(ValueError, match='Unable to serialize unknown type'):
+        assert s.to_python(gen_ok(1, 2), mode='json', serialize_generators=False) == [1, 2]
+    with pytest.raises(ValueError, match='Unable to serialize unknown type'):
+        assert s.to_json(gen_ok(1, 2), serialize_generators=False) == b'[1,2]'
+    assert s.to_python(gen_ok(1, 2), mode='json', serialize_generators=False, fallback=list) == [1, 2]
+    assert s.to_json(gen_ok(1, 2), serialize_generators=False, fallback=list) == b'[1,2]'
+
+
+def test_no_ser_to_json():
+    with pytest.raises(ValueError, match='Unable to serialize unknown type'):
+        assert pydantic_core.to_jsonable_python(iter([]), serialize_generators=False)
+    assert pydantic_core.to_jsonable_python(iter([]), serialize_generators=False, serialize_unknown=True) == IsStr(
+        regex=r'<(list_|sequence)iterator object at 0x\w+>'
+    )
+    assert pydantic_core.to_json(iter([]), serialize_generators=False, serialize_unknown=True).decode('utf8') == IsStr(
+        regex=r'"<(list_|sequence)iterator object at 0x\w+>"'
+    )
+    assert pydantic_core.to_json(iter([]), serialize_generators=False, serialize_unknown=True).decode('utf8') == IsStr(
+        regex=r'"<(list_|sequence)iterator object at 0x\w+>"'
+    )

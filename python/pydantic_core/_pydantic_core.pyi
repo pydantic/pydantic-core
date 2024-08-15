@@ -266,6 +266,7 @@ class SchemaSerializer:
         fallback: Callable[[Any], Any] | None = None,
         serialize_as_any: bool = False,
         context: Any | None = None,
+        serialize_generators: bool = True,
     ) -> Any:
         """
         Serialize/marshal a Python object to a Python object including transforming and filtering data.
@@ -289,6 +290,7 @@ class SchemaSerializer:
             serialize_as_any: Whether to serialize fields with duck-typing serialization behavior.
             context: The context to use for serialization, this is passed to functional serializers as
                 [`info.context`][pydantic_core.core_schema.SerializationInfo.context].
+            serialize_generators: Whether to consume and wrap generators. If this is False, generators are treated as an unknown type.
 
         Raises:
             PydanticSerializationError: If serialization fails and no `fallback` function is provided.
@@ -312,6 +314,7 @@ class SchemaSerializer:
         fallback: Callable[[Any], Any] | None = None,
         serialize_as_any: bool = False,
         context: Any | None = None,
+        serialize_generators: bool = True,
     ) -> bytes:
         """
         Serialize a Python object to JSON including transforming and filtering data.
@@ -334,6 +337,7 @@ class SchemaSerializer:
             serialize_as_any: Whether to serialize fields with duck-typing serialization behavior.
             context: The context to use for serialization, this is passed to functional serializers as
                 [`info.context`][pydantic_core.core_schema.SerializationInfo.context].
+            serialize_generators: Whether to consume and wrap generators. If this is False, generators are treated as an unknown type.
 
         Raises:
             PydanticSerializationError: If serialization fails and no `fallback` function is provided.
@@ -358,6 +362,7 @@ def to_json(
     fallback: Callable[[Any], Any] | None = None,
     serialize_as_any: bool = False,
     context: Any | None = None,
+    serialize_generators: bool = True,
 ) -> bytes:
     """
     Serialize a Python object to JSON including transforming and filtering data.
@@ -382,6 +387,7 @@ def to_json(
         serialize_as_any: Whether to serialize fields with duck-typing serialization behavior.
         context: The context to use for serialization, this is passed to functional serializers as
             [`info.context`][pydantic_core.core_schema.SerializationInfo.context].
+        serialize_generators: Whether to consume and wrap generators. If this is False, generators are treated as an unknown type.
 
     Raises:
         PydanticSerializationError: If serialization fails and no `fallback` function is provided.
@@ -433,6 +439,7 @@ def to_jsonable_python(
     fallback: Callable[[Any], Any] | None = None,
     serialize_as_any: bool = False,
     context: Any | None = None,
+    serialize_generators: bool = True,
 ) -> Any:
     """
     Serialize/marshal a Python object to a JSON-serializable Python object including transforming and filtering data.
@@ -457,6 +464,7 @@ def to_jsonable_python(
         serialize_as_any: Whether to serialize fields with duck-typing serialization behavior.
         context: The context to use for serialization, this is passed to functional serializers as
             [`info.context`][pydantic_core.core_schema.SerializationInfo.context].
+        serialize_generators: Whether to consume and wrap generators. If this is False, generators are treated as an unknown type.
 
     Raises:
         PydanticSerializationError: If serialization fails and no `fallback` function is provided.

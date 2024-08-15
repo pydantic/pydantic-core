@@ -64,6 +64,7 @@ impl SchemaSerializer {
         fallback: Option<&'a Bound<'a, PyAny>>,
         duck_typing_ser_mode: DuckTypingSerMode,
         context: Option<&'a Bound<'a, PyAny>>,
+        serialize_generators: bool,
     ) -> Extra<'b> {
         Extra::new(
             py,
@@ -80,6 +81,7 @@ impl SchemaSerializer {
             fallback,
             duck_typing_ser_mode,
             context,
+            serialize_generators,
         )
     }
 }
@@ -107,7 +109,7 @@ impl SchemaSerializer {
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (value, *, mode = None, include = None, exclude = None, by_alias = true,
         exclude_unset = false, exclude_defaults = false, exclude_none = false, round_trip = false, warnings = WarningsArg::Bool(true),
-        fallback = None, serialize_as_any = false, context = None))]
+        fallback = None, serialize_as_any = false, context = None, serialize_generators = true))]
     pub fn to_python(
         &self,
         py: Python,
@@ -124,6 +126,7 @@ impl SchemaSerializer {
         fallback: Option<&Bound<'_, PyAny>>,
         serialize_as_any: bool,
         context: Option<&Bound<'_, PyAny>>,
+        serialize_generators: bool,
     ) -> PyResult<PyObject> {
         let mode: SerMode = mode.into();
         let warnings_mode = match warnings {
@@ -147,6 +150,7 @@ impl SchemaSerializer {
             fallback,
             duck_typing_ser_mode,
             context,
+            serialize_generators,
         );
         let v = self.serializer.to_python(value, include, exclude, &extra)?;
         warnings.final_check(py)?;
@@ -156,7 +160,7 @@ impl SchemaSerializer {
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (value, *, indent = None, include = None, exclude = None, by_alias = true,
         exclude_unset = false, exclude_defaults = false, exclude_none = false, round_trip = false, warnings = WarningsArg::Bool(true),
-        fallback = None, serialize_as_any = false, context = None))]
+        fallback = None, serialize_as_any = false, context = None, serialize_generators = true))]
     pub fn to_json(
         &self,
         py: Python,
@@ -173,6 +177,7 @@ impl SchemaSerializer {
         fallback: Option<&Bound<'_, PyAny>>,
         serialize_as_any: bool,
         context: Option<&Bound<'_, PyAny>>,
+        serialize_generators: bool,
     ) -> PyResult<PyObject> {
         let warnings_mode = match warnings {
             WarningsArg::Bool(b) => b.into(),
@@ -195,6 +200,7 @@ impl SchemaSerializer {
             fallback,
             duck_typing_ser_mode,
             context,
+            serialize_generators,
         );
         let bytes = to_json_bytes(
             value,
@@ -244,7 +250,7 @@ impl SchemaSerializer {
 #[pyo3(signature = (value, *, indent = None, include = None, exclude = None, by_alias = true,
     exclude_none = false, round_trip = false, timedelta_mode = "iso8601", bytes_mode = "utf8",
     inf_nan_mode = "constants", serialize_unknown = false, fallback = None, serialize_as_any = false,
-    context = None))]
+    context = None, serialize_generators = true))]
 pub fn to_json(
     py: Python,
     value: &Bound<'_, PyAny>,
@@ -261,6 +267,7 @@ pub fn to_json(
     fallback: Option<&Bound<'_, PyAny>>,
     serialize_as_any: bool,
     context: Option<&Bound<'_, PyAny>>,
+    serialize_generators: bool,
 ) -> PyResult<PyObject> {
     let state = SerializationState::new(timedelta_mode, bytes_mode, inf_nan_mode)?;
     let duck_typing_ser_mode = DuckTypingSerMode::from_bool(serialize_as_any);
@@ -274,6 +281,7 @@ pub fn to_json(
         fallback,
         duck_typing_ser_mode,
         context,
+        serialize_generators,
     );
     let serializer = type_serializers::any::AnySerializer.into();
     let bytes = to_json_bytes(value, &serializer, include, exclude, &extra, indent, 1024)?;
@@ -286,7 +294,7 @@ pub fn to_json(
 #[pyfunction]
 #[pyo3(signature = (value, *, include = None, exclude = None, by_alias = true, exclude_none = false, round_trip = false,
     timedelta_mode = "iso8601", bytes_mode = "utf8", inf_nan_mode = "constants", serialize_unknown = false, fallback = None,
-    serialize_as_any = false, context = None))]
+    serialize_as_any = false, context = None, serialize_generators = true))]
 pub fn to_jsonable_python(
     py: Python,
     value: &Bound<'_, PyAny>,
@@ -302,6 +310,7 @@ pub fn to_jsonable_python(
     fallback: Option<&Bound<'_, PyAny>>,
     serialize_as_any: bool,
     context: Option<&Bound<'_, PyAny>>,
+    serialize_generators: bool,
 ) -> PyResult<PyObject> {
     let state = SerializationState::new(timedelta_mode, bytes_mode, inf_nan_mode)?;
     let duck_typing_ser_mode = DuckTypingSerMode::from_bool(serialize_as_any);
@@ -315,6 +324,7 @@ pub fn to_jsonable_python(
         fallback,
         duck_typing_ser_mode,
         context,
+        serialize_generators,
     );
     let v = infer::infer_to_python(value, include, exclude, &extra)?;
     state.final_check(py)?;
