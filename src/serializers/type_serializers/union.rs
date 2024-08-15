@@ -86,7 +86,7 @@ fn to_python(
     new_extra.check = SerCheck::Strict;
     let mut errors: SmallVec<[PyErr; SMALL_UNION_THRESHOLD]> = SmallVec::new();
 
-    for comb_serializer in choices.clone() {
+    for comb_serializer in choices {
         match comb_serializer.to_python(value, include, exclude, &new_extra) {
             Ok(v) => return Ok(v),
             Err(err) => match err.is_instance_of::<PydanticSerializationUnexpectedValue>(value.py()) {
@@ -117,18 +117,18 @@ fn to_python(
     infer_to_python(value, include, exclude, extra)
 }
 
-fn json_key(
-    key: &Bound<'_, PyAny>,
+fn json_key<'a>(
+    key: &'a Bound<'_, PyAny>,
     extra: &Extra,
     choices: &[CombinedSerializer],
     name: &str,
     retry_with_lax_check: bool,
-) -> PyResult<Cow<str>> {
+) -> PyResult<Cow<'a, str>> {
     let mut new_extra = extra.clone();
     new_extra.check = SerCheck::Strict;
     let mut errors: SmallVec<[PyErr; SMALL_UNION_THRESHOLD]> = SmallVec::new();
 
-    for comb_serializer in choices.clone() {
+    for comb_serializer in choices {
         match comb_serializer.json_key(key, &new_extra) {
             Ok(v) => return Ok(v),
             Err(err) => match err.is_instance_of::<PydanticSerializationUnexpectedValue>(key.py()) {
@@ -159,6 +159,7 @@ fn json_key(
     infer_json_key(key, extra)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn serde_serialize<S: serde::ser::Serializer>(
     value: &Bound<'_, PyAny>,
     serializer: S,
@@ -174,7 +175,7 @@ fn serde_serialize<S: serde::ser::Serializer>(
     new_extra.check = SerCheck::Strict;
     let mut errors: SmallVec<[PyErr; SMALL_UNION_THRESHOLD]> = SmallVec::new();
 
-    for comb_serializer in choices.clone() {
+    for comb_serializer in choices {
         match comb_serializer.to_python(value, include, exclude, &new_extra) {
             Ok(v) => return infer_serialize(v.bind(py), serializer, None, None, extra),
             Err(err) => match err.is_instance_of::<PydanticSerializationUnexpectedValue>(py) {
@@ -303,7 +304,7 @@ impl BuildSerializer for TaggedUnionSerializer {
     }
 }
 
-impl_py_gc_traverse!(TaggedUnionSerializer { discriminator, lookup });
+impl_py_gc_traverse!(TaggedUnionSerializer { discriminator, choices });
 
 impl TypeSerializer for TaggedUnionSerializer {
     fn to_python(
@@ -318,16 +319,18 @@ impl TypeSerializer for TaggedUnionSerializer {
         let mut new_extra = extra.clone();
         new_extra.check = SerCheck::Strict;
 
-        if let Some(tag) = self.get_discriminator_value(value) {
+        if let Some(tag) = self.get_discriminator_value(value, extra) {
             let tag_str = tag.to_string();
-            if let Some(serializer) = self.lookup.get(&tag_str) {
-                match self.choices[*serializer].to_python(value, include, exclude, &new_extra) {
+            if let Some(&serializer_index) = self.lookup.get(&tag_str) {
+                let serializer = &self.choices[serializer_index];
+
+                match serializer.to_python(value, include, exclude, &new_extra) {
                     Ok(v) => return Ok(v),
                     Err(err) => match err.is_instance_of::<PydanticSerializationUnexpectedValue>(py) {
                         true => {
                             if self.retry_with_lax_check() {
                                 new_extra.check = SerCheck::Lax;
-                                return self.choices[*serializer].to_python(value, include, exclude, &new_extra);
+                                return serializer.to_python(value, include, exclude, &new_extra);
                             }
                         }
                         false => return Err(err),
@@ -348,20 +351,26 @@ impl TypeSerializer for TaggedUnionSerializer {
     }
 
     fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
+        let py = key.py();
         let mut new_extra = extra.clone();
         new_extra.check = SerCheck::Strict;
 
-        if let Some(tag) = self.get_discriminator_value(key) {
+        if let Some(tag) = self.get_discriminator_value(key, extra) {
             let tag_str = tag.to_string();
-            if let Some(serializer) = self.lookup.get(&tag_str) {
-                match self.choices[*serializer].json_key(key, &new_extra) {
+            if let Some(&serializer_index) = self.lookup.get(&tag_str) {
+                let serializer = &self.choices[serializer_index];
+
+                match serializer.json_key(key, &new_extra) {
                     Ok(v) => return Ok(v),
-                    Err(_) => {
-                        if self.retry_with_lax_check() {
-                            new_extra.check = SerCheck::Lax;
-                            return self.choices[*serializer].json_key(key, &new_extra);
+                    Err(err) => match err.is_instance_of::<PydanticSerializationUnexpectedValue>(py) {
+                        true => {
+                            if self.retry_with_lax_check() {
+                                new_extra.check = SerCheck::Lax;
+                                return serializer.json_key(key, &new_extra);
+                            }
                         }
-                    }
+                        false => return Err(err),
+                    },
                 }
             }
         }
@@ -381,20 +390,25 @@ impl TypeSerializer for TaggedUnionSerializer {
         let mut new_extra = extra.clone();
         new_extra.check = SerCheck::Strict;
 
-        if let Some(tag) = self.get_discriminator_value(value) {
+        if let Some(tag) = self.get_discriminator_value(value, extra) {
             let tag_str = tag.to_string();
-            if let Some(selected_serializer) = self.lookup.get(&tag_str) {
-                match self.choices[*selected_serializer].to_python(value, include, exclude, &new_extra) {
+            if let Some(&serializer_index) = self.lookup.get(&tag_str) {
+                let selected_serializer = &self.choices[serializer_index];
+
+                match selected_serializer.to_python(value, include, exclude, &new_extra) {
                     Ok(v) => return infer_serialize(v.bind(py), serializer, None, None, extra),
-                    Err(_) => {
-                        if self.retry_with_lax_check() {
-                            new_extra.check = SerCheck::Lax;
-                            match self.choices[*selected_serializer].to_python(value, include, exclude, &new_extra) {
-                                Ok(v) => return infer_serialize(v.bind(py), serializer, None, None, extra),
-                                Err(err) => return Err(py_err_se_err(err)),
+                    Err(err) => match err.is_instance_of::<PydanticSerializationUnexpectedValue>(py) {
+                        true => {
+                            if self.retry_with_lax_check() {
+                                new_extra.check = SerCheck::Lax;
+                                match selected_serializer.to_python(value, include, exclude, &new_extra) {
+                                    Ok(v) => return infer_serialize(v.bind(py), serializer, None, None, extra),
+                                    Err(err) => return Err(py_err_se_err(err)),
+                                }
                             }
                         }
-                    }
+                        false => return Err(py_err_se_err(err)),
+                    },
                 }
             }
         }
@@ -421,7 +435,7 @@ impl TypeSerializer for TaggedUnionSerializer {
 }
 
 impl TaggedUnionSerializer {
-    fn get_discriminator_value(&self, value: &Bound<'_, PyAny>) -> Option<Py<PyAny>> {
+    fn get_discriminator_value(&self, value: &Bound<'_, PyAny>, extra: &Extra) -> Option<Py<PyAny>> {
         let py = value.py();
         let discriminator_value = match &self.discriminator {
             Discriminator::LookupKey(lookup_key) => match lookup_key {
@@ -431,8 +445,12 @@ impl TaggedUnionSerializer {
             Discriminator::Function(func) => func.call1(py, (value,)).ok(),
         };
         if discriminator_value.is_none() {
-            // warn if the discriminator value is not found
+            extra.warnings.custom_warning(
+                format!(
+                    "Failed to get discriminator value for tagged union serialization for {value} - defaulting to left to right union serialization."
+                )
+            );
         }
-        return discriminator_value;
+        discriminator_value
     }
 }
