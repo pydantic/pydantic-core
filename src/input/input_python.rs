@@ -248,7 +248,7 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
                     str_as_int(self, s)
                 } else if self.is_exact_instance_of::<PyFloat>() {
                     float_as_int(self, self.extract::<f64>()?)
-                } else if let Ok(decimal) = self.validate_decimal(strict, self.py()) {
+                } else if let Ok(decimal) = self.validate_decimal(true, self.py()) {
                     decimal_as_int(self, &decimal.into_inner())
                 } else if let Ok(float) = self.extract::<f64>() {
                     float_as_int(self, float)
