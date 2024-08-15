@@ -165,7 +165,7 @@ impl<'py, 'data> Input<'py> for JsonValue<'data> {
         }
     }
 
-    fn strict_decimal(&self, py: Python<'py>) -> ValMatch<Bound<'py, PyAny>> {
+    fn validate_decimal(&self, _strict: bool, py: Python<'py>) -> ValMatch<Bound<'py, PyAny>> {
         match self {
             JsonValue::Float(f) => {
                 create_decimal(&PyString::new_bound(py, &f.to_string()), self).map(ValidationMatch::strict)
@@ -374,8 +374,8 @@ impl<'py> Input<'py> for str {
         str_as_float(self, self).map(ValidationMatch::lax)
     }
 
-    fn strict_decimal(&self, py: Python<'py>) -> ValMatch<Bound<'py, PyAny>> {
-        create_decimal(self.to_object(py).bind(py), self).map(ValidationMatch::strict)
+    fn validate_decimal(&self, _strict: bool, py: Python<'py>) -> ValMatch<Bound<'py, PyAny>> {
+        create_decimal(self.to_object(py).bind(py), self).map(ValidationMatch::lax)
     }
 
     type Dict<'a> = Never;
