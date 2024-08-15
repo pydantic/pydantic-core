@@ -165,12 +165,13 @@ impl<'py, 'data> Input<'py> for JsonValue<'data> {
         }
     }
 
-    fn strict_decimal(&self, py: Python<'py>) -> ValResult<Bound<'py, PyAny>> {
+    fn strict_decimal(&self, py: Python<'py>) -> ValMatch<Bound<'py, PyAny>> {
         match self {
-            JsonValue::Float(f) => create_decimal(&PyString::new_bound(py, &f.to_string()), self),
-
+            JsonValue::Float(f) => {
+                create_decimal(&PyString::new_bound(py, &f.to_string()), self).map(ValidationMatch::strict)
+            }
             JsonValue::Str(..) | JsonValue::Int(..) | JsonValue::BigInt(..) => {
-                create_decimal(self.to_object(py).bind(py), self)
+                create_decimal(self.to_object(py).bind(py), self).map(ValidationMatch::lax)
             }
             _ => Err(ValError::new(ErrorTypeDefaults::DecimalType, self)),
         }
@@ -373,8 +374,8 @@ impl<'py> Input<'py> for str {
         str_as_float(self, self).map(ValidationMatch::lax)
     }
 
-    fn strict_decimal(&self, py: Python<'py>) -> ValResult<Bound<'py, PyAny>> {
-        create_decimal(self.to_object(py).bind(py), self)
+    fn strict_decimal(&self, py: Python<'py>) -> ValMatch<Bound<'py, PyAny>> {
+        create_decimal(self.to_object(py).bind(py), self).map(ValidationMatch::strict)
     }
 
     type Dict<'a> = Never;

@@ -249,7 +249,7 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
                 } else if self.is_exact_instance_of::<PyFloat>() {
                     float_as_int(self, self.extract::<f64>()?)
                 } else if let Ok(decimal) = self.strict_decimal(self.py()) {
-                    decimal_as_int(self, &decimal)
+                    decimal_as_int(self, &decimal.into_inner())
                 } else if let Ok(float) = self.extract::<f64>() {
                     float_as_int(self, float)
                 } else if let Some(enum_val) = maybe_as_enum(self) {
@@ -307,16 +307,16 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
         Err(ValError::new(ErrorTypeDefaults::FloatType, self))
     }
 
-    fn strict_decimal(&self, py: Python<'py>) -> ValResult<Bound<'py, PyAny>> {
+    fn strict_decimal(&self, py: Python<'py>) -> ValMatch<Bound<'py, PyAny>> {
         let decimal_type = get_decimal_type(py);
         // Fast path for existing decimal objects
         if self.is_exact_instance(decimal_type) {
-            return Ok(self.to_owned());
+            return Ok(ValidationMatch::exact(self.to_owned()));
         }
 
         // Try subclasses of decimals, they will be upcast to Decimal
         if self.is_instance(decimal_type)? {
-            return create_decimal(self, self);
+            return create_decimal(self, self).map(ValidationMatch::strict);
         }
 
         Err(ValError::new(
@@ -331,24 +331,27 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
         ))
     }
 
-    fn lax_decimal(&self, py: Python<'py>) -> ValResult<Bound<'py, PyAny>> {
+    fn lax_decimal(&self, py: Python<'py>) -> ValMatch<Bound<'py, PyAny>> {
         let decimal_type = get_decimal_type(py);
         // Fast path for existing decimal objects
         if self.is_exact_instance(decimal_type) {
-            return Ok(self.to_owned().clone());
+            return Ok(ValidationMatch::exact(self.to_owned().clone()));
         }
 
-        if self.is_instance_of::<PyString>() || (self.is_instance_of::<PyInt>() && !self.is_instance_of::<PyBool>()) {
+        // TODO: I can see the case for int and float being strict - wdyt @davidhewitt?
+        return if self.is_instance_of::<PyString>()
+            || (self.is_instance_of::<PyInt>() && !self.is_instance_of::<PyBool>())
+        {
             // checking isinstance for str / int / bool is fast compared to decimal / float
-            create_decimal(self, self)
+            create_decimal(self, self).map(ValidationMatch::lax)
         } else if self.is_instance(decimal_type)? {
             // upcast subclasses to decimal
-            return create_decimal(self, self);
+            create_decimal(self, self).map(ValidationMatch::strict)
         } else if self.is_instance_of::<PyFloat>() {
-            create_decimal(self.str()?.as_any(), self)
+            create_decimal(self.str()?.as_any(), self).map(ValidationMatch::lax)
         } else {
             Err(ValError::new(ErrorTypeDefaults::DecimalType, self))
-        }
+        };
     }
 
     type Dict<'a> = GenericPyMapping<'a, 'py> where Self: 'a;

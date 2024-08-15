@@ -141,9 +141,9 @@ impl<'py> Input<'py> for StringMapping<'py> {
         }
     }
 
-    fn strict_decimal(&self, _py: Python<'py>) -> ValResult<Bound<'py, PyAny>> {
+    fn strict_decimal(&self, _py: Python<'py>) -> ValMatch<Bound<'py, PyAny>> {
         match self {
-            Self::String(s) => create_decimal(s, self),
+            Self::String(s) => create_decimal(s, self).map(ValidationMatch::strict),
             Self::Mapping(_) => Err(ValError::new(ErrorTypeDefaults::DecimalType, self)),
         }
     }
