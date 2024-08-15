@@ -312,33 +312,39 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
 
         // Fast path for existing decimal objects
         if self.is_exact_instance(decimal_type) {
-            Ok(ValidationMatch::exact(self.to_owned().clone()))
-        } else if self.is_instance(decimal_type)? {
-            // Upcast subclasses to decimal
-            create_decimal(self, self).map(ValidationMatch::strict)
-        } else {
-            if strict {
-                return Err(ValError::new(
-                    ErrorType::IsInstanceOf {
-                        class: decimal_type
-                            .qualname()
-                            .and_then(|name| name.extract())
-                            .unwrap_or_else(|_| "Decimal".to_owned()),
-                        context: None,
-                    },
-                    self,
-                ));
-            }
+            return Ok(ValidationMatch::exact(self.to_owned().clone()));
+        }
+
+        if !strict {
             if self.is_instance_of::<PyString>() || (self.is_instance_of::<PyInt>() && !self.is_instance_of::<PyBool>())
             {
                 // Checking isinstance for str / int / bool is fast compared to decimal / float
-                create_decimal(self, self).map(ValidationMatch::lax)
-            } else if self.is_instance_of::<PyFloat>() {
-                create_decimal(self.str()?.as_any(), self).map(ValidationMatch::lax)
-            } else {
-                Err(ValError::new(ErrorTypeDefaults::DecimalType, self))
+                return create_decimal(self, self).map(ValidationMatch::lax);
+            }
+
+            if self.is_instance_of::<PyFloat>() {
+                return create_decimal(self.str()?.as_any(), self).map(ValidationMatch::lax);
             }
         }
+
+        if self.is_instance(decimal_type)? {
+            // Upcast subclasses to decimal
+            return create_decimal(self, self).map(ValidationMatch::strict);
+        }
+
+        let error_type = if strict {
+            ErrorType::IsInstanceOf {
+                class: decimal_type
+                    .qualname()
+                    .and_then(|name| name.extract())
+                    .unwrap_or_else(|_| "Decimal".to_owned()),
+                context: None,
+            }
+        } else {
+            ErrorTypeDefaults::DecimalType
+        };
+
+        Err(ValError::new(error_type, self))
     }
 
     type Dict<'a> = GenericPyMapping<'a, 'py> where Self: 'a;

@@ -171,7 +171,7 @@ impl<'py, 'data> Input<'py> for JsonValue<'data> {
                 create_decimal(&PyString::new_bound(py, &f.to_string()), self).map(ValidationMatch::strict)
             }
             JsonValue::Str(..) | JsonValue::Int(..) | JsonValue::BigInt(..) => {
-                create_decimal(self.to_object(py).bind(py), self).map(ValidationMatch::lax)
+                create_decimal(self.to_object(py).bind(py), self).map(ValidationMatch::strict)
             }
             _ => Err(ValError::new(ErrorTypeDefaults::DecimalType, self)),
         }
