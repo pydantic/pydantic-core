@@ -2,12 +2,14 @@ use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use jiter::JsonValue;
+use jiter::{JsonValue, PartialMode, PythonParse};
 
 use crate::errors::{ErrorType, ErrorTypeDefaults, ValError, ValLineError, ValResult};
 use crate::input::{EitherBytes, Input, InputType, ValidationMatch};
+use crate::serializers::BytesMode;
 use crate::tools::SchemaDict;
 
+use super::config::ValBytesMode;
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
 
 #[derive(Debug)]
@@ -64,7 +66,15 @@ impl Validator for JsonValidator {
                 validator.validate(py, &json_value, &mut json_state)
             }
             None => {
-                let obj = jiter::python_parse(py, json_bytes, true, state.cache_str(), false)
+                let parse_builder = PythonParse {
+                    allow_inf_nan: true,
+                    cache_mode: state.cache_str(),
+                    partial_mode: PartialMode::Off,
+                    catch_duplicate_keys: false,
+                    lossless_floats: false,
+                };
+                let obj = parse_builder
+                    .python_parse(py, json_bytes)
                     .map_err(|e| map_json_err(input, e, json_bytes))?;
                 Ok(obj.unbind())
             }
@@ -79,7 +89,7 @@ impl Validator for JsonValidator {
 pub fn validate_json_bytes<'a, 'py>(
     input: &'a (impl Input<'py> + ?Sized),
 ) -> ValResult<ValidationMatch<EitherBytes<'a, 'py>>> {
-    match input.validate_bytes(false) {
+    match input.validate_bytes(false, ValBytesMode { ser: BytesMode::Utf8 }) {
         Ok(v_match) => Ok(v_match),
         Err(ValError::LineErrors(e)) => Err(ValError::LineErrors(
             e.into_iter().map(map_bytes_error).collect::<Vec<_>>(),

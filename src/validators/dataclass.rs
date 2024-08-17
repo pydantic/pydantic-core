@@ -154,6 +154,7 @@ impl Validator for DataclassArgsValidator {
         let mut used_keys: AHashSet<&str> = AHashSet::with_capacity(self.fields.len());
 
         let state = &mut state.rebind_extra(|extra| extra.data = Some(output_dict.clone()));
+        let mut fields_set_count: usize = 0;
 
         macro_rules! set_item {
             ($field:ident, $value:expr) => {{
@@ -175,6 +176,7 @@ impl Validator for DataclassArgsValidator {
                     Ok(Some(value)) => {
                         // Default value exists, and passed validation if required
                         set_item!(field, value);
+                        fields_set_count += 1;
                     }
                     Ok(None) | Err(ValError::Omit) => continue,
                     // Note: this will always use the field name even if there is an alias
@@ -214,7 +216,10 @@ impl Validator for DataclassArgsValidator {
                 }
                 // found a positional argument, validate it
                 (Some(pos_value), None) => match field.validator.validate(py, pos_value.borrow_input(), state) {
-                    Ok(value) => set_item!(field, value),
+                    Ok(value) => {
+                        set_item!(field, value);
+                        fields_set_count += 1;
+                    }
                     Err(ValError::LineErrors(line_errors)) => {
                         errors.extend(line_errors.into_iter().map(|err| err.with_outer_location(index)));
                     }
@@ -222,7 +227,10 @@ impl Validator for DataclassArgsValidator {
                 },
                 // found a keyword argument, validate it
                 (None, Some((lookup_path, kw_value))) => match field.validator.validate(py, kw_value, state) {
-                    Ok(value) => set_item!(field, value),
+                    Ok(value) => {
+                        set_item!(field, value);
+                        fields_set_count += 1;
+                    }
                     Err(ValError::LineErrors(line_errors)) => {
                         errors.extend(
                             line_errors
@@ -335,6 +343,8 @@ impl Validator for DataclassArgsValidator {
                 }
             }
         }
+
+        state.add_fields_set(fields_set_count);
 
         if errors.is_empty() {
             if let Some(init_only_args) = init_only_args {
@@ -450,7 +460,7 @@ impl BuildValidator for DataclassValidator {
         let config = schema.get_as(intern!(py, "config"))?;
         let config = config.as_ref();
 
-        let class: &PyType = schema.get_as_req(intern!(py, "cls"))?;
+        let class = schema.get_as_req::<Bound<'_, PyType>>(intern!(py, "cls"))?;
         let name = match schema.get_as_req::<String>(intern!(py, "cls_name")) {
             Ok(name) => name,
             Err(_) => class.getattr(intern!(py, "__name__"))?.extract()?,
@@ -464,11 +474,7 @@ impl BuildValidator for DataclassValidator {
             None
         };
 
-        let fields = schema
-            .get_as_req::<&PyList>(intern!(py, "fields"))?
-            .iter()
-            .map(|s| Ok(s.downcast::<PyString>()?.into_py(py)))
-            .collect::<PyResult<Vec<_>>>()?;
+        let fields = schema.get_as_req(intern!(py, "fields"))?;
 
         Ok(Self {
             strict: is_strict(schema, config)?,
@@ -624,7 +630,7 @@ impl DataclassValidator {
                 dc.call_method0(post_init)
             } else {
                 let args = post_init_kwargs.downcast::<PyTuple>()?;
-                dc.call_method1(post_init, args.as_gil_ref())
+                dc.call_method1(post_init, args)
             };
             r.map_err(|e| convert_err(py, e, input))?;
         }

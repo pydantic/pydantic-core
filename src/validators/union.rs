@@ -1,6 +1,7 @@
 use std::fmt::Write;
 use std::str::FromStr;
 
+use crate::py_gc::PyGcTraverse;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyString, PyTuple};
 use pyo3::{intern, PyTraverseError, PyVisit};
@@ -8,10 +9,9 @@ use smallvec::SmallVec;
 
 use crate::build_tools::py_schema_err;
 use crate::build_tools::{is_strict, schema_or_config};
+use crate::common::union::{Discriminator, SMALL_UNION_THRESHOLD};
 use crate::errors::{ErrorType, ToErrorValue, ValError, ValLineError, ValResult};
 use crate::input::{BorrowInput, Input, ValidatedDict};
-use crate::lookup_key::LookupKey;
-use crate::py_gc::PyGcTraverse;
 use crate::tools::SchemaDict;
 
 use super::custom_error::CustomError;
@@ -108,10 +108,12 @@ impl UnionValidator {
         state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
         let old_exactness = state.exactness;
+        let old_fields_set_count = state.fields_set_count;
+
         let strict = state.strict_or(self.strict);
         let mut errors = MaybeErrors::new(self.custom_error.as_ref());
 
-        let mut success = None;
+        let mut best_match: Option<(Py<PyAny>, Exactness, Option<usize>)> = None;
 
         for (choice, label) in &self.choices {
             let state = &mut state.rebind_extra(|extra| {
@@ -120,47 +122,67 @@ impl UnionValidator {
                 }
             });
             state.exactness = Some(Exactness::Exact);
+            state.fields_set_count = None;
             let result = choice.validate(py, input, state);
             match result {
-                Ok(new_success) => match state.exactness {
-                    // exact match, return
-                    Some(Exactness::Exact) => {
+                Ok(new_success) => match (state.exactness, state.fields_set_count) {
+                    (Some(Exactness::Exact), None) => {
+                        // exact match with no fields set data, return immediately
                         return {
                             // exact match, return, restore any previous exactness
                             state.exactness = old_exactness;
+                            state.fields_set_count = old_fields_set_count;
                             Ok(new_success)
                         };
                     }
                     _ => {
                         // success should always have an exactness
                         debug_assert_ne!(state.exactness, None);
+
                         let new_exactness = state.exactness.unwrap_or(Exactness::Lax);
-                        // if the new result has higher exactness than the current success, replace it
-                        if success
-                            .as_ref()
-                            .map_or(true, |(_, current_exactness)| *current_exactness < new_exactness)
-                        {
-                            // TODO: is there a possible optimization here, where once there has
-                            // been one success, we turn on strict mode, to avoid unnecessary
-                            // coercions for further validation?
-                            success = Some((new_success, new_exactness));
+                        let new_fields_set_count = state.fields_set_count;
+
+                        // we use both the exactness and the fields_set_count to determine the best union member match
+                        // if fields_set_count is available for the current best match and the new candidate, we use this
+                        // as the primary metric. If the new fields_set_count is greater, the new candidate is better.
+                        // if the fields_set_count is the same, we use the exactness as a tie breaker to determine the best match.
+                        // if the fields_set_count is not available for either the current best match or the new candidate,
+                        // we use the exactness to determine the best match.
+                        let new_success_is_best_match: bool =
+                            best_match
+                                .as_ref()
+                                .map_or(true, |(_, cur_exactness, cur_fields_set_count)| {
+                                    match (*cur_fields_set_count, new_fields_set_count) {
+                                        (Some(cur), Some(new)) if cur != new => cur < new,
+                                        _ => *cur_exactness < new_exactness,
+                                    }
+                                });
+
+                        if new_success_is_best_match {
+                            best_match = Some((new_success, new_exactness, new_fields_set_count));
                         }
                     }
                 },
                 Err(ValError::LineErrors(lines)) => {
                     // if we don't yet know this validation will succeed, record the error
-                    if success.is_none() {
+                    if best_match.is_none() {
                         errors.push(choice, label.as_deref(), lines);
                     }
                 }
                 otherwise => return otherwise,
             }
         }
-        state.exactness = old_exactness;
 
-        if let Some((success, exactness)) = success {
+        // restore previous validation state to prepare for any future validations
+        state.exactness = old_exactness;
+        state.fields_set_count = old_fields_set_count;
+
+        if let Some((best_match, exactness, fields_set_count)) = best_match {
             state.floor_exactness(exactness);
-            return Ok(success);
+            if let Some(count) = fields_set_count {
+                state.add_fields_set(count);
+            }
+            return Ok(best_match);
         }
 
         // no matches, build errors
@@ -227,7 +249,7 @@ struct ChoiceLineErrors<'a> {
 
 enum MaybeErrors<'a> {
     Custom(&'a CustomError),
-    Errors(SmallVec<[ChoiceLineErrors<'a>; 4]>),
+    Errors(SmallVec<[ChoiceLineErrors<'a>; SMALL_UNION_THRESHOLD]>),
 }
 
 impl<'a> MaybeErrors<'a> {
@@ -273,49 +295,6 @@ impl<'a> MaybeErrors<'a> {
     }
 }
 
-#[derive(Debug, Clone)]
-enum Discriminator {
-    /// use `LookupKey` to find the tag, same as we do to find values in typed_dict aliases
-    LookupKey(LookupKey),
-    /// call a function to find the tag to use
-    Function(PyObject),
-    /// Custom discriminator specifically for the root `Schema` union in self-schema
-    SelfSchema,
-}
-
-impl Discriminator {
-    fn new(py: Python, raw: &Bound<'_, PyAny>) -> PyResult<Self> {
-        if raw.is_callable() {
-            return Ok(Self::Function(raw.to_object(py)));
-        } else if let Ok(py_str) = raw.downcast::<PyString>() {
-            if py_str.to_str()? == "self-schema-discriminator" {
-                return Ok(Self::SelfSchema);
-            }
-        }
-
-        let lookup_key = LookupKey::from_py(py, raw, None)?;
-        Ok(Self::LookupKey(lookup_key))
-    }
-
-    fn to_string_py(&self, py: Python) -> PyResult<String> {
-        match self {
-            Self::Function(f) => Ok(format!("{}()", f.getattr(py, "__name__")?)),
-            Self::LookupKey(lookup_key) => Ok(lookup_key.to_string()),
-            Self::SelfSchema => Ok("self-schema".to_string()),
-        }
-    }
-}
-
-impl PyGcTraverse for Discriminator {
-    fn py_gc_traverse(&self, visit: &PyVisit<'_>) -> Result<(), PyTraverseError> {
-        match self {
-            Self::Function(obj) => visit.call(obj)?,
-            Self::LookupKey(_) | Self::SelfSchema => {}
-        }
-        Ok(())
-    }
-}
-
 #[derive(Debug)]
 pub struct TaggedUnionValidator {
     discriminator: Discriminator,
@@ -344,11 +323,9 @@ impl BuildValidator for TaggedUnionValidator {
         let mut tags_repr = String::with_capacity(50);
         let mut descr = String::with_capacity(50);
         let mut first = true;
-        let mut discriminators = Vec::with_capacity(choices.len());
         let schema_choices: Bound<PyDict> = schema.get_as_req(intern!(py, "choices"))?;
         let mut lookup_map = Vec::with_capacity(choices.len());
         for (choice_key, choice_schema) in schema_choices {
-            discriminators.push(choice_key.clone());
             let validator = build_validator(&choice_schema, config, definitions)?;
             let tag_repr = choice_key.repr()?.to_string();
             if first {
@@ -367,11 +344,6 @@ impl BuildValidator for TaggedUnionValidator {
 
         let key = intern!(py, "from_attributes");
         let from_attributes = schema_or_config(schema, config, key, key)?.unwrap_or(true);
-
-        let descr = match discriminator {
-            Discriminator::SelfSchema => "self-schema".to_string(),
-            _ => descr,
-        };
 
         Ok(Self {
             discriminator,
@@ -416,9 +388,6 @@ impl Validator for TaggedUnionValidator {
                     self.find_call_validator(py, tag.bind(py), input, state)
                 }
             }
-            Discriminator::SelfSchema => {
-                self.find_call_validator(py, self.self_schema_tag(py, input, state)?.as_any(), input, state)
-            }
         }
     }
 
@@ -428,35 +397,6 @@ impl Validator for TaggedUnionValidator {
 }
 
 impl TaggedUnionValidator {
-    fn self_schema_tag<'py>(
-        &self,
-        py: Python<'py>,
-        input: &(impl Input<'py> + ?Sized),
-        state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<Bound<'py, PyString>> {
-        let dict = input.strict_dict()?;
-        let dict = dict.as_py_dict().expect("self schema is always a Python dictionary");
-        let tag = match dict.get_item(intern!(py, "type"))? {
-            Some(t) => t.downcast_into::<PyString>()?,
-            None => return Err(self.tag_not_found(input)),
-        };
-        let tag = tag.to_str()?;
-        // custom logic to distinguish between different function and tuple schemas
-        if tag == "function" {
-            let Some(mode) = dict.get_item(intern!(py, "mode"))? else {
-                return Err(self.tag_not_found(input));
-            };
-            let tag = match mode.validate_str(true, false)?.into_inner().as_cow()?.as_ref() {
-                "plain" => Ok(intern!(py, "function-plain").to_owned()),
-                "wrap" => Ok(intern!(py, "function-wrap").to_owned()),
-                _ => Ok(intern!(py, "function").to_owned()),
-            };
-            tag
-        } else {
-            Ok(state.maybe_cached_str(py, tag))
-        }
-    }
-
     fn find_call_validator<'py>(
         &self,
         py: Python<'py>,

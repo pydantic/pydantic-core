@@ -320,6 +320,16 @@ all_errors = [
     ('bytes_too_short', 'Data should have at least 1 byte', {'min_length': 1}),
     ('bytes_too_long', 'Data should have at most 42 bytes', {'max_length': 42}),
     ('bytes_too_long', 'Data should have at most 1 byte', {'max_length': 1}),
+    (
+        'bytes_invalid_encoding',
+        'Data should be valid base64: Invalid byte 1, offset 1',
+        {'encoding': 'base64', 'encoding_error': 'Invalid byte 1, offset 1'},
+    ),
+    (
+        'bytes_invalid_encoding',
+        'Data should be valid hex: Odd number of digits',
+        {'encoding': 'hex', 'encoding_error': 'Odd number of digits'},
+    ),
     ('value_error', 'Value error, foobar', {'error': ValueError('foobar')}),
     ('assertion_error', 'Assertion failed, foobar', {'error': AssertionError('foobar')}),
     ('literal_error', 'Input should be foo', {'expected': 'foo'}),
@@ -384,6 +394,16 @@ all_errors = [
         'decimal_whole_digits',
         'Decimal input should have no more than 1 digit before the decimal point',
         {'whole_digits': 1},
+    ),
+    (
+        'complex_type',
+        'Input should be a valid python complex object, a number, or a valid complex string following the rules at https://docs.python.org/3/library/functions.html#complex',
+        None,
+    ),
+    (
+        'complex_str_parsing',
+        'Input should be a valid complex string following the rules at https://docs.python.org/3/library/functions.html#complex',
+        None,
     ),
 ]
 

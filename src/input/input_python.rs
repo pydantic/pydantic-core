@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::str::from_utf8;
 
 use pyo3::intern;
@@ -6,17 +5,20 @@ use pyo3::prelude::*;
 
 use pyo3::types::PyType;
 use pyo3::types::{
-    PyBool, PyByteArray, PyBytes, PyDate, PyDateTime, PyDict, PyFloat, PyFrozenSet, PyInt, PyIterator, PyList,
-    PyMapping, PySet, PyString, PyTime, PyTuple,
+    PyBool, PyByteArray, PyBytes, PyComplex, PyDate, PyDateTime, PyDict, PyFloat, PyFrozenSet, PyInt, PyIterator,
+    PyList, PyMapping, PySet, PyString, PyTime, PyTuple,
 };
 
 use pyo3::PyTypeCheck;
+use pyo3::PyTypeInfo;
 use speedate::MicrosecondsPrecisionOverflowBehavior;
 
 use crate::errors::{ErrorType, ErrorTypeDefaults, InputValue, LocItem, ValError, ValResult};
 use crate::tools::{extract_i64, safe_repr};
+use crate::validators::complex::string_to_complex;
 use crate::validators::decimal::{create_decimal, get_decimal_type};
 use crate::validators::Exactness;
+use crate::validators::ValBytesMode;
 use crate::ArgsKwargs;
 
 use super::datetime::{
@@ -25,6 +27,7 @@ use super::datetime::{
     EitherTime,
 };
 use super::input_abstract::ValMatch;
+use super::return_enums::EitherComplex;
 use super::return_enums::{iterate_attributes, iterate_mapping_items, ValidationMatch};
 use super::shared::{
     decimal_as_int, float_as_int, get_enum_meta_object, int_as_bool, str_as_bool, str_as_float, str_as_int,
@@ -144,12 +147,8 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
                         Err(_) => Err(ValError::new(ErrorTypeDefaults::StringUnicode, self)),
                     }
                 } else if let Ok(py_byte_array) = self.downcast::<PyByteArray>() {
-                    // Safety: the gil is held while from_utf8 is running so py_byte_array is not mutated,
-                    // and we immediately copy the bytes into a new Python string
-                    match from_utf8(unsafe { py_byte_array.as_bytes() }) {
-                        // Why Python not Rust? to avoid an unnecessary allocation on the Rust side, the
-                        // final output needs to be Python anyway.
-                        Ok(s) => Ok(PyString::new_bound(self.py(), s).into()),
+                    match bytearray_to_str(py_byte_array) {
+                        Ok(py_str) => Ok(py_str.into()),
                         Err(_) => Err(ValError::new(ErrorTypeDefaults::StringUnicode, self)),
                     }
                 } else if coerce_numbers_to_str && !self.is_exact_instance_of::<PyBool>() && {
@@ -174,7 +173,11 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
         Err(ValError::new(ErrorTypeDefaults::StringType, self))
     }
 
-    fn validate_bytes<'a>(&'a self, strict: bool) -> ValResult<ValidationMatch<EitherBytes<'a, 'py>>> {
+    fn validate_bytes<'a>(
+        &'a self,
+        strict: bool,
+        mode: ValBytesMode,
+    ) -> ValResult<ValidationMatch<EitherBytes<'a, 'py>>> {
         if let Ok(py_bytes) = self.downcast_exact::<PyBytes>() {
             return Ok(ValidationMatch::exact(py_bytes.into()));
         } else if let Ok(py_bytes) = self.downcast::<PyBytes>() {
@@ -185,7 +188,10 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
             if !strict {
                 return if let Ok(py_str) = self.downcast::<PyString>() {
                     let str = py_string_str(py_str)?;
-                    Ok(str.as_bytes().into())
+                    match mode.deserialize_string(str) {
+                        Ok(b) => Ok(b),
+                        Err(e) => Err(ValError::new(e, self)),
+                    }
                 } else if let Ok(py_byte_array) = self.downcast::<PyByteArray>() {
                     Ok(py_byte_array.to_vec().into())
                 } else {
@@ -204,8 +210,8 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
         }
 
         if !strict {
-            if let Some(cow_str) = maybe_as_string(self, ErrorTypeDefaults::BoolParsing)? {
-                return str_as_bool(self, &cow_str).map(ValidationMatch::lax);
+            if let Some(s) = maybe_as_string(self, ErrorTypeDefaults::BoolParsing)? {
+                return str_as_bool(self, s).map(ValidationMatch::lax);
             } else if let Some(int) = extract_i64(self) {
                 return int_as_bool(self, int).map(ValidationMatch::lax);
             } else if let Ok(float) = self.extract::<f64>() {
@@ -241,12 +247,12 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
 
         'lax: {
             if !strict {
-                return if let Some(cow_str) = maybe_as_string(self, ErrorTypeDefaults::IntParsing)? {
-                    str_as_int(self, &cow_str)
+                return if let Some(s) = maybe_as_string(self, ErrorTypeDefaults::IntParsing)? {
+                    str_as_int(self, s)
                 } else if self.is_exact_instance_of::<PyFloat>() {
                     float_as_int(self, self.extract::<f64>()?)
-                } else if let Ok(decimal) = self.strict_decimal(self.py()) {
-                    decimal_as_int(self, &decimal)
+                } else if let Ok(decimal) = self.validate_decimal(true, self.py()) {
+                    decimal_as_int(self, &decimal.into_inner())
                 } else if let Ok(float) = self.extract::<f64>() {
                     float_as_int(self, float)
                 } else if let Some(enum_val) = maybe_as_enum(self) {
@@ -283,9 +289,9 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
         }
 
         if !strict {
-            if let Some(cow_str) = maybe_as_string(self, ErrorTypeDefaults::FloatParsing)? {
+            if let Some(s) = maybe_as_string(self, ErrorTypeDefaults::FloatParsing)? {
                 // checking for bytes and string is fast, so do this before isinstance(float)
-                return str_as_float(self, &cow_str).map(ValidationMatch::lax);
+                return str_as_float(self, s).map(ValidationMatch::lax);
             }
         }
 
@@ -304,45 +310,44 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
         Err(ValError::new(ErrorTypeDefaults::FloatType, self))
     }
 
-    fn strict_decimal(&self, py: Python<'py>) -> ValResult<Bound<'py, PyAny>> {
+    fn validate_decimal(&self, strict: bool, py: Python<'py>) -> ValMatch<Bound<'py, PyAny>> {
         let decimal_type = get_decimal_type(py);
+
         // Fast path for existing decimal objects
         if self.is_exact_instance(decimal_type) {
-            return Ok(self.to_owned());
+            return Ok(ValidationMatch::exact(self.to_owned().clone()));
         }
 
-        // Try subclasses of decimals, they will be upcast to Decimal
+        if !strict {
+            if self.is_instance_of::<PyString>() || (self.is_instance_of::<PyInt>() && !self.is_instance_of::<PyBool>())
+            {
+                // Checking isinstance for str / int / bool is fast compared to decimal / float
+                return create_decimal(self, self).map(ValidationMatch::lax);
+            }
+
+            if self.is_instance_of::<PyFloat>() {
+                return create_decimal(self.str()?.as_any(), self).map(ValidationMatch::lax);
+            }
+        }
+
         if self.is_instance(decimal_type)? {
-            return create_decimal(self, self);
+            // Upcast subclasses to decimal
+            return create_decimal(self, self).map(ValidationMatch::strict);
         }
 
-        Err(ValError::new(
+        let error_type = if strict {
             ErrorType::IsInstanceOf {
-                class: decimal_type.qualname().unwrap_or_else(|_| "Decimal".to_owned()),
+                class: decimal_type
+                    .qualname()
+                    .and_then(|name| name.extract())
+                    .unwrap_or_else(|_| "Decimal".to_owned()),
                 context: None,
-            },
-            self,
-        ))
-    }
-
-    fn lax_decimal(&self, py: Python<'py>) -> ValResult<Bound<'py, PyAny>> {
-        let decimal_type = get_decimal_type(py);
-        // Fast path for existing decimal objects
-        if self.is_exact_instance(decimal_type) {
-            return Ok(self.to_owned().clone());
-        }
-
-        if self.is_instance_of::<PyString>() || (self.is_instance_of::<PyInt>() && !self.is_instance_of::<PyBool>()) {
-            // checking isinstance for str / int / bool is fast compared to decimal / float
-            create_decimal(self, self)
-        } else if self.is_instance(decimal_type)? {
-            // upcast subclasses to decimal
-            return create_decimal(self, self);
-        } else if self.is_instance_of::<PyFloat>() {
-            create_decimal(self.str()?.as_any(), self)
+            }
         } else {
-            Err(ValError::new(ErrorTypeDefaults::DecimalType, self))
-        }
+            ErrorTypeDefaults::DecimalType
+        };
+
+        Err(ValError::new(error_type, self))
     }
 
     type Dict<'a> = GenericPyMapping<'a, 'py> where Self: 'a;
@@ -592,6 +597,45 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
 
         Err(ValError::new(ErrorTypeDefaults::TimeDeltaType, self))
     }
+
+    fn validate_complex<'a>(&'a self, strict: bool, py: Python<'py>) -> ValResult<ValidationMatch<EitherComplex<'py>>> {
+        if let Ok(complex) = self.downcast::<PyComplex>() {
+            return Ok(ValidationMatch::strict(EitherComplex::Py(complex.to_owned())));
+        }
+        if strict {
+            return Err(ValError::new(
+                ErrorType::IsInstanceOf {
+                    class: PyComplex::type_object_bound(py)
+                        .qualname()
+                        .and_then(|name| name.extract())
+                        .unwrap_or_else(|_| "complex".to_owned()),
+                    context: None,
+                },
+                self,
+            ));
+        }
+
+        if let Ok(s) = self.downcast::<PyString>() {
+            // If input is not a valid complex string, instead of telling users to correct
+            // the string, it makes more sense to tell them to provide any acceptable value
+            // since they might have just given values of some incorrect types instead
+            // of actually trying some complex strings.
+            if let Ok(c) = string_to_complex(s, self) {
+                return Ok(ValidationMatch::lax(EitherComplex::Py(c)));
+            }
+        } else if self.is_exact_instance_of::<PyFloat>() {
+            return Ok(ValidationMatch::lax(EitherComplex::Complex([
+                self.extract::<f64>().unwrap(),
+                0.0,
+            ])));
+        } else if self.is_exact_instance_of::<PyInt>() {
+            return Ok(ValidationMatch::lax(EitherComplex::Complex([
+                self.extract::<i64>().unwrap() as f64,
+                0.0,
+            ])));
+        }
+        Err(ValError::new(ErrorTypeDefaults::ComplexType, self))
+    }
 }
 
 impl<'py> BorrowInput<'py> for Bound<'py, PyAny> {
@@ -627,18 +671,29 @@ fn from_attributes_applicable(obj: &Bound<'_, PyAny>) -> bool {
 }
 
 /// Utility for extracting a string from a PyAny, if possible.
-fn maybe_as_string<'a>(v: &'a Bound<'_, PyAny>, unicode_error: ErrorType) -> ValResult<Option<Cow<'a, str>>> {
+fn maybe_as_string<'a>(v: &'a Bound<'_, PyAny>, unicode_error: ErrorType) -> ValResult<Option<&'a str>> {
     if let Ok(py_string) = v.downcast::<PyString>() {
-        let str = py_string_str(py_string)?;
-        Ok(Some(Cow::Borrowed(str)))
+        py_string_str(py_string).map(Some)
     } else if let Ok(bytes) = v.downcast::<PyBytes>() {
         match from_utf8(bytes.as_bytes()) {
-            Ok(s) => Ok(Some(Cow::Owned(s.to_string()))),
+            Ok(s) => Ok(Some(s)),
             Err(_) => Err(ValError::new(unicode_error, v)),
         }
     } else {
         Ok(None)
     }
+}
+
+/// Decode a Python bytearray to a Python string.
+///
+/// Using Python's built-in machinery for this should be efficient and avoids questions around
+/// safety of concurrent mutation of the bytearray (by leaving that to the Python interpreter).
+fn bytearray_to_str<'py>(bytearray: &Bound<'py, PyByteArray>) -> PyResult<Bound<'py, PyString>> {
+    let py = bytearray.py();
+    let py_string = bytearray
+        .call_method1(intern!(py, "decode"), (intern!(py, "utf-8"),))?
+        .downcast_into()?;
+    Ok(py_string)
 }
 
 /// Utility for extracting an enum value, if possible.
@@ -651,60 +706,6 @@ fn maybe_as_enum<'py>(v: &Bound<'py, PyAny>) -> Option<Bound<'py, PyAny>> {
     } else {
         None
     }
-}
-
-#[cfg(PyPy)]
-static DICT_KEYS_TYPE: pyo3::sync::GILOnceCell<Py<PyType>> = pyo3::sync::GILOnceCell::new();
-
-#[cfg(PyPy)]
-fn is_dict_keys_type(v: &Bound<'_, PyAny>) -> bool {
-    let py = v.py();
-    let keys_type = DICT_KEYS_TYPE
-        .get_or_init(py, || {
-            py.eval("type({}.keys())", None, None)
-                .unwrap()
-                .downcast::<PyType>()
-                .unwrap()
-                .into()
-        })
-        .bind(py);
-    v.is_instance(keys_type).unwrap_or(false)
-}
-
-#[cfg(PyPy)]
-static DICT_VALUES_TYPE: pyo3::sync::GILOnceCell<Py<PyType>> = pyo3::sync::GILOnceCell::new();
-
-#[cfg(PyPy)]
-fn is_dict_values_type(v: &Bound<'_, PyAny>) -> bool {
-    let py = v.py();
-    let values_type = DICT_VALUES_TYPE
-        .get_or_init(py, || {
-            py.eval("type({}.values())", None, None)
-                .unwrap()
-                .downcast::<PyType>()
-                .unwrap()
-                .into()
-        })
-        .bind(py);
-    v.is_instance(values_type).unwrap_or(false)
-}
-
-#[cfg(PyPy)]
-static DICT_ITEMS_TYPE: pyo3::sync::GILOnceCell<Py<PyType>> = pyo3::sync::GILOnceCell::new();
-
-#[cfg(PyPy)]
-fn is_dict_items_type(v: &Bound<'_, PyAny>) -> bool {
-    let py = v.py();
-    let items_type = DICT_ITEMS_TYPE
-        .get_or_init(py, || {
-            py.eval("type({}.items())", None, None)
-                .unwrap()
-                .downcast::<PyType>()
-                .unwrap()
-                .into()
-        })
-        .bind(py);
-    v.is_instance(items_type).unwrap_or(false)
 }
 
 #[cfg_attr(debug_assertions, derive(Debug))]
@@ -812,13 +813,6 @@ impl<'py> ValidatedDict<'py> for GenericPyMapping<'_, 'py> {
         matches!(self, Self::GetAttr(..))
     }
 
-    fn as_py_dict(&self) -> Option<&Bound<'py, PyDict>> {
-        match self {
-            Self::Dict(dict) => Some(dict),
-            _ => None,
-        }
-    }
-
     fn iterate<'a, R>(
         &'a self,
         consumer: impl ConsumeIterator<ValResult<(Self::Key<'a>, Self::Item<'a>)>, Output = R>,
@@ -826,7 +820,7 @@ impl<'py> ValidatedDict<'py> for GenericPyMapping<'_, 'py> {
         match self {
             Self::Dict(dict) => Ok(consumer.consume_iterator(dict.iter().map(Ok))),
             Self::Mapping(mapping) => Ok(consumer.consume_iterator(iterate_mapping_items(mapping)?)),
-            Self::GetAttr(obj, _) => Ok(consumer.consume_iterator(iterate_attributes(obj))),
+            Self::GetAttr(obj, _) => Ok(consumer.consume_iterator(iterate_attributes(obj)?)),
         }
     }
 }

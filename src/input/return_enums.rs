@@ -12,7 +12,7 @@ use pyo3::intern;
 use pyo3::prelude::*;
 #[cfg(not(PyPy))]
 use pyo3::types::PyFunction;
-use pyo3::types::{PyBytes, PyFloat, PyFrozenSet, PyIterator, PyMapping, PySet, PyString};
+use pyo3::types::{PyBytes, PyComplex, PyFloat, PyFrozenSet, PyIterator, PyMapping, PySet, PyString};
 
 use serde::{ser::Error, Serialize, Serializer};
 
@@ -124,6 +124,7 @@ pub(crate) fn validate_iter_to_vec<'py>(
     mut max_length_check: MaxLengthCheck<'_, impl Input<'py> + ?Sized>,
     validator: &CombinedValidator,
     state: &mut ValidationState<'_, 'py>,
+    fail_fast: bool,
 ) -> ValResult<Vec<PyObject>> {
     let mut output: Vec<PyObject> = Vec::with_capacity(capacity);
     let mut errors: Vec<ValLineError> = Vec::new();
@@ -137,6 +138,9 @@ pub(crate) fn validate_iter_to_vec<'py>(
             Err(ValError::LineErrors(line_errors)) => {
                 max_length_check.incr()?;
                 errors.extend(line_errors.into_iter().map(|err| err.with_outer_location(index)));
+                if fail_fast {
+                    break;
+                }
             }
             Err(ValError::Omit) => (),
             Err(err) => return Err(err),
@@ -190,6 +194,7 @@ pub(crate) fn validate_iter_to_set<'py>(
     max_length: Option<usize>,
     validator: &CombinedValidator,
     state: &mut ValidationState<'_, 'py>,
+    fail_fast: bool,
 ) -> ValResult<()> {
     let mut errors: Vec<ValLineError> = Vec::new();
     for (index, item_result) in iter.enumerate() {
@@ -219,6 +224,9 @@ pub(crate) fn validate_iter_to_set<'py>(
             }
             Err(ValError::Omit) => (),
             Err(err) => return Err(err),
+        }
+        if fail_fast && !errors.is_empty() {
+            break;
         }
     }
 
@@ -284,10 +292,10 @@ const MAPPING_TUPLE_ERROR: &str = "Mapping items must be tuples of (key, value) 
 /// Iterate over attributes of an object
 pub(crate) fn iterate_attributes<'a, 'py>(
     object: &'a Bound<'py, PyAny>,
-) -> impl Iterator<Item = ValResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)>> + 'a {
-    let mut attributes_iterator = object.dir().into_iter();
+) -> PyResult<impl Iterator<Item = ValResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)>> + 'a> {
+    let mut attributes_iterator = object.dir()?.into_iter();
 
-    std::iter::from_fn(move || {
+    Ok(std::iter::from_fn(move || {
         // loop until we find an attribute who's name does not start with underscore,
         // or we get to the end of the list of attributes
         let name = attributes_iterator.next()?;
@@ -319,7 +327,7 @@ pub(crate) fn iterate_attributes<'a, 'py>(
             }
         }
         None
-    })
+    }))
 }
 
 #[derive(Debug)]
@@ -549,6 +557,7 @@ impl<'a> EitherInt<'a> {
             Ok(Self::BigInt(big_int))
         }
     }
+
     pub fn into_i64(self, py: Python<'a>) -> ValResult<i64> {
         match self {
             EitherInt::I64(i) => Ok(i),
@@ -712,6 +721,33 @@ impl ToPyObject for Int {
         match self {
             Self::I64(i) => i.to_object(py),
             Self::Big(big_i) => big_i.to_object(py),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub enum EitherComplex<'a> {
+    Complex([f64; 2]),
+    Py(Bound<'a, PyComplex>),
+}
+
+impl<'a> IntoPy<PyObject> for EitherComplex<'a> {
+    fn into_py(self, py: Python<'_>) -> PyObject {
+        match self {
+            Self::Complex(c) => PyComplex::from_doubles_bound(py, c[0], c[1]).into_py(py),
+            Self::Py(c) => c.into_py(py),
+        }
+    }
+}
+
+impl<'a> EitherComplex<'a> {
+    pub fn as_f64(&self, py: Python<'_>) -> [f64; 2] {
+        match self {
+            EitherComplex::Complex(f) => *f,
+            EitherComplex::Py(f) => [
+                f.getattr(intern!(py, "real")).unwrap().extract().unwrap(),
+                f.getattr(intern!(py, "imag")).unwrap().extract().unwrap(),
+            ],
         }
     }
 }

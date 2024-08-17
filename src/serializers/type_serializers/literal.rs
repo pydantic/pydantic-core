@@ -16,7 +16,7 @@ use super::{
     SerMode, TypeSerializer,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct LiteralSerializer {
     expected_int: AHashSet<i64>,
     expected_str: AHashSet<String>,
@@ -89,7 +89,7 @@ impl LiteralSerializer {
                 if let Ok(py_str) = value.downcast::<PyString>() {
                     let s = py_str.to_str()?;
                     if self.expected_str.contains(s) {
-                        return Ok(OutputValue::OkStr(py_str.clone()));
+                        return Ok(OutputValue::OkStr(PyString::new_bound(value.py(), s)));
                     }
                 }
             }

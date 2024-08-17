@@ -10,7 +10,7 @@ import warnings
 from collections.abc import Mapping
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, Callable, Hashable, Set, Type, Union
+from typing import TYPE_CHECKING, Any, Callable, Hashable, Pattern, Set, Tuple, Type, Union
 
 from typing_extensions import deprecated
 
@@ -70,6 +70,7 @@ class CoreConfig(TypedDict, total=False):
         ser_json_bytes: The serialization option for `bytes` values. Default is 'utf8'.
         ser_json_inf_nan: The serialization option for infinity and NaN values
             in float fields. Default is 'null'.
+        val_json_bytes: The validation option for `bytes` values, complementing ser_json_bytes. Default is 'utf8'.
         hide_input_in_errors: Whether to hide input data from `ValidationError` representation.
         validation_error_cause: Whether to add user-python excs to the __cause__ of a ValidationError.
             Requires exceptiongroup backport pre Python 3.11.
@@ -106,7 +107,8 @@ class CoreConfig(TypedDict, total=False):
     # the config options are used to customise serialization to JSON
     ser_json_timedelta: Literal['iso8601', 'float']  # default: 'iso8601'
     ser_json_bytes: Literal['utf8', 'base64', 'hex']  # default: 'utf8'
-    ser_json_inf_nan: Literal['null', 'constants']  # default: 'null'
+    ser_json_inf_nan: Literal['null', 'constants', 'strings']  # default: 'null'
+    val_json_bytes: Literal['utf8', 'base64', 'hex']  # default: 'utf8'
     # used to hide input data from ValidationError repr
     hide_input_in_errors: bool
     validation_error_cause: bool  # default: False
@@ -217,6 +219,7 @@ ExpectedSerializationTypes = Literal[
     'multi-host-url',
     'json',
     'uuid',
+    'any',
 ]
 
 
@@ -742,9 +745,51 @@ def decimal_schema(
     )
 
 
+class ComplexSchema(TypedDict, total=False):
+    type: Required[Literal['complex']]
+    strict: bool
+    ref: str
+    metadata: Any
+    serialization: SerSchema
+
+
+def complex_schema(
+    *,
+    strict: bool | None = None,
+    ref: str | None = None,
+    metadata: Any = None,
+    serialization: SerSchema | None = None,
+) -> ComplexSchema:
+    """
+    Returns a schema that matches a complex value, e.g.:
+
+    ```py
+    from pydantic_core import SchemaValidator, core_schema
+
+    schema = core_schema.complex_schema()
+    v = SchemaValidator(schema)
+    assert v.validate_python('1+2j') == complex(1, 2)
+    assert v.validate_python(complex(1, 2)) == complex(1, 2)
+    ```
+
+    Args:
+        strict: Whether the value should be a complex object instance or a value that can be converted to a complex object
+        ref: optional unique identifier of the schema, used to reference the schema in other places
+        metadata: Any other information you want to include with the schema, not used by pydantic-core
+        serialization: Custom serialization schema
+    """
+    return _dict_not_none(
+        type='complex',
+        strict=strict,
+        ref=ref,
+        metadata=metadata,
+        serialization=serialization,
+    )
+
+
 class StringSchema(TypedDict, total=False):
     type: Required[Literal['str']]
-    pattern: str
+    pattern: Union[str, Pattern[str]]
     max_length: int
     min_length: int
     strip_whitespace: bool
@@ -760,7 +805,7 @@ class StringSchema(TypedDict, total=False):
 
 def str_schema(
     *,
-    pattern: str | None = None,
+    pattern: str | Pattern[str] | None = None,
     max_length: int | None = None,
     min_length: int | None = None,
     strip_whitespace: bool | None = None,
@@ -1399,6 +1444,7 @@ class ListSchema(TypedDict, total=False):
     items_schema: CoreSchema
     min_length: int
     max_length: int
+    fail_fast: bool
     strict: bool
     ref: str
     metadata: Any
@@ -1410,6 +1456,7 @@ def list_schema(
     *,
     min_length: int | None = None,
     max_length: int | None = None,
+    fail_fast: bool | None = None,
     strict: bool | None = None,
     ref: str | None = None,
     metadata: Any = None,
@@ -1430,6 +1477,7 @@ def list_schema(
         items_schema: The value must be a list of items that match this schema
         min_length: The value must be a list with at least this many items
         max_length: The value must be a list with at most this many items
+        fail_fast: Stop validation on the first error
         strict: The value must be a list with exactly this many items
         ref: optional unique identifier of the schema, used to reference the schema in other places
         metadata: Any other information you want to include with the schema, not used by pydantic-core
@@ -1440,6 +1488,7 @@ def list_schema(
         items_schema=items_schema,
         min_length=min_length,
         max_length=max_length,
+        fail_fast=fail_fast,
         strict=strict,
         ref=ref,
         metadata=metadata,
@@ -1547,6 +1596,7 @@ class TupleSchema(TypedDict, total=False):
     variadic_item_index: int
     min_length: int
     max_length: int
+    fail_fast: bool
     strict: bool
     ref: str
     metadata: Any
@@ -1559,6 +1609,7 @@ def tuple_schema(
     variadic_item_index: int | None = None,
     min_length: int | None = None,
     max_length: int | None = None,
+    fail_fast: bool | None = None,
     strict: bool | None = None,
     ref: str | None = None,
     metadata: Any = None,
@@ -1583,6 +1634,7 @@ def tuple_schema(
         variadic_item_index: The index of the schema in `items_schema` to be treated as variadic (following PEP 646)
         min_length: The value must be a tuple with at least this many items
         max_length: The value must be a tuple with at most this many items
+        fail_fast: Stop validation on the first error
         strict: The value must be a tuple with exactly this many items
         ref: Optional unique identifier of the schema, used to reference the schema in other places
         metadata: Any other information you want to include with the schema, not used by pydantic-core
@@ -1594,6 +1646,7 @@ def tuple_schema(
         variadic_item_index=variadic_item_index,
         min_length=min_length,
         max_length=max_length,
+        fail_fast=fail_fast,
         strict=strict,
         ref=ref,
         metadata=metadata,
@@ -1606,6 +1659,7 @@ class SetSchema(TypedDict, total=False):
     items_schema: CoreSchema
     min_length: int
     max_length: int
+    fail_fast: bool
     strict: bool
     ref: str
     metadata: Any
@@ -1617,6 +1671,7 @@ def set_schema(
     *,
     min_length: int | None = None,
     max_length: int | None = None,
+    fail_fast: bool | None = None,
     strict: bool | None = None,
     ref: str | None = None,
     metadata: Any = None,
@@ -1639,6 +1694,7 @@ def set_schema(
         items_schema: The value must be a set with items that match this schema
         min_length: The value must be a set with at least this many items
         max_length: The value must be a set with at most this many items
+        fail_fast: Stop validation on the first error
         strict: The value must be a set with exactly this many items
         ref: optional unique identifier of the schema, used to reference the schema in other places
         metadata: Any other information you want to include with the schema, not used by pydantic-core
@@ -1649,6 +1705,7 @@ def set_schema(
         items_schema=items_schema,
         min_length=min_length,
         max_length=max_length,
+        fail_fast=fail_fast,
         strict=strict,
         ref=ref,
         metadata=metadata,
@@ -1661,6 +1718,7 @@ class FrozenSetSchema(TypedDict, total=False):
     items_schema: CoreSchema
     min_length: int
     max_length: int
+    fail_fast: bool
     strict: bool
     ref: str
     metadata: Any
@@ -1672,6 +1730,7 @@ def frozenset_schema(
     *,
     min_length: int | None = None,
     max_length: int | None = None,
+    fail_fast: bool | None = None,
     strict: bool | None = None,
     ref: str | None = None,
     metadata: Any = None,
@@ -1694,6 +1753,7 @@ def frozenset_schema(
         items_schema: The value must be a frozenset with items that match this schema
         min_length: The value must be a frozenset with at least this many items
         max_length: The value must be a frozenset with at most this many items
+        fail_fast: Stop validation on the first error
         strict: The value must be a frozenset with exactly this many items
         ref: optional unique identifier of the schema, used to reference the schema in other places
         metadata: Any other information you want to include with the schema, not used by pydantic-core
@@ -1704,6 +1764,7 @@ def frozenset_schema(
         items_schema=items_schema,
         min_length=min_length,
         max_length=max_length,
+        fail_fast=fail_fast,
         strict=strict,
         ref=ref,
         metadata=metadata,
@@ -2062,7 +2123,7 @@ def with_info_after_validator_function(
 
 
 class ValidatorFunctionWrapHandler(Protocol):
-    def __call__(self, input_value: Any, outer_location: str | int | None = None) -> Any:  # pragma: no cover
+    def __call__(self, input_value: Any, outer_location: str | int | None = None, /) -> Any:  # pragma: no cover
         ...
 
 
@@ -2466,8 +2527,8 @@ class TaggedUnionSchema(TypedDict, total=False):
 
 
 def tagged_union_schema(
-    choices: dict[Hashable, CoreSchema],
-    discriminator: str | list[str | int] | list[list[str | int]] | Callable[[Any], Hashable],
+    choices: Dict[Any, CoreSchema],
+    discriminator: str | list[str | int] | list[list[str | int]] | Callable[[Any], Any],
     *,
     custom_error_type: str | None = None,
     custom_error_message: str | None = None,
@@ -3777,6 +3838,7 @@ if not MYPY:
         DefinitionsSchema,
         DefinitionReferenceSchema,
         UuidSchema,
+        ComplexSchema,
     ]
 elif False:
     CoreSchema: TypeAlias = Mapping[str, Any]
@@ -3832,6 +3894,7 @@ CoreSchemaType = Literal[
     'definitions',
     'definition-ref',
     'uuid',
+    'complex',
 ]
 
 CoreSchemaFieldType = Literal['model-field', 'dataclass-field', 'typed-dict-field', 'computed-field']
@@ -3888,6 +3951,7 @@ ErrorType = Literal[
     'bytes_type',
     'bytes_too_short',
     'bytes_too_long',
+    'bytes_invalid_encoding',
     'value_error',
     'assertion_error',
     'literal_error',
@@ -3936,6 +4000,8 @@ ErrorType = Literal[
     'decimal_max_digits',
     'decimal_max_places',
     'decimal_whole_digits',
+    'complex_type',
+    'complex_str_parsing',
 ]
 
 

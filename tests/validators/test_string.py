@@ -1,4 +1,5 @@
 import re
+import sys
 from decimal import Decimal
 from numbers import Number
 from typing import Any, Dict, Union
@@ -79,6 +80,8 @@ def test_str_not_json(input_value, expected):
         ({'pattern': r'^\d+$'}, '12345', '12345'),
         ({'pattern': r'\d+$'}, 'foobar 123', 'foobar 123'),
         ({'pattern': r'^\d+$'}, '12345a', Err("String should match pattern '^\\d+$' [type=string_pattern_mismatch")),
+        ({'pattern': r'[a-z]'}, 'Abc', 'Abc'),
+        ({'pattern': re.compile(r'[a-z]')}, 'Abc', 'Abc'),
         # strip comes after length check
         ({'max_length': 5, 'strip_whitespace': True}, '1234  ', '1234'),
         # to_upper and strip comes after pattern check
@@ -187,8 +190,9 @@ def test_invalid_regex(engine):
             'error: unclosed group'
         )
     elif engine == 'python-re':
+        prefix = 'PatternError' if sys.version_info >= (3, 13) else 'error'
         assert exc_info.value.args[0] == (
-            'Error building "str" validator:\n  error: missing ), unterminated subpattern at position 0'
+            f'Error building "str" validator:\n  {prefix}: missing ), unterminated subpattern at position 0'
         )
 
 
@@ -398,3 +402,10 @@ def test_coerce_numbers_to_str_schema_with_strict_mode(number: int):
         v.validate_python(number)
     with pytest.raises(ValidationError):
         v.validate_json(str(number))
+
+
+@pytest.mark.parametrize('engine', [None, 'rust-regex', 'python-re'])
+def test_compiled_regex(engine) -> None:
+    v = SchemaValidator(core_schema.str_schema(pattern=re.compile('abc', re.IGNORECASE), regex_engine=engine))
+    assert v.validate_python('abc') == 'abc'
+    assert v.validate_python('ABC') == 'ABC'

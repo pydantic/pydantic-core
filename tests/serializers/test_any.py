@@ -158,7 +158,7 @@ def test_any_with_date_serializer():
         assert s.to_python(b'bang', mode='json') == 'bang'
 
     assert [w.message.args[0] for w in warning_info.list] == [
-        'Pydantic serializer warnings:\n  Expected `date` but got `bytes` - serialized value may not be as expected'
+        "Pydantic serializer warnings:\n  Expected `date` but got `bytes` with value `b'bang'` - serialized value may not be as expected"
     ]
 
 
@@ -172,7 +172,7 @@ def test_any_with_timedelta_serializer():
         assert s.to_python(b'bang', mode='json') == 'bang'
 
     assert [w.message.args[0] for w in warning_info.list] == [
-        'Pydantic serializer warnings:\n  Expected `timedelta` but got `bytes` - '
+        "Pydantic serializer warnings:\n  Expected `timedelta` but got `bytes` with value `b'bang'` - "
         'serialized value may not be as expected'
     ]
 
@@ -623,6 +623,14 @@ def test_ser_json_inf_nan_with_any() -> None:
     assert s.to_python(nan, mode='json') is None
     assert s.to_json(nan) == b'null'
 
+    s = SchemaSerializer(core_schema.any_schema(), core_schema.CoreConfig(ser_json_inf_nan='strings'))
+    assert isinf(s.to_python(inf))
+    assert isinf(s.to_python(inf, mode='json'))
+    assert s.to_json(inf) == b'"Infinity"'
+    assert isnan(s.to_python(nan))
+    assert isnan(s.to_python(nan, mode='json'))
+    assert s.to_json(nan) == b'"NaN"'
+
 
 def test_ser_json_inf_nan_with_list_of_any() -> None:
     s = SchemaSerializer(
@@ -644,3 +652,32 @@ def test_ser_json_inf_nan_with_list_of_any() -> None:
     assert isnan(s.to_python([nan])[0])
     assert s.to_python([nan], mode='json')[0] is None
     assert s.to_json([nan]) == b'[null]'
+
+
+def test_simple_any_ser_schema_repr():
+    assert (
+        plain_repr(SchemaSerializer(core_schema.simple_ser_schema('any')))
+        == 'SchemaSerializer(serializer=Any(AnySerializer),definitions=[])'
+    )
+
+
+def test_simple_any_ser_schema():
+    import operator
+
+    class MyEnum(Enum):
+        A = (1,)
+        B = (2,)
+
+    v = SchemaSerializer(
+        core_schema.no_info_after_validator_function(
+            operator.attrgetter('value'),
+            core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())),
+            serialization=core_schema.simple_ser_schema('any'),
+        ),
+    )
+
+    assert v.to_python({MyEnum.A: 'x'}) == {MyEnum.A: 'x'}
+    assert v.to_python({MyEnum.A: 'x'}, mode='json') == {'1': 'x'}
+    assert v.to_json({MyEnum.A: 'x'}) == b'{"1":"x"}'
+    assert v.to_python(1) == 1
+    assert v.to_json(1) == b'1'

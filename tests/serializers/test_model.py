@@ -1,6 +1,7 @@
 import dataclasses
 import json
 import platform
+import warnings
 from random import randint
 from typing import Any, ClassVar, Dict
 
@@ -230,14 +231,17 @@ def test_model_wrong_warn():
     assert s.to_python(None, mode='json') is None
     assert s.to_json(None) == b'null'
 
-    with pytest.warns(UserWarning, match='Expected `MyModel` but got `int` - serialized value may.+'):
+    with pytest.warns(UserWarning, match='Expected `MyModel` but got `int` with value `123` - serialized value may.+'):
         assert s.to_python(123) == 123
-    with pytest.warns(UserWarning, match='Expected `MyModel` but got `int` - serialized value may.+'):
+    with pytest.warns(UserWarning, match='Expected `MyModel` but got `int` with value `123` - serialized value may.+'):
         assert s.to_python(123, mode='json') == 123
-    with pytest.warns(UserWarning, match='Expected `MyModel` but got `int` - serialized value may.+'):
+    with pytest.warns(UserWarning, match='Expected `MyModel` but got `int` with value `123` - serialized value may.+'):
         assert s.to_json(123) == b'123'
 
-    with pytest.warns(UserWarning, match='Expected `MyModel` but got `dict` - serialized value may.+'):
+    with pytest.warns(
+        UserWarning,
+        match="Expected `MyModel` but got `dict` with value `{'foo': 1, 'bar': b'more'}` - serialized value may.+",
+    ):
         assert s.to_python({'foo': 1, 'bar': b'more'}) == {'foo': 1, 'bar': b'more'}
 
 
@@ -563,6 +567,42 @@ def test_function_plain_field_serializer_to_json():
         )
     )
     assert json.loads(s.to_json(Model(x=1000))) == {'x': '1_000'}
+
+
+def test_function_plain_field_serializer_with_computed_field():
+    @dataclasses.dataclass
+    class Model:
+        x: int
+
+        @property
+        def computed_field_x(self) -> int:
+            return self.x + 200
+
+        def ser_func(self, v: Any, info: core_schema.FieldSerializationInfo) -> str:
+            return info.field_name + '_' + str(v * 2)
+
+    field_str_with_field_serializer = core_schema.str_schema(
+        serialization=core_schema.plain_serializer_function_ser_schema(
+            Model.ser_func,
+            is_field_serializer=True,
+            info_arg=True,
+            return_schema=core_schema.any_schema(),
+        )
+    )
+
+    s = SchemaSerializer(
+        core_schema.model_schema(
+            Model,
+            core_schema.model_fields_schema(
+                {'x': core_schema.model_field(field_str_with_field_serializer)},
+                computed_fields=[
+                    core_schema.computed_field('computed_field_x', field_str_with_field_serializer),
+                ],
+            ),
+        )
+    )
+    assert json.loads(s.to_json(Model(x=1000))) == {'x': 'x_2000', 'computed_field_x': 'computed_field_x_2400'}
+    assert s.to_python(Model(x=2000)) == {'x': 'x_4000', 'computed_field_x': 'computed_field_x_4400'}
 
 
 def test_function_wrap_field_serializer_to_json():
@@ -1041,3 +1081,23 @@ def test_extra_custom_serializer():
     m.__pydantic_extra__ = {'extra': 'extra'}
 
     assert s.to_python(m) == {'extra': 'extra bam!'}
+
+
+def test_no_warn_on_exclude() -> None:
+    warnings.simplefilter('error')
+
+    s = SchemaSerializer(
+        core_schema.model_schema(
+            BasicModel,
+            core_schema.model_fields_schema(
+                {
+                    'a': core_schema.model_field(core_schema.int_schema()),
+                    'b': core_schema.model_field(core_schema.int_schema()),
+                }
+            ),
+        )
+    )
+
+    value = BasicModel(a=0, b=1)
+    assert s.to_python(value, exclude={'b'}) == {'a': 0}
+    assert s.to_python(value, mode='json', exclude={'b'}) == {'a': 0}

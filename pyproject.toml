@@ -22,6 +22,7 @@ classifiers = [
     'Programming Language :: Python :: 3.10',
     'Programming Language :: Python :: 3.11',
     'Programming Language :: Python :: 3.12',
+    'Programming Language :: Python :: 3.13',
     'Programming Language :: Rust',
     'Framework :: Pydantic',
     'Intended Audience :: Developers',
@@ -73,10 +74,9 @@ testpaths = 'tests'
 log_format = '%(name)s %(levelname)s: %(message)s'
 filterwarnings = [
     'error',
-    # Work around https://github.com/pytest-dev/pytest/issues/10977 for Python 3.12
-    'ignore:(ast\.Str|ast\.NameConstant|ast\.Num|Attribute s) is deprecated and will be removed.*:DeprecationWarning:',
-    # issue with pytz - https://github.com/stub42/pytz/issues/105 for Python 3.12
-    'ignore:datetime\.utcfromtimestamp\(\) is deprecated.*:DeprecationWarning:',
+    # Python 3.9 and below allowed truncation of float to integers in some
+    # cases, by not making this an error we can test for this behaviour
+    'ignore:(.+)Implicit conversion to integers using __int__ is deprecated',
 ]
 timeout = 30
 xfail_strict = true
@@ -103,8 +103,7 @@ exclude_lines = [
 
 # configuring https://github.com/pydantic/hooky
 [tool.hooky]
-assignees = ['samuelcolvin', 'adriangb', 'dmontagu', 'davidhewitt', 'lig']
-reviewers = ['samuelcolvin', 'adriangb', 'dmontagu', 'davidhewitt']
+reviewers = ['sydney-runkle', 'davidhewitt']
 require_change_file = false
 
 [tool.pyright]
