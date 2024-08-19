@@ -2859,7 +2859,7 @@ def typed_dict_schema(
         a: str
 
     wrapper_schema = core_schema.typed_dict_schema(
-        {'a': core_schema.typed_dict_field(core_schema.str_schema())}
+        {'a': core_schema.typed_dict_field(core_schema.str_schema())},
         cls=MyTypedDict
     )
     v = SchemaValidator(wrapper_schema)
