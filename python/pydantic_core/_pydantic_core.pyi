@@ -736,20 +736,19 @@ class SchemaError(Exception):
             A list of [`ErrorDetails`][pydantic_core.ErrorDetails] for each error in the schema.
         """
 
-@final
 class ValidationError(ValueError):
     """
     `ValidationError` is the exception raised by `pydantic-core` when validation fails, it contains a list of errors
     which detail why validation failed.
     """
-
-    @staticmethod
+    @classmethod
     def from_exception_data(
+        cls,
         title: str,
         line_errors: list[InitErrorDetails],
         input_type: Literal['python', 'json'] = 'python',
         hide_input: bool = False,
-    ) -> ValidationError:
+    ) -> Self:
         """
         Python constructor for a Validation Error.
 
@@ -820,7 +819,6 @@ class ValidationError(ValueError):
         before the first validation error is created.
         """
 
-@final
 class PydanticCustomError(ValueError):
     def __new__(
         cls, error_type: LiteralString, message_template: LiteralString, context: dict[str, Any] | None = None
