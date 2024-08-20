@@ -1,8 +1,9 @@
-from typing import Any, LiteralString, Self, override
+from typing import Any
 from unittest import TestCase
 from unittest.mock import ANY
 
 import pytest
+from typing_extensions import LiteralString, Self, override
 
 from pydantic_core import ErrorDetails, InitErrorDetails, PydanticCustomError, ValidationError
 
