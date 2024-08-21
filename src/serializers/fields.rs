@@ -230,7 +230,7 @@ impl GeneralFieldsSerializer {
 
             Err(PydanticSerializationUnexpectedValue::new_err(
                 Some(format!(
-                    "Expected {required_fields} fields but got {used_req_fields} for field {field_name} of type `{type_name}` with value `{field_value}`  - serialized value may not be as expected."
+                    "Expected {required_fields} fields but got {used_req_fields} for field {field_name} of type `{type_name}` with value `{field_value}` - serialized value may not be as expected."
                 ))
             ))
         } else {
