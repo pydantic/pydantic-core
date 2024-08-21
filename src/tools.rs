@@ -130,7 +130,7 @@ pub fn truncate_safe_repr(v: &Bound<'_, PyAny>, max_len: Option<usize>) -> Strin
     let max_len = max_len.unwrap_or(50); // default to 100 bytes
     let input_str = safe_repr(v);
     let mut limited_str = String::with_capacity(max_len);
-    write_truncated_to_limited_bytes(&mut limited_str, input_str.to_cow(), max_len)
+    write_truncated_to_limited_bytes(&mut limited_str, &input_str.to_string(), max_len)
         .expect("Writing to a `String` failed");
     limited_str
 }

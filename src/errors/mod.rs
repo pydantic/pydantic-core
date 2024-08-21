@@ -1,5 +1,4 @@
 use core::fmt;
-use std::borrow::Cow;
 
 use pyo3::prelude::*;
 
@@ -64,18 +63,14 @@ pub fn ceil_char_boundary(value: &str, index: usize) -> usize {
         .map_or(upper_bound, |pos| pos + index)
 }
 
-pub fn write_truncated_to_limited_bytes<F: fmt::Write>(
-    f: &mut F,
-    val: Cow<'_, str>,
-    max_len: usize,
-) -> std::fmt::Result {
+pub fn write_truncated_to_limited_bytes<F: fmt::Write>(f: &mut F, val: &str, max_len: usize) -> std::fmt::Result {
     if val.len() > max_len {
         let mid_point = (max_len as f64 / 2.0).ceil() as usize;
         write!(
             f,
             "{}...{}",
-            &val[0..floor_char_boundary(&val, mid_point)],
-            &val[ceil_char_boundary(&val, val.len() - (mid_point - 1))..]
+            &val[0..floor_char_boundary(val, mid_point)],
+            &val[ceil_char_boundary(val, val.len() - (mid_point - 1))..]
         )
     } else {
         write!(f, "{val}")
@@ -83,6 +78,6 @@ pub fn write_truncated_to_limited_bytes<F: fmt::Write>(
 }
 
 // preserved for backwards compatibility, can be removed in a major (or potentially minor) release
-pub fn write_truncated_to_50_bytes<F: fmt::Write>(f: &mut F, val: Cow<'_, str>) -> std::fmt::Result {
+pub fn write_truncated_to_50_bytes<F: fmt::Write>(f: &mut F, val: &str) -> std::fmt::Result {
     write_truncated_to_limited_bytes(f, val, 50)
 }
