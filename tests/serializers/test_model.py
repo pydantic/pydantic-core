@@ -1084,26 +1084,27 @@ def test_extra_custom_serializer():
 
 
 def test_no_warn_on_exclude() -> None:
-    warnings.simplefilter('error')
+    with warnings.catch_warnings():
+        warnings.simplefilter('error')
 
-    s = SchemaSerializer(
-        core_schema.model_schema(
-            BasicModel,
-            core_schema.model_fields_schema(
-                {
-                    'a': core_schema.model_field(core_schema.int_schema()),
-                    'b': core_schema.model_field(core_schema.int_schema()),
-                }
-            ),
+        s = SchemaSerializer(
+            core_schema.model_schema(
+                BasicModel,
+                core_schema.model_fields_schema(
+                    {
+                        'a': core_schema.model_field(core_schema.int_schema()),
+                        'b': core_schema.model_field(core_schema.int_schema()),
+                    }
+                ),
+            )
         )
-    )
 
-    value = BasicModel(a=0, b=1)
-    assert s.to_python(value, exclude={'b'}) == {'a': 0}
-    assert s.to_python(value, mode='json', exclude={'b'}) == {'a': 0}
+        value = BasicModel(a=0, b=1)
+        assert s.to_python(value, exclude={'b'}) == {'a': 0}
+        assert s.to_python(value, mode='json', exclude={'b'}) == {'a': 0}
 
 
-@pytest.mark.xfail(reason='Currently failing bc of a lack of warning, but equivalent script is passing...')
+# @pytest.mark.xfail(reason='Currently failing bc of a lack of warning, but equivalent script is passing...')
 def test_warn_on_missing_field() -> None:
     class AModel(BasicModel): ...
 
