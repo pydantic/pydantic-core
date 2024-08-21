@@ -1,3 +1,5 @@
+use core::fmt;
+
 use std::borrow::Cow;
 
 use pyo3::exceptions::PyKeyError;
@@ -6,8 +8,6 @@ use pyo3::types::{PyDict, PyString};
 use pyo3::{intern, FromPyObject};
 
 use jiter::{cached_py_string, pystring_fast_new, StringCacheMode};
-
-use crate::errors::write_truncated_to_limited_bytes;
 
 pub trait SchemaDict<'py> {
     fn get_as<T>(&self, key: &Bound<'_, PyString>) -> PyResult<Option<T>>
@@ -155,5 +155,49 @@ pub(crate) fn new_py_string<'py>(py: Python<'py>, s: &str, cache_str: StringCach
         cached_py_string(py, s, ascii_only)
     } else {
         pystring_fast_new(py, s, ascii_only)
+    }
+}
+
+// TODO: is_utf8_char_boundary, floor_char_boundary and ceil_char_boundary
+// with builtin methods once https://github.com/rust-lang/rust/issues/93743 is resolved
+// These are just copy pasted from the current implementation
+const fn is_utf8_char_boundary(value: u8) -> bool {
+    // This is bit magic equivalent to: b < 128 || b >= 192
+    (value as i8) >= -0x40
+}
+
+pub fn floor_char_boundary(value: &str, index: usize) -> usize {
+    if index >= value.len() {
+        value.len()
+    } else {
+        let lower_bound = index.saturating_sub(3);
+        let new_index = value.as_bytes()[lower_bound..=index]
+            .iter()
+            .rposition(|b| is_utf8_char_boundary(*b));
+
+        // SAFETY: we know that the character boundary will be within four bytes
+        unsafe { lower_bound + new_index.unwrap_unchecked() }
+    }
+}
+
+pub fn ceil_char_boundary(value: &str, index: usize) -> usize {
+    let upper_bound = Ord::min(index + 4, value.len());
+    value.as_bytes()[index..upper_bound]
+        .iter()
+        .position(|b| is_utf8_char_boundary(*b))
+        .map_or(upper_bound, |pos| pos + index)
+}
+
+pub fn write_truncated_to_limited_bytes<F: fmt::Write>(f: &mut F, val: &str, max_len: usize) -> std::fmt::Result {
+    if val.len() > max_len {
+        let mid_point = max_len.div_ceil(2);
+        write!(
+            f,
+            "{}...{}",
+            &val[0..floor_char_boundary(val, mid_point)],
+            &val[ceil_char_boundary(val, val.len() - (mid_point - 1))..]
+        )
+    } else {
+        write!(f, "{val}")
     }
 }
