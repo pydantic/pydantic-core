@@ -426,7 +426,7 @@ impl CollectWarnings {
                 .qualname()
                 .unwrap_or_else(|_| PyString::new_bound(value.py(), "<unknown python object>"));
 
-            let value_str = truncate_safe_repr(value, Some(100));
+            let value_str = truncate_safe_repr(value, None);
 
             self.add_warning(format!(
                 "Expected `{field_type}` but got `{type_name}` with value `{value_str}` - serialized value may not be as expected"

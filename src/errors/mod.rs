@@ -70,11 +70,12 @@ pub fn write_truncated_to_limited_bytes<F: fmt::Write>(
     max_len: usize,
 ) -> std::fmt::Result {
     if val.len() > max_len {
+        let mid_point = (max_len as f64 / 2.0).ceil() as usize;
         write!(
             f,
             "{}...{}",
-            &val[0..floor_char_boundary(&val, max_len / 2)],
-            &val[ceil_char_boundary(&val, val.len() - max_len / 2)..]
+            &val[0..floor_char_boundary(&val, mid_point)],
+            &val[ceil_char_boundary(&val, val.len() - (mid_point - 1))..]
         )
     } else {
         write!(f, "{val}")

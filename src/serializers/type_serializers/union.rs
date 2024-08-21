@@ -445,7 +445,7 @@ impl TaggedUnionSerializer {
             Discriminator::Function(func) => func.call1(py, (value,)).ok(),
         };
         if discriminator_value.is_none() {
-            let value_str = truncate_safe_repr(value, Some(100));
+            let value_str = truncate_safe_repr(value, None);
             extra.warnings.custom_warning(
                 format!(
                     "Failed to get discriminator value for tagged union serialization with value `{value_str}` - defaulting to left to right union serialization."
