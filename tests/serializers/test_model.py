@@ -13,7 +13,13 @@ except ImportError:
 import pytest
 from dirty_equals import IsJson
 
-from pydantic_core import PydanticSerializationError, SchemaSerializer, SchemaValidator, core_schema
+from pydantic_core import (
+    PydanticSerializationError,
+    PydanticSerializationUnexpectedValue,
+    SchemaSerializer,
+    SchemaValidator,
+    core_schema,
+)
 
 from ..conftest import plain_repr
 
@@ -1104,7 +1110,6 @@ def test_no_warn_on_exclude() -> None:
         assert s.to_python(value, mode='json', exclude={'b'}) == {'a': 0}
 
 
-# @pytest.mark.xfail(reason='Currently failing bc of a lack of warning, but equivalent script is passing...')
 def test_warn_on_missing_field() -> None:
     class AModel(BasicModel): ...
 
@@ -1145,9 +1150,6 @@ def test_warn_on_missing_field() -> None:
         )
     )
 
-    value = BasicModel(root=AModel(type='a'))
-    with pytest.warns(
-        UserWarning,
-        match='Expected 2 fields but got 1 for field root of type.+',
-    ):
-        assert s.to_python(value) == {'root': {'type': 'a'}}
+    with pytest.raises(PydanticSerializationUnexpectedValue):
+        value = BasicModel(root=AModel(type='a'))
+        s.to_python(value)
