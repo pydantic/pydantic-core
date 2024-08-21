@@ -7,6 +7,8 @@ use pyo3::{intern, FromPyObject};
 
 use jiter::{cached_py_string, pystring_fast_new, StringCacheMode};
 
+use crate::errors::write_truncated_to_limited_bytes;
+
 pub trait SchemaDict<'py> {
     fn get_as<T>(&self, key: &Bound<'_, PyString>) -> PyResult<Option<T>>
     where
@@ -122,6 +124,15 @@ pub fn safe_repr<'py>(v: &Bound<'py, PyAny>) -> ReprOutput<'py> {
     } else {
         ReprOutput::Fallback("<unprintable object>".to_owned())
     }
+}
+
+pub fn truncate_safe_repr(v: &Bound<'_, PyAny>, max_len: Option<usize>) -> String {
+    let max_len = max_len.unwrap_or(100); // default to 100 bytes
+    let input_str = safe_repr(v);
+    let mut limited_str = String::with_capacity(max_len);
+    write_truncated_to_limited_bytes(&mut limited_str, input_str.to_cow(), max_len)
+        .expect("Writing to a `String` failed");
+    limited_str
 }
 
 pub fn extract_i64(v: &Bound<'_, PyAny>) -> Option<i64> {
