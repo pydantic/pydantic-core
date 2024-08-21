@@ -1104,6 +1104,10 @@ def test_no_warn_on_exclude() -> None:
 
 
 def test_warn_on_missing_field() -> None:
+    class AModel(BasicModel): ...
+
+    class BModel(BasicModel): ...
+
     s = SchemaSerializer(
         core_schema.model_schema(
             BasicModel,
@@ -1113,7 +1117,7 @@ def test_warn_on_missing_field() -> None:
                         core_schema.tagged_union_schema(
                             choices={
                                 'a': core_schema.model_schema(
-                                    BasicModel,
+                                    AModel,
                                     core_schema.model_fields_schema(
                                         {
                                             'type': core_schema.model_field(core_schema.literal_schema(['a'])),
@@ -1122,7 +1126,7 @@ def test_warn_on_missing_field() -> None:
                                     ),
                                 ),
                                 'b': core_schema.model_schema(
-                                    BasicModel,
+                                    BModel,
                                     core_schema.model_fields_schema(
                                         {
                                             'type': core_schema.model_field(core_schema.literal_schema(['b'])),
@@ -1139,9 +1143,9 @@ def test_warn_on_missing_field() -> None:
         )
     )
 
-    value = BasicModel(root=BasicModel(type='a', a=1))
+    value = BasicModel(root=AModel(type='a'))  # missing 'a' field
     with pytest.warns(
         UserWarning,
-        match='Expected 2 fields but got 1 for field root of type `BasicModel` with value.+',
+        match='Expected 2 fields but got 1 for field root of type.+',
     ):
         assert s.to_python(value) == {'root': {'type': 'a'}}
