@@ -1101,3 +1101,47 @@ def test_no_warn_on_exclude() -> None:
     value = BasicModel(a=0, b=1)
     assert s.to_python(value, exclude={'b'}) == {'a': 0}
     assert s.to_python(value, mode='json', exclude={'b'}) == {'a': 0}
+
+
+def test_warn_on_missing_field() -> None:
+    s = SchemaSerializer(
+        core_schema.model_schema(
+            BasicModel,
+            core_schema.model_fields_schema(
+                {
+                    'root': core_schema.model_field(
+                        core_schema.tagged_union_schema(
+                            choices={
+                                'a': core_schema.model_schema(
+                                    BasicModel,
+                                    core_schema.model_fields_schema(
+                                        {
+                                            'type': core_schema.model_field(core_schema.literal_schema(['a'])),
+                                            'a': core_schema.model_field(core_schema.int_schema()),
+                                        }
+                                    ),
+                                ),
+                                'b': core_schema.model_schema(
+                                    BasicModel,
+                                    core_schema.model_fields_schema(
+                                        {
+                                            'type': core_schema.model_field(core_schema.literal_schema(['b'])),
+                                            'b': core_schema.model_field(core_schema.int_schema()),
+                                        }
+                                    ),
+                                ),
+                            },
+                            discriminator='type',
+                        )
+                    ),
+                }
+            ),
+        )
+    )
+
+    value = BasicModel(root=BasicModel(type='a', a=1))
+    with pytest.warns(
+        UserWarning,
+        match='Expected 2 fields but got 1 for field root of type `BasicModel` with value.+',
+    ):
+        assert s.to_python(value) == {'root': {'type': 'a'}}

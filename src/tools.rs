@@ -1,7 +1,5 @@
 use core::fmt;
 
-use std::borrow::Cow;
-
 use pyo3::exceptions::PyKeyError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString};
@@ -96,15 +94,6 @@ pub fn function_name(f: &Bound<'_, PyAny>) -> PyResult<String> {
 pub enum ReprOutput<'py> {
     Python(Bound<'py, PyString>),
     Fallback(String),
-}
-
-impl ReprOutput<'_> {
-    pub fn to_cow(&self) -> Cow<'_, str> {
-        match self {
-            ReprOutput::Python(s) => s.to_string_lossy(),
-            ReprOutput::Fallback(s) => s.into(),
-        }
-    }
 }
 
 impl std::fmt::Display for ReprOutput<'_> {
