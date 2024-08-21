@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, List
 from unittest import TestCase
 from unittest.mock import ANY
 
@@ -42,11 +42,11 @@ def test_validation_error_loc_overrides():
         @override
         def errors(
             self, *, include_url: bool = True, include_context: bool = True, include_input: bool = True
-        ) -> list[ErrorDetails]:
+        ) -> List[ErrorDetails]:
             errors = super().errors(
                 include_url=include_url, include_context=include_context, include_input=include_input
             )
-            return [error | {'loc': error['loc'][1:]} for error in errors]
+            return [{**error, 'loc': error['loc'][1:]} for error in errors]
 
     with pytest.raises(CustomLocOverridesError) as exception_info:
         raise CustomLocOverridesError.from_exception_data(
@@ -136,7 +136,7 @@ def test_custom_pydantic_error_overrides():
             message_template = (
                 "'{my_custom_value}' setting requires a specific my custom field value, got '{wrong_value}'"
             )
-            context = context | {'my_custom_value': my_custom_setting}
+            context = {**context, 'my_custom_value': my_custom_setting}
             return super().__new__(cls, error_type, message_template, context)
 
     with pytest.raises(CustomErrorWithCustomTemplate) as exception_info:
