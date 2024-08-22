@@ -212,7 +212,6 @@ impl GeneralFieldsSerializer {
             && self.required_fields > used_req_fields
         {
             let required_fields = self.required_fields;
-            let field_name = extra.field_name.unwrap_or("<unknown field>").to_string();
             let type_name = match extra.model {
                 Some(model) => model
                     .get_type()
@@ -222,17 +221,14 @@ impl GeneralFieldsSerializer {
                     .to_string(),
                 None => "<unknown python object>".to_string(),
             };
-
             let field_value = match extra.model {
                 Some(model) => truncate_safe_repr(model, Some(100)),
                 None => "<unknown python object>".to_string(),
             };
 
-            Err(PydanticSerializationUnexpectedValue::new_err(
-                Some(format!(
-                    "Expected {required_fields} fields but got {used_req_fields} for field {field_name} of type `{type_name}` with value `{field_value}` - serialized value may not be as expected."
-                ))
-            ))
+            Err(PydanticSerializationUnexpectedValue::new_err(Some(format!(
+                "Expected {required_fields} fields but got {used_req_fields} for type `{type_name}` with value `{field_value}` - serialized value may not be as expected."
+            ))))
         } else {
             Ok(output_dict)
         }
