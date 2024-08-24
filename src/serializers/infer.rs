@@ -45,6 +45,7 @@ pub(crate) fn infer_to_python_known(
     mut extra: &Extra,
 ) -> PyResult<PyObject> {
     let py = value.py();
+
     let mode = extra.mode;
     let mut guard = match extra.recursion_guard(value, INFER_DEF_REF_ID) {
         Ok(v) => v,
@@ -110,6 +111,7 @@ pub(crate) fn infer_to_python_known(
         );
         serializer.serializer.to_python(value, include, exclude, &extra)
     };
+
     let value = match extra.mode {
         SerMode::Json => match ob_type {
             // `bool` and `None` can't be subclasses, `ObType::Int`, `ObType::Float`, `ObType::Str` refer to exact types
