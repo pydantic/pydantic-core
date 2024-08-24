@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use num_bigint::BigInt;
 use pyo3::exceptions::PyTypeError;
 use pyo3::intern;
 use pyo3::prelude::*;
@@ -44,7 +45,6 @@ pub(crate) fn infer_to_python_known(
     mut extra: &Extra,
 ) -> PyResult<PyObject> {
     let py = value.py();
-
     let mode = extra.mode;
     let mut guard = match extra.recursion_guard(value, INFER_DEF_REF_ID) {
         Ok(v) => v,
@@ -110,16 +110,20 @@ pub(crate) fn infer_to_python_known(
         );
         serializer.serializer.to_python(value, include, exclude, &extra)
     };
-
     let value = match extra.mode {
         SerMode::Json => match ob_type {
             // `bool` and `None` can't be subclasses, `ObType::Int`, `ObType::Float`, `ObType::Str` refer to exact types
             ObType::None | ObType::Bool | ObType::Int | ObType::Str => value.into_py(py),
             // have to do this to make sure subclasses of for example str are upcast to `str`
-            ObType::IntSubclass => match extract_i64(value) {
-                Some(v) => v.into_py(py),
-                None => return py_err!(PyTypeError; "expected int, got {}", safe_repr(value)),
-            },
+            ObType::IntSubclass => {
+                if let Some(v) = extract_i64(value) {
+                    v.into_py(py)
+                } else if let Ok(b) = value.extract::<BigInt>() {
+                    b.into_py(py)
+                } else {
+                    return py_err!(PyTypeError; "Expected int, got {}", safe_repr(value));
+                }
+            }
             ObType::Float | ObType::FloatSubclass => {
                 let v = value.extract::<f64>()?;
                 if (v.is_nan() || v.is_infinite()) && extra.config.inf_nan_mode == InfNanMode::Null {
