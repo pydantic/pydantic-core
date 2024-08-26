@@ -2,6 +2,7 @@ import dataclasses
 import json
 import platform
 import warnings
+from decimal import Decimal
 from random import randint
 from typing import Any, ClassVar, Dict
 
@@ -1155,3 +1156,27 @@ def test_warn_on_missing_field() -> None:
     ):
         value = BasicModel(root=AModel(type='a'))
         s.to_python(value)
+
+
+def test_float_nan_to_python_mode_json():
+    class M:
+        a: float
+        b: Decimal
+
+        def __init__(self, **kwargs):
+            self.__dict__ = kwargs
+
+    s = SchemaSerializer(
+        core_schema.model_schema(
+            M,
+            core_schema.model_fields_schema(
+                {
+                    'a': core_schema.model_field(core_schema.float_schema()),
+                    'b': core_schema.model_field(core_schema.decimal_schema()),
+                }
+            ),
+        )
+    )
+
+    m = M(a=float('nan'), b=Decimal('12345'))
+    assert s.to_python(m, mode='json') == {'a': None, 'b': '12345'}

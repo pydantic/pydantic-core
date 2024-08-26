@@ -73,7 +73,14 @@ impl TypeSerializer for FloatSerializer {
     ) -> PyResult<PyObject> {
         let py = value.py();
         match extra.ob_type_lookup.is_type(value, ObType::Float) {
-            IsType::Exact => Ok(value.into_py(py)),
+            IsType::Exact => {
+                let rust_value = value.extract::<f64>()?;
+                if rust_value.is_nan() || rust_value.is_infinite() {
+                    infer_to_python(value, include, exclude, extra)
+                } else {
+                    Ok(value.into_py(py))
+                }
+            }
             IsType::Subclass => match extra.check {
                 SerCheck::Strict => Err(PydanticSerializationUnexpectedValue::new_err(None)),
                 SerCheck::Lax | SerCheck::None => match extra.mode {

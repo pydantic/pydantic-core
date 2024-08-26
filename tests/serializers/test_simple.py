@@ -1,4 +1,5 @@
 import json
+import math
 from enum import IntEnum
 
 import pytest
@@ -142,30 +143,51 @@ def test_numpy():
 
 
 @pytest.mark.parametrize(
-    'value,expected_json,config',
+    'value,jsonble_python,expected_json,config',
     [
         # default values of ser_json_inf_nan
-        (float('inf'), 'null', {}),
-        (float('-inf'), 'null', {}),
-        (float('nan'), 'null', {}),
+        (float('inf'), None, 'null', {}),
+        (float('-inf'), None, 'null', {}),
         # explicit values of ser_json_inf_nan
-        (float('inf'), 'null', {'ser_json_inf_nan': 'null'}),
-        (float('-inf'), 'null', {'ser_json_inf_nan': 'null'}),
-        (float('nan'), 'null', {'ser_json_inf_nan': 'null'}),
-        (float('inf'), 'Infinity', {'ser_json_inf_nan': 'constants'}),
-        (float('-inf'), '-Infinity', {'ser_json_inf_nan': 'constants'}),
-        (float('nan'), 'NaN', {'ser_json_inf_nan': 'constants'}),
-        (float('inf'), '"Infinity"', {'ser_json_inf_nan': 'strings'}),
-        (float('-inf'), '"-Infinity"', {'ser_json_inf_nan': 'strings'}),
-        (float('nan'), '"NaN"', {'ser_json_inf_nan': 'strings'}),
+        (float('inf'), None, 'null', {'ser_json_inf_nan': 'null'}),
+        (float('-inf'), None, 'null', {'ser_json_inf_nan': 'null'}),
+        (float('inf'), float('inf'), 'Infinity', {'ser_json_inf_nan': 'constants'}),
+        (float('-inf'), float('-inf'), '-Infinity', {'ser_json_inf_nan': 'constants'}),
+        (float('inf'), float('inf'), '"Infinity"', {'ser_json_inf_nan': 'strings'}),
+        (float('-inf'), float('-inf'), '"-Infinity"', {'ser_json_inf_nan': 'strings'}),
     ],
 )
-def test_float_inf_and_nan_serializers(value, expected_json, config):
+def test_float_inf_serializers(value, jsonble_python, expected_json, config):
     s = SchemaSerializer(core_schema.float_schema(), config)
 
     # Python can represent these values without needing any changes
     assert s.to_python(value) is value
-    assert s.to_python(value, mode='json') is value
+    assert s.to_python(value, mode='json') == jsonble_python
 
     # Serialized JSON value respects the ser_json_inf_nan setting
+    assert s.to_json(value).decode() == expected_json
+
+
+@pytest.mark.parametrize(
+    'value,jsonble_python,expected_json,config',
+    [
+        # default values of ser_json_inf_nan
+        (float('nan'), None, 'null', {}),
+        # explicit values of ser_json_inf_nan
+        (float('nan'), None, 'null', {'ser_json_inf_nan': 'null'}),
+        (float('nan'), float('nan'), 'NaN', {'ser_json_inf_nan': 'constants'}),
+        (float('nan'), float('nan'), '"NaN"', {'ser_json_inf_nan': 'strings'}),
+    ],
+)
+def test_float_nan_serializers(value, jsonble_python, expected_json, config):
+    s = SchemaSerializer(core_schema.float_schema(), config)
+
+    assert s.to_python(value) is value
+
+    # Python can't compare NaN values, so we need to check for NaN explicitly
+    if jsonble_python is None:
+        assert s.to_python(value, mode='json') == jsonble_python
+    else:
+        assert math.isnan(s.to_python(value, mode='json'))
+
     assert s.to_json(value).decode() == expected_json
