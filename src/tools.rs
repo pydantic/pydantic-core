@@ -1,10 +1,13 @@
 use core::fmt;
 
+use num_bigint::BigInt;
+
 use pyo3::exceptions::PyKeyError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString};
 use pyo3::{intern, FromPyObject};
 
+use crate::input::Int;
 use jiter::{cached_py_string, pystring_fast_new, StringCacheMode};
 
 pub trait SchemaDict<'py> {
@@ -133,8 +136,20 @@ pub fn extract_i64(v: &Bound<'_, PyAny>) -> Option<i64> {
         // Can remove this after PyPy 7.3.17 is released
         return None;
     }
-
     v.extract().ok()
+}
+
+pub fn extract_int(v: &Bound<'_, PyAny>) -> Option<Int> {
+    match extract_i64(v) {
+        Some(i) => Some(Int::I64(i)),
+        None => {
+            if let Ok(big_int) = v.extract::<BigInt>() {
+                Some(Int::Big(big_int))
+            } else {
+                None
+            }
+        }
+    }
 }
 
 pub(crate) fn new_py_string<'py>(py: Python<'py>, s: &str, cache_str: StringCacheMode) -> Bound<'py, PyString> {
