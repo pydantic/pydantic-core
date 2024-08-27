@@ -140,16 +140,9 @@ pub fn extract_i64(v: &Bound<'_, PyAny>) -> Option<i64> {
 }
 
 pub fn extract_int(v: &Bound<'_, PyAny>) -> Option<Int> {
-    match extract_i64(v) {
-        Some(i) => Some(Int::I64(i)),
-        None => {
-            if let Ok(big_int) = v.extract::<BigInt>() {
-                Some(Int::Big(big_int))
-            } else {
-                None
-            }
-        }
-    }
+    extract_i64(v)
+        .map(Int::I64)
+        .or_else(|| v.extract::<BigInt>().ok().map(Int::Big))
 }
 
 pub(crate) fn new_py_string<'py>(py: Python<'py>, s: &str, cache_str: StringCacheMode) -> Bound<'py, PyString> {
