@@ -838,14 +838,14 @@ class PydanticCustomError(ValueError):
         context: The data to inject into the message template.
 
     Example:
-    ```python
-    from pydantic_core import PydanticCustomError
+        ```py
+        from pydantic_core import PydanticCustomError
 
-    def custom_validator(v) -> None:
-        if v <= 10:
-            raise PydanticCustomError('custom_value_error', 'Value must be greater than {value}', {'value': 10, 'extra_context': 'extra_data'})
-        return v
-    ```
+        def custom_validator(v) -> None:
+            if v <= 10:
+                raise PydanticCustomError('custom_value_error', 'Value must be greater than {value}', {'value': 10, 'extra_context': 'extra_data'})
+            return v
+        ```
     """
 
     @property
@@ -875,6 +875,16 @@ class PydanticKnownError(ValueError):
     Arguments:
         error_type: The error type, one of the known `ErrorType`s from `pydantic_core`.
         context: The data to inject into the message template.
+
+    Example:
+        ```py
+        from pydantic_core import PydanticKnownError
+
+        def custom_validator(v) -> None:
+            if v <= 10:
+                raise PydanticKnownError(error_type='greater_than', context={'gt': 10})
+            return v
+        ```
     """
 
     @property
@@ -894,13 +904,42 @@ class PydanticKnownError(ValueError):
 
 @final
 class PydanticOmit(Exception):
-    """An exception to signal that a field should be omitted from generated JSON Schema.
+    """An exception to signal that a field should be omitted from a generated result.
 
-    This exception can be raised from custom JSON schema generation functions to indicate that
-    types that don't have supported JSON Schema representations should be omitted from the schema,
-    rather than causing in a JSON Schema build failure.
+    This could span from omitting a field from a JSON Schema to omitting a field from a serialized result.
+    Upcoming: more robust support for using PydanticOmit in custom serializers is still in development.
+    Right now, this is primarily used in the JSON Schema generation process.
 
-    For an example, see the [customizing JSON schema](https://docs.pydantic.dev/latest/concepts/json_schema/#customizing-the-json-schema-generation-process) docs.
+    Example:
+        ```py
+        from typing import Callable
+
+        from pydantic_core import PydanticOmit
+
+        from pydantic import BaseModel
+        from pydantic.json_schema import GenerateJsonSchema, JsonSchemaValue
+
+
+        class MyGenerateJsonSchema(GenerateJsonSchema):
+            def handle_invalid_for_json_schema(self, schema, error_info) -> JsonSchemaValue:
+                raise PydanticOmit
+
+
+        class Predicate(BaseModel):
+            name: str = 'no-op'
+            func: Callable = lambda x: x
+
+
+        instance_example = Predicate()
+
+        validation_schema = instance_example.model_json_schema(schema_generator=MyGenerateJsonSchema, mode='validation')
+        print(validation_schema)
+        '''
+        {'properties': {'name': {'default': 'no-op', 'title': 'Name', 'type': 'string'}}, 'title': 'Predicate', 'type': 'object'}
+        '''
+        ```
+
+    For a more in depth example / explanation, see the [customizing JSON schema](../concepts/json_schema.md#customizing-the-json-schema-generation-process) docs.
     """
 
     def __new__(cls) -> Self: ...
@@ -910,7 +949,8 @@ class PydanticUseDefault(Exception):
     """An exception to signal that standard validation either failed or should be skipped, and the default value should be used instead.
 
     This warning can be raised in custom valiation functions to redirect the flow of validation.
-    For a contextualized example, see the [validating partial json data](https://docs.pydantic.dev/latest/concepts/json/#partial-json-parsing) section of the Pydantic documentation.
+
+    For an additional example, seethe [validating partial json data](../concepts/json.md#partial-json-parsing) section of the Pydantic documentation.
     """
 
     def __new__(cls) -> Self: ...
@@ -954,10 +994,37 @@ class PydanticSerializationUnexpectedValue(ValueError):
 
 @final
 class ArgsKwargs:
-    """An internal construct used to store arguments and keyword arguments for a function call.
+    """A construct used to store arguments and keyword arguments for a function call.
 
     This data structure is generally used to store information for core schemas associated with functions (like in an arguments schema).
     This data structure is also currently used for some validation against dataclasses.
+
+    Example:
+        ```py
+        from pydantic.dataclasses import dataclass
+        from pydantic import model_validator
+
+
+        @dataclass
+        class Model:
+            a: int
+            b: int
+
+            @model_validator(mode="before")
+            @classmethod
+            def no_op_validator(cls, values):
+                print(values)
+                return values
+
+        Model(1, b=2)
+        #> ArgsKwargs((1,), {"b": 2})
+
+        Model(1, 2)
+        #> ArgsKwargs((1, 2), {})
+
+        Model(a=1, b=2)
+        #> ArgsKwargs((), {"a": 1, "b": 2})
+        ```
     """
 
     def __new__(cls, args: tuple[Any, ...], kwargs: dict[str, Any] | None = None) -> Self: ...
