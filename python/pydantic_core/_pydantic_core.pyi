@@ -825,12 +825,6 @@ class PydanticCustomError(ValueError):
     """A custom exception providing flexible error handling for Pydantic validators.
 
     You can raise this error in custom validators when you'd like flexibility in regards to the error type, message, and context.
-    """
-
-    def __new__(
-        cls, error_type: LiteralString, message_template: LiteralString, context: dict[str, Any] | None = None
-    ) -> Self: ...
-    """Create a new `PydanticCustomError`.
 
     Arguments:
         error_type: The error type, typically a snake_case string.
@@ -848,29 +842,31 @@ class PydanticCustomError(ValueError):
         ```
     """
 
-    @property
-    def context(self) -> dict[str, Any] | None: ...
-    """Values which are required to render the error message, and could hence be useful in passing error data forward."""
+    def __new__(
+        cls, error_type: LiteralString, message_template: LiteralString, context: dict[str, Any] | None = None
+    ) -> Self:
+        """Create a new `PydanticCustomError`."""
 
     @property
-    def type(self) -> str: ...
-    """The error type associated with the error. For consistency with Pydantic, this is typically a snake_case string."""
+    def context(self) -> dict[str, Any] | None:
+        """Values which are required to render the error message, and could hence be useful in passing error data forward."""
 
     @property
-    def message_template(self) -> str: ...
-    """The message template associated with the error. This is a string that can be formatted with context variables in `{curly_braces}`."""
+    def type(self) -> str:
+        """The error type associated with the error. For consistency with Pydantic, this is typically a snake_case string."""
 
-    def message(self) -> str: ...
-    """The formatted message associated with the error. This presents as the message template with context variables appropriately injected."""
+    @property
+    def message_template(self) -> str:
+        """The message template associated with the error. This is a string that can be formatted with context variables in `{curly_braces}`."""
+
+    def message(self) -> str:
+        """The formatted message associated with the error. This presents as the message template with context variables appropriately injected."""
 
 @final
 class PydanticKnownError(ValueError):
     """A helper class for raising exceptions that mimic Pydantic's built-in exceptions, with more flexibility in regards to context.
 
-    Unlike [`PydanticCustomError`][pydantic_core.PydanticCustomError], the `error_type` argument must be a known [`ErrorType`][pydantic_core.ErrorType]."""
-
-    def __new__(cls, error_type: ErrorType, context: dict[str, Any] | None = None) -> Self: ...
-    """Create a new `PydanticKnownError`.
+    Unlike [`PydanticCustomError`][pydantic_core.PydanticCustomError], the `error_type` argument must be a known [`ErrorType`][pydantic_core.ErrorType].
 
     Arguments:
         error_type: The error type, one of the known `ErrorType`s from `pydantic_core`.
@@ -887,20 +883,23 @@ class PydanticKnownError(ValueError):
         ```
     """
 
-    @property
-    def context(self) -> dict[str, Any] | None: ...
-    """Values which are required to render the error message, and could hence be useful in passing error data forward."""
+    def __new__(cls, error_type: ErrorType, context: dict[str, Any] | None = None) -> Self:
+        """Create a new `PydanticKnownError`."""
 
     @property
-    def type(self) -> ErrorType: ...
-    """The type of the error, one of the known `ErrorType`s from `pydantic_core`."""
+    def context(self) -> dict[str, Any] | None:
+        """Values which are required to render the error message, and could hence be useful in passing error data forward."""
 
     @property
-    def message_template(self) -> str: ...
-    """The message template associated with the provided error type. This is a string that can be formatted with context variables in `{curly_braces}`."""
+    def type(self) -> ErrorType:
+        """The type of the error, one of the known `ErrorType`s from `pydantic_core`."""
 
-    def message(self) -> str: ...
-    """The formatted message associated with the error. This presents as the message template with context variables appropriately injected."""
+    @property
+    def message_template(self) -> str:
+        """The message template associated with the provided error type. This is a string that can be formatted with context variables in `{curly_braces}`."""
+
+    def message(self) -> str:
+        """The formatted message associated with the error. This presents as the message template with context variables appropriately injected."""
 
 @final
 class PydanticOmit(Exception):
@@ -942,7 +941,8 @@ class PydanticOmit(Exception):
     For a more in depth example / explanation, see the [customizing JSON schema](../concepts/json_schema.md#customizing-the-json-schema-generation-process) docs.
     """
 
-    def __new__(cls) -> Self: ...
+    def __new__(cls) -> Self:
+        """Create a new `PydanticOmit` exception instance."""
 
 @final
 class PydanticUseDefault(Exception):
@@ -979,21 +979,21 @@ class PydanticUseDefault(Exception):
     For an additional example, seethe [validating partial json data](../concepts/json.md#partial-json-parsing) section of the Pydantic documentation.
     """
 
-    def __new__(cls) -> Self: ...
+    def __new__(cls) -> Self:
+        """ "Create a new `PydanticUseDefault` exception instance."""
 
 @final
 class PydanticSerializationError(ValueError):
     """An error raised when an issue occurs during serialization.
 
     In custom serializers, this error can be used to indicate that serialization has failed.
-    """
-
-    def __new__(cls, message: str) -> Self: ...
-    """Create a new `PydanticSerializationError`.
 
     Arguments:
         message: The error message associated with the serialization issue.
     """
+
+    def __new__(cls, message: str) -> Self:
+        """Create a new `PydanticSerializationError`."""
 
 @final
 class PydanticSerializationUnexpectedValue(ValueError):
@@ -1001,15 +1001,6 @@ class PydanticSerializationUnexpectedValue(ValueError):
 
     This error is often caught and coerced into a warning, as `pydantic-core` generally makes a best attempt
     at serializing values, in contrast with validation where errors are eagerly raised.
-
-    This is often used internally in `pydantic-core` when unexpected types are encountered during serialization,
-    but it can also be used by users in custom serializers. For example, see
-    [this example](https://github.com/pydantic/pydantic/blob/018a4555388db3a37386ed98ac6aacb48b516ede/pydantic/_internal/_generate_schema.py#L525-L530)
-    of a custom serializer for ip address like types.
-    """
-
-    def __new__(cls, message: str | None = None) -> Self: ...
-    """Create a new `PydanticSerializationUnexpectedValue` error.
 
     Arguments:
         message: The message associated with the unexpected value.
@@ -1041,7 +1032,15 @@ class PydanticSerializationUnexpectedValue(ValueError):
         {'x': 'a', 'y': 2}
         '''
         ```
+
+    This is often used internally in `pydantic-core` when unexpected types are encountered during serialization,
+    but it can also be used by users in custom serializers. For another example, see
+    [this example](https://github.com/pydantic/pydantic/blob/018a4555388db3a37386ed98ac6aacb48b516ede/pydantic/_internal/_generate_schema.py#L525-L530)
+    of a custom serializer for ip address like types.
     """
+
+    def __new__(cls, message: str | None = None) -> Self:
+        """Create a new `PydanticSerializationUnexpectedValue` error."""
 
 @final
 class ArgsKwargs:
@@ -1049,6 +1048,10 @@ class ArgsKwargs:
 
     This data structure is generally used to store information for core schemas associated with functions (like in an arguments schema).
     This data structure is also currently used for some validation against dataclasses.
+
+    Arguments:
+        args: The arguments (inherently ordered) for a function call.
+        kwargs: The keyword arguments for a function call.
 
     Example:
         ```py
@@ -1078,20 +1081,16 @@ class ArgsKwargs:
         ```
     """
 
-    def __new__(cls, args: tuple[Any, ...], kwargs: dict[str, Any] | None = None) -> Self: ...
-    """Create a new `ArgsKwargs` instance.
-
-    Arguments:
-        args: The arguments (inherently ordered) for a function call.
-        kwargs: The keyword arguments for a function call.
-    """
-    @property
-    def args(self) -> tuple[Any, ...]: ...
-    """The arguments (inherently ordered) for a function call."""
+    def __new__(cls, args: tuple[Any, ...], kwargs: dict[str, Any] | None = None) -> Self:
+        """Create a new `ArgsKwargs` instance."""
 
     @property
-    def kwargs(self) -> dict[str, Any] | None: ...
-    """The keyword arguments for a function call."""
+    def args(self) -> tuple[Any, ...]:
+        """The arguments (inherently ordered) for a function call."""
+
+    @property
+    def kwargs(self) -> dict[str, Any] | None:
+        """The keyword arguments for a function call."""
 
 @final
 class PydanticUndefinedType:
@@ -1115,27 +1114,27 @@ class TzInfo(datetime.tzinfo):
 
     # Docstrings for attributes sourced from the abstract base class, [`datetime.tzinfo`](https://docs.python.org/3/library/datetime.html#datetime.tzinfo).
 
-    def tzname(self, _dt: datetime.datetime | None, /) -> str | None: ...
-    """Return the time zone name corresponding to the [`datetime`][datetime.datetime] object _dt_, as a string.
+    def tzname(self, _dt: datetime.datetime | None, /) -> str | None:
+        """Return the time zone name corresponding to the [`datetime`][datetime.datetime] object _dt_, as a string.
 
-    For more info, see [`tzinfo.tzname`][datetime.tzinfo.tzname].
-    """
+        For more info, see [`tzinfo.tzname`][datetime.tzinfo.tzname].
+        """
 
-    def utcoffset(self, _dt: datetime.datetime | None, /) -> datetime.timedelta | None: ...
-    """Return offset of local time from UTC, as a [`timedelta`][datetime.timedelta] object that is positive east of UTC. If local time is west of UTC, this should be negative.
+    def utcoffset(self, _dt: datetime.datetime | None, /) -> datetime.timedelta | None:
+        """Return offset of local time from UTC, as a [`timedelta`][datetime.timedelta] object that is positive east of UTC. If local time is west of UTC, this should be negative.
 
-    More info can be found at [`tzinfo.utcoffset`][datetime.tzinfo.utcoffset].
-    """
+        More info can be found at [`tzinfo.utcoffset`][datetime.tzinfo.utcoffset].
+        """
 
-    def dst(self, _dt: datetime.datetime | None, /) -> datetime.timedelta | None: ...
-    """Return the daylight saving time (DST) adjustment, as a [`timedelta`][datetime.timedelta] object or `None` if DST information isn’t known.
+    def dst(self, _dt: datetime.datetime | None, /) -> datetime.timedelta | None:
+        """Return the daylight saving time (DST) adjustment, as a [`timedelta`][datetime.timedelta] object or `None` if DST information isn’t known.
 
-    More info can be found at[`tzinfo.dst`][datetime.tzinfo.dst]."""
+        More info can be found at[`tzinfo.dst`][datetime.tzinfo.dst]."""
 
-    def fromutc(self, dt: datetime.datetime, /) -> datetime.datetime: ...
-    """Adjust the date and time data associated datetime object _dt_, returning an equivalent datetime in self’s local time.
+    def fromutc(self, dt: datetime.datetime, /) -> datetime.datetime:
+        """Adjust the date and time data associated datetime object _dt_, returning an equivalent datetime in self’s local time.
 
-    More info can be found at [`tzinfo.fromutc`][datetime.tzinfo.fromutc]."""
+        More info can be found at [`tzinfo.fromutc`][datetime.tzinfo.fromutc]."""
 
     def __deepcopy__(self, _memo: dict[Any, Any]) -> TzInfo: ...
 
