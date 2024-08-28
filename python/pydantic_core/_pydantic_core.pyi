@@ -980,9 +980,6 @@ class PydanticSerializationUnexpectedValue(ValueError):
     but it can also be used by users in custom serializers. For example, see
     [this example](https://github.com/pydantic/pydantic/blob/018a4555388db3a37386ed98ac6aacb48b516ede/pydantic/_internal/_generate_schema.py#L525-L530)
     of a custom serializer for ip address like types.
-
-    Args:
-        message: The error message.
     """
 
     def __new__(cls, message: str | None = None) -> Self: ...
@@ -990,6 +987,34 @@ class PydanticSerializationUnexpectedValue(ValueError):
 
     Arguments:
         message: The message associated with the unexpected value.
+
+    Example:
+        ```py
+        from pydantic import BaseModel, field_serializer
+        from pydantic_core import PydanticSerializationUnexpectedValue
+
+        class BasicPoint(BaseModel):
+            x: int
+            y: int
+
+            @field_serializer('*')
+            def serialize(self, v):
+                if not isinstance(v, int):
+                    raise PydanticSerializationUnexpectedValue(f'Expected type `int`, got {type(v)} with value {v}')
+                return v
+
+        point = BasicPoint(x=1, y=2)
+        # some sort of mutation
+        point.x = 'a'
+
+        print(point.model_dump())
+        '''
+        UserWarning: Pydantic serializer warnings:
+        PydanticSerializationUnexpectedValue(Expected type `int`, got <class 'str'> with value a)
+        return self.__pydantic_serializer__.to_python(
+        {'x': 'a', 'y': 2}
+        '''
+        ```
     """
 
 @final
