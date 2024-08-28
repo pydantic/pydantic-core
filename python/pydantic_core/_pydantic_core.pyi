@@ -822,7 +822,7 @@ class ValidationError(ValueError):
 
 @final
 class PydanticCustomError(ValueError):
-    """A helper class for raising exceptions that mimic Pydantic's built-in exceptions.
+    """A custom exception providing flexible error handling for Pydantic validators.
 
     You can raise this error in custom validators when you'd like flexibility in regards to the error type, message, and context.
     """
@@ -834,7 +834,7 @@ class PydanticCustomError(ValueError):
 
     Arguments:
         error_type: The error type, typically a snake_case string.
-        message_template: The message template, formatted with any context variables in {curly_braces}.
+        message_template: The message template, formatted with any context variables in `{curly_braces}`.
         context: The data to inject into the message template.
 
     Example:
@@ -843,18 +843,14 @@ class PydanticCustomError(ValueError):
 
     def custom_validator(v) -> None:
         if v <= 10:
-            raise PydanticCustomError('custom_value_error', 'Value must be greater than {value}', {'value': 10})
+            raise PydanticCustomError('custom_value_error', 'Value must be greater than {value}', {'value': 10, 'extra_context': 'extra_data'})
         return v
     ```
     """
 
     @property
     def context(self) -> dict[str, Any] | None: ...
-    """Values which are required to render the error message, and could hence be useful in passing error data forward.
-
-    For example, if your message template was `"{field_name} must be greater than {value}"`, you could pass
-    `{'field_name': 'age', 'value': 18}` as the context.
-    """
+    """Values which are required to render the error message, and could hence be useful in passing error data forward."""
 
     @property
     def type(self) -> str: ...
@@ -862,11 +858,7 @@ class PydanticCustomError(ValueError):
 
     @property
     def message_template(self) -> str: ...
-    """The message template associated with the error. This is a string that can be formatted with context variables in {curly_braces}.
-
-    For example, if your message template was `"{field_name} must be greater than {value}"`, you could pass
-    `{'field_name': 'age', 'value': 18}` as the context.
-    """
+    """The message template associated with the error. This is a string that can be formatted with context variables in `{curly_braces}`."""
 
     def message(self) -> str: ...
     """The formatted message associated with the error. This presents as the message template with context variables appropriately injected."""
@@ -875,13 +867,13 @@ class PydanticCustomError(ValueError):
 class PydanticKnownError(ValueError):
     """A helper class for raising exceptions that mimic Pydantic's built-in exceptions, with more flexibility in regards to context.
 
-    Unlike `PydanticCustomError`, the `error_type` argument must be a known [`ErrorType`][pydantic_core.ErrorType]."""
+    Unlike [`PydanticCustomError`][pydantic_core.PydanticCustomError], the `error_type` argument must be a known [`ErrorType`][pydantic_core.ErrorType]."""
 
     def __new__(cls, error_type: ErrorType, context: dict[str, Any] | None = None) -> Self: ...
     """Create a new `PydanticKnownError`.
 
     Arguments:
-        error_type: The error type, one of [`ErrorType`][pydantic_core.ErrorType].
+        error_type: The error type, one of the known `ErrorType`s from `pydantic_core`.
         context: The data to inject into the message template.
     """
 
@@ -891,22 +883,22 @@ class PydanticKnownError(ValueError):
 
     @property
     def type(self) -> ErrorType: ...
-    """The type of the error, one of [`ErrorType`][pydantic_core.ErrorType]."""
+    """The type of the error, one of the known `ErrorType`s from `pydantic_core`."""
 
     @property
     def message_template(self) -> str: ...
-    """The message template associated with the provided error type. This is a string that can be formatted with context variables in {curly_braces}."""
+    """The message template associated with the provided error type. This is a string that can be formatted with context variables in `{curly_braces}`."""
 
     def message(self) -> str: ...
     """The formatted message associated with the error. This presents as the message template with context variables appropriately injected."""
 
 @final
 class PydanticOmit(Exception):
-    """An exception to signal that a field should be omitted from generated JSON schema.
+    """An exception to signal that a field should be omitted from generated JSON Schema.
 
     This exception can be raised from custom JSON schema generation functions to indicate that
-    types that don't have supported JSON schema representations should be omitted from the schema,
-    rather than causing in a JSON schema build failure.
+    types that don't have supported JSON Schema representations should be omitted from the schema,
+    rather than causing in a JSON Schema build failure.
 
     For an example, see the [customizing JSON schema](https://docs.pydantic.dev/latest/concepts/json_schema/#customizing-the-json-schema-generation-process) docs.
     """
@@ -1001,27 +993,27 @@ def list_all_errors() -> list[ErrorTypeInfo]:
     """
 @final
 class TzInfo(datetime.tzinfo):
-    """A `pydantic-core` implementation of the `datetime.tzinfo` class.
+    """An `pydantic-core` implementation of the abstract [`datetime.tzinfo`] class."""
 
-    Docstrings for attributes sourced from the base class, [`datetime.tzinfo`](https://docs.python.org/3/library/datetime.html#datetime.tzinfo)."""
+    # Docstrings for attributes sourced from the abstract base class, [`datetime.tzinfo`](https://docs.python.org/3/library/datetime.html#datetime.tzinfo).
 
-    def tzname(self, _dt: datetime.datetime | None) -> str | None: ...
+    def tzname(self, _dt: datetime.datetime | None, /) -> str | None: ...
     """Return the time zone name corresponding to the datetime object dt, as a string.
 
     More info can be found at https://docs.python.org/3/library/datetime.html#datetime.tzinfo.tzname."""
 
-    def utcoffset(self, _dt: datetime.datetime | None) -> datetime.timedelta: ...
+    def utcoffset(self, _dt: datetime.datetime | None, /) -> datetime.timedelta | None: ...
     """Return offset of local time from UTC, as a timedelta object that is positive east of UTC. If local time is west of UTC, this should be negative.
 
     More info can be found at https://docs.python.org/3/library/datetime.html#datetime.tzinfo.utcoffset.
     """
 
-    def dst(self, _dt: datetime.datetime | None) -> datetime.timedelta | None: ...
+    def dst(self, _dt: datetime.datetime | None, /) -> datetime.timedelta | None: ...
     """Return the daylight saving time (DST) adjustment, as a timedelta object or None if DST information isn’t known.
 
     More info can be found at https://docs.python.org/3/library/datetime.html#datetime.tzinfo.dst."""
 
-    def fromutc(self, dt: datetime.datetime) -> datetime.datetime: ...
+    def fromutc(self, dt: datetime.datetime, /) -> datetime.datetime: ...
     """Adjust the date and time data associated datetime object dt, returning an equivalent datetime in self’s local time.
 
     More info can be found at https://docs.python.org/3/library/datetime.html#datetime.tzinfo.fromutc."""
