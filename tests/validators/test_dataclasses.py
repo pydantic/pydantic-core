@@ -961,11 +961,11 @@ def test_frozen_field():
 @pytest.mark.parametrize(
     'config,schema_extra_behavior_kw',
     [
-        (core_schema.CoreConfig(extra_fields_behavior='ignore'), {}),
-        (core_schema.CoreConfig(extra_fields_behavior='ignore'), {'extra_behavior': None}),
+        (core_schema.CoreConfig(extra_behavior='ignore'), {}),
+        (core_schema.CoreConfig(extra_behavior='ignore'), {'extra_behavior': None}),
         (core_schema.CoreConfig(), {'extra_behavior': 'ignore'}),
         (None, {'extra_behavior': 'ignore'}),
-        (core_schema.CoreConfig(extra_fields_behavior='allow'), {'extra_behavior': 'ignore'}),
+        (core_schema.CoreConfig(extra_behavior='allow'), {'extra_behavior': 'ignore'}),
     ],
 )
 def test_extra_behavior_ignore(config: Union[core_schema.CoreConfig, None], schema_extra_behavior_kw: Dict[str, Any]):
@@ -1009,11 +1009,11 @@ def test_extra_behavior_ignore(config: Union[core_schema.CoreConfig, None], sche
 @pytest.mark.parametrize(
     'config,schema_extra_behavior_kw',
     [
-        (core_schema.CoreConfig(extra_fields_behavior='forbid'), {}),
-        (core_schema.CoreConfig(extra_fields_behavior='forbid'), {'extra_behavior': None}),
+        (core_schema.CoreConfig(extra_behavior='forbid'), {}),
+        (core_schema.CoreConfig(extra_behavior='forbid'), {'extra_behavior': None}),
         (core_schema.CoreConfig(), {'extra_behavior': 'forbid'}),
         (None, {'extra_behavior': 'forbid'}),
-        (core_schema.CoreConfig(extra_fields_behavior='ignore'), {'extra_behavior': 'forbid'}),
+        (core_schema.CoreConfig(extra_behavior='ignore'), {'extra_behavior': 'forbid'}),
     ],
 )
 def test_extra_behavior_forbid(config: Union[core_schema.CoreConfig, None], schema_extra_behavior_kw: Dict[str, Any]):
@@ -1055,11 +1055,11 @@ def test_extra_behavior_forbid(config: Union[core_schema.CoreConfig, None], sche
 @pytest.mark.parametrize(
     'config,schema_extra_behavior_kw',
     [
-        (core_schema.CoreConfig(extra_fields_behavior='allow'), {}),
-        (core_schema.CoreConfig(extra_fields_behavior='allow'), {'extra_behavior': None}),
+        (core_schema.CoreConfig(extra_behavior='allow'), {}),
+        (core_schema.CoreConfig(extra_behavior='allow'), {'extra_behavior': None}),
         (core_schema.CoreConfig(), {'extra_behavior': 'allow'}),
         (None, {'extra_behavior': 'allow'}),
-        (core_schema.CoreConfig(extra_fields_behavior='forbid'), {'extra_behavior': 'allow'}),
+        (core_schema.CoreConfig(extra_behavior='forbid'), {'extra_behavior': 'allow'}),
     ],
 )
 def test_extra_behavior_allow(config: Union[core_schema.CoreConfig, None], schema_extra_behavior_kw: Dict[str, Any]):

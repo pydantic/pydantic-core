@@ -1029,7 +1029,7 @@ def test_extra_config():
                 'field_b': core_schema.model_field(core_schema.int_schema()),
             }
         ),
-        config=core_schema.CoreConfig(extra_fields_behavior='allow'),
+        config=core_schema.CoreConfig(extra_behavior='allow'),
     )
     s = SchemaSerializer(schema)
     assert 'mode:ModelExtra' in plain_repr(s)
@@ -1051,7 +1051,7 @@ def test_extra_config_nested_model():
                     core_schema.model_schema(
                         InnerModel,
                         core_schema.model_fields_schema({'int': core_schema.model_field(core_schema.int_schema())}),
-                        config=core_schema.CoreConfig(extra_fields_behavior='allow'),
+                        config=core_schema.CoreConfig(extra_behavior='allow'),
                     )
                 )
             }

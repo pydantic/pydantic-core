@@ -143,7 +143,7 @@ def test_serialize_as_any_with_unrelated_models() -> None:
                 'y': core_schema.model_field(core_schema.str_schema()),
             }
         ),
-        config=core_schema.CoreConfig(extra_fields_behavior='allow'),
+        config=core_schema.CoreConfig(extra_behavior='allow'),
     )
     Other.__pydantic_validator__ = SchemaValidator(Other.__pydantic_core_schema__)
     Other.__pydantic_serializer__ = SchemaSerializer(Other.__pydantic_core_schema__)

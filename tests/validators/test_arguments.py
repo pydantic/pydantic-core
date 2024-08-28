@@ -993,10 +993,10 @@ def create_function(validate, config = None):
         {'type': 'unexpected_keyword_argument', 'loc': ('b',), 'msg': 'Unexpected keyword argument', 'input': 2},
     ]
     # Allowing extras using the config
-    foobar = m.create_function(validate, config={'title': 'func', 'extra_fields_behavior': 'allow'})
+    foobar = m.create_function(validate, config={'title': 'func', 'extra_behavior': 'allow'})
     assert foobar('1', '2', c=3, d=4) == (1, 2, 3)
     # Ignore works similar than allow
-    foobar = m.create_function(validate, config={'title': 'func', 'extra_fields_behavior': 'ignore'})
+    foobar = m.create_function(validate, config={'title': 'func', 'extra_behavior': 'ignore'})
     assert foobar('1', '2', c=3, d=4) == (1, 2, 3)
 
 

@@ -339,7 +339,7 @@ def test_model_custom_init_extra():
                 'b': core_schema.model_field(core_schema.int_schema()),
             }
         ),
-        config=CoreConfig(extra_fields_behavior='allow'),
+        config=CoreConfig(extra_behavior='allow'),
         custom_init=True,
     )
     ModelInner.__pydantic_validator__ = SchemaValidator(inner_schema)
@@ -366,7 +366,7 @@ def test_model_custom_init_extra():
                     'b': core_schema.model_field(inner_schema),
                 }
             ),
-            config=CoreConfig(extra_fields_behavior='allow'),
+            config=CoreConfig(extra_behavior='allow'),
             custom_init=True,
         )
     )

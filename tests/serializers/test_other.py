@@ -78,7 +78,7 @@ def test_serialize_with_extra_on_superclass() -> None:
                 'x': core_schema.model_field(core_schema.int_schema()),
             }
         ),
-        config=core_schema.CoreConfig(extra_fields_behavior='allow'),
+        config=core_schema.CoreConfig(extra_behavior='allow'),
     )
     Parent.__pydantic_validator__ = SchemaValidator(Parent.__pydantic_core_schema__)
     Parent.__pydantic_serializer__ = SchemaSerializer(Parent.__pydantic_core_schema__)
@@ -91,7 +91,7 @@ def test_serialize_with_extra_on_superclass() -> None:
                 'y': core_schema.model_field(core_schema.str_schema()),
             }
         ),
-        config=core_schema.CoreConfig(extra_fields_behavior='forbid'),
+        config=core_schema.CoreConfig(extra_behavior='forbid'),
     )
     Other.__pydantic_validator__ = SchemaValidator(Other.__pydantic_core_schema__)
     Other.__pydantic_serializer__ = SchemaSerializer(Other.__pydantic_core_schema__)

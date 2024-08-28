@@ -178,11 +178,10 @@ impl ExtraBehavior {
         config: Option<&Bound<'_, PyDict>>,
         default: Self,
     ) -> PyResult<Self> {
-        let extra_behavior = schema_or_config::<Option<Bound<'_, PyString>>>(
+        let extra_behavior = schema_or_config_same::<Option<Bound<'_, PyString>>>(
             schema,
             config,
             intern!(py, "extra_behavior"),
-            intern!(py, "extra_fields_behavior"),
         )?
         .flatten();
         let res = match extra_behavior.as_ref().map(|s| s.to_str()).transpose()? {

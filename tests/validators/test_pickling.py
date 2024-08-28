@@ -27,7 +27,7 @@ def test_schema_validator_containing_config():
     """
     v = SchemaValidator(
         core_schema.model_fields_schema({'f': core_schema.model_field(core_schema.str_schema())}),
-        config=core_schema.CoreConfig(extra_fields_behavior='allow'),
+        config=core_schema.CoreConfig(extra_behavior='allow'),
     )
     v = pickle.loads(pickle.dumps(v))
 
