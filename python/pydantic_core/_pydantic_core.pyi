@@ -1015,7 +1015,7 @@ class TzInfo(datetime.tzinfo):
     More info can be found at[`tzinfo.dst`][datetime.tzinfo.dst]."""
 
     def fromutc(self, dt: datetime.datetime, /) -> datetime.datetime: ...
-    """Adjust the date and time data associated datetime object dt, returning an equivalent datetime in self’s local time.
+    """Adjust the date and time data associated datetime object _dt_, returning an equivalent datetime in self’s local time.
 
     More info can be found at [`tzinfo.fromutc`][datetime.tzinfo.fromutc]."""
 
