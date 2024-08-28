@@ -998,18 +998,19 @@ class TzInfo(datetime.tzinfo):
     # Docstrings for attributes sourced from the abstract base class, [`datetime.tzinfo`](https://docs.python.org/3/library/datetime.html#datetime.tzinfo).
 
     def tzname(self, _dt: datetime.datetime | None, /) -> str | None: ...
-    """Return the time zone name corresponding to the datetime object dt, as a string.
+    """Return the time zone name corresponding to the [`datetime`][datetime.datetime] object _dt_, as a string.
 
-    More info can be found at https://docs.python.org/3/library/datetime.html#datetime.tzinfo.tzname."""
+    For more info, see [`tzinfo.tzname`][datetime.tzinfo.tzname].
+    """
 
     def utcoffset(self, _dt: datetime.datetime | None, /) -> datetime.timedelta | None: ...
-    """Return offset of local time from UTC, as a timedelta object that is positive east of UTC. If local time is west of UTC, this should be negative.
+    """Return offset of local time from UTC, as a [`timedelta`][datetime.timedelta] object that is positive east of UTC. If local time is west of UTC, this should be negative.
 
     More info can be found at https://docs.python.org/3/library/datetime.html#datetime.tzinfo.utcoffset.
     """
 
     def dst(self, _dt: datetime.datetime | None, /) -> datetime.timedelta | None: ...
-    """Return the daylight saving time (DST) adjustment, as a timedelta object or None if DST information isn’t known.
+    """Return the daylight saving time (DST) adjustment, as a [`timedelta`][datetime.timedelta] object or `None` if DST information isn’t known.
 
     More info can be found at https://docs.python.org/3/library/datetime.html#datetime.tzinfo.dst."""
 
@@ -1021,7 +1022,7 @@ class TzInfo(datetime.tzinfo):
     def __deepcopy__(self, _memo: dict[Any, Any]) -> TzInfo: ...
 
 def validate_core_schema(schema: CoreSchema, *, strict: bool | None = None) -> CoreSchema:
-    """Validate a CoreSchema
+    """Validate a core schema.
 
     This currently uses lax mode for validation (i.e. will coerce strings to dates and such)
     but may use strict mode in the future.
