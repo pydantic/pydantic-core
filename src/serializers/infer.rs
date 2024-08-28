@@ -11,7 +11,7 @@ use serde::ser::{Error, Serialize, SerializeMap, SerializeSeq, Serializer};
 
 use crate::input::{EitherTimedelta, Int};
 use crate::serializers::type_serializers;
-use crate::tools::{extract_i64, py_err, safe_repr};
+use crate::tools::{extract_int, py_err, safe_repr};
 use crate::url::{PyMultiHostUrl, PyUrl};
 
 use super::config::InfNanMode;
@@ -116,10 +116,13 @@ pub(crate) fn infer_to_python_known(
             // `bool` and `None` can't be subclasses, `ObType::Int`, `ObType::Float`, `ObType::Str` refer to exact types
             ObType::None | ObType::Bool | ObType::Int | ObType::Str => value.into_py(py),
             // have to do this to make sure subclasses of for example str are upcast to `str`
-            ObType::IntSubclass => match extract_i64(value) {
-                Some(v) => v.into_py(py),
-                None => return py_err!(PyTypeError; "expected int, got {}", safe_repr(value)),
-            },
+            ObType::IntSubclass => {
+                if let Some(i) = extract_int(value) {
+                    i.into_py(py)
+                } else {
+                    return py_err!(PyTypeError; "Expected int, got {}", safe_repr(value));
+                }
+            }
             ObType::Float | ObType::FloatSubclass => {
                 let v = value.extract::<f64>()?;
                 if (v.is_nan() || v.is_infinite()) && extra.config.inf_nan_mode == InfNanMode::Null {
