@@ -1006,18 +1006,18 @@ class TzInfo(datetime.tzinfo):
     def utcoffset(self, _dt: datetime.datetime | None, /) -> datetime.timedelta | None: ...
     """Return offset of local time from UTC, as a [`timedelta`][datetime.timedelta] object that is positive east of UTC. If local time is west of UTC, this should be negative.
 
-    More info can be found at https://docs.python.org/3/library/datetime.html#datetime.tzinfo.utcoffset.
+    More info can be found at [`tzinfo.utcoffset`][datetime.tzinfo.utcoffset].
     """
 
     def dst(self, _dt: datetime.datetime | None, /) -> datetime.timedelta | None: ...
     """Return the daylight saving time (DST) adjustment, as a [`timedelta`][datetime.timedelta] object or `None` if DST information isn’t known.
 
-    More info can be found at https://docs.python.org/3/library/datetime.html#datetime.tzinfo.dst."""
+    More info can be found at[`tzinfo.dst`][datetime.tzinfo.dst]."""
 
     def fromutc(self, dt: datetime.datetime, /) -> datetime.datetime: ...
     """Adjust the date and time data associated datetime object dt, returning an equivalent datetime in self’s local time.
 
-    More info can be found at https://docs.python.org/3/library/datetime.html#datetime.tzinfo.fromutc."""
+    More info can be found at [`tzinfo.fromutc`][datetime.tzinfo.fromutc]."""
 
     def __deepcopy__(self, _memo: dict[Any, Any]) -> TzInfo: ...
 
