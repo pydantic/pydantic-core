@@ -68,16 +68,13 @@ class SchemaValidator:
     """
     `SchemaValidator` is the Python wrapper for `pydantic-core`'s Rust validation logic, internally it owns one
     `CombinedValidator` which may in turn own more `CombinedValidator`s which make up the full schema validator.
+
+    Arguments:
+        schema: The [`CoreSchema`][pydantic_core.core_schema.CoreSchema] to use for validation.
+        config: Optionally a [`CoreConfig`][pydantic_core.core_schema.CoreConfig] to configure validation.
     """
 
-    def __new__(cls, schema: CoreSchema, config: CoreConfig | None = None) -> Self:
-        """
-        Create a new SchemaValidator.
-
-        Arguments:
-            schema: The [`CoreSchema`][pydantic_core.core_schema.CoreSchema] to use for validation.
-            config: Optionally a [`CoreConfig`][pydantic_core.core_schema.CoreConfig] to configure validation.
-        """
+    def __new__(cls, schema: CoreSchema, config: CoreConfig | None = None) -> Self: ...
     @property
     def title(self) -> str:
         """
@@ -240,16 +237,13 @@ class SchemaSerializer:
     """
     `SchemaSerializer` is the Python wrapper for `pydantic-core`'s Rust serialization logic, internally it owns one
     `CombinedSerializer` which may in turn own more `CombinedSerializer`s which make up the full schema serializer.
+
+    Arguments:
+        schema: The [`CoreSchema`][pydantic_core.core_schema.CoreSchema] to use for serialization.
+        config: Optionally a [`CoreConfig`][pydantic_core.core_schema.CoreConfig] to to configure serialization.
     """
 
-    def __new__(cls, schema: CoreSchema, config: CoreConfig | None = None) -> Self:
-        """
-        Create a new SchemaSerializer.
-
-        Arguments:
-            schema: The [`CoreSchema`][pydantic_core.core_schema.CoreSchema] to use for serialization.
-            config: Optionally a [`CoreConfig`][pydantic_core.core_schema.CoreConfig] to to configure serialization.
-        """
+    def __new__(cls, schema: CoreSchema, config: CoreConfig | None = None) -> Self: ...
     def to_python(
         self,
         value: Any,
@@ -469,21 +463,18 @@ class Url(SupportsAllComparisons):
     """
     A URL type, internal logic uses the [url rust crate](https://docs.rs/url/latest/url/) originally developed
     by Mozilla.
+
+    Args:
+        url: String representation of a URL.
+
+    Returns:
+        A new `Url` instance.
+
+    Raises:
+        ValidationError: If the URL is invalid.
     """
 
-    def __new__(cls, url: str) -> Self:
-        """
-        Create a new `Url` instance.
-
-        Args:
-            url: String representation of a URL.
-
-        Returns:
-            A new `Url` instance.
-
-        Raises:
-            ValidationError: If the URL is invalid.
-        """
+    def __new__(cls, url: str) -> Self: ...
     @property
     def scheme(self) -> str:
         """
@@ -605,21 +596,18 @@ class MultiHostUrl(SupportsAllComparisons):
 
     Internal URL logic uses the [url rust crate](https://docs.rs/url/latest/url/) originally developed
     by Mozilla.
+
+    Args:
+        url: String representation of a URL.
+
+    Returns:
+        A new `MultiHostUrl` instance.
+
+    Raises:
+        ValidationError: If the URL is invalid.
     """
 
-    def __new__(cls, url: str) -> Self:
-        """
-        Create a new `MultiHostUrl` instance.
-
-        Args:
-            url: String representation of a URL.
-
-        Returns:
-            A new `MultiHostUrl` instance.
-
-        Raises:
-            ValidationError: If the URL is invalid.
-        """
+    def __new__(cls, url: str) -> Self: ...
     @property
     def scheme(self) -> str:
         """
@@ -844,9 +832,7 @@ class PydanticCustomError(ValueError):
 
     def __new__(
         cls, error_type: LiteralString, message_template: LiteralString, context: dict[str, Any] | None = None
-    ) -> Self:
-        """Create a new `PydanticCustomError`."""
-
+    ) -> Self: ...
     @property
     def context(self) -> dict[str, Any] | None:
         """Values which are required to render the error message, and could hence be useful in passing error data forward."""
@@ -866,10 +852,10 @@ class PydanticCustomError(ValueError):
 class PydanticKnownError(ValueError):
     """A helper class for raising exceptions that mimic Pydantic's built-in exceptions, with more flexibility in regards to context.
 
-    Unlike [`PydanticCustomError`][pydantic_core.PydanticCustomError], the `error_type` argument must be a known [`ErrorType`][pydantic_core.ErrorType].
+    Unlike [`PydanticCustomError`][pydantic_core.PydanticCustomError], the `error_type` argument must be a known `ErrorType`.
 
     Arguments:
-        error_type: The error type, one of the known `ErrorType`s from `pydantic_core`.
+        error_type: The error type.
         context: The data to inject into the message template.
 
     Example:
@@ -883,16 +869,14 @@ class PydanticKnownError(ValueError):
         ```
     """
 
-    def __new__(cls, error_type: ErrorType, context: dict[str, Any] | None = None) -> Self:
-        """Create a new `PydanticKnownError`."""
-
+    def __new__(cls, error_type: ErrorType, context: dict[str, Any] | None = None) -> Self: ...
     @property
     def context(self) -> dict[str, Any] | None:
         """Values which are required to render the error message, and could hence be useful in passing error data forward."""
 
     @property
     def type(self) -> ErrorType:
-        """The type of the error, one of the known `ErrorType`s from `pydantic_core`."""
+        """The type of the error."""
 
     @property
     def message_template(self) -> str:
@@ -941,8 +925,7 @@ class PydanticOmit(Exception):
     For a more in depth example / explanation, see the [customizing JSON schema](../concepts/json_schema.md#customizing-the-json-schema-generation-process) docs.
     """
 
-    def __new__(cls) -> Self:
-        """Create a new `PydanticOmit` exception instance."""
+    def __new__(cls) -> Self: ...
 
 @final
 class PydanticUseDefault(Exception):
@@ -979,8 +962,7 @@ class PydanticUseDefault(Exception):
     For an additional example, seethe [validating partial json data](../concepts/json.md#partial-json-parsing) section of the Pydantic documentation.
     """
 
-    def __new__(cls) -> Self:
-        """ "Create a new `PydanticUseDefault` exception instance."""
+    def __new__(cls) -> Self: ...
 
 @final
 class PydanticSerializationError(ValueError):
@@ -992,8 +974,7 @@ class PydanticSerializationError(ValueError):
         message: The error message associated with the serialization issue.
     """
 
-    def __new__(cls, message: str) -> Self:
-        """Create a new `PydanticSerializationError`."""
+    def __new__(cls, message: str) -> Self: ...
 
 @final
 class PydanticSerializationUnexpectedValue(ValueError):
@@ -1034,13 +1015,10 @@ class PydanticSerializationUnexpectedValue(ValueError):
         ```
 
     This is often used internally in `pydantic-core` when unexpected types are encountered during serialization,
-    but it can also be used by users in custom serializers. For another example, see
-    [this example](https://github.com/pydantic/pydantic/blob/018a4555388db3a37386ed98ac6aacb48b516ede/pydantic/_internal/_generate_schema.py#L525-L530)
-    of a custom serializer for ip address like types.
+    but it can also be used by users in custom serializers, as seen above.
     """
 
-    def __new__(cls, message: str | None = None) -> Self:
-        """Create a new `PydanticSerializationUnexpectedValue` error."""
+    def __new__(cls, message: str | None = None) -> Self: ...
 
 @final
 class ArgsKwargs:
@@ -1081,9 +1059,7 @@ class ArgsKwargs:
         ```
     """
 
-    def __new__(cls, args: tuple[Any, ...], kwargs: dict[str, Any] | None = None) -> Self:
-        """Create a new `ArgsKwargs` instance."""
-
+    def __new__(cls, args: tuple[Any, ...], kwargs: dict[str, Any] | None = None) -> Self: ...
     @property
     def args(self) -> tuple[Any, ...]:
         """The arguments (inherently ordered) for a function call."""
