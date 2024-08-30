@@ -4,7 +4,7 @@ use std::str::{from_utf8, FromStr, Utf8Error};
 use base64::Engine;
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::{PyDelta, PyDict, PyString};
+use pyo3::types::{PyDelta, PyDict, PyFloat, PyString};
 
 use serde::ser::Error;
 
@@ -89,6 +89,7 @@ serialization_mode! {
     "ser_json_timedelta",
     Iso8601 => "iso8601",
     Float => "float",
+    Millisecond => "millisecond"
 }
 
 serialization_mode! {
@@ -125,6 +126,14 @@ impl TimedeltaMode {
                 let seconds = Self::total_seconds(&py_timedelta)?;
                 Ok(seconds.into_py(py))
             }
+            Self::Millisecond => {
+                // convert to int via a py timedelta not duration since we know this this case the input would have
+                // been a py timedelta
+                let py_timedelta = either_delta.try_into_py(py)?;
+                let seconds: f64 = Self::total_seconds(&py_timedelta)?.extract()?;
+                let object: Bound<PyFloat> = PyFloat::new_bound(py, seconds * 1000.0);
+                Ok(object.into_py(py))
+            }
         }
     }
 
@@ -138,6 +147,12 @@ impl TimedeltaMode {
                 let py_timedelta = either_delta.try_into_py(py)?;
                 let seconds: f64 = Self::total_seconds(&py_timedelta)?.extract()?;
                 Ok(seconds.to_string().into())
+            }
+            Self::Millisecond => {
+                let py_timedelta = either_delta.try_into_py(py)?;
+                let seconds: f64 = Self::total_seconds(&py_timedelta)?.extract()?;
+                let milliseconds: f64 = seconds * 1000.0;
+                Ok(milliseconds.to_string().into())
             }
         }
     }
@@ -158,6 +173,13 @@ impl TimedeltaMode {
                 let seconds = Self::total_seconds(&py_timedelta).map_err(py_err_se_err)?;
                 let seconds: f64 = seconds.extract().map_err(py_err_se_err)?;
                 serializer.serialize_f64(seconds)
+            }
+            Self::Millisecond => {
+                let py_timedelta = either_delta.try_into_py(py).map_err(py_err_se_err)?;
+                let seconds = Self::total_seconds(&py_timedelta).map_err(py_err_se_err)?;
+                let seconds: f64 = seconds.extract().map_err(py_err_se_err)?;
+                let milliseconds: f64 = seconds * 1000.0;
+                serializer.serialize_f64(milliseconds)
             }
         }
     }
