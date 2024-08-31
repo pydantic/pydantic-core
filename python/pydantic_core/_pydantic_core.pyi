@@ -68,11 +68,18 @@ class SchemaValidator:
     """
     `SchemaValidator` is the Python wrapper for `pydantic-core`'s Rust validation logic, internally it owns one
     `CombinedValidator` which may in turn own more `CombinedValidator`s which make up the full schema validator.
-
-    Arguments:
-        schema: The [`CoreSchema`][pydantic_core.core_schema.CoreSchema] to use for validation.
-        config: Optionally a [`CoreConfig`][pydantic_core.core_schema.CoreConfig] to configure validation.
     """
+
+    # note: pyo3 currently supports __new__, but not __init__, though we include __init__ stubs
+    # and docstrings here (and in the following classes) for documentation purposes
+
+    def __init__(self, schema: CoreSchema, config: CoreConfig | None = None) -> None:
+        """Initializes the `SchemaValidator`.
+
+        Arguments:
+            schema: The [`CoreSchema`][pydantic_core.core_schema.CoreSchema] to use for validation.
+            config: Optionally a [`CoreConfig`][pydantic_core.core_schema.CoreConfig] to configure validation.
+        """
 
     def __new__(cls, schema: CoreSchema, config: CoreConfig | None = None) -> Self: ...
     @property
@@ -237,11 +244,15 @@ class SchemaSerializer:
     """
     `SchemaSerializer` is the Python wrapper for `pydantic-core`'s Rust serialization logic, internally it owns one
     `CombinedSerializer` which may in turn own more `CombinedSerializer`s which make up the full schema serializer.
-
-    Arguments:
-        schema: The [`CoreSchema`][pydantic_core.core_schema.CoreSchema] to use for serialization.
-        config: Optionally a [`CoreConfig`][pydantic_core.core_schema.CoreConfig] to to configure serialization.
     """
+
+    def __init__(self, schema: CoreSchema, config: CoreConfig | None = None) -> None:
+        """Initializes the `SchemaSerializer`.
+
+        Arguments:
+            schema: The [`CoreSchema`][pydantic_core.core_schema.CoreSchema] to use for serialization.
+            config: Optionally a [`CoreConfig`][pydantic_core.core_schema.CoreConfig] to to configure serialization.
+        """
 
     def __new__(cls, schema: CoreSchema, config: CoreConfig | None = None) -> Self: ...
     def to_python(
@@ -463,16 +474,20 @@ class Url(SupportsAllComparisons):
     """
     A URL type, internal logic uses the [url rust crate](https://docs.rs/url/latest/url/) originally developed
     by Mozilla.
-
-    Args:
-        url: String representation of a URL.
-
-    Returns:
-        A new `Url` instance.
-
-    Raises:
-        ValidationError: If the URL is invalid.
     """
+
+    def __init__(self, url: str) -> None:
+        """Initializes the `Url`.
+
+        Args:
+            url: String representation of a URL.
+
+        Returns:
+            A new `Url` instance.
+
+        Raises:
+            ValidationError: If the URL is invalid.
+        """
 
     def __new__(cls, url: str) -> Self: ...
     @property
@@ -596,16 +611,20 @@ class MultiHostUrl(SupportsAllComparisons):
 
     Internal URL logic uses the [url rust crate](https://docs.rs/url/latest/url/) originally developed
     by Mozilla.
-
-    Args:
-        url: String representation of a URL.
-
-    Returns:
-        A new `MultiHostUrl` instance.
-
-    Raises:
-        ValidationError: If the URL is invalid.
     """
+
+    def __init__(self, url: str) -> None:
+        """Initializes the `MultiHostUrl`.
+
+        Args:
+            url: String representation of a URL.
+
+        Returns:
+            A new `MultiHostUrl` instance.
+
+        Raises:
+            ValidationError: If the URL is invalid.
+        """
 
     def __new__(cls, url: str) -> Self: ...
     @property
@@ -814,11 +833,6 @@ class PydanticCustomError(ValueError):
 
     You can raise this error in custom validators when you'd like flexibility in regards to the error type, message, and context.
 
-    Arguments:
-        error_type: The error type, typically a snake_case string.
-        message_template: The message template, formatted with any context variables in `{curly_braces}`.
-        context: The data to inject into the message template.
-
     Example:
         ```py
         from pydantic_core import PydanticCustomError
@@ -829,6 +843,17 @@ class PydanticCustomError(ValueError):
             return v
         ```
     """
+
+    def __init__(
+        self, error_type: LiteralString, message_template: LiteralString, context: dict[str, Any] | None = None
+    ) -> None:
+        """Initializes the `PydanticCustomError`.
+
+        Arguments:
+            error_type: The error type.
+            message_template: The message template.
+            context: The data to inject into the message template.
+        """
 
     def __new__(
         cls, error_type: LiteralString, message_template: LiteralString, context: dict[str, Any] | None = None
@@ -854,10 +879,6 @@ class PydanticKnownError(ValueError):
 
     Unlike [`PydanticCustomError`][pydantic_core.PydanticCustomError], the `error_type` argument must be a known `ErrorType`.
 
-    Arguments:
-        error_type: The error type.
-        context: The data to inject into the message template.
-
     Example:
         ```py
         from pydantic_core import PydanticKnownError
@@ -868,6 +889,14 @@ class PydanticKnownError(ValueError):
             return v
         ```
     """
+
+    def __init__(self, error_type: ErrorType, context: dict[str, Any] | None = None) -> None:
+        """Initializes the `PydanticKnownError`.
+
+        Arguments:
+            error_type: The error type.
+            context: The data to inject into the message template.
+        """
 
     def __new__(cls, error_type: ErrorType, context: dict[str, Any] | None = None) -> Self: ...
     @property
@@ -969,10 +998,14 @@ class PydanticSerializationError(ValueError):
     """An error raised when an issue occurs during serialization.
 
     In custom serializers, this error can be used to indicate that serialization has failed.
-
-    Arguments:
-        message: The error message associated with the serialization issue.
     """
+
+    def __init__(self, message: str) -> None:
+        """Initializes the `PydanticSerializationError`.
+
+        Arguments:
+            message: The message associated with the error.
+        """
 
     def __new__(cls, message: str) -> Self: ...
 
@@ -982,9 +1015,6 @@ class PydanticSerializationUnexpectedValue(ValueError):
 
     This error is often caught and coerced into a warning, as `pydantic-core` generally makes a best attempt
     at serializing values, in contrast with validation where errors are eagerly raised.
-
-    Arguments:
-        message: The message associated with the unexpected value.
 
     Example:
         ```py
@@ -1018,6 +1048,13 @@ class PydanticSerializationUnexpectedValue(ValueError):
     but it can also be used by users in custom serializers, as seen above.
     """
 
+    def __init__(self, message: str) -> None:
+        """Initializes the `PydanticSerializationUnexpectedValue`.
+
+        Arguments:
+            message: The message associated with the unexpected value.
+        """
+
     def __new__(cls, message: str | None = None) -> Self: ...
 
 @final
@@ -1026,10 +1063,6 @@ class ArgsKwargs:
 
     This data structure is generally used to store information for core schemas associated with functions (like in an arguments schema).
     This data structure is also currently used for some validation against dataclasses.
-
-    Arguments:
-        args: The arguments (inherently ordered) for a function call.
-        kwargs: The keyword arguments for a function call.
 
     Example:
         ```py
@@ -1058,6 +1091,14 @@ class ArgsKwargs:
         #> ArgsKwargs((), {"a": 1, "b": 2})
         ```
     """
+
+    def __init__(self, args: tuple[Any, ...], kwargs: dict[str, Any] | None = None) -> None:
+        """Initializes the `ArgsKwargs`.
+
+        Arguments:
+            args: The arguments (inherently ordered) for a function call.
+            kwargs: The keyword arguments for a function call
+        """
 
     def __new__(cls, args: tuple[Any, ...], kwargs: dict[str, Any] | None = None) -> Self: ...
     @property
