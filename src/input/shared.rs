@@ -128,6 +128,7 @@ fn clean_int_str(mut s: &str) -> Option<Cow<str>> {
     // returning. This allows consistent handling of leading zeros for both positive and negative numbers.
     let mut is_negative = false;
     if let Some(suffix) = s.strip_prefix('-') {
+        // Invalidate "--" and "-+" as an integer prefix by returning None
         if suffix.starts_with('-') | suffix.starts_with('+') {
             return None;
         }
