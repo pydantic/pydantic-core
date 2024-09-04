@@ -1,5 +1,4 @@
 import math
-import platform
 import re
 
 import pytest
@@ -83,10 +82,6 @@ def test_complex_strict(input_value, expected):
         assert v.validate_python(input_value) == expected
 
 
-@pytest.mark.xfail(
-    platform.python_implementation() == 'PyPy',
-    reason='PyPy cannot process this string due to a bug, even if this string is considered valid in python',
-)
 def test_valid_complex_string_with_space():
     v = SchemaValidator({'type': 'complex'})
     assert v.validate_python('\t( -1.23+4.5J )\n') == complex(-1.23, 4.5)
