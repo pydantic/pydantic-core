@@ -77,7 +77,7 @@ class SchemaValidator:
         """Initializes the `SchemaValidator`.
 
         Arguments:
-            schema: The [`CoreSchema`][pydantic_core.core_schema.CoreSchema] to use for validation.
+            schema: The `CoreSchema` to use for validation.
             config: Optionally a [`CoreConfig`][pydantic_core.core_schema.CoreConfig] to configure validation.
         """
 
@@ -250,7 +250,7 @@ class SchemaSerializer:
         """Initializes the `SchemaSerializer`.
 
         Arguments:
-            schema: The [`CoreSchema`][pydantic_core.core_schema.CoreSchema] to use for serialization.
+            schema: The `CoreSchema` to use for serialization.
             config: Optionally a [`CoreConfig`][pydantic_core.core_schema.CoreConfig] to to configure serialization.
         """
 
