@@ -241,7 +241,13 @@ impl LookupKey {
         obj: &Bound<'py, PyAny>,
         kwargs: Option<&Bound<'py, PyDict>>,
     ) -> ValResult<Option<(&'s LookupPath, Bound<'py, PyAny>)>> {
-        match self._py_get_attr(obj, kwargs) {
+        if let Some(dict) = kwargs {
+            if let Ok(Some(item)) = self.py_get_dict_item(dict) {
+                return Ok(Some(item));
+            }
+        }
+
+        match self.simple_py_get_attr(obj) {
             Ok(v) => Ok(v),
             Err(err) => {
                 let error = py_err_string(obj.py(), err);
@@ -251,20 +257,6 @@ impl LookupKey {
                 ))
             }
         }
-    }
-
-    pub fn _py_get_attr<'py, 's>(
-        &'s self,
-        obj: &Bound<'py, PyAny>,
-        kwargs: Option<&Bound<'py, PyDict>>,
-    ) -> PyResult<Option<(&'s LookupPath, Bound<'py, PyAny>)>> {
-        if let Some(dict) = kwargs {
-            if let Ok(Some(item)) = self.py_get_dict_item(dict) {
-                return Ok(Some(item));
-            }
-        }
-
-        self.simple_py_get_attr(obj)
     }
 
     pub fn json_get<'a, 'data, 's>(
