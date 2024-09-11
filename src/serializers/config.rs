@@ -89,7 +89,8 @@ serialization_mode! {
     "ser_json_timedelta",
     Iso8601 => "iso8601",
     Float => "float",
-    Millisecond => "millisecond"
+    SecondsFloat => "seconds_float",
+    MillisecondsFloat => "milliseconds_float"
 }
 
 serialization_mode! {
@@ -119,14 +120,14 @@ impl TimedeltaMode {
                 let d = either_delta.to_duration()?;
                 Ok(d.to_string().into_py(py))
             }
-            Self::Float => {
+            Self::Float | Self::SecondsFloat => {
                 // convert to int via a py timedelta not duration since we know this this case the input would have
                 // been a py timedelta
                 let py_timedelta = either_delta.try_into_py(py)?;
                 let seconds = Self::total_seconds(&py_timedelta)?;
                 Ok(seconds.into_py(py))
             }
-            Self::Millisecond => {
+            Self::MillisecondsFloat => {
                 // convert to int via a py timedelta not duration since we know this this case the input would have
                 // been a py timedelta
                 let py_timedelta = either_delta.try_into_py(py)?;
@@ -143,12 +144,12 @@ impl TimedeltaMode {
                 let d = either_delta.to_duration()?;
                 Ok(d.to_string().into())
             }
-            Self::Float => {
+            Self::Float | Self::SecondsFloat => {
                 let py_timedelta = either_delta.try_into_py(py)?;
                 let seconds: f64 = Self::total_seconds(&py_timedelta)?.extract()?;
                 Ok(seconds.to_string().into())
             }
-            Self::Millisecond => {
+            Self::MillisecondsFloat => {
                 let py_timedelta = either_delta.try_into_py(py)?;
                 let seconds: f64 = Self::total_seconds(&py_timedelta)?.extract()?;
                 let milliseconds: f64 = seconds * 1000.0;
@@ -168,13 +169,13 @@ impl TimedeltaMode {
                 let d = either_delta.to_duration().map_err(py_err_se_err)?;
                 serializer.serialize_str(&d.to_string())
             }
-            Self::Float => {
+            Self::Float | Self::SecondsFloat => {
                 let py_timedelta = either_delta.try_into_py(py).map_err(py_err_se_err)?;
                 let seconds = Self::total_seconds(&py_timedelta).map_err(py_err_se_err)?;
                 let seconds: f64 = seconds.extract().map_err(py_err_se_err)?;
                 serializer.serialize_f64(seconds)
             }
-            Self::Millisecond => {
+            Self::MillisecondsFloat => {
                 let py_timedelta = either_delta.try_into_py(py).map_err(py_err_se_err)?;
                 let seconds = Self::total_seconds(&py_timedelta).map_err(py_err_se_err)?;
                 let seconds: f64 = seconds.extract().map_err(py_err_se_err)?;
