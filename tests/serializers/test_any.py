@@ -201,6 +201,18 @@ def test_any_config_timedelta_float_faction():
     assert s.to_json({one_half_s: 'foo'}) == b'{"1.5":"foo"}'
 
 
+def test_any_config_timedelta_float_negative():
+    s = SchemaSerializer(core_schema.any_schema(), config={'ser_json_timedelta': 'float'})
+    one_half_s = timedelta(seconds=-1.5)
+    assert s.to_python(one_half_s) == one_half_s
+    assert s.to_python(one_half_s, mode='json') == -1.5
+    assert s.to_json(one_half_s) == b'-1.5'
+
+    assert s.to_python({one_half_s: 'foo'}) == {one_half_s: 'foo'}
+    assert s.to_python({one_half_s: 'foo'}, mode='json') == {'-1.5': 'foo'}
+    assert s.to_json({one_half_s: 'foo'}) == b'{"-1.5":"foo"}'
+
+
 def test_any_config_timedelta_millisecond():
     s = SchemaSerializer(core_schema.any_schema(), config={'ser_json_timedelta': 'millisecond'})
     h2 = timedelta(hours=2)
@@ -223,6 +235,18 @@ def test_any_config_timedelta_millisecond_fraction():
     assert s.to_python({h2: 'foo'}) == {h2: 'foo'}
     assert s.to_python({h2: 'foo'}, mode='json') == {'1500': 'foo'}
     assert s.to_json({h2: 'foo'}) == b'{"1500":"foo"}'
+
+
+def test_any_config_timedelta_millisecond_negative():
+    s = SchemaSerializer(core_schema.any_schema(), config={'ser_json_timedelta': 'millisecond'})
+    h2 = timedelta(seconds=-1.5)
+    assert s.to_python(h2) == h2
+    assert s.to_python(h2, mode='json') == -1500.0
+    assert s.to_json(h2) == b'-1500.0'
+
+    assert s.to_python({h2: 'foo'}) == {h2: 'foo'}
+    assert s.to_python({h2: 'foo'}, mode='json') == {'-1500': 'foo'}
+    assert s.to_json({h2: 'foo'}) == b'{"-1500":"foo"}'
 
 
 def test_recursion(any_serializer):
