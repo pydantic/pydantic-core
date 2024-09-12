@@ -49,6 +49,7 @@ mod list;
 mod literal;
 mod model;
 mod model_fields;
+mod nested;
 mod none;
 mod nullable;
 mod set;
@@ -584,6 +585,7 @@ pub fn build_validator(
         definitions::DefinitionRefValidator,
         definitions::DefinitionsValidatorBuilder,
         complex::ComplexValidator,
+        nested::NestedValidator,
     )
 }
 
@@ -738,6 +740,8 @@ pub enum CombinedValidator {
     // input dependent
     JsonOrPython(json_or_python::JsonOrPython),
     Complex(complex::ComplexValidator),
+    // Schema for reusing an existing validator
+    Nested(nested::NestedValidator),
 }
 
 /// This trait must be implemented by all validators, it allows various validators to be accessed consistently,
