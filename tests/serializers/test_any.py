@@ -216,40 +216,54 @@ def test_any_config_timedelta_float_negative(mode):
     assert s.to_json({one_half_s: 'foo'}) == b'{"-1.5":"foo"}'
 
 
-def test_any_config_timedelta_millisecond():
+@pytest.mark.parametrize(
+    'td,expected_to_python,expected_to_json,expected_to_python_dict,expected_to_json_dict',
+    [
+        (timedelta(hours=2), 7200000.0, b'7200000.0', {'7200000': 'foo'}, b'{"7200000":"foo"}'),
+        (timedelta(hours=-2), -7200000.0, b'-7200000.0', {'-7200000': 'foo'}, b'{"-7200000":"foo"}'),
+        (timedelta(seconds=1.5), 1500.0, b'1500.0', {'1500': 'foo'}, b'{"1500":"foo"}'),
+        (timedelta(seconds=-1.5), -1500.0, b'-1500.0', {'-1500': 'foo'}, b'{"-1500":"foo"}'),
+        (timedelta(microseconds=1), 0.001, b'0.001', {'0.001': 'foo'}, b'{"0.001":"foo"}'),
+        (timedelta(microseconds=-1), -0.001, b'-0.001', {'-0.001': 'foo'}, b'{"-0.001":"foo"}'),
+        (timedelta(days=1), 86400000.0, b'86400000.0', {'86400000': 'foo'}, b'{"86400000":"foo"}'),
+        (timedelta(days=-1), -86400000.0, b'-86400000.0', {'-86400000': 'foo'}, b'{"-86400000":"foo"}'),
+        (timedelta(days=1, seconds=1), 86401000.0, b'86401000.0', {'86401000': 'foo'}, b'{"86401000":"foo"}'),
+        (timedelta(days=-1, seconds=-1), -86401000.0, b'-86401000.0', {'-86401000': 'foo'}, b'{"-86401000":"foo"}'),
+        (timedelta(days=1, seconds=-1), 86399000.0, b'86399000.0', {'86399000': 'foo'}, b'{"86399000":"foo"}'),
+        (
+            timedelta(days=1, seconds=1, microseconds=1),
+            86401000.001,
+            b'86401000.001',
+            {'86401000.001': 'foo'},
+            b'{"86401000.001":"foo"}',
+        ),
+        (
+            timedelta(days=-1, seconds=-1, microseconds=-1),
+            -86401000.001,
+            b'-86401000.001',
+            {'-86401000.001': 'foo'},
+            b'{"-86401000.001":"foo"}',
+        ),
+        (
+            timedelta(days=-1, seconds=-1, microseconds=-1),
+            -86401000.001,
+            b'-86401000.001',
+            {'-86401000.001': 'foo'},
+            b'{"-86401000.001":"foo"}',
+        ),
+    ],
+)
+def test_any_config_timedelta_millisecond(
+    td: timedelta, expected_to_python, expected_to_json, expected_to_python_dict, expected_to_json_dict
+):
     s = SchemaSerializer(core_schema.any_schema(), config={'ser_json_timedelta': 'milliseconds_float'})
-    h2 = timedelta(hours=2)
-    assert s.to_python(h2) == h2
-    assert s.to_python(h2, mode='json') == 7200000.0
-    assert s.to_json(h2) == b'7200000.0'
+    assert s.to_python(td) == td
+    assert s.to_python(td, mode='json') == expected_to_python
+    assert s.to_json(td) == expected_to_json
 
-    assert s.to_python({h2: 'foo'}) == {h2: 'foo'}
-    assert s.to_python({h2: 'foo'}, mode='json') == {'7200000': 'foo'}
-    assert s.to_json({h2: 'foo'}) == b'{"7200000":"foo"}'
-
-
-def test_any_config_timedelta_millisecond_fraction():
-    s = SchemaSerializer(core_schema.any_schema(), config={'ser_json_timedelta': 'milliseconds_float'})
-    h2 = timedelta(seconds=1.5)
-    assert s.to_python(h2) == h2
-    assert s.to_python(h2, mode='json') == 1500.0
-    assert s.to_json(h2) == b'1500.0'
-
-    assert s.to_python({h2: 'foo'}) == {h2: 'foo'}
-    assert s.to_python({h2: 'foo'}, mode='json') == {'1500': 'foo'}
-    assert s.to_json({h2: 'foo'}) == b'{"1500":"foo"}'
-
-
-def test_any_config_timedelta_millisecond_negative():
-    s = SchemaSerializer(core_schema.any_schema(), config={'ser_json_timedelta': 'milliseconds_float'})
-    h2 = timedelta(seconds=-1.5)
-    assert s.to_python(h2) == h2
-    assert s.to_python(h2, mode='json') == -1500.0
-    assert s.to_json(h2) == b'-1500.0'
-
-    assert s.to_python({h2: 'foo'}) == {h2: 'foo'}
-    assert s.to_python({h2: 'foo'}, mode='json') == {'-1500': 'foo'}
-    assert s.to_json({h2: 'foo'}) == b'{"-1500":"foo"}'
+    assert s.to_python({td: 'foo'}) == {td: 'foo'}
+    assert s.to_python({td: 'foo'}, mode='json') == expected_to_python_dict
+    assert s.to_json({td: 'foo'}) == expected_to_json_dict
 
 
 def test_recursion(any_serializer):
