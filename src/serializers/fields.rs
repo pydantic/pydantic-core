@@ -226,9 +226,12 @@ impl GeneralFieldsSerializer {
                 None => "<unknown python object>".to_string(),
             };
 
-            Err(PydanticSerializationUnexpectedValue::new_err(Some(format!(
-                "Expected {required_fields} fields but got {used_req_fields} for type `{type_name}` with value `{field_value}` - serialized value may not be as expected."
-            ))))
+            extra.warnings.custom_warning(
+                format!(
+                    "Expected {required_fields} fields but got {used_req_fields} for type `{type_name}` with value `{field_value}` - serialized value may not be as expected."
+                ),
+            );
+            Ok(output_dict)
         } else {
             Ok(output_dict)
         }
