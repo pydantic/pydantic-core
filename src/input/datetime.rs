@@ -113,10 +113,10 @@ impl<'a> EitherTimedelta<'a> {
     pub fn total_seconds(&self) -> PyResult<f64> {
         match self {
             Self::Raw(timedelta) => {
-                let mut days: f64 = timedelta.day as f64;
-                let mut seconds: f64 = timedelta.second as f64;
-                let mut microseconds: f64 = timedelta.microsecond as f64;
-                let mut total_seconds: f64 = if !timedelta.positive {
+                let days: f64 = f64::from(timedelta.day);
+                let seconds: f64 = f64::from(timedelta.second);
+                let microseconds: f64 = f64::from(timedelta.microsecond);
+                let total_seconds: f64 = if !timedelta.positive {
                     -1.0 * (86400.0 * days + seconds + microseconds / 1_000_000.0)
                 } else {
                     86400.0 * days + seconds + microseconds / 1_000_000.0
@@ -124,16 +124,10 @@ impl<'a> EitherTimedelta<'a> {
                 Ok(total_seconds)
             }
             Self::PyExact(py_timedelta) => {
-                let mut days: f64 = py_timedelta.get_days() as f64; // -999999999 to 999999999
-                let mut seconds: f64 = py_timedelta.get_seconds() as f64; // 0 through 86399
-                let mut microseconds: f64 = py_timedelta.get_microseconds() as f64; // 0 through 999999
-                let positive = days >= 0.0;
-                let total_seconds: f64 = if !positive {
-                    86400.0 * days + seconds + microseconds / 1_000_000.0
-                } else {
-                    86400.0 * days + seconds + microseconds / 1_000_000.0
-                };
-                Ok(total_seconds)
+                let days: f64 = f64::from(py_timedelta.get_days()); // -999999999 to 999999999
+                let seconds: f64 = f64::from(py_timedelta.get_seconds()); // 0 through 86399
+                let microseconds: f64 = f64::from(py_timedelta.get_microseconds()); // 0 through 999999
+                Ok(86400.0 * days + seconds + microseconds / 1_000_000.0)
             }
             Self::PySubclass(py_timedelta) => {
                 let total_seconds: f64 = py_timedelta

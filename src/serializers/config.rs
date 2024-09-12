@@ -4,7 +4,7 @@ use std::str::{from_utf8, FromStr, Utf8Error};
 use base64::Engine;
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::{PyDelta, PyDict, PyFloat, PyString};
+use pyo3::types::{PyDict, PyFloat, PyString};
 
 use serde::ser::Error;
 
@@ -132,7 +132,7 @@ impl TimedeltaMode {
         }
     }
 
-    pub fn json_key<'py>(self, py: Python, either_delta: &EitherTimedelta) -> PyResult<Cow<'py, str>> {
+    pub fn json_key<'py>(self, either_delta: &EitherTimedelta) -> PyResult<Cow<'py, str>> {
         match self {
             Self::Iso8601 => {
                 let d = either_delta.to_duration()?;
@@ -152,7 +152,6 @@ impl TimedeltaMode {
 
     pub fn timedelta_serialize<S: serde::ser::Serializer>(
         self,
-        py: Python,
         either_delta: &EitherTimedelta,
         serializer: S,
     ) -> Result<S::Ok, S::Error> {
