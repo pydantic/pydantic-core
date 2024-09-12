@@ -9,7 +9,7 @@ from decimal import Decimal
 from enum import Enum
 from math import inf, isinf, isnan, nan
 from pathlib import Path
-from typing import ClassVar, Literal
+from typing import ClassVar
 
 import pytest
 from dirty_equals import HasRepr, IsList
@@ -177,71 +177,76 @@ def test_any_with_timedelta_serializer():
     ]
 
 
-@pytest.mark.parametrize('mode', ['float', 'seconds_float'])
-def test_any_config_timedelta_float(mode: Literal['float', 'seconds_float']):
-    s = SchemaSerializer(core_schema.any_schema(), config={'ser_json_timedelta': mode})
-    h2 = timedelta(hours=2)
-    assert s.to_python(h2) == h2
-    assert s.to_python(h2, mode='json') == 7200.0
-    assert s.to_json(h2) == b'7200.0'
-
-    assert s.to_python({h2: 'foo'}) == {h2: 'foo'}
-    assert s.to_python({h2: 'foo'}, mode='json') == {'7200': 'foo'}
-    assert s.to_json({h2: 'foo'}) == b'{"7200":"foo"}'
-
-
-@pytest.mark.parametrize('mode', ['float', 'seconds_float'])
-def test_any_config_timedelta_float_faction(mode):
-    s = SchemaSerializer(core_schema.any_schema(), config={'ser_json_timedelta': mode})
-    one_half_s = timedelta(seconds=1.5)
-    assert s.to_python(one_half_s) == one_half_s
-    assert s.to_python(one_half_s, mode='json') == 1.5
-    assert s.to_json(one_half_s) == b'1.5'
-
-    assert s.to_python({one_half_s: 'foo'}) == {one_half_s: 'foo'}
-    assert s.to_python({one_half_s: 'foo'}, mode='json') == {'1.5': 'foo'}
-    assert s.to_json({one_half_s: 'foo'}) == b'{"1.5":"foo"}'
-
-
-@pytest.mark.parametrize('mode', ['float', 'seconds_float'])
-def test_any_config_timedelta_float_negative(mode):
-    s = SchemaSerializer(core_schema.any_schema(), config={'ser_json_timedelta': mode})
-    one_half_s = timedelta(seconds=-1.5)
-    assert s.to_python(one_half_s) == one_half_s
-    assert s.to_python(one_half_s, mode='json') == -1.5
-    assert s.to_json(one_half_s) == b'-1.5'
-
-    assert s.to_python({one_half_s: 'foo'}) == {one_half_s: 'foo'}
-    assert s.to_python({one_half_s: 'foo'}, mode='json') == {'-1.5': 'foo'}
-    assert s.to_json({one_half_s: 'foo'}) == b'{"-1.5":"foo"}'
-
-
 @pytest.mark.parametrize(
-    'td,expected_to_python,expected_to_json,expected_to_python_dict,expected_to_json_dict',
+    'td,expected_to_python,expected_to_json,expected_to_python_dict,expected_to_json_dict,mode',
     [
-        (timedelta(hours=2), 7200000.0, b'7200000.0', {'7200000': 'foo'}, b'{"7200000":"foo"}'),
-        (timedelta(hours=-2), -7200000.0, b'-7200000.0', {'-7200000': 'foo'}, b'{"-7200000":"foo"}'),
-        (timedelta(seconds=1.5), 1500.0, b'1500.0', {'1500': 'foo'}, b'{"1500":"foo"}'),
-        (timedelta(seconds=-1.5), -1500.0, b'-1500.0', {'-1500': 'foo'}, b'{"-1500":"foo"}'),
-        (timedelta(microseconds=1), 0.001, b'0.001', {'0.001': 'foo'}, b'{"0.001":"foo"}'),
+        (timedelta(hours=2), 7200000.0, b'7200000.0', {'7200000': 'foo'}, b'{"7200000":"foo"}', 'milliseconds_float'),
+        (
+            timedelta(hours=-2),
+            -7200000.0,
+            b'-7200000.0',
+            {'-7200000': 'foo'},
+            b'{"-7200000":"foo"}',
+            'milliseconds_float',
+        ),
+        (timedelta(seconds=1.5), 1500.0, b'1500.0', {'1500': 'foo'}, b'{"1500":"foo"}', 'milliseconds_float'),
+        (timedelta(seconds=-1.5), -1500.0, b'-1500.0', {'-1500': 'foo'}, b'{"-1500":"foo"}', 'milliseconds_float'),
+        (timedelta(microseconds=1), 0.001, b'0.001', {'0.001': 'foo'}, b'{"0.001":"foo"}', 'milliseconds_float'),
         (
             timedelta(microseconds=-1),
             -0.0010000000000287557,
             b'-0.0010000000000287557',
             {'-0.0010000000000287557': 'foo'},
             b'{"-0.0010000000000287557":"foo"}',
+            'milliseconds_float',
         ),
-        (timedelta(days=1), 86400000.0, b'86400000.0', {'86400000': 'foo'}, b'{"86400000":"foo"}'),
-        (timedelta(days=-1), -86400000.0, b'-86400000.0', {'-86400000': 'foo'}, b'{"-86400000":"foo"}'),
-        (timedelta(days=1, seconds=1), 86401000.0, b'86401000.0', {'86401000': 'foo'}, b'{"86401000":"foo"}'),
-        (timedelta(days=-1, seconds=-1), -86401000.0, b'-86401000.0', {'-86401000': 'foo'}, b'{"-86401000":"foo"}'),
-        (timedelta(days=1, seconds=-1), 86399000.0, b'86399000.0', {'86399000': 'foo'}, b'{"86399000":"foo"}'),
+        (
+            timedelta(days=1),
+            86400000.0,
+            b'86400000.0',
+            {'86400000': 'foo'},
+            b'{"86400000":"foo"}',
+            'milliseconds_float',
+        ),
+        (
+            timedelta(days=-1),
+            -86400000.0,
+            b'-86400000.0',
+            {'-86400000': 'foo'},
+            b'{"-86400000":"foo"}',
+            'milliseconds_float',
+        ),
+        (
+            timedelta(days=1, seconds=1),
+            86401000.0,
+            b'86401000.0',
+            {'86401000': 'foo'},
+            b'{"86401000":"foo"}',
+            'milliseconds_float',
+        ),
+        (
+            timedelta(days=-1, seconds=-1),
+            -86401000.0,
+            b'-86401000.0',
+            {'-86401000': 'foo'},
+            b'{"-86401000":"foo"}',
+            'milliseconds_float',
+        ),
+        (
+            timedelta(days=1, seconds=-1),
+            86399000.0,
+            b'86399000.0',
+            {'86399000': 'foo'},
+            b'{"86399000":"foo"}',
+            'milliseconds_float',
+        ),
         (
             timedelta(days=1, seconds=1, microseconds=1),
             86401000.00099999,
             b'86401000.00099999',
             {'86401000.00099999': 'foo'},
             b'{"86401000.00099999":"foo"}',
+            'milliseconds_float',
         ),
         (
             timedelta(days=-1, seconds=-1, microseconds=-1),
@@ -249,13 +254,55 @@ def test_any_config_timedelta_float_negative(mode):
             b'-86401000.00099999',
             {'-86401000.00099999': 'foo'},
             b'{"-86401000.00099999":"foo"}',
+            'milliseconds_float',
+        ),
+        (timedelta(hours=2), 7200.0, b'7200.0', {'7200': 'foo'}, b'{"7200":"foo"}', 'seconds_float'),
+        (timedelta(hours=-2), -7200.0, b'-7200.0', {'-7200': 'foo'}, b'{"-7200":"foo"}', 'seconds_float'),
+        (timedelta(seconds=1.5), 1.5, b'1.5', {'1.5': 'foo'}, b'{"1.5":"foo"}', 'seconds_float'),
+        (timedelta(seconds=-1.5), -1.5, b'-1.5', {'-1.5': 'foo'}, b'{"-1.5":"foo"}', 'seconds_float'),
+        (timedelta(microseconds=1), 1e-6, b'1e-6', {'0.000001': 'foo'}, b'{"0.000001":"foo"}', 'seconds_float'),
+        (
+            timedelta(microseconds=-1),
+            -1.0000000000287557e-6,
+            b'-1.0000000000287557e-6',
+            {'-0.0000010000000000287557': 'foo'},
+            b'{"-0.0000010000000000287557":"foo"}',
+            'seconds_float',
+        ),
+        (timedelta(days=1), 86400.0, b'86400.0', {'86400': 'foo'}, b'{"86400":"foo"}', 'seconds_float'),
+        (timedelta(days=-1), -86400.0, b'-86400.0', {'-86400': 'foo'}, b'{"-86400":"foo"}', 'seconds_float'),
+        (timedelta(days=1, seconds=1), 86401.0, b'86401.0', {'86401': 'foo'}, b'{"86401":"foo"}', 'seconds_float'),
+        (
+            timedelta(days=-1, seconds=-1),
+            -86401.0,
+            b'-86401.0',
+            {'-86401': 'foo'},
+            b'{"-86401":"foo"}',
+            'seconds_float',
+        ),
+        (timedelta(days=1, seconds=-1), 86399.0, b'86399.0', {'86399': 'foo'}, b'{"86399":"foo"}', 'seconds_float'),
+        (
+            timedelta(days=1, seconds=1, microseconds=1),
+            86401.000001,
+            b'86401.000001',
+            {'86401.000001': 'foo'},
+            b'{"86401.000001":"foo"}',
+            'seconds_float',
+        ),
+        (
+            timedelta(days=-1, seconds=-1, microseconds=-1),
+            -86401.000001,
+            b'-86401.000001',
+            {'-86401.000001': 'foo'},
+            b'{"-86401.000001":"foo"}',
+            'seconds_float',
         ),
     ],
 )
-def test_any_config_timedelta_millisecond(
-    td: timedelta, expected_to_python, expected_to_json, expected_to_python_dict, expected_to_json_dict
+def test_any_config_timedelta(
+    td: timedelta, expected_to_python, expected_to_json, expected_to_python_dict, expected_to_json_dict, mode
 ):
-    s = SchemaSerializer(core_schema.any_schema(), config={'ser_json_timedelta': 'milliseconds_float'})
+    s = SchemaSerializer(core_schema.any_schema(), config={'ser_json_timedelta': mode})
     assert s.to_python(td) == td
     assert s.to_python(td, mode='json') == expected_to_python
     assert s.to_json(td) == expected_to_json
