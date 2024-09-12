@@ -88,7 +88,6 @@ serialization_mode! {
     TimedeltaMode,
     "ser_json_timedelta",
     Iso8601 => "iso8601",
-    Float => "float",
     SecondsFloat => "seconds_float",
     MillisecondsFloat => "milliseconds_float"
 }
@@ -116,7 +115,7 @@ impl TimedeltaMode {
                 let d = either_delta.to_duration()?;
                 Ok(d.to_string().into_py(py))
             }
-            Self::Float | Self::SecondsFloat => {
+            Self::SecondsFloat => {
                 // convert to int via a py timedelta not duration since we know this this case the input would have
                 // been a py timedelta
                 let seconds: f64 = either_delta.total_seconds()?;
@@ -138,7 +137,7 @@ impl TimedeltaMode {
                 let d = either_delta.to_duration()?;
                 Ok(d.to_string().into())
             }
-            Self::Float | Self::SecondsFloat => {
+            Self::SecondsFloat => {
                 let seconds: f64 = either_delta.total_seconds()?;
                 Ok(seconds.to_string().into())
             }
@@ -160,7 +159,7 @@ impl TimedeltaMode {
                 let d = either_delta.to_duration().map_err(py_err_se_err)?;
                 serializer.serialize_str(&d.to_string())
             }
-            Self::Float | Self::SecondsFloat => {
+            Self::SecondsFloat => {
                 let seconds: f64 = either_delta.total_seconds().map_err(py_err_se_err)?;
                 serializer.serialize_f64(seconds)
             }
