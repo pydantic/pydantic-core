@@ -61,6 +61,7 @@ mod union;
 mod url;
 mod uuid;
 mod validation_state;
+mod var_kwargs;
 mod with_default;
 
 pub use self::validation_state::{Exactness, ValidationState};
@@ -561,6 +562,7 @@ pub fn build_validator(
         callable::CallableValidator,
         // arguments
         arguments::ArgumentsValidator,
+        var_kwargs::VarKwargsValidator,
         // default value
         with_default::WithDefaultValidator,
         // chain validators
@@ -716,6 +718,7 @@ pub enum CombinedValidator {
     Callable(callable::CallableValidator),
     // arguments
     Arguments(arguments::ArgumentsValidator),
+    VarKwargs(var_kwargs::VarKwargsValidator),
     // default value
     WithDefault(with_default::WithDefaultValidator),
     // chain validators

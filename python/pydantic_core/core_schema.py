@@ -10,7 +10,7 @@ import warnings
 from collections.abc import Mapping
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, Callable, Dict, Hashable, List, Pattern, Set, Tuple, Type, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Hashable, List, Pattern, Set, Tuple, Type, Union, overload
 
 from typing_extensions import deprecated
 
@@ -3370,6 +3370,48 @@ def arguments_parameter(
         alias: The alias to use for the argument parameter
     """
     return _dict_not_none(name=name, schema=schema, mode=mode, alias=alias)
+
+
+class VarKwargsSchema(TypedDict):
+    type: Literal['var_kwargs']
+    mode: Literal['single', 'typed_dict']
+    schema: CoreSchema
+
+
+@overload
+def var_kwargs_schema(
+    *,
+    mode: Literal['single'],
+    schema: CoreSchema,
+) -> VarKwargsSchema: ...
+
+
+@overload
+def var_kwargs_schema(
+    *,
+    mode: Literal['typed_dict'],
+    schema: TypedDictSchema,
+) -> VarKwargsSchema: ...
+
+
+def var_kwargs_schema(
+    *,
+    mode: Literal['single', 'typed_dict'],
+    schema: CoreSchema,
+) -> VarKwargsSchema:
+    """Returns a schema describing the variadic keyword arguments of a callable.
+
+    Args:
+        mode: The validation mode to use. If `'single'`, every value of the keyword arguments will
+            be validated against the core schema from the `schema` argument. If `'typed_dict'`, the
+            `schema` argument must be a [`typed_dict_schema`][pydantic_core.core_schema.typed_dict_schema].
+    """
+
+    return _dict_not_none(
+        type='var_kwargs',
+        mode=mode,
+        schema=schema,
+    )
 
 
 class ArgumentsSchema(TypedDict, total=False):
