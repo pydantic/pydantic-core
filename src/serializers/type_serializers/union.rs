@@ -9,7 +9,6 @@ use crate::build_tools::py_schema_err;
 use crate::common::union::{Discriminator, SMALL_UNION_THRESHOLD};
 use crate::definitions::DefinitionsBuilder;
 use crate::tools::{truncate_safe_repr, SchemaDict};
-use crate::PydanticSerializationUnexpectedValue;
 
 use super::{
     infer_json_key, infer_serialize, infer_to_python, BuildSerializer, CombinedSerializer, Extra, SerCheck,
@@ -119,10 +118,7 @@ fn json_key<'a>(
     for comb_serializer in choices {
         match comb_serializer.json_key(key, &new_extra) {
             Ok(v) => return Ok(v),
-            Err(err) => match err.is_instance_of::<PydanticSerializationUnexpectedValue>(key.py()) {
-                true => (),
-                false => errors.push(err),
-            },
+            Err(err) => errors.push(err),
         }
     }
 
@@ -160,10 +156,7 @@ fn serde_serialize<S: serde::ser::Serializer>(
     for comb_serializer in choices {
         match comb_serializer.to_python(value, include, exclude, &new_extra) {
             Ok(v) => return infer_serialize(v.bind(py), serializer, None, None, extra),
-            Err(err) => match err.is_instance_of::<PydanticSerializationUnexpectedValue>(py) {
-                true => (),
-                false => errors.push(err),
-            },
+            Err(err) => errors.push(err),
         }
     }
 
