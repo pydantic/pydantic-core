@@ -4,7 +4,7 @@ use std::str::{from_utf8, FromStr, Utf8Error};
 use base64::Engine;
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyFloat, PyString};
+use pyo3::types::{PyDict, PyString};
 
 use serde::ser::Error;
 
@@ -120,9 +120,8 @@ impl TimedeltaMode {
                 Ok(seconds.into_py(py))
             }
             Self::MillisecondsFloat => {
-                let seconds: f64 = either_delta.total_seconds()?;
-                let object: Bound<PyFloat> = PyFloat::new_bound(py, seconds * 1000.0);
-                Ok(object.into_py(py))
+                let milliseconds: f64 = either_delta.total_milliseconds()?;
+                Ok(milliseconds.into_py(py))
             }
         }
     }
@@ -138,8 +137,7 @@ impl TimedeltaMode {
                 Ok(seconds.to_string().into())
             }
             Self::MillisecondsFloat => {
-                let seconds: f64 = either_delta.total_seconds()?;
-                let milliseconds: f64 = seconds * 1000.0;
+                let milliseconds: f64 = either_delta.total_milliseconds()?;
                 Ok(milliseconds.to_string().into())
             }
         }
@@ -160,8 +158,7 @@ impl TimedeltaMode {
                 serializer.serialize_f64(seconds)
             }
             Self::MillisecondsFloat => {
-                let seconds: f64 = either_delta.total_seconds().map_err(py_err_se_err)?;
-                let milliseconds: f64 = seconds * 1000.0;
+                let milliseconds: f64 = either_delta.total_milliseconds().map_err(py_err_se_err)?;
                 serializer.serialize_f64(milliseconds)
             }
         }

@@ -134,6 +134,31 @@ impl<'a> EitherTimedelta<'a> {
                 .extract(),
         }
     }
+
+    pub fn total_milliseconds(&self) -> PyResult<f64> {
+        match self {
+            Self::Raw(timedelta) => {
+                let days: f64 = f64::from(timedelta.day);
+                let seconds: f64 = f64::from(timedelta.second);
+                let microseconds: f64 = f64::from(timedelta.microsecond);
+                let total_seconds: f64 = if !timedelta.positive {
+                    -1.0 * (86_400_000.0 * days + seconds * 1_000.0 + microseconds / 1_000.0)
+                } else {
+                    86_400_000.0 * days + seconds * 1_000.0 + microseconds / 1_000.0
+                };
+                Ok(total_seconds)
+            }
+            Self::PyExact(py_timedelta) => {
+                let days: f64 = f64::from(py_timedelta.get_days()); // -999999999 to 999999999
+                let seconds: f64 = f64::from(py_timedelta.get_seconds()); // 0 through 86399
+                let microseconds: f64 = f64::from(py_timedelta.get_microseconds()); // 0 through 999999
+                Ok(86_400_000.0 * days + seconds * 1_000.0 + microseconds / 1_000.0)
+            }
+            Self::PySubclass(py_timedelta) => py_timedelta
+                .call_method0(intern!(py_timedelta.py(), "total_seconds"))?
+                .extract(),
+        }
+    }
 }
 
 impl<'a> TryFrom<&'_ Bound<'a, PyAny>> for EitherTimedelta<'a> {
