@@ -116,14 +116,10 @@ impl TimedeltaMode {
                 Ok(d.to_string().into_py(py))
             }
             Self::SecondsFloat => {
-                // convert to int via a py timedelta not duration since we know this this case the input would have
-                // been a py timedelta
                 let seconds: f64 = either_delta.total_seconds()?;
                 Ok(seconds.into_py(py))
             }
             Self::MillisecondsFloat => {
-                // convert to int via a py timedelta not duration since we know this this case the input would have
-                // been a py timedelta
                 let seconds: f64 = either_delta.total_seconds()?;
                 let object: Bound<PyFloat> = PyFloat::new_bound(py, seconds * 1000.0);
                 Ok(object.into_py(py))
