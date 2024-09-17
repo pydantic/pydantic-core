@@ -141,11 +141,11 @@ impl BuildValidator for ArgumentsValidator {
             });
         }
 
-        let py_var_kwargs_mode: Bound<PyString> = match schema.get_as(intern!(py, "var_kwargs_mode"))? {
-            Some(v) => v,
-            None => PyString::new_bound(py, "single"),
-        };
-        let var_kwargs_mode = VarKwargsMode::from_str(py_var_kwargs_mode.to_string().as_str())?;
+        let py_var_kwargs_mode: Bound<PyString> = schema
+            .get_as(intern!(py, "var_kwargs_mode"))?
+            .unwrap_or_else(|| PyString::new_bound(py, "single"));
+
+        let var_kwargs_mode = VarKwargsMode::from_str(py_var_kwargs_mode.to_str()?)?;
         let var_kwargs_validator = match schema.get_item(intern!(py, "var_kwargs_schema"))? {
             Some(v) => Some(Box::new(build_validator(&v, config, definitions)?)),
             None => None,
