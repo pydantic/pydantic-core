@@ -154,9 +154,12 @@ impl<'a> EitherTimedelta<'a> {
                 let microseconds: f64 = f64::from(py_timedelta.get_microseconds()); // 0 through 999999
                 Ok(86_400_000.0 * days + seconds * 1_000.0 + microseconds / 1_000.0)
             }
-            Self::PySubclass(py_timedelta) => py_timedelta
-                .call_method0(intern!(py_timedelta.py(), "total_seconds"))?
-                .extract(),
+            Self::PySubclass(py_timedelta) => {
+                let total_seconds = py_timedelta
+                    .call_method0(intern!(py_timedelta.py(), "total_seconds"))?
+                    .extract()?;
+                Ok(total_seconds / 1000.0)
+            },
         }
     }
 }
