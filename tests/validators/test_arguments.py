@@ -791,7 +791,7 @@ def test_build_missing_var_kwargs():
     ],
     ids=repr,
 )
-def test_kwargs_single(py_and_json: PyAndJson, input_value, expected):
+def test_kwargs_uniform(py_and_json: PyAndJson, input_value, expected):
     v = py_and_json(
         {
             'type': 'arguments',

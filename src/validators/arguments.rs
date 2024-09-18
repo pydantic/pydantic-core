@@ -19,7 +19,7 @@ use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuild
 
 #[derive(Debug, PartialEq)]
 enum VarKwargsMode {
-    Single,
+    Uniform,
     UnpackedTypedDict,
 }
 
@@ -28,10 +28,10 @@ impl FromStr for VarKwargsMode {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "single" => Ok(Self::Single),
+            "uniform" => Ok(Self::Uniform),
             "unpacked-typed-dict" => Ok(Self::UnpackedTypedDict),
             s => py_schema_err!(
-                "Invalid var_kwargs mode: `{}`, expected `single` or `unpacked-typed-dict`",
+                "Invalid var_kwargs mode: `{}`, expected `uniform` or `unpacked-typed-dict`",
                 s
             ),
         }
@@ -319,8 +319,8 @@ impl Validator for ArgumentsValidator {
                     };
                     if !used_kwargs.contains(either_str.as_cow()?.as_ref()) {
                         match self.var_kwargs_mode {
-                            VarKwargsMode::Single => match self.var_kwargs_validator {
-                                Some(ref validator) => match validator.validate(py, value.borrow_input(), state) {
+                            VarKwargsMode::Uniform => match &self.var_kwargs_validator {
+                                Some(validator) => match validator.validate(py, value.borrow_input(), state) {
                                     Ok(value) => {
                                         output_kwargs
                                             .set_item(either_str.as_py_string(py, state.cache_str()), value)?;
@@ -362,9 +362,7 @@ impl Validator for ArgumentsValidator {
                             output_kwargs.update(value.downcast_bound::<PyDict>(py).unwrap().as_mapping())?;
                         }
                         Err(ValError::LineErrors(line_errors)) => {
-                            for error in line_errors {
-                                errors.push(error);
-                            }
+                            errors.extend(line_errors);
                         }
                         Err(err) => return Err(err),
                     }

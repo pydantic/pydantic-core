@@ -3372,7 +3372,7 @@ def arguments_parameter(
     return _dict_not_none(name=name, schema=schema, mode=mode, alias=alias)
 
 
-VarKwargsMode: TypeAlias = Literal['single', 'unpacked-typed-dict']
+VarKwargsMode: TypeAlias = Literal['uniform', 'unpacked-typed-dict']
 
 
 class ArgumentsSchema(TypedDict, total=False):
@@ -3419,7 +3419,7 @@ def arguments_schema(
         arguments: The arguments to use for the arguments schema
         populate_by_name: Whether to populate by name
         var_args_schema: The variable args schema to use for the arguments schema
-        var_kwargs_mode: The validation mode to use for variadic keyword arguments. If `'single'`, every value of the
+        var_kwargs_mode: The validation mode to use for variadic keyword arguments. If `'uniform'`, every value of the
             keyword arguments will be validated against the `var_kwargs_schema` schema. If `'unpacked-typed-dict'`,
             the `schema` argument must be a [`typed_dict_schema`][pydantic_core.core_schema.typed_dict_schema]
         var_kwargs_schema: The variable kwargs schema to use for the arguments schema
