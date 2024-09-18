@@ -1,7 +1,6 @@
 // Validator for Enums, so named because "enum" is a reserved keyword in Rust.
 use std::marker::PhantomData;
 
-use pyo3::exceptions::PyTypeError;
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyFloat, PyInt, PyList, PyString, PyType};
@@ -9,7 +8,7 @@ use pyo3::types::{PyDict, PyFloat, PyInt, PyList, PyString, PyType};
 use crate::build_tools::{is_strict, py_schema_err};
 use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::Input;
-use crate::tools::{safe_repr, SchemaDict};
+use crate::tools::SchemaDict;
 
 use super::is_instance::class_repr;
 use super::literal::{expected_repr_name, LiteralLookup};
@@ -119,33 +118,11 @@ impl<T: EnumValidateValue> Validator for EnumValidator<T> {
         } else if let Some(v) = T::validate_value(py, input, &self.lookup, strict)? {
             state.floor_exactness(Exactness::Lax);
             return Ok(v);
-        } else if let Some(ref missing) = self.missing {
+        } else if let Ok(res) = class.as_unbound().call1(py, (input.as_python(),)) {
             state.floor_exactness(Exactness::Lax);
-            let enum_value = missing.bind(py).call1((input.to_object(py),)).map_err(|_| {
-                ValError::new(
-                    ErrorType::Enum {
-                        expected: self.expected_repr.clone(),
-                        context: None,
-                    },
-                    input,
-                )
-            })?;
-            // check enum_value is an instance of the class like
-            // https://github.com/python/cpython/blob/v3.12.2/Lib/enum.py#L1148
-            if enum_value.is_instance(class)? {
-                return Ok(enum_value.into());
-            } else if !enum_value.is(&py.None()) {
-                let type_error = PyTypeError::new_err(format!(
-                    "error in {}._missing_: returned {} instead of None or a valid member",
-                    class
-                        .name()
-                        .and_then(|name| name.extract::<String>())
-                        .unwrap_or_else(|_| "<Unknown>".into()),
-                    safe_repr(&enum_value)
-                ));
-                return Err(type_error.into());
-            }
+            return Ok(res);
         }
+
         Err(ValError::new(
             ErrorType::Enum {
                 expected: self.expected_repr.clone(),
