@@ -123,7 +123,6 @@ impl<T: EnumValidateValue> Validator for EnumValidator<T> {
         if let Some(v) = T::validate_value(py, input, &self.lookup, strict)? {
             return Ok(v);
         } else if let Ok(res) = class.as_unbound().call1(py, (input.as_python(),)) {
-            // as a last result, just try to initialize the enum with the input
             return Ok(res);
         } else if let Some(ref missing) = self.missing {
             let enum_value = missing.bind(py).call1((input.to_object(py),)).map_err(|_| {
