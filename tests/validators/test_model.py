@@ -1316,7 +1316,7 @@ def test_model_error():
     ]
 
 
-@pytest.mark.skip(
+@pytest.mark.skipif(
     sys.version_info >= (3, 13),
     reason='Python 3.13+ enum initialization is different, see https://github.com/python/cpython/blob/ec610069637d56101896803a70d418a89afe0b4b/Lib/enum.py#L1159-L1163',
 )
