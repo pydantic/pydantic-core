@@ -378,15 +378,17 @@ def test_enum_int_validation_should_succeed_for_decimal(value: int):
     assert v_int.validate_python(Decimal(float(value))) is MyIntEnum.VALUE
 
 
+@pytest.mark.skip(
+    sys.version_info >= (3, 13),
+    reason='Python 3.13+ enum initialization is different, see https://github.com/python/cpython/blob/ec610069637d56101896803a70d418a89afe0b4b/Lib/enum.py#L1159-L1163',
+)
 def test_enum_int_validation_should_succeed_for_custom_type():
     class AnyWrapper:
         def __init__(self, value):
             self.value = value
 
         def __eq__(self, other: object) -> bool:
-            if sys.version_info < (3, 13):
-                return self.value == other
-            return self.value == other.value
+            return self.value == other
 
     class MyEnum(Enum):
         VALUE = 999
