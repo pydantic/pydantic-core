@@ -1,4 +1,5 @@
 import re
+import sys
 from copy import deepcopy
 from decimal import Decimal
 from typing import Any, Callable, Dict, List, Set, Tuple
@@ -1328,8 +1329,13 @@ def test_model_with_enum_int_field_validation_should_succeed_for_any_type_equali
         def __init__(self, value: int):
             self.value = value
 
-        def __eq__(self, value: object) -> bool:
-            return self.value == value
+        def __eq__(self, other: object) -> bool:
+            if sys.version_info < (3, 13):
+                return self.value == other
+
+            # in Python 3.13+, comparison is done against a list of enum members rather than raw values
+            # see https://github.com/python/cpython/blob/ec610069637d56101896803a70d418a89afe0b4b/Lib/enum.py#L1159-L1163
+            return self.value == other.value
 
     class MyModel:
         __slots__ = (

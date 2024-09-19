@@ -352,14 +352,12 @@ def test_big_int():
     [-1, 0, 1],
 )
 def test_enum_int_validation_should_succeed_for_decimal(value: int):
-    # GIVEN
     class MyEnum(Enum):
         VALUE = value
 
     class MyIntEnum(IntEnum):
         VALUE = value
 
-    # WHEN
     v = SchemaValidator(
         core_schema.with_default_schema(
             schema=core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())),
@@ -374,29 +372,27 @@ def test_enum_int_validation_should_succeed_for_decimal(value: int):
         )
     )
 
-    # THEN
     assert v.validate_python(Decimal(value)) is MyEnum.VALUE
     assert v.validate_python(Decimal(float(value))) is MyEnum.VALUE
-
     assert v_int.validate_python(Decimal(value)) is MyIntEnum.VALUE
     assert v_int.validate_python(Decimal(float(value))) is MyIntEnum.VALUE
 
 
 def test_enum_int_validation_should_succeed_for_custom_type():
-    # GIVEN
     class AnyWrapper:
         def __init__(self, value):
             self.value = value
 
         def __eq__(self, other: object) -> bool:
-            return self.value == other
+            if sys.version_info < (3, 13):
+                return self.value == other
+            return self.value == other.value
 
     class MyEnum(Enum):
         VALUE = 999
         SECOND_VALUE = 1000000
         THIRD_VALUE = 'Py03'
 
-    # WHEN
     v = SchemaValidator(
         core_schema.with_default_schema(
             schema=core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())),
@@ -404,18 +400,15 @@ def test_enum_int_validation_should_succeed_for_custom_type():
         )
     )
 
-    # THEN
     assert v.validate_python(AnyWrapper(999)) is MyEnum.VALUE
     assert v.validate_python(AnyWrapper(1000000)) is MyEnum.SECOND_VALUE
     assert v.validate_python(AnyWrapper('Py03')) is MyEnum.THIRD_VALUE
 
 
 def test_enum_str_validation_should_fail_for_decimal_when_expecting_str_value():
-    # GIVEN
     class MyEnum(Enum):
         VALUE = '1'
 
-    # WHEN
     v = SchemaValidator(
         core_schema.with_default_schema(
             schema=core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())),
@@ -423,17 +416,14 @@ def test_enum_str_validation_should_fail_for_decimal_when_expecting_str_value():
         )
     )
 
-    # THEN
     with pytest.raises(ValidationError):
         v.validate_python(Decimal(1))
 
 
 def test_enum_int_validation_should_fail_for_incorrect_decimal_value():
-    # GIVEN
     class MyEnum(Enum):
         VALUE = 1
 
-    # WHEN
     v = SchemaValidator(
         core_schema.with_default_schema(
             schema=core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())),
@@ -441,7 +431,6 @@ def test_enum_int_validation_should_fail_for_incorrect_decimal_value():
         )
     )
 
-    # THEN
     with pytest.raises(ValidationError):
         v.validate_python(Decimal(2))
 
@@ -453,7 +442,6 @@ def test_enum_int_validation_should_fail_for_incorrect_decimal_value():
 
 
 def test_enum_int_validation_should_fail_for_plain_type_without_eq_checking():
-    # GIVEN
     class MyEnum(Enum):
         VALUE = 1
 
@@ -461,7 +449,6 @@ def test_enum_int_validation_should_fail_for_plain_type_without_eq_checking():
         def __init__(self, value):
             self.value = value
 
-    # WHEN
     v = SchemaValidator(
         core_schema.with_default_schema(
             schema=core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())),
@@ -469,6 +456,32 @@ def test_enum_int_validation_should_fail_for_plain_type_without_eq_checking():
         )
     )
 
-    # THEN
     with pytest.raises(ValidationError):
         v.validate_python(MyClass(1))
+
+
+def support_custom_new_method() -> None:
+    """Demonstrates support for custom new methods, as well as conceptually, multi-value enums without dependency on a 3rd party lib for testing."""
+
+    class Animal(Enum):
+        CAT = 'cat', 'meow'
+        DOG = 'dog', 'woof'
+
+        def __new__(cls, species: str, sound: str):
+            obj = object.__new__(cls)
+
+            obj._value_ = species
+            obj._all_values = (species, sound)
+
+            obj.species = species
+            obj.sound = sound
+
+            cls._value2member_map_[sound] = obj
+
+            return obj
+
+    v = SchemaValidator(core_schema.enum_schema(Animal, list(Animal.__members__.values())))
+    assert v.validate_python('cat') is Animal.CAT
+    assert v.validate_python('meow') is Animal.CAT
+    assert v.validate_python('dog') is Animal.DOG
+    assert v.validate_python('woof') is Animal.DOG
