@@ -3421,7 +3421,7 @@ def arguments_schema(
         var_args_schema: The variable args schema to use for the arguments schema
         var_kwargs_mode: The validation mode to use for variadic keyword arguments. If `'uniform'`, every value of the
             keyword arguments will be validated against the `var_kwargs_schema` schema. If `'unpacked-typed-dict'`,
-            the `schema` argument must be a [`typed_dict_schema`][pydantic_core.core_schema.typed_dict_schema]
+            the `var_kwargs_schema` argument must be a [`typed_dict_schema`][pydantic_core.core_schema.typed_dict_schema]
         var_kwargs_schema: The variable kwargs schema to use for the arguments schema
         ref: optional unique identifier of the schema, used to reference the schema in other places
         metadata: Any other information you want to include with the schema, not used by pydantic-core
