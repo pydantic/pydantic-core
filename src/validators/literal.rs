@@ -35,6 +35,8 @@ pub struct LiteralLookup<T: Debug> {
     expected_py_dict: Option<Py<PyDict>>,
     // Catch all for unhashable types like list
     expected_py_values: Option<Vec<(Py<PyAny>, usize)>>,
+    // Fallback for ints, bools, and strings to use Python equality checks
+    expected_py_primitives: Option<Vec<(Py<PyAny>, usize)>>,
 
     pub values: Vec<T>,
 }
@@ -46,6 +48,7 @@ impl<T: Debug> LiteralLookup<T> {
         let mut expected_str: AHashMap<String, usize> = AHashMap::new();
         let expected_py_dict = PyDict::new_bound(py);
         let mut expected_py_values = Vec::new();
+        let mut expected_py_primitives = Vec::new();
         let mut values = Vec::new();
         for (k, v) in expected {
             let id = values.len();
@@ -56,10 +59,13 @@ impl<T: Debug> LiteralLookup<T> {
                 } else {
                     expected_bool.false_id = Some(id);
                 }
+
+                expected_py_primitives.push((k.as_unbound().clone_ref(py), id));
             }
             if k.is_exact_instance_of::<PyInt>() {
                 if let Ok(int_64) = k.extract::<i64>() {
                     expected_int.insert(int_64, id);
+                    expected_py_primitives.push((k.as_unbound().clone_ref(py), id));
                 } else {
                     // cover the case of an int that's > i64::MAX etc.
                     expected_py_dict.set_item(k, id)?;
@@ -69,6 +75,7 @@ impl<T: Debug> LiteralLookup<T> {
                     .as_cow()
                     .map_err(|_| py_schema_error_type!("error extracting str {:?}", k))?;
                 expected_str.insert(str.to_string(), id);
+                expected_py_primitives.push((k.as_unbound().clone_ref(py), id));
             } else if expected_py_dict.set_item(&k, id).is_err() {
                 expected_py_values.push((k.as_unbound().clone_ref(py), id));
             }
@@ -94,6 +101,10 @@ impl<T: Debug> LiteralLookup<T> {
             expected_py_values: match expected_py_values.is_empty() {
                 true => None,
                 false => Some(expected_py_values),
+            },
+            expected_py_primitives: match expected_py_primitives.is_empty() {
+                true => None,
+                false => Some(expected_py_primitives),
             },
             values,
         })
@@ -157,6 +168,15 @@ impl<T: Debug> LiteralLookup<T> {
         if let Some(expected_py_values) = &self.expected_py_values {
             let py_input = py_input.get_or_insert_with(|| input.to_object(py));
             for (k, id) in expected_py_values {
+                if k.bind(py).eq(&*py_input).unwrap_or(false) {
+                    return Ok(Some((input, &self.values[*id])));
+                }
+            }
+        };
+
+        if let Some(expected_py_primitives) = &self.expected_py_primitives {
+            let py_input = py_input.get_or_insert_with(|| input.to_object(py));
+            for (k, id) in expected_py_primitives {
                 if k.bind(py).eq(&*py_input).unwrap_or(false) {
                     return Ok(Some((input, &self.values[*id])));
                 }
