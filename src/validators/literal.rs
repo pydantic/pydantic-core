@@ -53,13 +53,13 @@ impl<T: Debug> LiteralLookup<T> {
         for (k, v) in expected {
             let id = values.len();
             values.push(v);
-            if let Ok(bool) = k.validate_bool(true) {
-                if bool.into_inner() {
+
+            if let Ok(bool_value) = k.validate_bool(true) {
+                if bool_value.into_inner() {
                     expected_bool.true_id = Some(id);
                 } else {
                     expected_bool.false_id = Some(id);
                 }
-
                 expected_py_primitives.push((k.as_unbound().clone_ref(py), id));
             }
             if k.is_exact_instance_of::<PyInt>() {
@@ -82,30 +82,13 @@ impl<T: Debug> LiteralLookup<T> {
         }
 
         Ok(Self {
-            expected_bool: match expected_bool.true_id.is_some() || expected_bool.false_id.is_some() {
-                true => Some(expected_bool),
-                false => None,
-            },
-            expected_int: match expected_int.is_empty() {
-                true => None,
-                false => Some(expected_int),
-            },
-            expected_str: match expected_str.is_empty() {
-                true => None,
-                false => Some(expected_str),
-            },
-            expected_py_dict: match expected_py_dict.is_empty() {
-                true => None,
-                false => Some(expected_py_dict.into()),
-            },
-            expected_py_values: match expected_py_values.is_empty() {
-                true => None,
-                false => Some(expected_py_values),
-            },
-            expected_py_primitives: match expected_py_primitives.is_empty() {
-                true => None,
-                false => Some(expected_py_primitives),
-            },
+            expected_bool: (expected_bool.true_id.is_some() || expected_bool.false_id.is_some())
+                .then_some(expected_bool),
+            expected_int: (!expected_int.is_empty()).then_some(expected_int),
+            expected_str: (!expected_str.is_empty()).then_some(expected_str),
+            expected_py_dict: (!expected_py_dict.is_empty()).then_some(expected_py_dict.into()),
+            expected_py_values: (!expected_py_values.is_empty()).then_some(expected_py_values),
+            expected_py_primitives: (!expected_py_primitives.is_empty()).then_some(expected_py_primitives),
             values,
         })
     }
