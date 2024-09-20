@@ -143,7 +143,7 @@ impl BuildValidator for ArgumentsValidator {
 
         let py_var_kwargs_mode: Bound<PyString> = schema
             .get_as(intern!(py, "var_kwargs_mode"))?
-            .unwrap_or_else(|| PyString::new_bound(py, "single"));
+            .unwrap_or_else(|| PyString::new_bound(py, "uniform"));
 
         let var_kwargs_mode = VarKwargsMode::from_str(py_var_kwargs_mode.to_str()?)?;
         let var_kwargs_validator = match schema.get_item(intern!(py, "var_kwargs_schema"))? {
@@ -293,11 +293,12 @@ impl Validator for ArgumentsValidator {
                 }
             }
         }
+
+        let remaining_kwargs = PyDict::new_bound(py);
+
         // if there are kwargs check any that haven't been processed yet
         if let Some(kwargs) = args.kwargs() {
             if kwargs.len() > used_kwargs.len() {
-                let remaining_kwargs = PyDict::new_bound(py);
-
                 for result in kwargs.iter() {
                     let (raw_key, value) = result?;
                     let either_str = match raw_key
@@ -349,24 +350,24 @@ impl Validator for ArgumentsValidator {
                         }
                     }
                 }
+            }
+        }
 
-                if self.var_kwargs_mode == VarKwargsMode::UnpackedTypedDict {
-                    // `var_kwargs_validator` is guaranteed to be `Some`:
-                    match self
-                        .var_kwargs_validator
-                        .as_ref()
-                        .unwrap()
-                        .validate(py, remaining_kwargs.as_any(), state)
-                    {
-                        Ok(value) => {
-                            output_kwargs.update(value.downcast_bound::<PyDict>(py).unwrap().as_mapping())?;
-                        }
-                        Err(ValError::LineErrors(line_errors)) => {
-                            errors.extend(line_errors);
-                        }
-                        Err(err) => return Err(err),
-                    }
+        if self.var_kwargs_mode == VarKwargsMode::UnpackedTypedDict {
+            // `var_kwargs_validator` is guaranteed to be `Some`:
+            match self
+                .var_kwargs_validator
+                .as_ref()
+                .unwrap()
+                .validate(py, remaining_kwargs.as_any(), state)
+            {
+                Ok(value) => {
+                    output_kwargs.update(value.downcast_bound::<PyDict>(py).unwrap().as_mapping())?;
                 }
+                Err(ValError::LineErrors(line_errors)) => {
+                    errors.extend(line_errors);
+                }
+                Err(err) => return Err(err),
             }
         }
 
