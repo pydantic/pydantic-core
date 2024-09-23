@@ -434,12 +434,80 @@ SerSchema = Union[
     ModelSerSchema,
 ]
 
+# TODO: improve typing here, maybe move some constructs like CoreSchemaOrField to `pydantic-core`
+GetJsonSchemaFunction = Callable[[Any, Any], Any]
+
+# TODO: documentation for each of the below constructs, especially why I've chosen to go with one TypedDict
+# rather than subclasses for schema specific settings (mostly, for typing purposes), and this
+# kind of reminds me of CoreConfig in that sense
+
+
+class PydanticMetadata(TypedDict, total=False):
+    """
+    Assorted metadata for core schema, primarily related to JSON schema generation."""
+
+    json_schema_transforms: list[GetJsonSchemaFunction]
+
+    # used (then popped) during union -> tagged_union schema conversion
+    # ideally we wouldn't store these in metadata bc they're not related to json schema
+    tagged_union_tag: str
+    tagged_union_discriminator: str
+
+    # If `prefer_positional_arguments` is True, the JSON schema generator will prefer positional over keyword arguments
+    prefer_positional_arguments: bool  # default False
+
+    # used for before / wrap validators
+    pydantic_input_core_schema: CoreSchema
+
+    # ideally, we could fully replace the above callable logic with these more simple flags
+    # perhaps with leaving one list of callables to support __get_pydantic_json_schema__ and such
+    json_title: str
+    json_description: str
+    json_deprecated: bool
+    json_examples: list[Any]
+    json_dict_extra: dict[str, Any]
+    # TODO: double check on the typing here
+    json_callable_extra: Callable[[Any, Any], None]
+
+
+def pydantic_metadata(
+    json_schema_transforms: list[GetJsonSchemaFunction] | None = None,
+    tagged_union_tag: str | None = None,
+    tagged_union_discriminator: str | None = None,
+    prefer_positional_arguments: bool | None = None,
+    pydantic_input_core_schema: CoreSchema | None = None,
+    json_title: str | None = None,
+    json_description: str | None = None,
+    json_deprecated: bool | None = None,
+    json_examples: list[Any] | None = None,
+    json_dict_extra: dict[str, Any] | None = None,
+    json_callable_extra: Callable[[Any, Any], None] | None = None,
+) -> PydanticMetadata:
+    return _dict_not_none(
+        json_schema_transforms=json_schema_transforms,
+        tagged_union_tag=tagged_union_tag,
+        tagged_union_discriminator=tagged_union_discriminator,
+        prefer_positional_arguments=prefer_positional_arguments,
+        pydantic_input_core_schema=pydantic_input_core_schema,
+        json_title=json_title,
+        json_description=json_description,
+        json_deprecated=json_deprecated,
+        json_examples=json_examples,
+        json_dict_extra=json_dict_extra,
+        json_callable_extra=json_callable_extra,
+    )
+
+
 class InvalidSchema(TypedDict, total=False):
     type: Required[Literal['invalid']]
     ref: str
+    pydantic_metadata: PydanticMetadata
     metadata: Dict[str, Any]
 
-def invalid_schema(ref: str | None = None, metadata: Dict[str, Any] | None = None) -> InvalidSchema:
+
+def invalid_schema(
+    ref: str | None = None, pydantic_metadata: PydanticMetadata | None = None, metadata: Dict[str, Any] | None = None
+) -> InvalidSchema:
     """
     Returns an invalid schema, used to indicate that a schema is invalid.
 
@@ -451,9 +519,7 @@ def invalid_schema(ref: str | None = None, metadata: Dict[str, Any] | None = Non
         metadata: Any other information you want to include with the schema, not used by pydantic-core
     """
 
-    return _dict_not_none(
-        type='invalid', ref=ref, metadata=metadata
-    )
+    return _dict_not_none(type='invalid', ref=ref, pydantic_metadta=pydantic_metadata, metadata=metadata)
 
 
 class ComputedField(TypedDict, total=False):
@@ -461,11 +527,17 @@ class ComputedField(TypedDict, total=False):
     property_name: Required[str]
     return_schema: Required[CoreSchema]
     alias: str
+    pydantic_metadata: PydanticMetadata
     metadata: Dict[str, Any]
 
 
 def computed_field(
-    property_name: str, return_schema: CoreSchema, *, alias: str | None = None, metadata: Dict[str, Any] | None = None
+    property_name: str,
+    return_schema: CoreSchema,
+    *,
+    alias: str | None = None,
+    pydantic_metadata: PydanticMetadata | None = None,
+    metadata: Dict[str, Any] | None = None,
 ) -> ComputedField:
     """
     ComputedFields are properties of a model or dataclass that are included in serialization.
@@ -478,7 +550,12 @@ def computed_field(
         metadata: Any other information you want to include with the schema, not used by pydantic-core
     """
     return _dict_not_none(
-        type='computed-field', property_name=property_name, return_schema=return_schema, alias=alias, metadata=metadata
+        type='computed-field',
+        property_name=property_name,
+        return_schema=return_schema,
+        alias=alias,
+        pydantic_metadata=pydantic_metadata,
+        metadata=metadata,
     )
 
 
@@ -491,8 +568,11 @@ class AnySchema(TypedDict, total=False):
 
 
 def any_schema(
-    *, ref: str | None = None, pydantic_metadata: PydanticMetadata | None = None,
-    metadata: Dict[str, Any] | None = None,serialization: SerSchema | None = None
+    *,
+    ref: str | None = None,
+    pydantic_metadata: PydanticMetadata | None = None,
+    metadata: Dict[str, Any] | None = None,
+    serialization: SerSchema | None = None,
 ) -> AnySchema:
     """
     Returns a schema that matches any value, e.g.:
@@ -511,8 +591,9 @@ def any_schema(
         metadata: Any other information you want to include with the schema, not used by pydantic-core
         serialization: Custom serialization schema
     """
-    return _dict_not_none(type='any', ref=ref, pydantic_metadata=pydantic_metadata,
-        metadata=metadata, serialization=serialization)
+    return _dict_not_none(
+        type='any', ref=ref, pydantic_metadata=pydantic_metadata, metadata=metadata, serialization=serialization
+    )
 
 
 class NoneSchema(TypedDict, total=False):
@@ -524,8 +605,11 @@ class NoneSchema(TypedDict, total=False):
 
 
 def none_schema(
-    *, ref: str | None = None, pydantic_metadata: PydanticMetadata | None = None,
-    metadata: Dict[str, Any] | None = None,serialization: SerSchema | None = None
+    *,
+    ref: str | None = None,
+    pydantic_metadata: PydanticMetadata | None = None,
+    metadata: Dict[str, Any] | None = None,
+    serialization: SerSchema | None = None,
 ) -> NoneSchema:
     """
     Returns a schema that matches a None value, e.g.:
@@ -544,8 +628,9 @@ def none_schema(
         metadata: Any other information you want to include with the schema, not used by pydantic-core
         serialization: Custom serialization schema
     """
-    return _dict_not_none(type='none', ref=ref, pydantic_metadata=pydantic_metadata,
-        metadata=metadata, serialization=serialization)
+    return _dict_not_none(
+        type='none', ref=ref, pydantic_metadata=pydantic_metadata, metadata=metadata, serialization=serialization
+    )
 
 
 class BoolSchema(TypedDict, total=False):
@@ -582,8 +667,14 @@ def bool_schema(
         metadata: Any other information you want to include with the schema, not used by pydantic-core
         serialization: Custom serialization schema
     """
-    return _dict_not_none(type='bool', strict=strict, ref=ref, pydantic_metadata=pydantic_metadata,
-        metadata=metadata, serialization=serialization)
+    return _dict_not_none(
+        type='bool',
+        strict=strict,
+        ref=ref,
+        pydantic_metadata=pydantic_metadata,
+        metadata=metadata,
+        serialization=serialization,
+    )
 
 
 class IntSchema(TypedDict, total=False):
@@ -1304,8 +1395,14 @@ def literal_schema(
         metadata: Any other information you want to include with the schema, not used by pydantic-core
         serialization: Custom serialization schema
     """
-    return _dict_not_none(type='literal', expected=expected, ref=ref, pydantic_metadata=pydantic_metadata,
-        metadata=metadata, serialization=serialization)
+    return _dict_not_none(
+        type='literal',
+        expected=expected,
+        ref=ref,
+        pydantic_metadata=pydantic_metadata,
+        metadata=metadata,
+        serialization=serialization,
+    )
 
 
 class EnumSchema(TypedDict, total=False):
@@ -1421,8 +1518,13 @@ def is_instance_schema(
         serialization: Custom serialization schema
     """
     return _dict_not_none(
-        type='is-instance', cls=cls, cls_repr=cls_repr, ref=ref, pydantic_metadata=pydantic_metadata,
-        metadata=metadata, serialization=serialization
+        type='is-instance',
+        cls=cls,
+        cls_repr=cls_repr,
+        ref=ref,
+        pydantic_metadata=pydantic_metadata,
+        metadata=metadata,
+        serialization=serialization,
     )
 
 
@@ -1471,8 +1573,13 @@ def is_subclass_schema(
         serialization: Custom serialization schema
     """
     return _dict_not_none(
-        type='is-subclass', cls=cls, cls_repr=cls_repr, ref=ref, pydantic_metadata=pydantic_metadata,
-        metadata=metadata, serialization=serialization
+        type='is-subclass',
+        cls=cls,
+        cls_repr=cls_repr,
+        ref=ref,
+        pydantic_metadata=pydantic_metadata,
+        metadata=metadata,
+        serialization=serialization,
     )
 
 
@@ -1485,8 +1592,11 @@ class CallableSchema(TypedDict, total=False):
 
 
 def callable_schema(
-    *, ref: str | None = None, pydantic_metadata: PydanticMetadata | None = None,
-    metadata: Dict[str, Any] | None = None,serialization: SerSchema | None = None
+    *,
+    ref: str | None = None,
+    pydantic_metadata: PydanticMetadata | None = None,
+    metadata: Dict[str, Any] | None = None,
+    serialization: SerSchema | None = None,
 ) -> CallableSchema:
     """
     Returns a schema that checks if a value is callable, equivalent to python's `callable` method, e.g.:
@@ -1505,8 +1615,9 @@ def callable_schema(
         metadata: Any other information you want to include with the schema, not used by pydantic-core
         serialization: Custom serialization schema
     """
-    return _dict_not_none(type='callable', ref=ref, pydantic_metadata=pydantic_metadata,
-        metadata=metadata, serialization=serialization)
+    return _dict_not_none(
+        type='callable', ref=ref, pydantic_metadata=pydantic_metadata, metadata=metadata, serialization=serialization
+    )
 
 
 class UuidSchema(TypedDict, total=False):
@@ -1529,8 +1640,13 @@ def uuid_schema(
     serialization: SerSchema | None = None,
 ) -> UuidSchema:
     return _dict_not_none(
-        type='uuid', version=version, strict=strict, ref=ref, pydantic_metadata=pydantic_metadata,
-        metadata=metadata, serialization=serialization
+        type='uuid',
+        version=version,
+        strict=strict,
+        ref=ref,
+        pydantic_metadata=pydantic_metadata,
+        metadata=metadata,
+        serialization=serialization,
     )
 
 
@@ -2611,8 +2727,13 @@ def nullable_schema(
         serialization: Custom serialization schema
     """
     return _dict_not_none(
-        type='nullable', schema=schema, strict=strict, ref=ref, pydantic_metadata=pydantic_metadata,
-        metadata=metadata, serialization=serialization
+        type='nullable',
+        schema=schema,
+        strict=strict,
+        ref=ref,
+        pydantic_metadata=pydantic_metadata,
+        metadata=metadata,
+        serialization=serialization,
     )
 
 
@@ -2833,8 +2954,14 @@ def chain_schema(
         metadata: Any other information you want to include with the schema, not used by pydantic-core
         serialization: Custom serialization schema
     """
-    return _dict_not_none(type='chain', steps=steps, ref=ref, pydantic_metadata=pydantic_metadata,
-        metadata=metadata, serialization=serialization)
+    return _dict_not_none(
+        type='chain',
+        steps=steps,
+        ref=ref,
+        pydantic_metadata=pydantic_metadata,
+        metadata=metadata,
+        serialization=serialization,
+    )
 
 
 class LaxOrStrictSchema(TypedDict, total=False):
@@ -3840,8 +3967,14 @@ def json_schema(
         metadata: Any other information you want to include with the schema, not used by pydantic-core
         serialization: Custom serialization schema
     """
-    return _dict_not_none(type='json', schema=schema, ref=ref, pydantic_metadata=pydantic_metadata,
-        metadata=metadata, serialization=serialization)
+    return _dict_not_none(
+        type='json',
+        schema=schema,
+        ref=ref,
+        pydantic_metadata=pydantic_metadata,
+        metadata=metadata,
+        serialization=serialization,
+    )
 
 
 class UrlSchema(TypedDict, total=False):
@@ -4057,8 +4190,12 @@ def definition_reference_schema(
         serialization: Custom serialization schema
     """
     return _dict_not_none(
-        type='definition-ref', schema_ref=schema_ref, ref=ref, pydantic_metadata=pydantic_metadata,
-        metadata=metadata, serialization=serialization
+        type='definition-ref',
+        schema_ref=schema_ref,
+        ref=ref,
+        pydantic_metadata=pydantic_metadata,
+        metadata=metadata,
+        serialization=serialization,
     )
 
 
