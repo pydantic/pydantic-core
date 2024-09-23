@@ -107,8 +107,8 @@ serialization_mode! {
     DatetimeMode,
     "ser_json_datetime",
     Iso8601 => "iso8601",
-    SecondsFloat => "seconds_float",
-    MillisecondsFloat => "milliseconds_float"
+    SecondsInt => "seconds_float",
+    MillisecondsInt => "milliseconds_float"
 }
 
 serialization_mode! {
@@ -210,11 +210,19 @@ impl BytesMode {
 
 impl DatetimeMode {
     pub fn datetime_to_json(self, py: Python, datetime: &Bound<'_, PyDateTime>) -> PyResult<PyObject> {
-        Ok(datetime_to_string(datetime)?.into_py(py))
+        match self {
+            Self::Iso8601 => Ok(datetime_to_string(datetime)?.into_py(py)),
+            Self::SecondsInt => Ok(datetime_to_seconds(datetime)?.into_py(py)),
+            Self::MillisecondsInt => Ok(datetime_to_milliseconds(datetime)?.into_py(py)),
+        }
     }
 
     pub fn json_key<'py>(self, datetime: &Bound<'_, PyDateTime>) -> PyResult<Cow<'py, str>> {
-        Ok(datetime_to_string(datetime)?.to_string().into())
+        match self {
+            Self::Iso8601 => Ok(datetime_to_string(datetime)?.to_string().into()),
+            Self::SecondsInt => Ok(datetime_to_seconds(datetime)?.to_string().into()),
+            Self::MillisecondsInt => Ok(datetime_to_milliseconds(datetime)?.to_string().into()),
+        }
     }
 
     pub fn datetime_serialize<S: serde::ser::Serializer>(
@@ -222,8 +230,20 @@ impl DatetimeMode {
         datetime: &Bound<'_, PyDateTime>,
         serializer: S,
     ) -> Result<S::Ok, S::Error> {
-        let s = datetime_to_string(datetime).map_err(py_err_se_err)?;
-        serializer.serialize_str(&s)
+        match self {
+            Self::Iso8601 => {
+                let s = datetime_to_string(datetime).map_err(py_err_se_err)?;
+                serializer.serialize_str(&s)
+            }
+            Self::SecondsInt => {
+                let s = datetime_to_seconds(datetime).map_err(py_err_se_err)?;
+                serializer.serialize_i64(s)
+            }
+            Self::MillisecondsInt => {
+                let s = datetime_to_milliseconds(datetime).map_err(py_err_se_err)?;
+                serializer.serialize_i64(s)
+            }
+        }
     }
 }
 
