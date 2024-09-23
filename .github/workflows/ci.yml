@@ -557,9 +557,7 @@ jobs:
             --release
             --out pgo-wheel
             --interpreter ${{ matrix.interpreter }}
-          # Limit windows builds to 1.77 to keep Windows 7 support.
-          # FIXME: Unpin when Python 3.8 support is dropped. (3.9 requires Windows 10)
-          rust-toolchain: ${{ (matrix.os == 'windows' && '1.77') || 'stable' }}
+          rust-toolchain: ${{ steps.rust-toolchain.outputs.name }}
           docker-options: -e CI
         env:
           RUSTFLAGS: "-Cprofile-generate=${{ github.workspace }}/profdata"
@@ -574,7 +572,7 @@ jobs:
           pip install -r tests/requirements.txt
           pip install pydantic-core --no-index --no-deps --find-links pgo-wheel --force-reinstall
           pytest tests/benchmarks
-          rustup run stable bash -c 'echo LLVM_PROFDATA=$RUSTUP_HOME/toolchains/$RUSTUP_TOOLCHAIN/lib/rustlib/${{ env.RUST_HOST }}/bin/llvm-profdata >> "$GITHUB_ENV"'
+          rustup run ${{ steps.rust-toolchain.outputs.name }} bash -c 'echo LLVM_PROFDATA=$RUSTUP_HOME/toolchains/$RUSTUP_TOOLCHAIN/lib/rustlib/${{ env.RUST_HOST }}/bin/llvm-profdata >> "$GITHUB_ENV"'
 
       - name: merge pgo data
         run: ${{ env.LLVM_PROFDATA }} merge -o ${{ github.workspace }}/merged.profdata ${{ github.workspace }}/profdata
@@ -587,9 +585,7 @@ jobs:
             --release
             --out dist
             --interpreter ${{ matrix.interpreter }}
-          # Limit windows builds to 1.77 to keep Windows 7 support.
-          # FIXME: Unpin when Python 3.8 support is dropped. (3.9 requires Windows 10)
-          rust-toolchain: ${{ (matrix.os == 'windows' && '1.77') || 'stable' }}
+          rust-toolchain: ${{steps.rust-toolchain.outputs.name}}
           docker-options: -e CI
         env:
           RUSTFLAGS: "-Cprofile-use=${{ github.workspace }}/merged.profdata"
