@@ -108,8 +108,8 @@ serialization_mode! {
     DatetimeMode,
     "ser_json_datetime",
     Iso8601 => "iso8601",
-    SecondsInt => "seconds_float",
-    MillisecondsInt => "milliseconds_float"
+    SecondsInt => "seconds_int",
+    MillisecondsInt => "milliseconds_int"
 }
 
 serialization_mode! {

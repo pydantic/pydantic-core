@@ -329,7 +329,7 @@ def test_any_config_timedelta(
             b'1704067200',
             {'1704067200': 'foo'},
             b'{"1704067200":"foo"}',
-            'seconds_float',
+            'seconds_int',
         ),
         (
             datetime(2024, 1, 1, 0, 0, 0),
@@ -337,7 +337,7 @@ def test_any_config_timedelta(
             b'1704067200000',
             {'1704067200000': 'foo'},
             b'{"1704067200000":"foo"}',
-            'milliseconds_float',
+            'milliseconds_int',
         ),
     ],
 )
