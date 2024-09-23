@@ -358,6 +358,7 @@ def to_json(
     exclude_none: bool = False,
     round_trip: bool = False,
     timedelta_mode: Literal['iso8601', 'seconds_float', 'milliseconds_float'] = 'iso8601',
+    datetime_mode: Literal['iso8601', 'seconds_float', 'milliseconds_float'] = 'iso8601',
     bytes_mode: Literal['utf8', 'base64', 'hex'] = 'utf8',
     inf_nan_mode: Literal['null', 'constants', 'strings'] = 'constants',
     serialize_unknown: bool = False,
@@ -379,6 +380,7 @@ def to_json(
         exclude_none: Whether to exclude fields that have a value of `None`.
         round_trip: Whether to enable serialization and validation round-trip support.
         timedelta_mode: How to serialize `timedelta` objects, either `'iso8601'`, `'seconds_float'` or `'milliseconds_float'`.
+        datetime_mode: How to serialize `timedelta` objects, either `'iso8601'`, `'seconds_float'` or `'milliseconds_float'`.
         bytes_mode: How to serialize `bytes` objects, either `'utf8'`, `'base64'`, or `'hex'`.
         inf_nan_mode: How to serialize `Infinity`, `-Infinity` and `NaN` values, either `'null'`, `'constants'`, or `'strings'`.
         serialize_unknown: Attempt to serialize unknown types, `str(value)` will be used, if that fails
@@ -433,6 +435,7 @@ def to_jsonable_python(
     exclude_none: bool = False,
     round_trip: bool = False,
     timedelta_mode: Literal['iso8601', 'seconds_float', 'milliseconds_float'] = 'iso8601',
+    datetime_mode: Literal['iso8601', 'seconds_float', 'milliseconds_float'] = 'iso8601',
     bytes_mode: Literal['utf8', 'base64', 'hex'] = 'utf8',
     inf_nan_mode: Literal['null', 'constants', 'strings'] = 'constants',
     serialize_unknown: bool = False,
@@ -454,6 +457,7 @@ def to_jsonable_python(
         exclude_none: Whether to exclude fields that have a value of `None`.
         round_trip: Whether to enable serialization and validation round-trip support.
         timedelta_mode: How to serialize `timedelta` objects, either `'iso8601'`, `'seconds_float'`, or`'milliseconds_float'`.
+        datetime_mode: How to serialize `timedelta` objects, either `'iso8601'`, `'seconds_float'`, or`'milliseconds_float'`.
         bytes_mode: How to serialize `bytes` objects, either `'utf8'`, `'base64'`, or `'hex'`.
         inf_nan_mode: How to serialize `Infinity`, `-Infinity` and `NaN` values, either `'null'`, `'constants'`, or `'strings'`.
         serialize_unknown: Attempt to serialize unknown types, `str(value)` will be used, if that fails

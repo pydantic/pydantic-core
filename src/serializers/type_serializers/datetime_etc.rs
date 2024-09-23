@@ -8,7 +8,7 @@ use super::{
     SerMode, TypeSerializer,
 };
 use crate::definitions::DefinitionsBuilder;
-use crate::input::{pydate_as_date, pydatetime_as_datetime, pytime_as_time, EitherTimedelta};
+use crate::input::{pydate_as_date, pydatetime_as_datetime, pytime_as_time};
 use crate::serializers::config::{DatetimeMode, FromConfig};
 use crate::PydanticSerializationUnexpectedValue;
 
@@ -153,21 +153,19 @@ impl TypeSerializer for DateTimeSerializer {
         exclude: Option<&Bound<'_, PyAny>>,
         extra: &Extra,
     ) -> PyResult<PyObject> {
-        let py = value.py();
-        match PyAnyMethods::downcast::<PyDateTime>(value) {
-            Ok(py_value) => match extra.mode {
-                SerMode::Json => Ok(self.datetime_mode.datetime_to_json(py, py_value)?),
-                _ => Ok(value.into_py(py)),
+        match extra.mode {
+            SerMode::Json => match PyAnyMethods::downcast::<PyDateTime>(value) {
+                Ok(py_value) => Ok(self.datetime_mode.datetime_to_json(value.py(), py_value)?),
+                Err(_) => {
+                    extra.warnings.on_fallback_py(self.get_name(), value, extra)?;
+                    infer_to_python(value, include, exclude, extra)
+                }
             },
-            Err(_) => {
-                extra.warnings.on_fallback_py(self.get_name(), value, extra)?;
-                infer_to_python(value, include, exclude, extra)
-            }
+            _ => infer_to_python(value, include, exclude, extra),
         }
     }
 
     fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
-        let py = key.py();
         match PyAnyMethods::downcast::<PyDateTime>(key) {
             Ok(py_value) => Ok(self.datetime_mode.json_key(py_value)?),
             Err(_) => {

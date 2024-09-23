@@ -4,7 +4,7 @@ use std::str::{from_utf8, FromStr, Utf8Error};
 use base64::Engine;
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::{PyDateTime, PyDelta, PyDict, PyString};
+use pyo3::types::{PyDateTime, PyDict, PyString};
 
 use serde::ser::Error;
 

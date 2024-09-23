@@ -171,8 +171,11 @@ pub(crate) fn infer_to_python_known(
                 })?
             }
             ObType::Datetime => {
-                let iso_dt = super::type_serializers::datetime_etc::datetime_to_string(value.downcast()?)?;
-                iso_dt.into_py(py)
+                let datetime = extra
+                    .config
+                    .datetime_mode
+                    .datetime_to_json(value.py(), value.downcast()?)?;
+                datetime.into_py(py)
             }
             ObType::Date => {
                 let iso_date = super::type_serializers::datetime_etc::date_to_string(value.downcast()?)?;
@@ -458,9 +461,8 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
         ObType::Set => serialize_seq!(PySet),
         ObType::Frozenset => serialize_seq!(PyFrozenSet),
         ObType::Datetime => {
-            let py_dt = value.downcast().map_err(py_err_se_err)?;
-            let iso_dt = super::type_serializers::datetime_etc::datetime_to_string(py_dt).map_err(py_err_se_err)?;
-            serializer.serialize_str(&iso_dt)
+            let py_datetime = value.downcast().map_err(py_err_se_err)?;
+            extra.config.datetime_mode.datetime_serialize(py_datetime, serializer)
         }
         ObType::Date => {
             let py_date = value.downcast().map_err(py_err_se_err)?;
@@ -637,10 +639,7 @@ pub(crate) fn infer_json_key_known<'a>(
                 .bytes_to_string(key.py(), unsafe { py_byte_array.as_bytes() })
                 .map(|cow| Cow::Owned(cow.into_owned()))
         }
-        ObType::Datetime => {
-            let iso_dt = super::type_serializers::datetime_etc::datetime_to_string(key.downcast()?)?;
-            Ok(Cow::Owned(iso_dt))
-        }
+        ObType::Datetime => extra.config.datetime_mode.json_key(key.downcast()?),
         ObType::Date => {
             let iso_date = super::type_serializers::datetime_etc::date_to_string(key.downcast()?)?;
             Ok(Cow::Owned(iso_date))
