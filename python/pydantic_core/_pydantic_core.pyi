@@ -434,7 +434,7 @@ def to_jsonable_python(
     by_alias: bool = True,
     exclude_none: bool = False,
     round_trip: bool = False,
-    timedelta_mode: Literal['iso8601', 'seconds_int', 'milliseconds_int'] = 'iso8601',
+    timedelta_mode: Literal['iso8601', 'seconds_float', 'milliseconds_float'] = 'iso8601',
     datetime_mode: Literal['iso8601', 'seconds_int', 'milliseconds_int'] = 'iso8601',
     bytes_mode: Literal['utf8', 'base64', 'hex'] = 'utf8',
     inf_nan_mode: Literal['null', 'constants', 'strings'] = 'constants',
