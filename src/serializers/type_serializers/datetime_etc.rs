@@ -3,17 +3,25 @@ use std::borrow::Cow;
 use pyo3::prelude::*;
 use pyo3::types::{PyDate, PyDateTime, PyDict, PyTime};
 
-use crate::definitions::DefinitionsBuilder;
-use crate::input::{pydate_as_date, pydatetime_as_datetime, pytime_as_time};
-use crate::PydanticSerializationUnexpectedValue;
-
 use super::{
     infer_json_key, infer_serialize, infer_to_python, py_err_se_err, BuildSerializer, CombinedSerializer, Extra,
     SerMode, TypeSerializer,
 };
+use crate::definitions::DefinitionsBuilder;
+use crate::input::{pydate_as_date, pydatetime_as_datetime, pytime_as_time, EitherTimedelta};
+use crate::serializers::config::{DatetimeMode, FromConfig};
+use crate::PydanticSerializationUnexpectedValue;
 
 pub(crate) fn datetime_to_string(py_dt: &Bound<'_, PyDateTime>) -> PyResult<String> {
     pydatetime_as_datetime(py_dt).map(|dt| dt.to_string())
+}
+
+pub(crate) fn datetime_to_seconds(py_dt: &Bound<'_, PyDateTime>) -> PyResult<i64> {
+    pydatetime_as_datetime(py_dt).map(|dt| dt.timestamp())
+}
+
+pub(crate) fn datetime_to_milliseconds(py_dt: &Bound<'_, PyDateTime>) -> PyResult<i64> {
+    pydatetime_as_datetime(py_dt).map(|dt| dt.timestamp() * 1000)
 }
 
 pub(crate) fn date_to_string(py_date: &Bound<'_, PyDate>) -> PyResult<String> {
@@ -118,11 +126,78 @@ macro_rules! build_serializer {
     };
 }
 
-build_serializer!(
-    DatetimeSerializer,
-    "datetime",
-    PyAnyMethods::downcast::<PyDateTime>,
-    datetime_to_string
-);
+#[derive(Debug)]
+pub struct DateTimeSerializer {
+    datetime_mode: DatetimeMode,
+}
+
+impl BuildSerializer for DateTimeSerializer {
+    const EXPECTED_TYPE: &'static str = "datetime";
+
+    fn build(
+        _schema: &Bound<'_, PyDict>,
+        config: Option<&Bound<'_, PyDict>>,
+        _definitions: &mut DefinitionsBuilder<CombinedSerializer>,
+    ) -> PyResult<CombinedSerializer> {
+        let datetime_mode = DatetimeMode::from_config(config)?;
+        Ok(Self { datetime_mode }.into())
+    }
+}
+impl_py_gc_traverse!(DateTimeSerializer {});
+
+impl TypeSerializer for DateTimeSerializer {
+    fn to_python(
+        &self,
+        value: &Bound<'_, PyAny>,
+        include: Option<&Bound<'_, PyAny>>,
+        exclude: Option<&Bound<'_, PyAny>>,
+        extra: &Extra,
+    ) -> PyResult<PyObject> {
+        let py = value.py();
+        match PyAnyMethods::downcast::<PyDateTime>(value) {
+            Ok(py_value) => match extra.mode {
+                SerMode::Json => Ok(self.datetime_mode.datetime_to_json(py, py_value)?),
+                _ => Ok(value.into_py(py)),
+            },
+            Err(_) => {
+                extra.warnings.on_fallback_py(self.get_name(), value, extra)?;
+                infer_to_python(value, include, exclude, extra)
+            }
+        }
+    }
+
+    fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
+        let py = key.py();
+        match PyAnyMethods::downcast::<PyDateTime>(key) {
+            Ok(py_value) => Ok(self.datetime_mode.json_key(py_value)?),
+            Err(_) => {
+                extra.warnings.on_fallback_py(self.get_name(), key, extra)?;
+                infer_json_key(key, extra)
+            }
+        }
+    }
+
+    fn serde_serialize<S: serde::ser::Serializer>(
+        &self,
+        value: &Bound<'_, PyAny>,
+        serializer: S,
+        include: Option<&Bound<'_, PyAny>>,
+        exclude: Option<&Bound<'_, PyAny>>,
+        extra: &Extra,
+    ) -> Result<S::Ok, S::Error> {
+        match PyAnyMethods::downcast::<PyDateTime>(value) {
+            Ok(py_value) => self.datetime_mode.datetime_serialize(py_value, serializer),
+            Err(_) => {
+                extra.warnings.on_fallback_ser::<S>(self.get_name(), value, extra)?;
+                infer_serialize(value, serializer, include, exclude, extra)
+            }
+        }
+    }
+
+    fn get_name(&self) -> &str {
+        Self::EXPECTED_TYPE
+    }
+}
+
 build_serializer!(DateSerializer, "date", downcast_date_reject_datetime, date_to_string);
 build_serializer!(TimeSerializer, "time", PyAnyMethods::downcast::<PyTime>, time_to_string);

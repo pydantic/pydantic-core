@@ -4,12 +4,15 @@ use std::str::{from_utf8, FromStr, Utf8Error};
 use base64::Engine;
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::{PyDelta, PyDict, PyString};
+use pyo3::types::{PyDateTime, PyDelta, PyDict, PyString};
 
 use serde::ser::Error;
 
 use crate::build_tools::py_schema_err;
 use crate::input::EitherTimedelta;
+use crate::serializers::type_serializers::datetime_etc::{
+    datetime_to_milliseconds, datetime_to_seconds, datetime_to_string,
+};
 use crate::tools::SchemaDict;
 
 use super::errors::py_err_se_err;
@@ -18,6 +21,7 @@ use super::errors::py_err_se_err;
 #[allow(clippy::struct_field_names)]
 pub(crate) struct SerializationConfig {
     pub timedelta_mode: TimedeltaMode,
+    pub datetime_mode: DatetimeMode,
     pub bytes_mode: BytesMode,
     pub inf_nan_mode: InfNanMode,
 }
@@ -25,18 +29,26 @@ pub(crate) struct SerializationConfig {
 impl SerializationConfig {
     pub fn from_config(config: Option<&Bound<'_, PyDict>>) -> PyResult<Self> {
         let timedelta_mode = TimedeltaMode::from_config(config)?;
+        let datetime_mode = DatetimeMode::from_config(config)?;
         let bytes_mode = BytesMode::from_config(config)?;
         let inf_nan_mode = InfNanMode::from_config(config)?;
         Ok(Self {
             timedelta_mode,
+            datetime_mode,
             bytes_mode,
             inf_nan_mode,
         })
     }
 
-    pub fn from_args(timedelta_mode: &str, bytes_mode: &str, inf_nan_mode: &str) -> PyResult<Self> {
+    pub fn from_args(
+        timedelta_mode: &str,
+        datetime_mode: &str,
+        bytes_mode: &str,
+        inf_nan_mode: &str,
+    ) -> PyResult<Self> {
         Ok(Self {
             timedelta_mode: TimedeltaMode::from_str(timedelta_mode)?,
+            datetime_mode: DatetimeMode::from_str(datetime_mode)?,
             bytes_mode: BytesMode::from_str(bytes_mode)?,
             inf_nan_mode: InfNanMode::from_str(inf_nan_mode)?,
         })
@@ -89,6 +101,14 @@ serialization_mode! {
     "ser_json_timedelta",
     Iso8601 => "iso8601",
     Float => "float",
+}
+
+serialization_mode! {
+    DatetimeMode,
+    "ser_json_datetime",
+    Iso8601 => "iso8601",
+    SecondsFloat => "seconds_float",
+    MillisecondsFloat => "milliseconds_float"
 }
 
 serialization_mode! {
@@ -185,6 +205,25 @@ impl BytesMode {
             Self::Base64 => serializer.serialize_str(&base64::engine::general_purpose::URL_SAFE.encode(bytes)),
             Self::Hex => serializer.serialize_str(hex::encode(bytes).as_str()),
         }
+    }
+}
+
+impl DatetimeMode {
+    pub fn datetime_to_json(self, py: Python, datetime: &Bound<'_, PyDateTime>) -> PyResult<PyObject> {
+        Ok(datetime_to_string(datetime)?.into_py(py))
+    }
+
+    pub fn json_key<'py>(self, datetime: &Bound<'_, PyDateTime>) -> PyResult<Cow<'py, str>> {
+        Ok(datetime_to_string(datetime)?.to_string().into())
+    }
+
+    pub fn datetime_serialize<S: serde::ser::Serializer>(
+        self,
+        datetime: &Bound<'_, PyDateTime>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        let s = datetime_to_string(datetime).map_err(py_err_se_err)?;
+        serializer.serialize_str(&s)
     }
 }
 
