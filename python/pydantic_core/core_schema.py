@@ -434,70 +434,102 @@ SerSchema = Union[
     ModelSerSchema,
 ]
 
-# TODO: improve typing here, maybe move some constructs like CoreSchemaOrField to `pydantic-core`
-GetJsonSchemaFunction = Callable[[Any, Any], Any]
-
-# TODO: documentation for each of the below constructs, especially why I've chosen to go with one TypedDict
-# rather than subclasses for schema specific settings (mostly, for typing purposes), and this
-# kind of reminds me of CoreConfig in that sense
-
 
 class PydanticMetadata(TypedDict, total=False):
     """
-    Assorted metadata for core schema, primarily related to JSON schema generation."""
+    Assorted metadata for core schema, primarily related to JSON schema generation.
 
+    We considered having a base PydanticMetadata class and subclassing for specific core schemas with additional configuration,
+    like ArgumentsSchema with json_prefer_positional_arguments, for example. However, this makes type checking more difficult,
+    as we often use `CoreSchema` as a generic type, and thus it's helpful then to have a single `PydanticMetadata` type.
+    This is similar to how we have one `CoreConfig` structure for all core schemas, despite the irrelevant settings for some schemas.
+
+    Attributes:
+        json_schema_transforms: List of functions to transform the JSON schema.
+            Each function accepts as parameters a json schema and json schema handler. The function returns a json schema.
+        json_title: The title for the JSON schema.
+        json_description: The description for the JSON schema.
+        json_deprecated: Whether the corresponding type should be marked as deprecated in the JSON schema.
+        json_examples: List of examples to attach to the type in the JSON schema.
+        json_dict_extra: Extra information to update the JSON schema dict with (from `config.json_schema_extra`).
+        json_callable_extra: Extra information with which to update the JSON schema via a callable (from `config.json_schema_extra`).
+        json_prefer_positional_arguments: If `True`, the JSON schema generator will prefer positional over keyword arguments. Defaults to `False`.
+        json_pydantic_input_core_schema: The core schema associated with the input type for a functional validator,
+            used to generate the JSON schema in `'validation'` mode.
+        tagged_union_tag: The tag associated with a member in a tagged union schema. Sometimes stored on a member of a
+            union schema prior to conversion to a tagged union schema.
+        tagged_union_discriminator: The discriminator associated with a member in a tagged union schema.
+    """
+
+    # whereas we used to support most JSON schema modification with these callables, we now leave this residual
+    # support for __get_pydantic_json_schema__
+    # TODO: could we transform this just into GetJsonSchemaFunction rather than list[GetJsonSchemaFunction]
     json_schema_transforms: list[GetJsonSchemaFunction]
 
-    # used (then popped) during union -> tagged_union schema conversion
-    # ideally we wouldn't store these in metadata bc they're not related to json schema
-    tagged_union_tag: str
-    tagged_union_discriminator: str
-
-    # If `prefer_positional_arguments` is True, the JSON schema generator will prefer positional over keyword arguments
-    prefer_positional_arguments: bool  # default False
-
-    # used for before / wrap validators
-    pydantic_input_core_schema: CoreSchema
-
-    # ideally, we could fully replace the above callable logic with these more simple flags
-    # perhaps with leaving one list of callables to support __get_pydantic_json_schema__ and such
     json_title: str
     json_description: str
     json_deprecated: bool
     json_examples: list[Any]
     json_dict_extra: dict[str, Any]
-    # TODO: double check on the typing here
-    json_callable_extra: Callable[[Any, Any], None]
+    json_callable_extra: JsonSchemaExtraCallable
+
+    json_prefer_positional_arguments: bool
+    json_input_core_schema: CoreSchema
+
+    # TODO: can we remove these from metadata? They don't relate to JSON schema generation, so ideally they wouldn't be here
+    # Unfortunately, so many types can be involved in union -> tagged union coercion that it's hard to avoid, for now
+    tagged_union_tag: str
+    tagged_union_discriminator: str
 
 
 def pydantic_metadata(
     json_schema_transforms: list[GetJsonSchemaFunction] | None = None,
-    tagged_union_tag: str | None = None,
-    tagged_union_discriminator: str | None = None,
-    prefer_positional_arguments: bool | None = None,
-    pydantic_input_core_schema: CoreSchema | None = None,
     json_title: str | None = None,
     json_description: str | None = None,
     json_deprecated: bool | None = None,
     json_examples: list[Any] | None = None,
     json_dict_extra: dict[str, Any] | None = None,
-    json_callable_extra: Callable[[Any, Any], None] | None = None,
-) -> PydanticMetadata:
+    json_callable_extra: JsonSchemaExtraCallable | None = None,
+    json_prefer_positional_arguments: bool | None = None,
+    json_input_core_schema: CoreSchema | None = None,
+    tagged_union_tag: str | None = None,
+    tagged_union_discriminator: str | None = None,
+) -> None:
+    """
+    Returns a PydanticMetadata object, used to store assorted metadata for core schema.
+
+    Args:
+        json_schema_transforms: List of functions to transform the JSON schema.
+            Each function accepts as parameters a json schema and json schema handler. The function returns a json schema.
+        json_title: The title for the JSON schema.
+        json_description: The description for the JSON schema.
+        json_deprecated: Whether the corresponding type should be marked as deprecated in the JSON schema.
+        json_examples: List of examples to attach to the type in the JSON schema.
+        json_dict_extra: Extra information to update the JSON schema dict with (from `config.json_schema_extra`).
+        json_callable_extra: Extra information with which to update the JSON schema via a callable (from `config.json_schema_extra`).
+        json_prefer_positional_arguments: If `True`, the JSON schema generator will prefer positional over keyword arguments. Defaults to `False`.
+        json_input_core_schema: The core schema associated with the input type for a functional validator,
+            used to generate the JSON schema in `'validation'` mode.
+        tagged_union_tag: The tag associated with a member in a tagged union schema. Sometimes stored on a member of a
+            union schema prior to conversion to a tagged union schema.
+        tagged_union_discriminator: The discriminator associated with a member in a tagged union schema.
+    """
     return _dict_not_none(
         json_schema_transforms=json_schema_transforms,
-        tagged_union_tag=tagged_union_tag,
-        tagged_union_discriminator=tagged_union_discriminator,
-        prefer_positional_arguments=prefer_positional_arguments,
-        pydantic_input_core_schema=pydantic_input_core_schema,
         json_title=json_title,
         json_description=json_description,
         json_deprecated=json_deprecated,
         json_examples=json_examples,
         json_dict_extra=json_dict_extra,
         json_callable_extra=json_callable_extra,
+        json_prefer_positional_arguments=json_prefer_positional_arguments,
+        json_input_core_schema=json_input_core_schema,
+        tagged_union_tag=tagged_union_tag,
+        tagged_union_discriminator=tagged_union_discriminator,
     )
 
 
+# TODO: can we leverage this concept to get rid of the Mock*Schema concepts in pydantic?
 class InvalidSchema(TypedDict, total=False):
     type: Required[Literal['invalid']]
     ref: str
@@ -4254,6 +4286,24 @@ if not MYPY:
         DefinitionReferenceSchema,
         UuidSchema,
         ComplexSchema,
+    ]
+    CoreSchemaField = Union[ModelField, DataclassField, TypedDictField, ComputedField]
+    CoreSchemaOrField = Union[CoreSchema, CoreSchemaField]
+
+    # Though pydantic-core doesn't manage any JSON schema generation, it's helpful to have these
+    # types here for reference when we do pull JSON schema generation information off of the `pydantic_metadata` dict.
+    # TODO: do we need to list any of these in the `False` block below? I think not, as they're just used for type checking?
+    JsonSchemaValue = Dict[str, Any]
+    GetJsonSchemaFunction = Callable[
+        [CoreSchemaOrField, Callable[[CoreSchemaOrField], JsonSchemaValue]], JsonSchemaValue
+    ]
+
+    JsonValue: TypeAlias = Union[int, float, str, bool, None, List['JsonValue'], 'JsonDict']
+    JsonDict: TypeAlias = Dict[str, JsonValue]
+
+    JsonSchemaExtraCallable: TypeAlias = Union[
+        Callable[[JsonDict], None],
+        Callable[[JsonDict, Type[Any]], None],
     ]
 elif False:
     CoreSchema: TypeAlias = Mapping[str, Any]
