@@ -35,7 +35,7 @@ pub struct LiteralLookup<T: Debug> {
     expected_py_dict: Option<Py<PyDict>>,
     // Catch all for unhashable types like list
     expected_py_values: Option<Vec<(Py<PyAny>, usize)>>,
-    // Fallback for ints, bools, and strings to use Python equality checks
+    // Fallback for ints, bools, and strings to use Python hash and equality checks
     expected_py_primitives: Option<Vec<(Py<PyAny>, usize)>>,
 
     pub values: Vec<T>,
@@ -159,9 +159,17 @@ impl<T: Debug> LiteralLookup<T> {
 
         if let Some(expected_py_primitives) = &self.expected_py_primitives {
             let py_input = py_input.get_or_insert_with(|| input.to_object(py));
+            let py_input_bound = py_input.bind(py);
+
             for (k, id) in expected_py_primitives {
-                if k.bind(py).eq(&*py_input).unwrap_or(false) {
-                    return Ok(Some((input, &self.values[*id])));
+                let bound_k = k.bind(py);
+                if bound_k.eq(&*py_input).unwrap_or(false) {
+                    match (bound_k.hash(), py_input_bound.hash()) {
+                        (Ok(k_hash), Ok(input_hash)) if k_hash == input_hash => {
+                            return Ok(Some((input, &self.values[*id])));
+                        }
+                        _ => continue, // Skip to the next item on hash failure or mismatch
+                    }
                 }
             }
         };
