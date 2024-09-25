@@ -339,6 +339,14 @@ def test_any_config_timedelta(
             b'{"1704067200000":"foo"}',
             'milliseconds_int',
         ),
+        (
+            datetime(2024, 1, 1, 0, 0, 0, 100, ),
+            1704067201000,
+            b'1704067201000',
+            {'1704067201000': 'foo'},
+            b'{"1704067201000":"foo"}',
+            'milliseconds_int',
+        ),
     ],
 )
 def test_any_config_datetime(
