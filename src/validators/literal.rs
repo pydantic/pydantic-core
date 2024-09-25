@@ -36,7 +36,8 @@ pub struct LiteralLookup<T: Debug> {
     // Catch all for unhashable types like list
     expected_py_values: Option<Vec<(Py<PyAny>, usize)>>,
     // Fallback for ints, bools, and strings to use Python hash and equality checks
-    // which we can't mix with `expected_py_dict`, see tests/test_validators/test_literal.py::test_mix_int_enum_with_int
+    // which we can't mix with `expected_py_dict`, as there may be conflicts
+    // for an example, see tests/test_validators/test_literal.py::test_mix_int_enum_with_int
     expected_py_primitives: Option<Py<PyDict>>,
 
     pub values: Vec<T>,
