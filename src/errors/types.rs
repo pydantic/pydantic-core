@@ -290,6 +290,10 @@ error_types! {
     BytesTooLong {
         max_length: {ctx_type: usize, ctx_fn: field_from_context},
     },
+    BytesInvalidEncoding {
+        encoding: {ctx_type: String, ctx_fn: field_from_context},
+        encoding_error: {ctx_type: String, ctx_fn: field_from_context},
+    },
     // ---------------------
     // python errors from functions
     ValueError {
@@ -422,6 +426,9 @@ error_types! {
     DecimalWholeDigits {
         whole_digits: {ctx_type: u64, ctx_fn: field_from_context},
     },
+    // Complex errors
+    ComplexType {},
+    ComplexStrParsing {},
 }
 
 macro_rules! render {
@@ -515,6 +522,7 @@ impl ErrorType {
             Self::BytesType {..} => "Input should be a valid bytes",
             Self::BytesTooShort {..} => "Data should have at least {min_length} byte{expected_plural}",
             Self::BytesTooLong {..} => "Data should have at most {max_length} byte{expected_plural}",
+            Self::BytesInvalidEncoding { .. } => "Data should be valid {encoding}: {encoding_error}",
             Self::ValueError {..} => "Value error, {error}",
             Self::AssertionError {..} => "Assertion failed, {error}",
             Self::CustomError {..} => "",  // custom errors are handled separately
@@ -564,6 +572,8 @@ impl ErrorType {
             Self::DecimalMaxDigits {..} => "Decimal input should have no more than {max_digits} digit{expected_plural} in total",
             Self::DecimalMaxPlaces {..} => "Decimal input should have no more than {decimal_places} decimal place{expected_plural}",
             Self::DecimalWholeDigits {..} => "Decimal input should have no more than {whole_digits} digit{expected_plural} before the decimal point",
+            Self::ComplexType {..} => "Input should be a valid python complex object, a number, or a valid complex string following the rules at https://docs.python.org/3/library/functions.html#complex",
+            Self::ComplexStrParsing {..} => "Input should be a valid complex string following the rules at https://docs.python.org/3/library/functions.html#complex",
         }
     }
 
@@ -664,6 +674,11 @@ impl ErrorType {
                 let expected_plural = plural_s(*max_length);
                 to_string_render!(tmpl, max_length, expected_plural)
             }
+            Self::BytesInvalidEncoding {
+                encoding,
+                encoding_error,
+                ..
+            } => render!(tmpl, encoding, encoding_error),
             Self::ValueError { error, .. } => {
                 let error = &error
                     .as_ref()

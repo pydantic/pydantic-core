@@ -109,6 +109,93 @@ impl<'a> EitherTimedelta<'a> {
             Self::Raw(duration) => duration_as_pytimedelta(py, duration),
         }
     }
+
+    pub fn total_seconds(&self) -> PyResult<f64> {
+        match self {
+            Self::Raw(timedelta) => {
+                let mut days: i64 = i64::from(timedelta.day);
+                let mut seconds: i64 = i64::from(timedelta.second);
+                let mut microseconds = i64::from(timedelta.microsecond);
+                if !timedelta.positive {
+                    days = -days;
+                    seconds = -seconds;
+                    microseconds = -microseconds;
+                }
+
+                let days_seconds = (86_400 * days) + seconds;
+                if let Some(days_seconds_as_micros) = days_seconds.checked_mul(1_000_000) {
+                    let total_microseconds = days_seconds_as_micros + microseconds;
+                    Ok(total_microseconds as f64 / 1_000_000.0)
+                } else {
+                    // Fall back to floating-point operations if the multiplication overflows
+                    let total_seconds = days_seconds as f64 + microseconds as f64 / 1_000_000.0;
+                    Ok(total_seconds)
+                }
+            }
+            Self::PyExact(py_timedelta) => {
+                let days: i64 = py_timedelta.get_days().into(); // -999999999 to 999999999
+                let seconds: i64 = py_timedelta.get_seconds().into(); // 0 through 86399
+                let microseconds = py_timedelta.get_microseconds(); // 0 through 999999
+                let days_seconds = (86_400 * days) + seconds;
+                if let Some(days_seconds_as_micros) = days_seconds.checked_mul(1_000_000) {
+                    let total_microseconds = days_seconds_as_micros + i64::from(microseconds);
+                    Ok(total_microseconds as f64 / 1_000_000.0)
+                } else {
+                    // Fall back to floating-point operations if the multiplication overflows
+                    let total_seconds = days_seconds as f64 + f64::from(microseconds) / 1_000_000.0;
+                    Ok(total_seconds)
+                }
+            }
+            Self::PySubclass(py_timedelta) => py_timedelta
+                .call_method0(intern!(py_timedelta.py(), "total_seconds"))?
+                .extract(),
+        }
+    }
+
+    pub fn total_milliseconds(&self) -> PyResult<f64> {
+        match self {
+            Self::Raw(timedelta) => {
+                let mut days: i64 = i64::from(timedelta.day);
+                let mut seconds: i64 = i64::from(timedelta.second);
+                let mut microseconds = i64::from(timedelta.microsecond);
+                if !timedelta.positive {
+                    days = -days;
+                    seconds = -seconds;
+                    microseconds = -microseconds;
+                }
+
+                let days_seconds = (86_400 * days) + seconds;
+                if let Some(days_seconds_as_micros) = days_seconds.checked_mul(1_000_000) {
+                    let total_microseconds = days_seconds_as_micros + microseconds;
+                    Ok(total_microseconds as f64 / 1_000.0)
+                } else {
+                    // Fall back to floating-point operations if the multiplication overflows
+                    let total_seconds = days_seconds as f64 + microseconds as f64 / 1_000.0;
+                    Ok(total_seconds)
+                }
+            }
+            Self::PyExact(py_timedelta) => {
+                let days: i64 = py_timedelta.get_days().into(); // -999999999 to 999999999
+                let seconds: i64 = py_timedelta.get_seconds().into(); // 0 through 86399
+                let microseconds = py_timedelta.get_microseconds(); // 0 through 999999
+                let days_seconds = (86_400 * days) + seconds;
+                if let Some(days_seconds_as_micros) = days_seconds.checked_mul(1_000_000) {
+                    let total_microseconds = days_seconds_as_micros + i64::from(microseconds);
+                    Ok(total_microseconds as f64 / 1_000.0)
+                } else {
+                    // Fall back to floating-point operations if the multiplication overflows
+                    let total_milliseconds = days_seconds as f64 * 1_000.0 + f64::from(microseconds) / 1_000.0;
+                    Ok(total_milliseconds)
+                }
+            }
+            Self::PySubclass(py_timedelta) => {
+                let total_seconds: f64 = py_timedelta
+                    .call_method0(intern!(py_timedelta.py(), "total_seconds"))?
+                    .extract()?;
+                Ok(total_seconds / 1000.0)
+            }
+        }
+    }
 }
 
 impl<'a> TryFrom<&'_ Bound<'a, PyAny>> for EitherTimedelta<'a> {
@@ -516,15 +603,18 @@ impl TzInfo {
         Self::try_from(seconds.trunc() as i32)
     }
 
-    fn utcoffset<'py>(&self, py: Python<'py>, _dt: &Bound<'_, PyAny>) -> PyResult<Bound<'py, PyDelta>> {
+    #[allow(unused_variables)]
+    fn utcoffset<'py>(&self, py: Python<'py>, dt: &Bound<'_, PyAny>) -> PyResult<Bound<'py, PyDelta>> {
         PyDelta::new_bound(py, 0, self.seconds, 0, true)
     }
 
-    fn tzname(&self, _dt: &Bound<'_, PyAny>) -> String {
+    #[allow(unused_variables)]
+    fn tzname(&self, dt: &Bound<'_, PyAny>) -> String {
         self.__str__()
     }
 
-    fn dst(&self, _dt: &Bound<'_, PyAny>) -> Option<&PyDelta> {
+    #[allow(unused_variables)]
+    fn dst(&self, dt: &Bound<'_, PyAny>) -> Option<&PyDelta> {
         None
     }
 
