@@ -61,7 +61,7 @@ pub fn from_json<'py>(
         cache_mode: cache_strings,
         partial_mode: allow_partial,
         catch_duplicate_keys: false,
-        lossless_floats: false,
+        float_mode: jiter::FloatMode::Float,
     };
     parse_builder
         .python_parse(py, json_bytes)

@@ -1,4 +1,5 @@
 use core::slice::Iter;
+use std::convert::Infallible;
 use std::fmt;
 
 use pyo3::exceptions::{PyAttributeError, PyTypeError};
@@ -407,14 +408,17 @@ impl fmt::Display for PathItem {
     }
 }
 
-impl ToPyObject for PathItem {
-    fn to_object(&self, py: Python<'_>) -> PyObject {
+impl<'py> IntoPyObject<'py> for &'_ PathItem {
+    type Target = PyAny;
+    type Output = Bound<'py, PyAny>;
+    type Error = Infallible;
+    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
         match self {
-            Self::S(_, val) => val.to_object(py),
-            Self::Pos(val) => val.to_object(py),
-            Self::Neg(val) => {
+            PathItem::S(_, val) => Ok(val.bind(py).clone().into_any()),
+            PathItem::Pos(val) => val.into_pyobject(py).map(Bound::into_any),
+            PathItem::Neg(val) => {
                 let neg_value = -(*val as i64);
-                neg_value.to_object(py)
+                neg_value.into_pyobject(py).map(Bound::into_any)
             }
         }
     }
