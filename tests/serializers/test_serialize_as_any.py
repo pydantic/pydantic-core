@@ -159,7 +159,6 @@ def test_serialize_as_any_with_unrelated_models() -> None:
 
 
 def test_serialize_with_recursive_models() -> None:
-
     class Node:
         next: Optional['Node'] = None
         value: int = 42
@@ -171,12 +170,12 @@ def test_serialize_with_recursive_models() -> None:
                 Node,
                 core_schema.model_fields_schema(
                     {
-                        'value': core_schema.model_field(core_schema.with_default_schema(core_schema.int_schema(), default=42)),
+                        'value': core_schema.model_field(
+                            core_schema.with_default_schema(core_schema.int_schema(), default=42)
+                        ),
                         'next': core_schema.model_field(
                             core_schema.with_default_schema(
-                                core_schema.nullable_schema(
-                                    core_schema.definition_reference_schema('Node')
-                                ),
+                                core_schema.nullable_schema(core_schema.definition_reference_schema('Node')),
                                 default=None,
                             )
                         ),
@@ -187,7 +186,12 @@ def test_serialize_with_recursive_models() -> None:
         ],
     )
 
-    s = SchemaSerializer(schema)
-    v = SchemaValidator(schema)
+    Node.__pydantic_core_schema__ = schema
+    Node.__pydantic_validator__ = SchemaValidator(Node.__pydantic_core_schema__)
+    Node.__pydantic_serializer__ = SchemaSerializer(Node.__pydantic_core_schema__)
+    other = Node.__pydantic_validator__.validate_python({'next': {'value': 4}})
 
-    obj = v.validate_python({'value': 2, 'asdas': 1})
+    assert Node.__pydantic_serializer__.to_python(other, serialize_as_any=True) == {
+        'next': {'next': None, 'value': 4},
+        'value': 42,
+    }
