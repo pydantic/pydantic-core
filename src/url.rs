@@ -7,7 +7,7 @@ use idna::punycode::decode_to_string;
 use pyo3::exceptions::PyValueError;
 use pyo3::pyclass::CompareOp;
 use pyo3::sync::GILOnceCell;
-use pyo3::types::{PyDict, PyTuple, PyType};
+use pyo3::types::{PyDict, PyType};
 use pyo3::{intern, prelude::*};
 use url::Url;
 
@@ -155,6 +155,14 @@ impl PyUrl {
         (self.__str__(),)
     }
 
+    fn __truediv__(&self, other: &str) -> PyResult<Self> {
+        self.join(other, true)
+    }
+
+    fn __floordiv__(&self, other: &str) -> PyResult<Self> {
+        self.join(other, false)
+    }
+
     #[classmethod]
     #[pyo3(signature=(*, scheme, host, username=None, password=None, port=None, path=None, query=None, fragment=None))]
     #[allow(clippy::too_many_arguments)]
@@ -191,34 +199,23 @@ impl PyUrl {
         cls.call1((url,))
     }
 
-    #[pyo3(signature=(path, *args, no_trailing_slash=false))]
-    pub fn join(&self, path: &str, args: &Bound<'_, PyTuple>, no_trailing_slash: bool) -> PyResult<Self> {
-        let join_path = |base: &Url, partial_path: String| -> Result<Url, PyErr> {
-            base.join(&partial_path)
-                .map_err(|err| PyValueError::new_err(err.to_string()))
-        };
+    #[pyo3(signature=(path, trailing_slash=true))]
+    pub fn join(&self, path: &str, trailing_slash: bool) -> PyResult<Self> {
+        let mut new_url = self
+            .lib_url
+            .join(path)
+            .map_err(|err| PyValueError::new_err(err.to_string()))?;
 
-        let add_trailing_slash = |path_str: &mut String| {
-            if !path_str.trim_end().ends_with('/') {
-                path_str.push('/');
-            }
-        };
-
-        let num_of_args = args.len();
-        let mut path_str = path.to_string();
-        if num_of_args != 0 || !no_trailing_slash {
-            add_trailing_slash(&mut path_str);
+        if !trailing_slash || new_url.query().is_some() || new_url.fragment().is_some() || new_url.cannot_be_a_base() {
+            return Ok(PyUrl::new(new_url));
         }
 
-        let mut new_url = join_path(&self.lib_url, path_str)?;
+        new_url
+            .path_segments_mut()
+            .map_err(|()| PyValueError::new_err("Url cannot be a base"))?
+            .pop_if_empty()
+            .push("");
 
-        for i in 0..num_of_args {
-            let mut arg_str = args.get_item(i)?.to_string();
-            if i != num_of_args - 1 || !no_trailing_slash {
-                add_trailing_slash(&mut arg_str);
-            }
-            new_url = join_path(&new_url, arg_str)?;
-        }
         Ok(PyUrl::new(new_url))
     }
 }

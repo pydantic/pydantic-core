@@ -9,6 +9,10 @@ from pydantic_core import MultiHostUrl, SchemaError, SchemaValidator, Url, Valid
 
 from ..conftest import Err, PyAndJson
 
+SIMPLE_BASE = 'http://a/b/c/d'
+QUERY_BASE = 'http://a/b/c/d;p?q'
+QUERY_FRAGMENT_BASE = 'http://a/b/c/d;p?q#f'
+
 
 def test_url_ok(py_and_json: PyAndJson):
     v = py_and_json(core_schema.url_schema())
@@ -1299,3 +1303,150 @@ def test_url_build() -> None:
     )
     assert url == Url('postgresql://testuser:testpassword@127.0.0.1:5432/database?sslmode=require#test')
     assert str(url) == 'postgresql://testuser:testpassword@127.0.0.1:5432/database?sslmode=require#test'
+
+
+@pytest.mark.parametrize(
+    'base_url,join_path,expected_with_slash,expected_without_slash',
+    [
+        # Tests are based on the URL specification from https://url.spec.whatwg.org/
+        # Joining empty path with or without trailing slash should not affect the base url.
+        ('http://example.com/', '', 'http://example.com/', 'http://example.com/'),
+        ('svn://pathtorepo/dir1', 'dir2', 'svn://pathtorepo/dir2/', 'svn://pathtorepo/dir2'),
+        ('svn+ssh://pathtorepo/dir1', 'dir2', 'svn+ssh://pathtorepo/dir2/', 'svn+ssh://pathtorepo/dir2'),
+        ('ws://a/b', 'g', 'ws://a/g/', 'ws://a/g'),
+        ('wss://a/b', 'g', 'wss://a/g/', 'wss://a/g'),
+        ('http://a/b/c/de', ';x', 'http://a/b/c/;x/', 'http://a/b/c/;x'),
+        # Non-RFC-defined tests, covering variations of base and trailing
+        # slashes
+        ('http://a/b/c/d/e/', '../../f/g/', 'http://a/b/c/f/g/', 'http://a/b/c/f/g/'),
+        ('http://a/b/c/d/e', '../../f/g/', 'http://a/b/f/g/', 'http://a/b/f/g/'),
+        ('http://a/b/c/d/e/', '/../../f/g/', 'http://a/f/g/', 'http://a/f/g/'),
+        ('http://a/b/c/d/e', '/../../f/g/', 'http://a/f/g/', 'http://a/f/g/'),
+        ('http://a/b/c/d/e/', '../../f/g', 'http://a/b/c/f/g/', 'http://a/b/c/f/g'),
+        ('http://a/b/', '../../f/g/', 'http://a/f/g/', 'http://a/f/g/'),
+        (SIMPLE_BASE, 'g:h', 'g:h', 'g:h'),
+        (SIMPLE_BASE, 'g', 'http://a/b/c/g/', 'http://a/b/c/g'),
+        (SIMPLE_BASE, './g', 'http://a/b/c/g/', 'http://a/b/c/g'),
+        (SIMPLE_BASE, 'g/', 'http://a/b/c/g/', 'http://a/b/c/g/'),
+        (SIMPLE_BASE, '/g', 'http://a/g/', 'http://a/g'),
+        (SIMPLE_BASE, '//g', 'http://g/', 'http://g/'),
+        (SIMPLE_BASE, '?y', 'http://a/b/c/d?y', 'http://a/b/c/d?y'),
+        (SIMPLE_BASE, 'g?y', 'http://a/b/c/g?y', 'http://a/b/c/g?y'),
+        (SIMPLE_BASE, 'g?y/./x', 'http://a/b/c/g?y/./x', 'http://a/b/c/g?y/./x'),
+        (SIMPLE_BASE, '.', 'http://a/b/c/', 'http://a/b/c/'),
+        (SIMPLE_BASE, './', 'http://a/b/c/', 'http://a/b/c/'),
+        (SIMPLE_BASE, '..', 'http://a/b/', 'http://a/b/'),
+        (SIMPLE_BASE, '../', 'http://a/b/', 'http://a/b/'),
+        (SIMPLE_BASE, '../g', 'http://a/b/g/', 'http://a/b/g'),
+        (SIMPLE_BASE, '../..', 'http://a/', 'http://a/'),
+        (SIMPLE_BASE, '../../g', 'http://a/g/', 'http://a/g'),
+        (SIMPLE_BASE, './../g', 'http://a/b/g/', 'http://a/b/g'),
+        (SIMPLE_BASE, './g/.', 'http://a/b/c/g/', 'http://a/b/c/g/'),
+        (SIMPLE_BASE, 'g/./h', 'http://a/b/c/g/h/', 'http://a/b/c/g/h'),
+        (SIMPLE_BASE, 'g/../h', 'http://a/b/c/h/', 'http://a/b/c/h'),
+        (SIMPLE_BASE, 'http:g', 'http://a/b/c/g/', 'http://a/b/c/g'),
+        (SIMPLE_BASE, 'http:g?y', 'http://a/b/c/g?y', 'http://a/b/c/g?y'),
+        (SIMPLE_BASE, 'http:g?y/./x', 'http://a/b/c/g?y/./x', 'http://a/b/c/g?y/./x'),
+        (SIMPLE_BASE + '/', 'foo', SIMPLE_BASE + '/foo/', SIMPLE_BASE + '/foo'),
+        (QUERY_BASE, '?y', 'http://a/b/c/d;p?y', 'http://a/b/c/d;p?y'),
+        (QUERY_BASE, ';x', 'http://a/b/c/;x/', 'http://a/b/c/;x'),
+        (QUERY_BASE, 'g:h', 'g:h', 'g:h'),
+        (QUERY_BASE, 'g', 'http://a/b/c/g/', 'http://a/b/c/g'),
+        (QUERY_BASE, './g', 'http://a/b/c/g/', 'http://a/b/c/g'),
+        (QUERY_BASE, 'g/', 'http://a/b/c/g/', 'http://a/b/c/g/'),
+        (QUERY_BASE, '/g', 'http://a/g/', 'http://a/g'),
+        (QUERY_BASE, '//g', 'http://g/', 'http://g/'),
+        (QUERY_BASE, '?y', 'http://a/b/c/d;p?y', 'http://a/b/c/d;p?y'),
+        (QUERY_BASE, 'g?y', 'http://a/b/c/g?y', 'http://a/b/c/g?y'),
+        (QUERY_BASE, '#s', 'http://a/b/c/d;p?q#s', 'http://a/b/c/d;p?q#s'),
+        (QUERY_BASE, 'g#s', 'http://a/b/c/g#s', 'http://a/b/c/g#s'),
+        (QUERY_BASE, 'g?y#s', 'http://a/b/c/g?y#s', 'http://a/b/c/g?y#s'),
+        (QUERY_BASE, ';x', 'http://a/b/c/;x/', 'http://a/b/c/;x'),
+        (QUERY_BASE, 'g;x', 'http://a/b/c/g;x/', 'http://a/b/c/g;x'),
+        (QUERY_BASE, 'g;x?y#s', 'http://a/b/c/g;x?y#s', 'http://a/b/c/g;x?y#s'),
+        (QUERY_BASE, '', 'http://a/b/c/d;p?q', 'http://a/b/c/d;p?q'),
+        (QUERY_BASE, '.', 'http://a/b/c/', 'http://a/b/c/'),
+        (QUERY_BASE, './', 'http://a/b/c/', 'http://a/b/c/'),
+        (QUERY_BASE, '..', 'http://a/b/', 'http://a/b/'),
+        (QUERY_BASE, '../', 'http://a/b/', 'http://a/b/'),
+        (QUERY_BASE, '../g', 'http://a/b/g/', 'http://a/b/g'),
+        (QUERY_BASE, '../..', 'http://a/', 'http://a/'),
+        (QUERY_BASE, '../../', 'http://a/', 'http://a/'),
+        (QUERY_BASE, '../../g', 'http://a/g/', 'http://a/g'),
+        (QUERY_BASE, '../../../g', 'http://a/g/', 'http://a/g'),
+        # Abnormal Examples
+        (QUERY_BASE, '../../../g', 'http://a/g/', 'http://a/g'),
+        (QUERY_BASE, '../../../../g', 'http://a/g/', 'http://a/g'),
+        (QUERY_BASE, '/./g', 'http://a/g/', 'http://a/g'),
+        (QUERY_BASE, '/../g', 'http://a/g/', 'http://a/g'),
+        (QUERY_BASE, 'g.', 'http://a/b/c/g./', 'http://a/b/c/g.'),
+        (QUERY_BASE, '.g', 'http://a/b/c/.g/', 'http://a/b/c/.g'),
+        (QUERY_BASE, 'g..', 'http://a/b/c/g../', 'http://a/b/c/g..'),
+        (QUERY_BASE, '..g', 'http://a/b/c/..g/', 'http://a/b/c/..g'),
+        (QUERY_BASE, './../g', 'http://a/b/g/', 'http://a/b/g'),
+        (QUERY_BASE, './g/.', 'http://a/b/c/g/', 'http://a/b/c/g/'),
+        (QUERY_BASE, 'g/./h', 'http://a/b/c/g/h/', 'http://a/b/c/g/h'),
+        (QUERY_BASE, 'g/../h', 'http://a/b/c/h/', 'http://a/b/c/h'),
+        (QUERY_BASE, 'g;x=1/./y', 'http://a/b/c/g;x=1/y/', 'http://a/b/c/g;x=1/y'),
+        (QUERY_BASE, 'g;x=1/../y', 'http://a/b/c/y/', 'http://a/b/c/y'),
+        (QUERY_BASE, 'g?y/./x', 'http://a/b/c/g?y/./x', 'http://a/b/c/g?y/./x'),
+        (QUERY_BASE, 'g?y/../x', 'http://a/b/c/g?y/../x', 'http://a/b/c/g?y/../x'),
+        (QUERY_BASE, 'g#s/./x', 'http://a/b/c/g#s/./x', 'http://a/b/c/g#s/./x'),
+        (QUERY_BASE, 'g#s/../x', 'http://a/b/c/g#s/../x', 'http://a/b/c/g#s/../x'),
+        (QUERY_BASE, 'http:g', 'http://a/b/c/g/', 'http://a/b/c/g'),
+        # Test with empty (but defined) components.
+        (QUERY_FRAGMENT_BASE, '', 'http://a/b/c/d;p?q', 'http://a/b/c/d;p?q'),
+        (QUERY_FRAGMENT_BASE, '#', 'http://a/b/c/d;p?q#', 'http://a/b/c/d;p?q#'),
+        (QUERY_FRAGMENT_BASE, '#z', 'http://a/b/c/d;p?q#z', 'http://a/b/c/d;p?q#z'),
+        (QUERY_FRAGMENT_BASE, '?', 'http://a/b/c/d;p?', 'http://a/b/c/d;p?'),
+        (QUERY_FRAGMENT_BASE, '?#z', 'http://a/b/c/d;p?#z', 'http://a/b/c/d;p?#z'),
+        (QUERY_FRAGMENT_BASE, '?y', 'http://a/b/c/d;p?y', 'http://a/b/c/d;p?y'),
+        (QUERY_FRAGMENT_BASE, ';', 'http://a/b/c/;/', 'http://a/b/c/;'),
+        (QUERY_FRAGMENT_BASE, ';?y', 'http://a/b/c/;?y', 'http://a/b/c/;?y'),
+        (QUERY_FRAGMENT_BASE, ';#z', 'http://a/b/c/;#z', 'http://a/b/c/;#z'),
+        (QUERY_FRAGMENT_BASE, ';x', 'http://a/b/c/;x/', 'http://a/b/c/;x'),
+        (QUERY_FRAGMENT_BASE, '/w', 'http://a/w/', 'http://a/w'),
+        (QUERY_FRAGMENT_BASE, '//;x', 'http://;x/', 'http://;x/'),
+        (QUERY_FRAGMENT_BASE, '//v', 'http://v/', 'http://v/'),
+        # For backward compatibility with RFC1630, the scheme name is allowed
+        # to be present in a relative reference if it is the same as the base
+        # URI scheme.
+        (QUERY_FRAGMENT_BASE, 'http:', 'http://a/b/c/d;p?q', 'http://a/b/c/d;p?q'),
+        (QUERY_FRAGMENT_BASE, 'http:#', 'http://a/b/c/d;p?q#', 'http://a/b/c/d;p?q#'),
+        (QUERY_FRAGMENT_BASE, 'http:#z', 'http://a/b/c/d;p?q#z', 'http://a/b/c/d;p?q#z'),
+        (QUERY_FRAGMENT_BASE, 'http:?', 'http://a/b/c/d;p?', 'http://a/b/c/d;p?'),
+        (QUERY_FRAGMENT_BASE, 'http:?#z', 'http://a/b/c/d;p?#z', 'http://a/b/c/d;p?#z'),
+        (QUERY_FRAGMENT_BASE, 'http:?y', 'http://a/b/c/d;p?y', 'http://a/b/c/d;p?y'),
+        (QUERY_FRAGMENT_BASE, 'http:;', 'http://a/b/c/;/', 'http://a/b/c/;'),
+        (QUERY_FRAGMENT_BASE, 'http:;?y', 'http://a/b/c/;?y', 'http://a/b/c/;?y'),
+        (QUERY_FRAGMENT_BASE, 'http:;#z', 'http://a/b/c/;#z', 'http://a/b/c/;#z'),
+        (QUERY_FRAGMENT_BASE, 'http:;x', 'http://a/b/c/;x/', 'http://a/b/c/;x'),
+        (QUERY_FRAGMENT_BASE, 'http:/w', 'http://a/w/', 'http://a/w'),
+        (QUERY_FRAGMENT_BASE, 'http://;x', 'http://;x/', 'http://;x/'),
+        (QUERY_FRAGMENT_BASE, 'http:///w', 'http://w/', 'http://w/'),
+        (QUERY_FRAGMENT_BASE, 'http://v', 'http://v/', 'http://v/'),
+        # Different scheme is not ignored.
+        (QUERY_FRAGMENT_BASE, 'https:;', 'https://;/', 'https://;/'),
+        (QUERY_FRAGMENT_BASE, 'https:;x', 'https://;x/', 'https://;x/'),
+    ],
+)
+def test_url_join(base_url, join_path, expected_with_slash, expected_without_slash) -> None:
+    """Tests are based on
+    https://github.com/python/cpython/blob/3a0e7f57628466aedcaaf6c5ff7c8224f5155a2c/Lib/test/test_urlparse.py
+    and the URL specification from https://url.spec.whatwg.org/
+    """
+    url = Url(base_url)
+    assert str(url.join(join_path, trailing_slash=True)) == expected_with_slash
+    assert str(url.join(join_path, trailing_slash=False)) == expected_without_slash
+
+
+def test_url_join_operators() -> None:
+    url = Url('http://a/b/c/d')
+    assert str(url / 'e' / 'f') == 'http://a/b/c/e/f/'
+    assert str(url / 'e' // 'f') == 'http://a/b/c/e/f'
+    assert str(url // 'e' // 'f') == 'http://a/b/c/f'
+    assert str(url / 'e' / '?x=1') == 'http://a/b/c/e/?x=1'
+    assert str(url / 'e' / '?x=1' / '#y') == 'http://a/b/c/e/?x=1#y'
+    assert str(url / 'e' / '?x=1' // '#y') == 'http://a/b/c/e/?x=1#y'
+    assert str(url / 'e' // '?x=1' / '#y') == 'http://a/b/c/e/?x=1#y'
+    assert str(url // 'e' / '?x=1' / '#y') == 'http://a/b/c/e?x=1#y'
