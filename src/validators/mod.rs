@@ -16,6 +16,7 @@ use crate::input::{Input, InputType, StringMapping};
 use crate::py_gc::PyGcTraverse;
 use crate::recursion_guard::RecursionState;
 use crate::tools::SchemaDict;
+pub(crate) use config::ValBytesMode;
 
 mod any;
 mod arguments;
@@ -24,6 +25,8 @@ mod bytes;
 mod call;
 mod callable;
 mod chain;
+pub(crate) mod complex;
+mod config;
 mod custom_error;
 mod dataclass;
 mod date;
@@ -580,6 +583,7 @@ pub fn build_validator(
         // recursive (self-referencing) models
         definitions::DefinitionRefValidator,
         definitions::DefinitionsValidatorBuilder,
+        complex::ComplexValidator,
     )
 }
 
@@ -733,6 +737,7 @@ pub enum CombinedValidator {
     DefinitionRef(definitions::DefinitionRefValidator),
     // input dependent
     JsonOrPython(json_or_python::JsonOrPython),
+    Complex(complex::ComplexValidator),
 }
 
 /// This trait must be implemented by all validators, it allows various validators to be accessed consistently,

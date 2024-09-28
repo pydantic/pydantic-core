@@ -7,12 +7,15 @@ use crate::errors::{ErrorTypeDefaults, InputValue, LocItem, ValError, ValResult}
 use crate::input::py_string_str;
 use crate::lookup_key::{LookupKey, LookupPath};
 use crate::tools::safe_repr;
+use crate::validators::complex::string_to_complex;
 use crate::validators::decimal::create_decimal;
+use crate::validators::ValBytesMode;
 
 use super::datetime::{
     bytes_as_date, bytes_as_datetime, bytes_as_time, bytes_as_timedelta, EitherDate, EitherDateTime, EitherTime,
 };
 use super::input_abstract::{Never, ValMatch};
+use super::return_enums::EitherComplex;
 use super::shared::{str_as_bool, str_as_float, str_as_int};
 use super::{
     Arguments, BorrowInput, EitherBytes, EitherFloat, EitherInt, EitherString, EitherTimedelta, GenericIterator, Input,
@@ -105,9 +108,16 @@ impl<'py> Input<'py> for StringMapping<'py> {
         }
     }
 
-    fn validate_bytes<'a>(&'a self, _strict: bool) -> ValResult<ValidationMatch<EitherBytes<'a, 'py>>> {
+    fn validate_bytes<'a>(
+        &'a self,
+        _strict: bool,
+        mode: ValBytesMode,
+    ) -> ValResult<ValidationMatch<EitherBytes<'a, 'py>>> {
         match self {
-            Self::String(s) => py_string_str(s).map(|b| ValidationMatch::strict(b.as_bytes().into())),
+            Self::String(s) => py_string_str(s).and_then(|b| match mode.deserialize_string(b) {
+                Ok(b) => Ok(ValidationMatch::strict(b)),
+                Err(e) => Err(ValError::new(e, self)),
+            }),
             Self::Mapping(_) => Err(ValError::new(ErrorTypeDefaults::BytesType, self)),
         }
     }
@@ -133,9 +143,9 @@ impl<'py> Input<'py> for StringMapping<'py> {
         }
     }
 
-    fn strict_decimal(&self, _py: Python<'py>) -> ValResult<Bound<'py, PyAny>> {
+    fn validate_decimal(&self, _strict: bool, _py: Python<'py>) -> ValMatch<Bound<'py, PyAny>> {
         match self {
-            Self::String(s) => create_decimal(s, self),
+            Self::String(s) => create_decimal(s, self).map(ValidationMatch::strict),
             Self::Mapping(_) => Err(ValError::new(ErrorTypeDefaults::DecimalType, self)),
         }
     }
@@ -217,6 +227,13 @@ impl<'py> Input<'py> for StringMapping<'py> {
             Self::Mapping(_) => Err(ValError::new(ErrorTypeDefaults::TimeDeltaType, self)),
         }
     }
+
+    fn validate_complex(&self, _strict: bool, _py: Python<'py>) -> ValResult<ValidationMatch<EitherComplex<'py>>> {
+        match self {
+            Self::String(s) => Ok(ValidationMatch::strict(EitherComplex::Py(string_to_complex(s, self)?))),
+            Self::Mapping(_) => Err(ValError::new(ErrorTypeDefaults::ComplexType, self)),
+        }
+    }
 }
 
 impl<'py> BorrowInput<'py> for StringMapping<'py> {
@@ -275,9 +292,6 @@ impl<'py> ValidatedDict<'py> for StringMappingDict<'py> {
         Self: 'a;
     fn get_item<'k>(&self, key: &'k LookupKey) -> ValResult<Option<(&'k LookupPath, Self::Item<'_>)>> {
         key.py_get_string_mapping_item(&self.0)
-    }
-    fn as_py_dict(&self) -> Option<&Bound<'py, PyDict>> {
-        None
     }
     fn iterate<'a, R>(
         &'a self,
