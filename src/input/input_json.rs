@@ -8,8 +8,11 @@ use speedate::MicrosecondsPrecisionOverflowBehavior;
 use strum::EnumMessage;
 
 use crate::errors::{ErrorType, ErrorTypeDefaults, InputValue, LocItem, ValError, ValResult};
+use crate::input::return_enums::EitherComplex;
 use crate::lookup_key::{LookupKey, LookupPath};
+use crate::validators::complex::string_to_complex;
 use crate::validators::decimal::create_decimal;
+use crate::validators::ValBytesMode;
 
 use super::datetime::{
     bytes_as_date, bytes_as_datetime, bytes_as_time, bytes_as_timedelta, float_as_datetime, float_as_duration,
@@ -106,9 +109,16 @@ impl<'py, 'data> Input<'py> for JsonValue<'data> {
         }
     }
 
-    fn validate_bytes<'a>(&'a self, _strict: bool) -> ValResult<ValidationMatch<EitherBytes<'a, 'py>>> {
+    fn validate_bytes<'a>(
+        &'a self,
+        _strict: bool,
+        mode: ValBytesMode,
+    ) -> ValResult<ValidationMatch<EitherBytes<'a, 'py>>> {
         match self {
-            JsonValue::Str(s) => Ok(ValidationMatch::strict(s.as_bytes().into())),
+            JsonValue::Str(s) => match mode.deserialize_string(s) {
+                Ok(b) => Ok(ValidationMatch::strict(b)),
+                Err(e) => Err(ValError::new(e, self)),
+            },
             _ => Err(ValError::new(ErrorTypeDefaults::BytesType, self)),
         }
     }
@@ -157,12 +167,13 @@ impl<'py, 'data> Input<'py> for JsonValue<'data> {
         }
     }
 
-    fn strict_decimal(&self, py: Python<'py>) -> ValResult<Bound<'py, PyAny>> {
+    fn validate_decimal(&self, _strict: bool, py: Python<'py>) -> ValMatch<Bound<'py, PyAny>> {
         match self {
-            JsonValue::Float(f) => create_decimal(&PyString::new_bound(py, &f.to_string()), self),
-
+            JsonValue::Float(f) => {
+                create_decimal(&PyString::new_bound(py, &f.to_string()), self).map(ValidationMatch::strict)
+            }
             JsonValue::Str(..) | JsonValue::Int(..) | JsonValue::BigInt(..) => {
-                create_decimal(self.to_object(py).bind(py), self)
+                create_decimal(self.to_object(py).bind(py), self).map(ValidationMatch::strict)
             }
             _ => Err(ValError::new(ErrorTypeDefaults::DecimalType, self)),
         }
@@ -296,6 +307,30 @@ impl<'py, 'data> Input<'py> for JsonValue<'data> {
             _ => Err(ValError::new(ErrorTypeDefaults::TimeDeltaType, self)),
         }
     }
+
+    fn validate_complex(&self, strict: bool, py: Python<'py>) -> ValResult<ValidationMatch<EitherComplex<'py>>> {
+        match self {
+            JsonValue::Str(s) => Ok(ValidationMatch::strict(EitherComplex::Py(string_to_complex(
+                &PyString::new_bound(py, s),
+                self,
+            )?))),
+            JsonValue::Float(f) => {
+                if !strict {
+                    Ok(ValidationMatch::lax(EitherComplex::Complex([*f, 0.0])))
+                } else {
+                    Err(ValError::new(ErrorTypeDefaults::ComplexStrParsing, self))
+                }
+            }
+            JsonValue::Int(f) => {
+                if !strict {
+                    Ok(ValidationMatch::lax(EitherComplex::Complex([(*f) as f64, 0.0])))
+                } else {
+                    Err(ValError::new(ErrorTypeDefaults::ComplexStrParsing, self))
+                }
+            }
+            _ => Err(ValError::new(ErrorTypeDefaults::ComplexType, self)),
+        }
+    }
 }
 
 /// Required for JSON Object keys so the string can behave like an Input
@@ -342,8 +377,15 @@ impl<'py> Input<'py> for str {
         Ok(ValidationMatch::strict(self.into()))
     }
 
-    fn validate_bytes<'a>(&'a self, _strict: bool) -> ValResult<ValidationMatch<EitherBytes<'a, 'py>>> {
-        Ok(ValidationMatch::strict(self.as_bytes().into()))
+    fn validate_bytes<'a>(
+        &'a self,
+        _strict: bool,
+        mode: ValBytesMode,
+    ) -> ValResult<ValidationMatch<EitherBytes<'a, 'py>>> {
+        match mode.deserialize_string(self) {
+            Ok(b) => Ok(ValidationMatch::strict(b)),
+            Err(e) => Err(ValError::new(e, self)),
+        }
     }
 
     fn validate_bool(&self, _strict: bool) -> ValResult<ValidationMatch<bool>> {
@@ -358,8 +400,8 @@ impl<'py> Input<'py> for str {
         str_as_float(self, self).map(ValidationMatch::lax)
     }
 
-    fn strict_decimal(&self, py: Python<'py>) -> ValResult<Bound<'py, PyAny>> {
-        create_decimal(self.to_object(py).bind(py), self)
+    fn validate_decimal(&self, _strict: bool, py: Python<'py>) -> ValMatch<Bound<'py, PyAny>> {
+        create_decimal(self.to_object(py).bind(py), self).map(ValidationMatch::lax)
     }
 
     type Dict<'a> = Never;
@@ -425,6 +467,13 @@ impl<'py> Input<'py> for str {
     ) -> ValResult<ValidationMatch<EitherTimedelta<'py>>> {
         bytes_as_timedelta(self, self.as_bytes(), microseconds_overflow_behavior).map(ValidationMatch::lax)
     }
+
+    fn validate_complex(&self, _strict: bool, py: Python<'py>) -> ValResult<ValidationMatch<EitherComplex<'py>>> {
+        Ok(ValidationMatch::strict(EitherComplex::Py(string_to_complex(
+            self.to_object(py).downcast_bound::<PyString>(py)?,
+            self,
+        )?)))
+    }
 }
 
 impl BorrowInput<'_> for &'_ String {
@@ -459,10 +508,6 @@ impl<'py, 'data> ValidatedDict<'py> for &'_ JsonObject<'data> {
 
     fn get_item<'k>(&self, key: &'k LookupKey) -> ValResult<Option<(&'k LookupPath, Self::Item<'_>)>> {
         key.json_get(self)
-    }
-
-    fn as_py_dict(&self) -> Option<&Bound<'py, PyDict>> {
-        None
     }
 
     fn iterate<'a, R>(

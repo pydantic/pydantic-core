@@ -7,9 +7,10 @@ use pyo3::{intern, prelude::*};
 use crate::errors::{ErrorTypeDefaults, InputValue, LocItem, ValError, ValResult};
 use crate::lookup_key::{LookupKey, LookupPath};
 use crate::tools::py_err;
+use crate::validators::ValBytesMode;
 
 use super::datetime::{EitherDate, EitherDateTime, EitherTime, EitherTimedelta};
-use super::return_enums::{EitherBytes, EitherInt, EitherString};
+use super::return_enums::{EitherBytes, EitherComplex, EitherInt, EitherString};
 use super::{EitherFloat, GenericIterator, ValidationMatch};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -71,7 +72,7 @@ pub trait Input<'py>: fmt::Debug + ToPyObject {
 
     fn validate_str(&self, strict: bool, coerce_numbers_to_str: bool) -> ValMatch<EitherString<'_>>;
 
-    fn validate_bytes<'a>(&'a self, strict: bool) -> ValMatch<EitherBytes<'a, 'py>>;
+    fn validate_bytes<'a>(&'a self, strict: bool, mode: ValBytesMode) -> ValMatch<EitherBytes<'a, 'py>>;
 
     fn validate_bool(&self, strict: bool) -> ValMatch<bool>;
 
@@ -97,18 +98,7 @@ pub trait Input<'py>: fmt::Debug + ToPyObject {
 
     fn validate_float(&self, strict: bool) -> ValMatch<EitherFloat<'_>>;
 
-    fn validate_decimal(&self, strict: bool, py: Python<'py>) -> ValResult<Bound<'py, PyAny>> {
-        if strict {
-            self.strict_decimal(py)
-        } else {
-            self.lax_decimal(py)
-        }
-    }
-    fn strict_decimal(&self, py: Python<'py>) -> ValResult<Bound<'py, PyAny>>;
-    #[cfg_attr(has_coverage_attribute, coverage(off))]
-    fn lax_decimal(&self, py: Python<'py>) -> ValResult<Bound<'py, PyAny>> {
-        self.strict_decimal(py)
-    }
+    fn validate_decimal(&self, strict: bool, py: Python<'py>) -> ValMatch<Bound<'py, PyAny>>;
 
     type Dict<'a>: ValidatedDict<'py>
     where
@@ -172,6 +162,8 @@ pub trait Input<'py>: fmt::Debug + ToPyObject {
         strict: bool,
         microseconds_overflow_behavior: speedate::MicrosecondsPrecisionOverflowBehavior,
     ) -> ValMatch<EitherTimedelta<'py>>;
+
+    fn validate_complex(&self, strict: bool, py: Python<'py>) -> ValMatch<EitherComplex<'py>>;
 }
 
 /// The problem to solve here is that iterating collections often returns owned
@@ -236,7 +228,6 @@ pub trait ValidatedDict<'py> {
     where
         Self: 'a;
     fn get_item<'k>(&self, key: &'k LookupKey) -> ValResult<Option<(&'k LookupPath, Self::Item<'_>)>>;
-    fn as_py_dict(&self) -> Option<&Bound<'py, PyDict>>;
     // FIXME this is a bit of a leaky abstraction
     fn is_py_get_attr(&self) -> bool {
         false
@@ -277,9 +268,6 @@ impl<'py> ValidatedDict<'py> for Never {
     type Key<'a> = Bound<'py, PyAny>;
     type Item<'a> = Bound<'py, PyAny>;
     fn get_item<'k>(&self, _key: &'k LookupKey) -> ValResult<Option<(&'k LookupPath, Self::Item<'_>)>> {
-        unreachable!()
-    }
-    fn as_py_dict(&self) -> Option<&Bound<'py, PyDict>> {
         unreachable!()
     }
     fn iterate<'a, R>(

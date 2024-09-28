@@ -40,7 +40,7 @@ macro_rules! combined_serializer {
         find_only: {$($builder:path;)*}
         both: {$($b_key:ident: $b_serializer:path;)*}
     ) => {
-        #[derive(Debug, Clone)]
+        #[derive(Debug)]
         #[enum_dispatch]
         pub enum CombinedSerializer {
             $($e_key($e_serializer),)*
@@ -88,7 +88,6 @@ combined_serializer! {
     // `find_only` is for type_serializers which are built directly via the `type` key and `find_serializer`
     // but aren't actually used for serialization, e.g. their `build` method must return another serializer
     find_only: {
-        super::type_serializers::union::TaggedUnionBuilder;
         super::type_serializers::other::ChainBuilder;
         super::type_serializers::other::CustomErrorBuilder;
         super::type_serializers::other::CallBuilder;
@@ -138,10 +137,12 @@ combined_serializer! {
         Json: super::type_serializers::json::JsonSerializer;
         JsonOrPython: super::type_serializers::json_or_python::JsonOrPythonSerializer;
         Union: super::type_serializers::union::UnionSerializer;
+        TaggedUnion: super::type_serializers::union::TaggedUnionSerializer;
         Literal: super::type_serializers::literal::LiteralSerializer;
         Enum: super::type_serializers::enum_::EnumSerializer;
         Recursive: super::type_serializers::definitions::DefinitionRefSerializer;
         Tuple: super::type_serializers::tuple::TupleSerializer;
+        Complex: super::type_serializers::complex::ComplexSerializer;
     }
 }
 
@@ -246,17 +247,19 @@ impl PyGcTraverse for CombinedSerializer {
             CombinedSerializer::Json(inner) => inner.py_gc_traverse(visit),
             CombinedSerializer::JsonOrPython(inner) => inner.py_gc_traverse(visit),
             CombinedSerializer::Union(inner) => inner.py_gc_traverse(visit),
+            CombinedSerializer::TaggedUnion(inner) => inner.py_gc_traverse(visit),
             CombinedSerializer::Literal(inner) => inner.py_gc_traverse(visit),
             CombinedSerializer::Enum(inner) => inner.py_gc_traverse(visit),
             CombinedSerializer::Recursive(inner) => inner.py_gc_traverse(visit),
             CombinedSerializer::Tuple(inner) => inner.py_gc_traverse(visit),
             CombinedSerializer::Uuid(inner) => inner.py_gc_traverse(visit),
+            CombinedSerializer::Complex(inner) => inner.py_gc_traverse(visit),
         }
     }
 }
 
 #[enum_dispatch(CombinedSerializer)]
-pub(crate) trait TypeSerializer: Send + Sync + Clone + Debug {
+pub(crate) trait TypeSerializer: Send + Sync + Debug {
     fn to_python(
         &self,
         value: &Bound<'_, PyAny>,
