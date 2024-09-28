@@ -94,7 +94,7 @@ impl TypeSerializer for DefinitionRefSerializer {
     ) -> PyResult<PyObject> {
         self.definition.read(|comb_serializer| {
             let comb_serializer = comb_serializer.unwrap();
-            if extra.duck_typing_ser_mode != DuckTypingSerMode::Inferred {
+            if extra.duck_typing_ser_mode == DuckTypingSerMode::NeedsInference {
                 comb_serializer.to_python(value, include, exclude, extra)
             } else {
                 let mut guard = extra.recursion_guard(value, self.definition.id())?;
@@ -117,7 +117,7 @@ impl TypeSerializer for DefinitionRefSerializer {
     ) -> Result<S::Ok, S::Error> {
         self.definition.read(|comb_serializer| {
             let comb_serializer = comb_serializer.unwrap();
-            if extra.duck_typing_ser_mode != DuckTypingSerMode::Inferred {
+            if extra.duck_typing_ser_mode.is_need_inference() {
                 comb_serializer.serde_serialize(value, serializer, include, exclude, extra)
             } else {
                 let mut guard = extra

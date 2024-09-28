@@ -47,6 +47,10 @@ impl DuckTypingSerMode {
         }
     }
 
+    pub fn is_need_inference(self) -> bool {
+        self == DuckTypingSerMode::NeedsInference
+    }
+
     pub fn to_bool(self) -> bool {
         match self {
             DuckTypingSerMode::SchemaBased => false,
