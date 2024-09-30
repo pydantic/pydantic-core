@@ -434,10 +434,12 @@ SerSchema = Union[
     ModelSerSchema,
 ]
 
+
 class InvalidSchema(TypedDict, total=False):
     type: Required[Literal['invalid']]
     ref: str
     metadata: Dict[str, Any]
+
 
 def invalid_schema(ref: str | None = None, metadata: Dict[str, Any] | None = None) -> InvalidSchema:
     """
@@ -450,9 +452,7 @@ def invalid_schema(ref: str | None = None, metadata: Dict[str, Any] | None = Non
         metadata: Any other information you want to include with the schema, not used by pydantic-core
     """
 
-    return _dict_not_none(
-        type='invalid', ref=ref, metadata=metadata
-    )
+    return _dict_not_none(type='invalid', ref=ref, metadata=metadata)
 
 
 class ComputedField(TypedDict, total=False):
