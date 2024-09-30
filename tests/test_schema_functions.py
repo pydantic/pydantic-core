@@ -300,7 +300,7 @@ def test_schema_functions(function, args_kwargs, expected_schema):
     args, kwargs = args_kwargs
     schema = function(*args, **kwargs)
     assert schema == expected_schema
-    if schema.get('type') in {None, 'definition-ref', 'typed-dict-field', 'model-field'}:
+    if schema.get('type') in {None, 'definition-ref', 'typed-dict-field', 'model-field', 'invalid'}:
         return
 
     v = SchemaValidator(schema)
