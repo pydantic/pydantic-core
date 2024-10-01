@@ -3,7 +3,6 @@ use std::borrow::Cow;
 use jiter::{JsonArray, JsonObject, JsonValue, LazyIndexMap};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyString};
-use smallvec::SmallVec;
 use speedate::MicrosecondsPrecisionOverflowBehavior;
 use strum::EnumMessage;
 
@@ -522,7 +521,7 @@ impl<'a, 'py, 'data> ValidatedList<'py> for &'a JsonArray<'data> {
     type Item = &'a JsonValue<'data>;
 
     fn len(&self) -> Option<usize> {
-        Some(SmallVec::len(self))
+        Some((**self).len())
     }
     fn iterate<R>(self, consumer: impl ConsumeIterator<PyResult<Self::Item>, Output = R>) -> ValResult<R> {
         Ok(consumer.consume_iterator(self.iter().map(Ok)))
@@ -536,7 +535,7 @@ impl<'a, 'data> ValidatedTuple<'_> for &'a JsonArray<'data> {
     type Item = &'a JsonValue<'data>;
 
     fn len(&self) -> Option<usize> {
-        Some(SmallVec::len(self))
+        Some((**self).len())
     }
     fn iterate<R>(self, consumer: impl ConsumeIterator<PyResult<Self::Item>, Output = R>) -> ValResult<R> {
         Ok(consumer.consume_iterator(self.iter().map(Ok)))
