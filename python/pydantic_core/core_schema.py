@@ -2478,7 +2478,6 @@ class UnionSchema(TypedDict, total=False):
     type: Required[Literal['union']]
     choices: Required[List[Union[CoreSchema, Tuple[CoreSchema, str]]]]
     # default true, whether to automatically collapse unions with one element to the inner validator
-    tagged_union_tag: str
     auto_collapse: bool
     custom_error_type: str
     custom_error_message: str
