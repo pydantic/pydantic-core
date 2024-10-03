@@ -14,7 +14,7 @@ pub use errors::{PydanticSerializationError, PydanticSerializationUnexpectedValu
 use extra::{CollectWarnings, SerRecursionState, WarningsMode};
 pub(crate) use extra::{DuckTypingSerMode, Extra, SerMode, SerializationState};
 pub use shared::CombinedSerializer;
-use shared::{to_json_bytes, BuildSerializer, TypeSerializer};
+use shared::{inc_ex_to_set, to_json_bytes, BuildSerializer, TypeSerializer};
 
 mod computed_fields;
 mod config;
@@ -133,6 +133,9 @@ impl SchemaSerializer {
         let warnings = CollectWarnings::new(warnings_mode);
         let rec_guard = SerRecursionState::default();
         let duck_typing_ser_mode = DuckTypingSerMode::from_bool(serialize_as_any);
+        let new_include = inc_ex_to_set(py, include)?;
+        let new_exclude = inc_ex_to_set(py, exclude)?;
+
         let extra = self.build_extra(
             py,
             &mode,
@@ -148,7 +151,9 @@ impl SchemaSerializer {
             duck_typing_ser_mode,
             context,
         );
-        let v = self.serializer.to_python(value, include, exclude, &extra)?;
+        let v = self
+            .serializer
+            .to_python(value, new_include.as_ref(), new_exclude.as_ref(), &extra)?;
         warnings.final_check(py)?;
         Ok(v)
     }
@@ -181,6 +186,9 @@ impl SchemaSerializer {
         let warnings = CollectWarnings::new(warnings_mode);
         let rec_guard = SerRecursionState::default();
         let duck_typing_ser_mode = DuckTypingSerMode::from_bool(serialize_as_any);
+        let new_include = inc_ex_to_set(py, include)?;
+        let new_exclude = inc_ex_to_set(py, exclude)?;
+
         let extra = self.build_extra(
             py,
             &SerMode::Json,
@@ -199,8 +207,8 @@ impl SchemaSerializer {
         let bytes = to_json_bytes(
             value,
             &self.serializer,
-            include,
-            exclude,
+            new_include.as_ref(),
+            new_exclude.as_ref(),
             &extra,
             indent,
             self.expected_json_size.load(Ordering::Relaxed),

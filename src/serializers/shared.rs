@@ -2,10 +2,10 @@ use std::borrow::Cow;
 use std::fmt::Debug;
 
 use pyo3::exceptions::PyTypeError;
-use pyo3::prelude::*;
 use pyo3::sync::GILOnceCell;
-use pyo3::types::{PyDict, PyString};
+use pyo3::types::{PyDict, PySet, PyString};
 use pyo3::{intern, PyTraverseError, PyVisit};
+use pyo3::{prelude::*, PyTypeInfo};
 
 use enum_dispatch::enum_dispatch;
 use serde::Serialize;
@@ -405,4 +405,28 @@ fn get_field_marker(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
         py.import_bound("dataclasses")?.getattr("_FIELD").map(|f| f.into_py(py))
     })?;
     Ok(field_type_marker_obj.bind(py).clone())
+}
+
+/// Try to convert the include or exclude values to a set if provided and not an instance of a dict.
+/// If it fails, returns the value as is, it might define `__contains__` and this will be handled in
+/// `FilterLogic::filter`.
+pub fn inc_ex_to_set<'py>(
+    py: Python<'py>,
+    maybe_inc_ex: Option<&Bound<'py, PyAny>>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    match maybe_inc_ex {
+        Some(inc_ex) => {
+            if inc_ex.is_instance_of::<PyDict>() {
+                // Return the mapping as-is:
+                Ok(Some(inc_ex.to_owned()))
+            } else {
+                // Try to convert to a set:
+                match PySet::type_object_bound(py).call1((inc_ex,)) {
+                    Ok(inc_ex_set) => Ok(Some(inc_ex_set.into_any())),
+                    Err(_) => Ok(Some(inc_ex.to_owned())),
+                }
+            }
+        }
+        None => Ok(None),
+    }
 }

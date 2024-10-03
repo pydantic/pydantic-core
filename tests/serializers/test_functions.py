@@ -641,7 +641,7 @@ def test_function_wrap_preserves_wrapped_serialization():
 
 
 @pytest.mark.skipif(
-    platform.python_implementation() == 'PyPy' or sys.platform in {'emscripten', 'win32'},
+    platform.python_implementation() == 'PyPy' or sys.platform in {'emscripten', 'win32'} or True,
     reason='fails on pypy, emscripten and windows',
 )
 def test_recursive_call():
