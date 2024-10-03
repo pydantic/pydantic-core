@@ -134,8 +134,8 @@ field_b
         ({}, Map(a=123), ({'a': 123, 'b': 4.2}, None, {'a'})),
         ({}, {b'a': '123'}, Err('Field required [type=missing,')),
         ({}, {'a': '123', 'c': 4}, ({'a': 123, 'b': 4.2}, None, {'a'})),
-        ({'extra_fields_behavior': 'allow'}, {'a': '123', 'c': 4}, ({'a': 123, 'b': 4.2}, {'c': 4}, {'a', 'c'})),
-        ({'extra_fields_behavior': 'allow'}, {'a': '123', b'c': 4}, Err('Keys should be strings [type=invalid_key,')),
+        ({'extra_behavior': 'allow'}, {'a': '123', 'c': 4}, ({'a': 123, 'b': 4.2}, {'c': 4}, {'a', 'c'})),
+        ({'extra_behavior': 'allow'}, {'a': '123', b'c': 4}, Err('Keys should be strings [type=invalid_key,')),
         (
             {'strict': True},
             Map(a=123),
@@ -218,7 +218,7 @@ def test_allow_extra_invalid():
 
 def test_allow_extra_wrong():
     with pytest.raises(SchemaError, match='Invalid extra_behavior: `wrong`'):
-        SchemaValidator({'type': 'model-fields', 'fields': {}}, {'extra_fields_behavior': 'wrong'})
+        SchemaValidator({'type': 'model-fields', 'fields': {}}, {'extra_behavior': 'wrong'})
 
 
 def test_str_config():
@@ -1653,11 +1653,11 @@ def test_frozen_field():
 @pytest.mark.parametrize(
     'config,schema_extra_behavior_kw',
     [
-        (core_schema.CoreConfig(extra_fields_behavior='allow'), {}),
-        (core_schema.CoreConfig(extra_fields_behavior='allow'), {'extra_behavior': None}),
+        (core_schema.CoreConfig(extra_behavior='allow'), {}),
+        (core_schema.CoreConfig(extra_behavior='allow'), {'extra_behavior': None}),
         (core_schema.CoreConfig(), {'extra_behavior': 'allow'}),
         (None, {'extra_behavior': 'allow'}),
-        (core_schema.CoreConfig(extra_fields_behavior='forbid'), {'extra_behavior': 'allow'}),
+        (core_schema.CoreConfig(extra_behavior='forbid'), {'extra_behavior': 'allow'}),
     ],
 )
 @pytest.mark.parametrize(
@@ -1695,11 +1695,11 @@ def test_extra_behavior_allow(
 @pytest.mark.parametrize(
     'config,schema_extra_behavior_kw',
     [
-        (core_schema.CoreConfig(extra_fields_behavior='forbid'), {}),
-        (core_schema.CoreConfig(extra_fields_behavior='forbid'), {'extra_behavior': None}),
+        (core_schema.CoreConfig(extra_behavior='forbid'), {}),
+        (core_schema.CoreConfig(extra_behavior='forbid'), {'extra_behavior': None}),
         (core_schema.CoreConfig(), {'extra_behavior': 'forbid'}),
         (None, {'extra_behavior': 'forbid'}),
-        (core_schema.CoreConfig(extra_fields_behavior='allow'), {'extra_behavior': 'forbid'}),
+        (core_schema.CoreConfig(extra_behavior='allow'), {'extra_behavior': 'forbid'}),
     ],
 )
 def test_extra_behavior_forbid(config: Union[core_schema.CoreConfig, None], schema_extra_behavior_kw: Dict[str, Any]):
@@ -1740,10 +1740,10 @@ def test_extra_behavior_forbid(config: Union[core_schema.CoreConfig, None], sche
 @pytest.mark.parametrize(
     'config,schema_extra_behavior_kw',
     [
-        (core_schema.CoreConfig(extra_fields_behavior='ignore'), {}),
+        (core_schema.CoreConfig(extra_behavior='ignore'), {}),
         (core_schema.CoreConfig(), {'extra_behavior': 'ignore'}),
         (None, {'extra_behavior': 'ignore'}),
-        (core_schema.CoreConfig(extra_fields_behavior='forbid'), {'extra_behavior': 'ignore'}),
+        (core_schema.CoreConfig(extra_behavior='forbid'), {'extra_behavior': 'ignore'}),
         (core_schema.CoreConfig(), {}),
         (core_schema.CoreConfig(), {'extra_behavior': None}),
         (None, {'extra_behavior': None}),

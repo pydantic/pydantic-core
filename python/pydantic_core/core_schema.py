@@ -51,7 +51,7 @@ class CoreConfig(TypedDict, total=False):
     Attributes:
         title: The name of the configuration.
         strict: Whether the configuration should strictly adhere to specified rules.
-        extra_fields_behavior: The behavior for handling extra fields.
+        extra_behavior: The behavior for handling extra fields.
         typed_dict_total: Whether the TypedDict should be considered total. Default is `True`.
         from_attributes: Whether to use attributes for models, dataclasses, and tagged union keys.
         loc_by_alias: Whether to use the used alias (or first alias for "field required" errors) instead of
@@ -83,7 +83,7 @@ class CoreConfig(TypedDict, total=False):
     title: str
     strict: bool
     # settings related to typed dicts, model fields, dataclass fields
-    extra_fields_behavior: ExtraBehavior
+    extra_behavior: ExtraBehavior
     typed_dict_total: bool  # default: True
     # used for models, dataclasses, and tagged union keys
     from_attributes: bool
