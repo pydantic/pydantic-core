@@ -1,8 +1,8 @@
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::sync::GILOnceCell;
-use pyo3::types::PyString;
 use pyo3::types::{PyDict, PyTuple};
+use pyo3::types::{PyFunction, PyString};
 use pyo3::PyTraverseError;
 use pyo3::PyVisit;
 
@@ -46,14 +46,21 @@ impl DefaultType {
         match self {
             Self::Default(ref default) => Ok(Some(default.clone_ref(py))),
             Self::DefaultFactory(ref default_factory) => {
-                let co_vars = default_factory.getattr(py, "__code__")?.getattr(py, "co_varnames")?;
-                let default_factory_args: &Bound<PyTuple> = co_vars.downcast_bound::<PyTuple>(py)?;
+                let is_func = default_factory.downcast_bound::<PyFunction>(py).is_ok();
 
-                let result = if default_factory_args.len() >= 1 && !validated_data.is_none() {
-                    default_factory.call1(py, (validated_data.as_deref().unwrap(),))
+                let result = if is_func {
+                    let co_vars = default_factory.getattr(py, "__code__")?.getattr(py, "co_varnames")?;
+                    let default_factory_args: &Bound<PyTuple> = co_vars.downcast_bound::<PyTuple>(py)?;
+
+                    if default_factory_args.len() >= 1 && !validated_data.is_none() {
+                        default_factory.call1(py, (validated_data.as_deref().unwrap(),))
+                    } else {
+                        default_factory.call0(py)
+                    }
                 } else {
                     default_factory.call0(py)
                 }?;
+
                 Ok(Some(result))
             }
             Self::None => Ok(None),
