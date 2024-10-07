@@ -1471,12 +1471,7 @@ def test_with_default_factory():
     'default_factory,error_message',
     [
         (lambda: 1 + 'a', "unsupported operand type(s) for +: 'int' and 'str'"),
-        (
-            lambda x: 'a' + x,
-            "unsupported operand type(s) for +: 'str' and 'dict'"
-            if sys.version_info <= (3, 10)
-            else 'can only concatenate str (not "dict") to str',
-        ),
+        (lambda x: 'a' + x, "unsupported operand type(s) for +: 'str' and 'dict'"),
     ],
 )
 def test_bad_default_factory(default_factory, error_message):
