@@ -15,7 +15,9 @@ def gen_error(*things):
 
 def test_generator_any_iter():
     s = SchemaSerializer(core_schema.generator_schema(core_schema.any_schema()))
-    gen = s.to_python(gen_ok('a', b'b', 3))
+    gen_inner = gen_ok('a', b'b', 3)
+    gen = s.to_python(gen_inner)
+    assert gen.iterator is gen_inner
     assert repr(gen) == IsStr(regex=r'SerializationIterator\(index=0, iterator=<generator object gen_ok at 0x\w+>\)')
     assert str(gen) == repr(gen)
     assert gen.index == 0
@@ -33,7 +35,9 @@ def test_generator_any_iter():
 
 def test_any_iter():
     s = SchemaSerializer(core_schema.any_schema())
-    gen = s.to_python(gen_ok('a', b'b', 3))
+    gen_inner = gen_ok('a', b'b', 3)
+    gen = s.to_python(gen_inner)
+    assert gen.iterator is gen_inner
     assert repr(gen) == IsStr(regex=r'SerializationIterator\(index=0, iterator=<generator object gen_ok at 0x\w+>\)')
     assert str(gen) == repr(gen)
     assert next(gen) == 'a'
@@ -93,7 +97,9 @@ def test_generator_int():
     ):
         s.to_json(gen_ok(1, 'a'))
 
-    gen = s.to_python(gen_ok(1, 'a'))
+    gen_inner = gen_ok(1, 'a')
+    gen = s.to_python(gen_inner)
+    assert gen.iterator is gen_inner
     assert next(gen) == 1
     with pytest.warns(
         UserWarning, match="Expected `int` but got `str` with value `'a'` - serialized value may not be as expected"
