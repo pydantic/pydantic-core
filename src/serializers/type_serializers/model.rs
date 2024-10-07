@@ -15,7 +15,6 @@ use crate::build_tools::py_schema_err;
 use crate::build_tools::{py_schema_error_type, ExtraBehavior};
 use crate::definitions::DefinitionsBuilder;
 use crate::serializers::errors::PydanticSerializationUnexpectedValue;
-use crate::serializers::extra::DuckTypingSerMode;
 use crate::tools::SchemaDict;
 
 const ROOT_FIELD: &str = "root";
@@ -166,16 +165,8 @@ impl TypeSerializer for ModelSerializer {
         extra: &Extra,
     ) -> PyResult<PyObject> {
         let model = Some(value);
-        let duck_typing_ser_mode = extra.duck_typing_ser_mode.next_mode();
 
-        let model_extra = Extra {
-            model,
-            duck_typing_ser_mode,
-            ..*extra
-        };
-        if model_extra.duck_typing_ser_mode == DuckTypingSerMode::Inferred {
-            return infer_to_python(value, include, exclude, &model_extra);
-        }
+        let model_extra = Extra { model, ..*extra };
         if self.root_model {
             let field_name = Some(ROOT_FIELD);
             let root_extra = Extra {
@@ -218,15 +209,7 @@ impl TypeSerializer for ModelSerializer {
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         let model = Some(value);
-        let duck_typing_ser_mode = extra.duck_typing_ser_mode.next_mode();
-        let model_extra = Extra {
-            model,
-            duck_typing_ser_mode,
-            ..*extra
-        };
-        if model_extra.duck_typing_ser_mode == DuckTypingSerMode::Inferred {
-            return infer_serialize(value, serializer, include, exclude, &model_extra);
-        }
+        let model_extra = Extra { model, ..*extra };
         if self.root_model {
             let field_name = Some(ROOT_FIELD);
             let root_extra = Extra {

@@ -7,7 +7,6 @@ use pyo3::types::{PyDict, PyList};
 
 use crate::definitions::DefinitionsBuilder;
 use crate::definitions::{DefinitionRef, RecursionSafeCache};
-use crate::serializers::DuckTypingSerMode;
 
 use crate::tools::SchemaDict;
 
@@ -94,12 +93,8 @@ impl TypeSerializer for DefinitionRefSerializer {
     ) -> PyResult<PyObject> {
         self.definition.read(|comb_serializer| {
             let comb_serializer = comb_serializer.unwrap();
-            if extra.duck_typing_ser_mode == DuckTypingSerMode::NeedsInference {
-                comb_serializer.to_python(value, include, exclude, extra)
-            } else {
-                let mut guard = extra.recursion_guard(value, self.definition.id())?;
-                comb_serializer.to_python(value, include, exclude, guard.state())
-            }
+            let mut guard = extra.recursion_guard(value, self.definition.id())?;
+            comb_serializer.to_python(value, include, exclude, guard.state())
         })
     }
 
@@ -117,14 +112,10 @@ impl TypeSerializer for DefinitionRefSerializer {
     ) -> Result<S::Ok, S::Error> {
         self.definition.read(|comb_serializer| {
             let comb_serializer = comb_serializer.unwrap();
-            if extra.duck_typing_ser_mode.is_need_inference() {
-                comb_serializer.serde_serialize(value, serializer, include, exclude, extra)
-            } else {
-                let mut guard = extra
-                    .recursion_guard(value, self.definition.id())
-                    .map_err(py_err_se_err)?;
-                comb_serializer.serde_serialize(value, serializer, include, exclude, guard.state())
-            }
+            let mut guard = extra
+                .recursion_guard(value, self.definition.id())
+                .map_err(py_err_se_err)?;
+            comb_serializer.serde_serialize(value, serializer, include, exclude, guard.state())
         })
     }
 

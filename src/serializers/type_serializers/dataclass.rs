@@ -8,7 +8,6 @@ use serde::ser::SerializeMap;
 
 use crate::build_tools::{py_schema_error_type, ExtraBehavior};
 use crate::definitions::DefinitionsBuilder;
-use crate::serializers::DuckTypingSerMode;
 use crate::tools::SchemaDict;
 
 use super::{
@@ -134,35 +133,27 @@ impl TypeSerializer for DataclassSerializer {
         extra: &Extra,
     ) -> PyResult<PyObject> {
         let model = Some(value);
-        let duck_typing_ser_mode = extra.duck_typing_ser_mode.next_mode();
-        let dc_extra = Extra {
-            model,
-            duck_typing_ser_mode,
-            ..*extra
-        };
-        if dc_extra.duck_typing_ser_mode == DuckTypingSerMode::Inferred {
-            return infer_to_python(value, include, exclude, &dc_extra);
-        }
-        if self.allow_value(value, &dc_extra)? {
+        let model_extra = Extra { model, ..*extra };
+        if self.allow_value(value, &model_extra)? {
             let py = value.py();
             if let CombinedSerializer::Fields(ref fields_serializer) = *self.serializer {
-                let output_dict = fields_serializer.main_to_python(
+                let output_dict: Bound<PyDict> = fields_serializer.main_to_python(
                     py,
                     known_dataclass_iter(&self.fields, value),
                     include,
                     exclude,
-                    dc_extra,
+                    model_extra,
                 )?;
 
                 fields_serializer.add_computed_fields_python(model, &output_dict, include, exclude, extra)?;
                 Ok(output_dict.into_py(py))
             } else {
                 let inner_value = self.get_inner_value(value)?;
-                self.serializer.to_python(&inner_value, include, exclude, &dc_extra)
+                self.serializer.to_python(&inner_value, include, exclude, &model_extra)
             }
         } else {
-            extra.warnings.on_fallback_py(self.get_name(), value, &dc_extra)?;
-            infer_to_python(value, include, exclude, &dc_extra)
+            extra.warnings.on_fallback_py(self.get_name(), value, &model_extra)?;
+            infer_to_python(value, include, exclude, &model_extra)
         }
     }
 
@@ -183,17 +174,9 @@ impl TypeSerializer for DataclassSerializer {
         exclude: Option<&Bound<'_, PyAny>>,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
-        let duck_typing_ser_mode = extra.duck_typing_ser_mode.next_mode();
         let model = Some(value);
-        let dc_extra = Extra {
-            model,
-            duck_typing_ser_mode,
-            ..*extra
-        };
-        if dc_extra.duck_typing_ser_mode == DuckTypingSerMode::Inferred {
-            return infer_serialize(value, serializer, include, exclude, &dc_extra);
-        }
-        if self.allow_value(value, &dc_extra).map_err(py_err_se_err)? {
+        let model_extra = Extra { model, ..*extra };
+        if self.allow_value(value, &model_extra).map_err(py_err_se_err)? {
             if let CombinedSerializer::Fields(ref fields_serializer) = *self.serializer {
                 let expected_len = self.fields.len() + fields_serializer.computed_field_count();
                 let mut map = fields_serializer.main_serde_serialize(
@@ -202,18 +185,20 @@ impl TypeSerializer for DataclassSerializer {
                     serializer,
                     include,
                     exclude,
-                    dc_extra,
+                    model_extra,
                 )?;
                 fields_serializer.add_computed_fields_json::<S>(model, &mut map, include, exclude, extra)?;
                 map.end()
             } else {
                 let inner_value = self.get_inner_value(value).map_err(py_err_se_err)?;
                 self.serializer
-                    .serde_serialize(&inner_value, serializer, include, exclude, &dc_extra)
+                    .serde_serialize(&inner_value, serializer, include, exclude, &model_extra)
             }
         } else {
-            extra.warnings.on_fallback_ser::<S>(self.get_name(), value, &dc_extra)?;
-            infer_serialize(value, serializer, include, exclude, &dc_extra)
+            extra
+                .warnings
+                .on_fallback_ser::<S>(self.get_name(), value, &model_extra)?;
+            infer_serialize(value, serializer, include, exclude, &model_extra)
         }
     }
 

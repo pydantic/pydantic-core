@@ -567,7 +567,7 @@ impl SerializationInfo {
                     exclude_none: extra.exclude_none,
                     round_trip: extra.round_trip,
                     field_name: Some(field_name.to_string()),
-                    serialize_as_any: extra.duck_typing_ser_mode.to_bool(),
+                    serialize_as_any: extra.serialize_as_any,
                 }),
                 _ => Err(PyRuntimeError::new_err(
                     "Model field context expected for field serialization info but no model field was found",
@@ -585,7 +585,7 @@ impl SerializationInfo {
                 exclude_none: extra.exclude_none,
                 round_trip: extra.round_trip,
                 field_name: None,
-                serialize_as_any: extra.duck_typing_ser_mode.to_bool(),
+                serialize_as_any: extra.serialize_as_any,
             })
         }
     }
