@@ -1,8 +1,8 @@
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::sync::GILOnceCell;
-use pyo3::types::PyDict;
 use pyo3::types::PyString;
+use pyo3::types::{PyDict, PyTuple};
 use pyo3::PyTraverseError;
 use pyo3::PyVisit;
 
@@ -42,10 +42,20 @@ impl DefaultType {
         }
     }
 
-    pub fn default_value(&self, py: Python) -> PyResult<Option<PyObject>> {
+    pub fn default_value(&self, py: Python, validated_data: &Option<Bound<PyDict>>) -> PyResult<Option<PyObject>> {
         match self {
             Self::Default(ref default) => Ok(Some(default.clone_ref(py))),
-            Self::DefaultFactory(ref default_factory) => Ok(Some(default_factory.call0(py)?)),
+            Self::DefaultFactory(ref default_factory) => {
+                let co_vars = default_factory.getattr(py, "__code__")?.getattr(py, "co_varnames")?;
+                let default_factory_args: &Bound<PyTuple> = co_vars.downcast_bound::<PyTuple>(py)?;
+
+                let result = if default_factory_args.len() >= 1 && !validated_data.is_none() {
+                    default_factory.call1(py, (validated_data.as_deref().unwrap(),))
+                } else {
+                    default_factory.call0(py)
+                }?;
+                Ok(Some(result))
+            }
             Self::None => Ok(None),
         }
     }
@@ -163,7 +173,7 @@ impl Validator for WithDefaultValidator {
         outer_loc: Option<impl Into<LocItem>>,
         state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<Option<PyObject>> {
-        match self.default.default_value(py)? {
+        match self.default.default_value(py, &state.extra().data)? {
             Some(stored_dft) => {
                 let dft: Py<PyAny> = if self.copy_default {
                     let deepcopy_func = COPY_DEEPCOPY.get_or_init(py, || get_deepcopy(py).unwrap());

@@ -240,7 +240,7 @@ def test_factory_type_error():
         v.validate_python('wrong')
 
 
-def test_typed_dict_error():
+def test_typed_dict():
     v = SchemaValidator(
         {
             'type': 'typed-dict',
@@ -248,14 +248,17 @@ def test_typed_dict_error():
                 'x': {'type': 'typed-dict-field', 'schema': {'type': 'str'}},
                 'y': {
                     'type': 'typed-dict-field',
-                    'schema': {'type': 'default', 'schema': {'type': 'str'}, 'default_factory': lambda y: y * 2},
+                    'schema': {
+                        'type': 'default',
+                        'schema': {'type': 'str'},
+                        'default_factory': lambda v_data: v_data['x'] + ' and y',
+                    },
                 },
             },
         }
     )
     assert v.validate_python({'x': 'x', 'y': 'y'}) == {'x': 'x', 'y': 'y'}
-    with pytest.raises(TypeError, match=r"<lambda>\(\) missing 1 required positional argument: 'y'"):
-        v.validate_python({'x': 'x'})
+    assert v.validate_python({'x': 'x value'}) == {'x': 'x value', 'y': 'x value and y'}
 
 
 def test_on_error_default_not_int():
@@ -812,3 +815,32 @@ def test_validate_default_raises_dataclass(input_value: dict, expected: Any) -> 
         v.validate_python(input_value)
 
     assert exc_info.value.errors(include_url=False, include_context=False) == expected
+
+
+def test_typed_dict_default_factory():
+    v = SchemaValidator(
+        {
+            'type': 'typed-dict',
+            'fields': {
+                'x': {'type': 'typed-dict-field', 'schema': {'type': 'str'}},
+                'y': {
+                    'type': 'typed-dict-field',
+                    'schema': {
+                        'type': 'default',
+                        'schema': {'type': 'str'},
+                        'default_factory': lambda v_data: v_data['x'] + ' and y',
+                    },
+                },
+                'z': {
+                    'type': 'typed-dict-field',
+                    'schema': {
+                        'type': 'default',
+                        'schema': {'type': 'str'},
+                        'default_factory': lambda v_data: v_data['y'] + ' and z',
+                    },
+                },
+            },
+        }
+    )
+    assert v.validate_python({'x': 'x', 'y': 'y', 'z': 'z'}) == {'x': 'x', 'y': 'y', 'z': 'z'}
+    assert v.validate_python({'x': 'x'}) == {'x': 'x', 'y': 'x and y', 'z': 'x and y and z'}

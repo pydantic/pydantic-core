@@ -879,7 +879,7 @@ def test_field_required_and_default_factory():
     'default_factory,error_message',
     [
         (lambda: 1 + 'a', "unsupported operand type(s) for +: 'int' and 'str'"),
-        (lambda x: 'a' + x, "<lambda>() missing 1 required positional argument: 'x'"),
+        (lambda x: 'a' + x, 'can only concatenate str (not "dict") to str'),
     ],
 )
 def test_bad_default_factory(default_factory, error_message):
