@@ -436,12 +436,6 @@ jobs:
           - os: linux
             manylinux: musllinux_1_1
             target: armv7
-          - os: linux
-            manylinux: musllinux_1_1
-            target: ppc64le
-          - os: linux
-            manylinux: musllinux_1_1
-            target: s390x
 
           # macos;
           # all versions x86_64
