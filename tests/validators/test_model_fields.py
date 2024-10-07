@@ -1475,7 +1475,8 @@ def test_with_default_factory():
         (
             lambda x: 'a' + x,
             "unsupported operand type(s) for +: 'str' and 'dict'"
-            if sys.version_info <= (3, 10) and (platform.python_implementation() == 'PyPy')
+            # fix pypy3.10 CI failed
+            if sys.version_info < (3, 11) and (platform.python_implementation() == 'PyPy')
             else 'can only concatenate str (not "dict") to str',
         ),
     ],
