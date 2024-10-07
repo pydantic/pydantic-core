@@ -355,3 +355,8 @@ def test_expected_serialization_types(return_schema):
             )
         )
     )
+
+
+def test_err_on_invalid() -> None:
+    with pytest.raises(SchemaError, match='Cannot construct schema with `InvalidSchema` member.'):
+        SchemaValidator(core_schema.invalid_schema())
