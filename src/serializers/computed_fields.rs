@@ -12,6 +12,7 @@ use crate::serializers::shared::{BuildSerializer, CombinedSerializer, PydanticSe
 use crate::tools::SchemaDict;
 
 use super::errors::py_err_se_err;
+use super::type_serializers::any::AnySerializer;
 use super::Extra;
 
 #[derive(Debug)]
@@ -156,10 +157,12 @@ impl ComputedField {
 
         if let Some((next_include, next_exclude)) = filter.key_filter(property_name_py, include, exclude)? {
             let next_value = model.getattr(property_name_py)?;
-
-            let value = self
-                .serializer
-                .to_python(&next_value, next_include.as_ref(), next_exclude.as_ref(), extra)?;
+            let serializer = if extra.serialize_as_any {
+                AnySerializer::get()
+            } else {
+                &self.serializer
+            };
+            let value = serializer.to_python(&next_value, next_include.as_ref(), next_exclude.as_ref(), extra)?;
             if extra.exclude_none && value.is_none(py) {
                 return Ok(());
             }
@@ -198,7 +201,11 @@ impl<'py> Serialize for ComputedFieldSerializer<'py> {
         let next_value = self.model.getattr(property_name_py).map_err(py_err_se_err)?;
         let s = PydanticSerializer::new(
             &next_value,
-            &self.computed_field.serializer,
+            if self.extra.serialize_as_any {
+                AnySerializer::get()
+            } else {
+                &self.computed_field.serializer
+            },
             self.include,
             self.exclude,
             self.extra,

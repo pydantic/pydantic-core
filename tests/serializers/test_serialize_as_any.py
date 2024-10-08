@@ -158,6 +158,78 @@ def test_serialize_as_any_with_unrelated_models() -> None:
     }
 
 
+def test_serialize_as_any_with_nested_models() -> None:
+    class Parent:
+        x: int
+
+    class Other(Parent):
+        y: str
+
+    class Outer:
+        p: Parent
+
+    Parent.__pydantic_core_schema__ = core_schema.model_schema(
+        Parent,
+        core_schema.model_fields_schema(
+            {
+                'x': core_schema.model_field(core_schema.int_schema()),
+            }
+        ),
+        ref='Parent',
+    )
+    Parent.__pydantic_validator__ = SchemaValidator(Parent.__pydantic_core_schema__)
+    Parent.__pydantic_serializer__ = SchemaSerializer(Parent.__pydantic_core_schema__)
+
+    Other.__pydantic_core_schema__ = core_schema.model_schema(
+        Other,
+        core_schema.model_fields_schema(
+            {
+                'x': core_schema.model_field(core_schema.int_schema()),
+                'y': core_schema.model_field(core_schema.str_schema()),
+            }
+        ),
+        config=core_schema.CoreConfig(extra_fields_behavior='allow'),
+    )
+    Other.__pydantic_validator__ = SchemaValidator(Other.__pydantic_core_schema__)
+    Other.__pydantic_serializer__ = SchemaSerializer(Other.__pydantic_core_schema__)
+
+    Outer.__pydantic_core_schema__ = core_schema.definitions_schema(
+        core_schema.model_schema(
+            Outer,
+            core_schema.model_fields_schema(
+                {
+                    'p': core_schema.model_field(core_schema.definition_reference_schema('Parent')),
+                }
+            ),
+        ),
+        [
+            Parent.__pydantic_core_schema__,
+        ],
+    )
+    Outer.__pydantic_validator__ = SchemaValidator(Outer.__pydantic_core_schema__)
+    Outer.__pydantic_serializer__ = SchemaSerializer(Outer.__pydantic_core_schema__)
+
+    other = Other.__pydantic_validator__.validate_python({'x': 1, 'y': 'hopefully not a secret'})
+    outer = Outer()
+    outer.p = other
+
+    assert Outer.__pydantic_serializer__.to_python(outer, serialize_as_any=False) == {
+        'p': {'x': 1},
+    }
+    assert Outer.__pydantic_serializer__.to_python(outer, serialize_as_any=True) == {
+        'p': {
+            'x': 1,
+            'y': 'hopefully not a secret',
+        }
+    }
+
+    assert Outer.__pydantic_serializer__.to_json(outer, serialize_as_any=False) == b'{"p":{"x":1}}'
+    assert (
+        Outer.__pydantic_serializer__.to_json(outer, serialize_as_any=True)
+        == b'{"p":{"x":1,"y":"hopefully not a secret"}}'
+    )
+
+
 def test_serialize_with_recursive_models() -> None:
     class Node:
         next: Optional['Node'] = None
