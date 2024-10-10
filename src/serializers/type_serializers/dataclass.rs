@@ -133,8 +133,8 @@ impl TypeSerializer for DataclassSerializer {
         extra: &Extra,
     ) -> PyResult<PyObject> {
         let model = Some(value);
-        let model_extra = Extra { model, ..*extra };
-        if self.allow_value(value, &model_extra)? {
+        let dc_extra = Extra { model, ..*extra };
+        if self.allow_value(value, &dc_extra)? {
             let py = value.py();
             if let CombinedSerializer::Fields(ref fields_serializer) = *self.serializer {
                 let output_dict: Bound<PyDict> = fields_serializer.main_to_python(
@@ -142,18 +142,18 @@ impl TypeSerializer for DataclassSerializer {
                     known_dataclass_iter(&self.fields, value),
                     include,
                     exclude,
-                    model_extra,
+                    dc_extra,
                 )?;
 
                 fields_serializer.add_computed_fields_python(model, &output_dict, include, exclude, extra)?;
                 Ok(output_dict.into_py(py))
             } else {
                 let inner_value = self.get_inner_value(value)?;
-                self.serializer.to_python(&inner_value, include, exclude, &model_extra)
+                self.serializer.to_python(&inner_value, include, exclude, &dc_extra)
             }
         } else {
-            extra.warnings.on_fallback_py(self.get_name(), value, &model_extra)?;
-            infer_to_python(value, include, exclude, &model_extra)
+            extra.warnings.on_fallback_py(self.get_name(), value, &dc_extra)?;
+            infer_to_python(value, include, exclude, &dc_extra)
         }
     }
 
@@ -175,8 +175,8 @@ impl TypeSerializer for DataclassSerializer {
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         let model = Some(value);
-        let model_extra = Extra { model, ..*extra };
-        if self.allow_value(value, &model_extra).map_err(py_err_se_err)? {
+        let dc_extra = Extra { model, ..*extra };
+        if self.allow_value(value, &dc_extra).map_err(py_err_se_err)? {
             if let CombinedSerializer::Fields(ref fields_serializer) = *self.serializer {
                 let expected_len = self.fields.len() + fields_serializer.computed_field_count();
                 let mut map = fields_serializer.main_serde_serialize(
@@ -185,20 +185,18 @@ impl TypeSerializer for DataclassSerializer {
                     serializer,
                     include,
                     exclude,
-                    model_extra,
+                    dc_extra,
                 )?;
                 fields_serializer.add_computed_fields_json::<S>(model, &mut map, include, exclude, extra)?;
                 map.end()
             } else {
                 let inner_value = self.get_inner_value(value).map_err(py_err_se_err)?;
                 self.serializer
-                    .serde_serialize(&inner_value, serializer, include, exclude, &model_extra)
+                    .serde_serialize(&inner_value, serializer, include, exclude, &dc_extra)
             }
         } else {
-            extra
-                .warnings
-                .on_fallback_ser::<S>(self.get_name(), value, &model_extra)?;
-            infer_serialize(value, serializer, include, exclude, &model_extra)
+            extra.warnings.on_fallback_ser::<S>(self.get_name(), value, &dc_extra)?;
+            infer_serialize(value, serializer, include, exclude, &dc_extra)
         }
     }
 
