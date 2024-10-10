@@ -1,4 +1,5 @@
 import math
+import platform
 import re
 import sys
 from dataclasses import dataclass
@@ -1471,7 +1472,13 @@ def test_with_default_factory():
     'default_factory,error_message',
     [
         (lambda: 1 + 'a', "unsupported operand type(s) for +: 'int' and 'str'"),
-        (lambda x: 'a' + x, "<lambda>() missing 1 required positional argument: 'x'"),
+        (
+            lambda x: 'a' + x,
+            "unsupported operand type(s) for +: 'str' and 'dict'"
+            # fix pypy3.10 CI failed
+            if sys.version_info < (3, 11) and (platform.python_implementation() == 'PyPy')
+            else 'can only concatenate str (not "dict") to str',
+        ),
     ],
 )
 def test_bad_default_factory(default_factory, error_message):
