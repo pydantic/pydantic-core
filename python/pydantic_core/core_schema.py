@@ -1457,6 +1457,30 @@ def uuid_schema(
     )
 
 
+class NestedSchema(TypedDict, total=False):
+    type: Required[Literal['nested']]
+    cls: Required[Type[Any]]
+    # Should return `(CoreSchema, SchemaValidator, SchemaSerializer)` but this requires a forward ref
+    get_info: Required[Callable[[], Any]]
+    metadata: Dict[str, Any]
+    serialization: SerSchema
+
+def nested_schema(
+    *,
+    cls: Type[Any],
+    get_info: Callable[[], Any],
+    metadata: Dict[str, Any] | None = None,
+    serialization: SerSchema | None = None
+) -> NestedSchema:
+    return _dict_not_none(
+        type='nested',
+        cls=cls,
+        get_info=get_info,
+        metadata=metadata,
+        serialization=serialization
+    )
+
+
 class IncExSeqSerSchema(TypedDict, total=False):
     type: Required[Literal['include-exclude-sequence']]
     include: Set[int]
@@ -3896,6 +3920,7 @@ if not MYPY:
         DefinitionReferenceSchema,
         UuidSchema,
         ComplexSchema,
+        NestedSchema,
     ]
 elif False:
     CoreSchema: TypeAlias = Mapping[str, Any]
@@ -3953,6 +3978,7 @@ CoreSchemaType = Literal[
     'definition-ref',
     'uuid',
     'complex',
+    'nested',
 ]
 
 CoreSchemaFieldType = Literal['model-field', 'dataclass-field', 'typed-dict-field', 'computed-field']
