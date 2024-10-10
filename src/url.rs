@@ -155,6 +155,14 @@ impl PyUrl {
         (self.__str__(),)
     }
 
+    fn __truediv__(&self, other: &str) -> PyResult<Self> {
+        self.join(other, true)
+    }
+
+    fn __floordiv__(&self, other: &str) -> PyResult<Self> {
+        self.join(other, false)
+    }
+
     #[classmethod]
     #[pyo3(signature=(*, scheme, host, username=None, password=None, port=None, path=None, query=None, fragment=None))]
     #[allow(clippy::too_many_arguments)]
@@ -189,6 +197,26 @@ impl PyUrl {
             url.push_str(fragment);
         }
         cls.call1((url,))
+    }
+
+    #[pyo3(signature=(path, trailing_slash=true))]
+    pub fn join(&self, path: &str, trailing_slash: bool) -> PyResult<Self> {
+        let mut new_url = self
+            .lib_url
+            .join(path)
+            .map_err(|err| PyValueError::new_err(err.to_string()))?;
+
+        if !trailing_slash || new_url.query().is_some() || new_url.fragment().is_some() || new_url.cannot_be_a_base() {
+            return Ok(PyUrl::new(new_url));
+        }
+
+        new_url
+            .path_segments_mut()
+            .map_err(|()| PyValueError::new_err("Url cannot be a base"))?
+            .pop_if_empty()
+            .push("");
+
+        Ok(PyUrl::new(new_url))
     }
 }
 
