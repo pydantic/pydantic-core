@@ -1233,6 +1233,21 @@ def test_multi_url_build() -> None:
     assert str(url) == 'postgresql://testuser:testpassword@127.0.0.1:5432/database?sslmode=require#test'
 
 
+def test_multi_url_build_password_encode() -> None:
+    url = MultiHostUrl.build(
+        scheme='postgresql',
+        username='testuser',
+        password='test?password',
+        host='127.0.0.1',
+        port=5432,
+        path='database',
+        query='sslmode=require',
+        fragment='test',
+    )
+    assert url == MultiHostUrl('postgresql://testuser:test%3Fpassword@127.0.0.1:5432/database?sslmode=require#test')
+    assert str(url) == 'postgresql://testuser:test%3Fpassword@127.0.0.1:5432/database?sslmode=require#test'
+
+
 @pytest.mark.parametrize('field', ['host', 'password', 'username', 'port'])
 def test_multi_url_build_hosts_set_with_single_value(field) -> None:
     """Hosts can't be provided with any single url values."""
