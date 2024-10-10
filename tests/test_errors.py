@@ -258,7 +258,7 @@ all_errors = [
     ('json_invalid', 'Invalid JSON: foobar', {'error': 'foobar'}),
     ('json_type', 'JSON input should be string, bytes or bytearray', None),
     (
-        'cannot_validate_from_json',
+        'needs_python_object',
         'Cannot check `isinstance` when validating from json, use a JsonOrPython validator instead',
         {'method_name': 'isinstance'},
     ),
@@ -511,7 +511,7 @@ def test_all_errors():
             'example_context': None,
         },
         {
-            'type': 'cannot_validate_from_json',
+            'type': 'needs_python_object',
             'message_template_python': 'Cannot check `{method_name}` when validating from json, use a JsonOrPython validator instead',
             'example_message_python': 'Cannot check `` when validating from json, use a JsonOrPython validator instead',
             'example_context': {'method_name': ''},

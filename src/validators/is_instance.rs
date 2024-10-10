@@ -57,7 +57,7 @@ impl Validator for IsInstanceValidator {
         let Some(obj) = input.as_python() else {
             let method_name = "isinstance".to_string();
             return Err(ValError::new(
-                ErrorType::CannotValidateFromJson {
+                ErrorType::NeedsPythonObject {
                     context: None,
                     method_name,
                 },

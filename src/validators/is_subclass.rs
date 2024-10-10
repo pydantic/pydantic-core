@@ -52,7 +52,7 @@ impl Validator for IsSubclassValidator {
         let Some(obj) = input.as_python() else {
             let method_name = "issubclass".to_string();
             return Err(ValError::new(
-                ErrorType::CannotValidateFromJson {
+                ErrorType::NeedsPythonObject {
                     context: None,
                     method_name,
                 },
