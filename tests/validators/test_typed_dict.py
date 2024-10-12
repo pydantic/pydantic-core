@@ -891,15 +891,13 @@ def test_field_required_and_default_factory():
 )
 def test_bad_default_factory(default_factory, error_message):
     v = SchemaValidator(
-        {
-            'type': 'typed-dict',
-            'fields': {
-                'x': {
-                    'type': 'typed-dict-field',
-                    'schema': {'type': 'default', 'schema': {'type': 'str'}, 'default_factory': default_factory},
-                }
-            },
-        }
+        core_schema.typed_dict_schema(
+            fields={
+                'x': core_schema.typed_dict_field(
+                    core_schema.with_default_schema(core_schema.str_schema(), default_factory=default_factory)
+                )
+            }
+        ),
     )
     with pytest.raises(TypeError, match=re.escape(error_message)):
         v.validate_python({})

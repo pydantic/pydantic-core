@@ -17,6 +17,10 @@ def make_5():
     return 5
 
 
+def make_5_with_arg(d):
+    return 5
+
+
 class MyModel:
     __slots__ = '__dict__', '__pydantic_fields_set__', '__pydantic_extra__', '__pydantic_private__'
 
@@ -143,17 +147,27 @@ all_schema_functions = [
     (
         core_schema.with_default_schema,
         args({'type': 'int'}, default=5),
-        {'type': 'default', 'schema': {'type': 'int'}, 'default': 5},
+        {'type': 'default', 'schema': {'type': 'int'}, 'default': 5, 'default_factory_has_args': False},
     ),
     (
         core_schema.with_default_schema,
         args({'type': 'int'}, default=None),
-        {'type': 'default', 'schema': {'type': 'int'}, 'default': None},
+        {'type': 'default', 'schema': {'type': 'int'}, 'default': None, 'default_factory_has_args': False},
     ),
     (
         core_schema.with_default_schema,
         args({'type': 'int'}, default_factory=make_5),
-        {'type': 'default', 'schema': {'type': 'int'}, 'default_factory': make_5},
+        {'type': 'default', 'schema': {'type': 'int'}, 'default_factory': make_5, 'default_factory_has_args': False},
+    ),
+    (
+        core_schema.with_default_schema,
+        args({'type': 'int'}, default_factory=make_5_with_arg),
+        {
+            'type': 'default',
+            'schema': {'type': 'int'},
+            'default_factory': make_5_with_arg,
+            'default_factory_has_args': True,
+        },
     ),
     (core_schema.nullable_schema, args({'type': 'int'}), {'type': 'nullable', 'schema': {'type': 'int'}}),
     (

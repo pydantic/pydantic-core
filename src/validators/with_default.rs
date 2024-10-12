@@ -1,8 +1,8 @@
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::sync::GILOnceCell;
+use pyo3::types::PyDict;
 use pyo3::types::PyString;
-use pyo3::types::{PyDict, PyTuple};
 use pyo3::PyTraverseError;
 use pyo3::PyVisit;
 
@@ -42,31 +42,24 @@ impl DefaultType {
         }
     }
 
-    pub fn default_value(&self, py: Python, validated_data: &Option<Bound<PyDict>>) -> PyResult<Option<PyObject>> {
+    pub fn default_value(
+        &self,
+        py: Python,
+        validated_data: &Option<Bound<PyDict>>,
+        pass_arg: bool,
+    ) -> PyResult<Option<PyObject>> {
         match self {
             Self::Default(ref default) => Ok(Some(default.clone_ref(py))),
             Self::DefaultFactory(ref default_factory) => {
-                // MASSIVE HACK! PyFunction doesn't exist for PyPy,
-                // ref from https://github.com/pydantic/pydantic-core/pull/161#discussion_r917257635
-                let is_func = default_factory.getattr(py, "__class__")?.to_string() == "<class 'function'>";
-
-                let result = if is_func {
-                    let co_vars = default_factory.getattr(py, "__code__")?.getattr(py, "co_varnames")?;
-                    let default_factory_args: &Bound<PyTuple> = co_vars.downcast_bound::<PyTuple>(py)?;
-
-                    if default_factory_args.len() >= 1 {
-                        if validated_data.is_none() {
-                            default_factory.call1(py, ({},))
-                        } else {
-                            default_factory.call1(py, (validated_data.as_deref().unwrap(),))
-                        }
+                let result = if pass_arg {
+                    if validated_data.is_none() {
+                        default_factory.call1(py, ({},))
                     } else {
-                        default_factory.call0(py)
+                        default_factory.call1(py, (validated_data.as_deref().unwrap(),))
                     }
                 } else {
                     default_factory.call0(py)
                 }?;
-
                 Ok(Some(result))
             }
             Self::None => Ok(None),
@@ -96,6 +89,7 @@ pub struct WithDefaultValidator {
     on_error: OnError,
     validator: Box<CombinedValidator>,
     validate_default: bool,
+    default_factory_has_args: bool,
     copy_default: bool,
     name: String,
     undefined: PyObject,
@@ -140,12 +134,15 @@ impl BuildValidator for WithDefaultValidator {
         };
 
         let name = format!("{}[{}]", Self::EXPECTED_TYPE, validator.get_name());
+        let default_factory_has_args =
+            schema_or_config_same(schema, config, intern!(py, "default_factory_has_args"))?.unwrap_or(false);
 
         Ok(Self {
             default,
             on_error,
             validator,
             validate_default: schema_or_config_same(schema, config, intern!(py, "validate_default"))?.unwrap_or(false),
+            default_factory_has_args,
             copy_default,
             name,
             undefined: PydanticUndefinedType::new(py).to_object(py),
@@ -186,7 +183,10 @@ impl Validator for WithDefaultValidator {
         outer_loc: Option<impl Into<LocItem>>,
         state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<Option<PyObject>> {
-        match self.default.default_value(py, &state.extra().data)? {
+        match self
+            .default
+            .default_value(py, &state.extra().data, self.default_factory_has_args)?
+        {
             Some(stored_dft) => {
                 let dft: Py<PyAny> = if self.copy_default {
                     let deepcopy_func = COPY_DEEPCOPY.get_or_init(py, || get_deepcopy(py).unwrap());

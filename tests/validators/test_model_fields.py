@@ -1483,15 +1483,13 @@ def test_with_default_factory():
 )
 def test_bad_default_factory(default_factory, error_message):
     v = SchemaValidator(
-        {
-            'type': 'model-fields',
-            'fields': {
-                'x': {
-                    'type': 'model-field',
-                    'schema': {'type': 'default', 'schema': {'type': 'str'}, 'default_factory': default_factory},
-                }
-            },
-        }
+        core_schema.model_fields_schema(
+            fields={
+                'x': core_schema.model_field(
+                    core_schema.with_default_schema(core_schema.str_schema(), default_factory=default_factory)
+                )
+            }
+        ),
     )
     with pytest.raises(TypeError, match=re.escape(error_message)):
         v.validate_python({})
