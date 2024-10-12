@@ -95,7 +95,7 @@ class CoreConfig(TypedDict, total=False):
     revalidate_instances: Literal['always', 'never', 'subclass-instances']
     # whether to validate default values during validation, default False
     validate_default: bool
-    #
+    # whether to pass the validated data to the default_factory, computed base on signature of default_factory.
     default_factory_has_args: bool
     # used on typed-dicts and arguments
     populate_by_name: bool  # replaces `allow_population_by_field_name` in pydantic v1
