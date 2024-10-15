@@ -10,6 +10,7 @@ import warnings
 from collections.abc import Mapping
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
+from inspect import isfunction, signature
 from typing import TYPE_CHECKING, Any, Callable, Dict, Hashable, List, Pattern, Set, Tuple, Type, Union
 
 from typing_extensions import deprecated
@@ -94,6 +95,8 @@ class CoreConfig(TypedDict, total=False):
     revalidate_instances: Literal['always', 'never', 'subclass-instances']
     # whether to validate default values during validation, default False
     validate_default: bool
+    # whether to pass the validated data to the default_factory, computed base on signature of default_factory.
+    default_factory_has_args: bool
     # used on typed-dicts and arguments
     populate_by_name: bool  # replaces `allow_population_by_field_name` in pydantic v1
     # fields related to string fields only
@@ -2378,6 +2381,7 @@ class WithDefaultSchema(TypedDict, total=False):
     default_factory: Callable[[], Any]
     on_error: Literal['raise', 'omit', 'default']  # default: 'raise'
     validate_default: bool  # default: False
+    default_factory_has_args: bool
     strict: bool
     ref: str
     metadata: Dict[str, Any]
@@ -2388,7 +2392,7 @@ def with_default_schema(
     schema: CoreSchema,
     *,
     default: Any = PydanticUndefined,
-    default_factory: Callable[[], Any] | None = None,
+    default_factory: Callable[[Dict[str, Any]], Any] | Callable[[], Any] | None = None,
     on_error: Literal['raise', 'omit', 'default'] | None = None,
     validate_default: bool | None = None,
     strict: bool | None = None,
@@ -2421,10 +2425,14 @@ def with_default_schema(
         metadata: Any other information you want to include with the schema, not used by pydantic-core
         serialization: Custom serialization schema
     """
+
+    has_arg = isfunction(default_factory) and len(signature(default_factory).parameters) > 0
+
     s = _dict_not_none(
         type='default',
         schema=schema,
         default_factory=default_factory,
+        default_factory_has_args=has_arg,
         on_error=on_error,
         validate_default=validate_default,
         strict=strict,

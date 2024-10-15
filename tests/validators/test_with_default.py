@@ -228,34 +228,34 @@ def test_factory_runtime_error():
 
 
 def test_factory_type_error():
-    def broken(x):
+    def broken():
         return 7
 
     v = SchemaValidator(
-        {'type': 'default', 'schema': {'type': 'int'}, 'on_error': 'default', 'default_factory': broken}
+        core_schema.with_default_schema(core_schema.int_schema(), default_factory=broken, on_error='default'),
     )
     assert v.validate_python(42) == 42
     assert v.validate_python('42') == 42
-    with pytest.raises(TypeError, match=r"broken\(\) missing 1 required positional argument: 'x'"):
-        v.validate_python('wrong')
+    assert v.validate_python('wrong') == 7
 
 
-def test_typed_dict_error():
+def test_typed_dict():
     v = SchemaValidator(
-        {
-            'type': 'typed-dict',
-            'fields': {
-                'x': {'type': 'typed-dict-field', 'schema': {'type': 'str'}},
-                'y': {
-                    'type': 'typed-dict-field',
-                    'schema': {'type': 'default', 'schema': {'type': 'str'}, 'default_factory': lambda y: y * 2},
-                },
-            },
-        }
+        core_schema.typed_dict_schema(
+            fields={
+                'x': core_schema.typed_dict_field(
+                    core_schema.str_schema(),
+                ),
+                'y': core_schema.typed_dict_field(
+                    core_schema.with_default_schema(
+                        core_schema.str_schema(), default_factory=lambda v_data: v_data['x'] + ' and y'
+                    )
+                ),
+            }
+        )
     )
     assert v.validate_python({'x': 'x', 'y': 'y'}) == {'x': 'x', 'y': 'y'}
-    with pytest.raises(TypeError, match=r"<lambda>\(\) missing 1 required positional argument: 'y'"):
-        v.validate_python({'x': 'x'})
+    assert v.validate_python({'x': 'x value'}) == {'x': 'x value', 'y': 'x value and y'}
 
 
 def test_on_error_default_not_int():
@@ -812,3 +812,27 @@ def test_validate_default_raises_dataclass(input_value: dict, expected: Any) -> 
         v.validate_python(input_value)
 
     assert exc_info.value.errors(include_url=False, include_context=False) == expected
+
+
+def test_typed_dict_default_factory():
+    v = SchemaValidator(
+        core_schema.typed_dict_schema(
+            fields={
+                'x': core_schema.typed_dict_field(
+                    core_schema.str_schema(),
+                ),
+                'y': core_schema.typed_dict_field(
+                    core_schema.with_default_schema(
+                        core_schema.str_schema(), default_factory=lambda v_data: v_data['x'] + ' and y'
+                    )
+                ),
+                'z': core_schema.typed_dict_field(
+                    core_schema.with_default_schema(
+                        core_schema.str_schema(), default_factory=lambda v_data: v_data['y'] + ' and z'
+                    )
+                ),
+            }
+        )
+    )
+    assert v.validate_python({'x': 'x', 'y': 'y', 'z': 'z'}) == {'x': 'x', 'y': 'y', 'z': 'z'}
+    assert v.validate_python({'x': 'x'}) == {'x': 'x', 'y': 'x and y', 'z': 'x and y and z'}

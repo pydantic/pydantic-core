@@ -1,4 +1,5 @@
 import math
+import platform
 import re
 import sys
 from dataclasses import dataclass
@@ -1471,20 +1472,24 @@ def test_with_default_factory():
     'default_factory,error_message',
     [
         (lambda: 1 + 'a', "unsupported operand type(s) for +: 'int' and 'str'"),
-        (lambda x: 'a' + x, "<lambda>() missing 1 required positional argument: 'x'"),
+        (
+            lambda x: 'a' + x,
+            "unsupported operand type(s) for +: 'str' and 'dict'"
+            # fix pypy3.10 CI failed
+            if sys.version_info < (3, 11) and (platform.python_implementation() == 'PyPy')
+            else 'can only concatenate str (not "dict") to str',
+        ),
     ],
 )
 def test_bad_default_factory(default_factory, error_message):
     v = SchemaValidator(
-        {
-            'type': 'model-fields',
-            'fields': {
-                'x': {
-                    'type': 'model-field',
-                    'schema': {'type': 'default', 'schema': {'type': 'str'}, 'default_factory': default_factory},
-                }
-            },
-        }
+        core_schema.model_fields_schema(
+            fields={
+                'x': core_schema.model_field(
+                    core_schema.with_default_schema(core_schema.str_schema(), default_factory=default_factory)
+                )
+            }
+        ),
     )
     with pytest.raises(TypeError, match=re.escape(error_message)):
         v.validate_python({})

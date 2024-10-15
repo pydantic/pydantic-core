@@ -42,10 +42,26 @@ impl DefaultType {
         }
     }
 
-    pub fn default_value(&self, py: Python) -> PyResult<Option<PyObject>> {
+    pub fn default_value(
+        &self,
+        py: Python,
+        validated_data: &Option<Bound<PyDict>>,
+        pass_arg: bool,
+    ) -> PyResult<Option<PyObject>> {
         match self {
             Self::Default(ref default) => Ok(Some(default.clone_ref(py))),
-            Self::DefaultFactory(ref default_factory) => Ok(Some(default_factory.call0(py)?)),
+            Self::DefaultFactory(ref default_factory) => {
+                let result = if pass_arg {
+                    if validated_data.is_none() {
+                        default_factory.call1(py, ({},))
+                    } else {
+                        default_factory.call1(py, (validated_data.as_deref().unwrap(),))
+                    }
+                } else {
+                    default_factory.call0(py)
+                }?;
+                Ok(Some(result))
+            }
             Self::None => Ok(None),
         }
     }
@@ -73,6 +89,7 @@ pub struct WithDefaultValidator {
     on_error: OnError,
     validator: Box<CombinedValidator>,
     validate_default: bool,
+    default_factory_has_args: bool,
     copy_default: bool,
     name: String,
     undefined: PyObject,
@@ -117,12 +134,15 @@ impl BuildValidator for WithDefaultValidator {
         };
 
         let name = format!("{}[{}]", Self::EXPECTED_TYPE, validator.get_name());
+        let default_factory_has_args =
+            schema_or_config_same(schema, config, intern!(py, "default_factory_has_args"))?.unwrap_or(false);
 
         Ok(Self {
             default,
             on_error,
             validator,
             validate_default: schema_or_config_same(schema, config, intern!(py, "validate_default"))?.unwrap_or(false),
+            default_factory_has_args,
             copy_default,
             name,
             undefined: PydanticUndefinedType::new(py).to_object(py),
@@ -163,7 +183,10 @@ impl Validator for WithDefaultValidator {
         outer_loc: Option<impl Into<LocItem>>,
         state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<Option<PyObject>> {
-        match self.default.default_value(py)? {
+        match self
+            .default
+            .default_value(py, &state.extra().data, self.default_factory_has_args)?
+        {
             Some(stored_dft) => {
                 let dft: Py<PyAny> = if self.copy_default {
                     let deepcopy_func = COPY_DEEPCOPY.get_or_init(py, || get_deepcopy(py).unwrap());
