@@ -242,7 +242,7 @@ impl SchemaSerializer {
 #[allow(clippy::too_many_arguments)]
 #[pyfunction]
 #[pyo3(signature = (value, *, indent = None, include = None, exclude = None, by_alias = true,
-    exclude_none = false, round_trip = false, timedelta_mode = "iso8601", bytes_mode = "utf8",
+    exclude_none = false, round_trip = false, timedelta_mode = "iso8601", datetime_mode = "iso8601", bytes_mode = "utf8",
     inf_nan_mode = "constants", serialize_unknown = false, fallback = None, serialize_as_any = false,
     context = None))]
 pub fn to_json(
@@ -255,6 +255,7 @@ pub fn to_json(
     exclude_none: bool,
     round_trip: bool,
     timedelta_mode: &str,
+    datetime_mode: &str,
     bytes_mode: &str,
     inf_nan_mode: &str,
     serialize_unknown: bool,
@@ -262,7 +263,7 @@ pub fn to_json(
     serialize_as_any: bool,
     context: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PyObject> {
-    let state = SerializationState::new(timedelta_mode, bytes_mode, inf_nan_mode)?;
+    let state = SerializationState::new(timedelta_mode, datetime_mode, bytes_mode, inf_nan_mode)?;
     let duck_typing_ser_mode = DuckTypingSerMode::from_bool(serialize_as_any);
     let extra = state.extra(
         py,
@@ -285,7 +286,7 @@ pub fn to_json(
 #[allow(clippy::too_many_arguments)]
 #[pyfunction]
 #[pyo3(signature = (value, *, include = None, exclude = None, by_alias = true, exclude_none = false, round_trip = false,
-    timedelta_mode = "iso8601", bytes_mode = "utf8", inf_nan_mode = "constants", serialize_unknown = false, fallback = None,
+    timedelta_mode = "iso8601", datetime_mode ="iso8601", bytes_mode = "utf8", inf_nan_mode = "constants", serialize_unknown = false, fallback = None,
     serialize_as_any = false, context = None))]
 pub fn to_jsonable_python(
     py: Python,
@@ -296,6 +297,7 @@ pub fn to_jsonable_python(
     exclude_none: bool,
     round_trip: bool,
     timedelta_mode: &str,
+    datetime_mode: &str,
     bytes_mode: &str,
     inf_nan_mode: &str,
     serialize_unknown: bool,
@@ -303,7 +305,7 @@ pub fn to_jsonable_python(
     serialize_as_any: bool,
     context: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PyObject> {
-    let state = SerializationState::new(timedelta_mode, bytes_mode, inf_nan_mode)?;
+    let state = SerializationState::new(timedelta_mode, datetime_mode, bytes_mode, inf_nan_mode)?;
     let duck_typing_ser_mode = DuckTypingSerMode::from_bool(serialize_as_any);
     let extra = state.extra(
         py,

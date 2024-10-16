@@ -116,7 +116,7 @@ combined_serializer! {
         Decimal: super::type_serializers::decimal::DecimalSerializer;
         Str: super::type_serializers::string::StrSerializer;
         Bytes: super::type_serializers::bytes::BytesSerializer;
-        Datetime: super::type_serializers::datetime_etc::DatetimeSerializer;
+        Datetime: super::type_serializers::datetime_etc::DateTimeSerializer;
         TimeDelta: super::type_serializers::timedelta::TimeDeltaSerializer;
         Date: super::type_serializers::datetime_etc::DateSerializer;
         Time: super::type_serializers::datetime_etc::TimeSerializer;

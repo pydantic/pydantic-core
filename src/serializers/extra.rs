@@ -66,10 +66,10 @@ impl DuckTypingSerMode {
 }
 
 impl SerializationState {
-    pub fn new(timedelta_mode: &str, bytes_mode: &str, inf_nan_mode: &str) -> PyResult<Self> {
+    pub fn new(timedelta_mode: &str, datetime_mode: &str, bytes_mode: &str, inf_nan_mode: &str) -> PyResult<Self> {
         let warnings = CollectWarnings::new(WarningsMode::None);
         let rec_guard = SerRecursionState::default();
-        let config = SerializationConfig::from_args(timedelta_mode, bytes_mode, inf_nan_mode)?;
+        let config = SerializationConfig::from_args(timedelta_mode, datetime_mode, bytes_mode, inf_nan_mode)?;
         Ok(Self {
             warnings,
             rec_guard,
