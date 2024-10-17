@@ -5,7 +5,7 @@ from typing import Any, Callable, Generic, Literal, TypeVar, final
 from _typeshed import SupportsAllComparisons
 from typing_extensions import LiteralString, Self, TypeAlias
 
-from pydantic_core import ErrorDetails, ErrorTypeInfo, InitErrorDetails, MultiHostHost
+from pydantic_core import ErrorDetails, ErrorTypeInfo, GatherResult, InitErrorDetails, MultiHostHost
 from pydantic_core.core_schema import CoreConfig, CoreSchema, ErrorType
 
 __all__ = [
@@ -28,6 +28,7 @@ __all__ = [
     'PydanticSerializationUnexpectedValue',
     'PydanticUndefined',
     'PydanticUndefinedType',
+    'GatherInvalidDefinitionError',
     'Some',
     'to_json',
     'from_json',
@@ -35,6 +36,7 @@ __all__ = [
     'list_all_errors',
     'TzInfo',
     'validate_core_schema',
+    'gather_schemas_for_cleaning',
 ]
 __version__: str
 build_profile: str
@@ -1011,3 +1013,14 @@ def validate_core_schema(schema: CoreSchema, *, strict: bool | None = None) -> C
     We may also remove this function altogether, do not rely on it being present if you are
     using pydantic-core directly.
     """
+@final
+class GatherInvalidDefinitionError(Exception):
+    """Internal error when encountering invalid definition refs"""
+
+def gather_schemas_for_cleaning(
+    schema: CoreSchema,
+    definitions: dict[str, CoreSchema],
+    find_meta_with_keys: set[str] | None,
+) -> GatherResult:
+    """Used internally for schema cleaning when schemas are generated.
+    Gathers information from the schema tree for the cleaning."""
