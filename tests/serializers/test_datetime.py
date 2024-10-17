@@ -48,6 +48,7 @@ def tz(**kwargs):
     [
         (datetime(2022, 12, 2, 12, 13, 14), '2022-12-02T12:13:14'),
         (datetime(2022, 12, 2, 12, tzinfo=timezone.utc), '2022-12-02T12:00:00Z'),
+        (datetime(2022, 12, 2, 12, tzinfo=timezone.utc), '2022-12-02T12:00:00.000Z'),
         (datetime(2022, 12, 2, 12, tzinfo=tz(hours=2)), '2022-12-02T12:00:00+02:00'),
         (datetime(2022, 12, 2, 12, tzinfo=tz(hours=2, minutes=30)), '2022-12-02T12:00:00+02:30'),
         (datetime(2022, 12, 2, 12, tzinfo=tz(hours=-2)), '2022-12-02T12:00:00-02:00'),
