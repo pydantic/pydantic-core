@@ -3,7 +3,7 @@ use pyo3::exceptions::{PyKeyError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PySet, PyString, PyTuple};
 use pyo3::{intern, Bound, PyResult};
-use std::collections::HashMap;
+use std::collections::HashSet;
 
 const CORE_SCHEMA_METADATA_DISCRIMINATOR_PLACEHOLDER_KEY: &str = "pydantic.internal.union_discriminator";
 
@@ -41,21 +41,19 @@ fn gather_definition_ref(schema_ref_dict: &Bound<'_, PyDict>, ctx: &mut GatherCt
         let schema_ref_str = schema_ref_pystr.to_str()?;
         defaultdict_list_append!(&ctx.def_refs, schema_ref_pystr, schema_ref_dict);
 
-        if *ctx.refs_recursion_count.entry(schema_ref_str.to_string()).or_insert(0) == 0 {
+        if !ctx.recursively_seen_refs.contains(schema_ref_str) {
+            // TODO should py_err! when not found. That error can be used to detect the missing defs in cleaning side
             if let Some(def) = ctx.definitions_dict.get_item(schema_ref_pystr)? {
-                *ctx.refs_recursion_count.get_mut(schema_ref_str).unwrap() += 1;
-                ctx.def_refs_chain.push(schema_ref_str.to_string());
+                ctx.recursively_seen_refs.insert(schema_ref_str.to_string());
                 gather_schema(def.downcast_exact::<PyDict>()?, ctx)?;
-                ctx.def_refs_chain.pop();
-                *ctx.refs_recursion_count.get_mut(schema_ref_str).unwrap() -= 1;
+                ctx.recursively_seen_refs.remove(schema_ref_str);
             }
             Ok(false)
         } else {
             ctx.recursive_def_refs.add(schema_ref_pystr)?;
-            for r in &ctx.def_refs_chain {
+            for r in &ctx.recursively_seen_refs {
                 ctx.recursive_def_refs.add(PyString::new_bound(schema_ref.py(), r))?;
             }
-            ctx.def_refs_chain.clear();
             Ok(true)
         }
     } else {
@@ -188,8 +186,7 @@ pub struct GatherCtx<'a, 'py> {
     pub def_refs: Bound<'py, PyDict>,
     pub recursive_def_refs: Bound<'py, PySet>,
     pub discriminators: Bound<'py, PyList>,
-    refs_recursion_count: HashMap<String, i32>,
-    def_refs_chain: Vec<String>,
+    recursively_seen_refs: HashSet<String>,
 }
 
 impl<'a, 'py> GatherCtx<'a, 'py> {
@@ -199,8 +196,7 @@ impl<'a, 'py> GatherCtx<'a, 'py> {
             def_refs: PyDict::new_bound(definitions.py()),
             recursive_def_refs: PySet::empty_bound(definitions.py())?,
             discriminators: PyList::empty_bound(definitions.py()),
-            refs_recursion_count: HashMap::default(),
-            def_refs_chain: Vec::new(),
+            recursively_seen_refs: HashSet::new(),
         };
         Ok(ctx)
     }
