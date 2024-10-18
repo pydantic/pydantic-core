@@ -44,12 +44,18 @@ fn gather_definition_ref(schema_ref_dict: &Bound<'_, PyDict>, ctx: &mut GatherCt
         if *ctx.refs_recursion_count.entry(schema_ref_str.to_string()).or_insert(0) == 0 {
             if let Some(def) = ctx.definitions_dict.get_item(schema_ref_pystr)? {
                 *ctx.refs_recursion_count.get_mut(schema_ref_str).unwrap() += 1;
+                ctx.def_refs_chain.push(schema_ref_str.to_string());
                 gather_schema(def.downcast_exact::<PyDict>()?, ctx)?;
+                ctx.def_refs_chain.pop();
                 *ctx.refs_recursion_count.get_mut(schema_ref_str).unwrap() -= 1;
             }
             Ok(false)
         } else {
             ctx.recursive_def_refs.add(schema_ref_pystr)?;
+            for r in &ctx.def_refs_chain {
+                ctx.recursive_def_refs.add(PyString::new_bound(schema_ref.py(), r))?;
+            }
+            ctx.def_refs_chain.clear();
             Ok(true)
         }
     } else {
@@ -183,6 +189,7 @@ pub struct GatherCtx<'a, 'py> {
     pub recursive_def_refs: Bound<'py, PySet>,
     pub discriminators: Bound<'py, PyList>,
     refs_recursion_count: HashMap<String, i32>,
+    def_refs_chain: Vec<String>,
 }
 
 impl<'a, 'py> GatherCtx<'a, 'py> {
@@ -193,6 +200,7 @@ impl<'a, 'py> GatherCtx<'a, 'py> {
             recursive_def_refs: PySet::empty_bound(definitions.py())?,
             discriminators: PyList::empty_bound(definitions.py()),
             refs_recursion_count: HashMap::default(),
+            def_refs_chain: Vec::new(),
         };
         Ok(ctx)
     }
