@@ -1,9 +1,9 @@
-use std::collections::HashMap;
 use crate::tools::py_err;
 use pyo3::exceptions::{PyKeyError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PySet, PyString, PyTuple};
 use pyo3::{intern, Bound, PyResult};
+use std::collections::HashMap;
 
 const CORE_SCHEMA_METADATA_DISCRIMINATOR_PLACEHOLDER_KEY: &str = "pydantic.internal.union_discriminator";
 
@@ -39,10 +39,9 @@ fn gather_definition_ref(schema_ref_dict: &Bound<'_, PyDict>, ctx: &mut GatherCt
     if let Some(schema_ref) = get!(schema_ref_dict, "schema_ref") {
         let schema_ref_pystr = schema_ref.downcast_exact::<PyString>()?;
         let schema_ref_str = schema_ref_pystr.to_str()?;
+        defaultdict_list_append!(&ctx.def_refs, schema_ref_pystr, schema_ref_dict);
 
         if *ctx.refs_recursion_count.entry(schema_ref_str.to_string()).or_insert(0) == 0 {
-            defaultdict_list_append!(&ctx.def_refs, schema_ref_pystr, schema_ref_dict);
-
             if let Some(def) = ctx.definitions_dict.get_item(schema_ref_pystr)? {
                 *ctx.refs_recursion_count.get_mut(schema_ref_str).unwrap() += 1;
                 gather_schema(def.downcast_exact::<PyDict>()?, ctx)?;
