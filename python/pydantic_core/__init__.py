@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys as _sys
 from typing import Any as _Any
+from typing import NamedTuple
 
 from ._pydantic_core import (
     ArgsKwargs,
@@ -23,11 +24,12 @@ from ._pydantic_core import (
     ValidationError,
     __version__,
     from_json,
+    gather_schemas_for_cleaning,
     to_json,
     to_jsonable_python,
     validate_core_schema,
 )
-from .core_schema import CoreConfig, CoreSchema, CoreSchemaType, ErrorType
+from .core_schema import CoreConfig, CoreSchema, CoreSchemaType, DefinitionReferenceSchema, ErrorType
 
 if _sys.version_info < (3, 11):
     from typing_extensions import NotRequired as _NotRequired
@@ -67,6 +69,7 @@ __all__ = [
     'from_json',
     'to_jsonable_python',
     'validate_core_schema',
+    'gather_schemas_for_cleaning',
 ]
 
 
@@ -137,3 +140,9 @@ class MultiHostHost(_TypedDict):
     """The host part of this host, or `None`."""
     port: int | None
     """The port part of this host, or `None`."""
+
+
+class GatherResult(NamedTuple):
+    definition_refs: dict[str, list[DefinitionReferenceSchema]]
+    recursive_refs: set[str]
+    deferred_discriminators: list[tuple[CoreSchema, _Any]]

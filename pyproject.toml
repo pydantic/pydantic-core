@@ -53,6 +53,7 @@ python-source = "python"
 module-name = "pydantic_core._pydantic_core"
 bindings = 'pyo3'
 features = ["pyo3/extension-module"]
+profile = "release"  # TEMPORARY: remove this
 
 [tool.ruff]
 line-length = 120

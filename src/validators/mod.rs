@@ -64,6 +64,7 @@ mod validation_state;
 mod with_default;
 
 pub use self::validation_state::{Exactness, ValidationState};
+use crate::schema_traverse::{gather_schema, GatherCtx};
 pub use with_default::DefaultType;
 
 #[pyclass(module = "pydantic_core._pydantic_core", name = "Some")]
@@ -441,6 +442,25 @@ impl<'py> SelfValidator<'py> {
             cache_str: true.into(),
         })
     }
+}
+
+#[pyfunction(signature = (schema, definitions))]
+pub fn gather_schemas_for_cleaning<'py>(
+    schema: &Bound<'py, PyAny>,
+    definitions: &Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyTuple>> {
+    let py = schema.py();
+    let schema_dict = schema.downcast_exact::<PyDict>()?;
+
+    let mut ctx = GatherCtx::new(definitions.downcast_exact()?)?;
+    gather_schema(schema_dict, &mut ctx)?;
+
+    let res = vec![
+        ctx.def_refs.as_any(),
+        ctx.recursive_def_refs.as_any(),
+        ctx.discriminators.as_any(),
+    ];
+    return Ok(PyTuple::new_bound(py, res));
 }
 
 #[pyfunction(signature = (schema, *, strict = None))]
