@@ -2857,6 +2857,7 @@ class TypedDictSchema(TypedDict, total=False):
     type: Required[Literal['typed-dict']]
     fields: Required[Dict[str, TypedDictField]]
     cls: Type[TypedDict]
+    generic_origin: Type[TypedDict]
     computed_fields: List[ComputedField]
     strict: bool
     extras_schema: CoreSchema
@@ -2874,6 +2875,7 @@ def typed_dict_schema(
     fields: Dict[str, TypedDictField],
     *,
     cls: Type[TypedDict] | None = None,
+    generic_origin: Type[TypedDict] | None = None,
     computed_fields: list[ComputedField] | None = None,
     strict: bool | None = None,
     extras_schema: CoreSchema | None = None,
@@ -2920,6 +2922,7 @@ def typed_dict_schema(
         type='typed-dict',
         fields=fields,
         cls=cls,
+        generic_origin=generic_origin,
         computed_fields=computed_fields,
         strict=strict,
         extras_schema=extras_schema,
@@ -3056,6 +3059,7 @@ def model_fields_schema(
 class ModelSchema(TypedDict, total=False):
     type: Required[Literal['model']]
     cls: Required[Type[Any]]
+    generic_origin: Type[Any]
     schema: Required[CoreSchema]
     custom_init: bool
     root_model: bool
@@ -3074,6 +3078,7 @@ def model_schema(
     cls: Type[Any],
     schema: CoreSchema,
     *,
+    generic_origin: Type[Any] | None = None,
     custom_init: bool | None = None,
     root_model: bool | None = None,
     post_init: str | None = None,
@@ -3136,6 +3141,7 @@ def model_schema(
     return _dict_not_none(
         type='model',
         cls=cls,
+        generic_origin=generic_origin,
         schema=schema,
         custom_init=custom_init,
         root_model=root_model,
@@ -3289,6 +3295,7 @@ def dataclass_args_schema(
 class DataclassSchema(TypedDict, total=False):
     type: Required[Literal['dataclass']]
     cls: Required[Type[Any]]
+    generic_origin: Type[Any]
     schema: Required[CoreSchema]
     fields: Required[List[str]]
     cls_name: str
@@ -3308,6 +3315,7 @@ def dataclass_schema(
     schema: CoreSchema,
     fields: List[str],
     *,
+    generic_origin: Type[Any] | None = None,
     cls_name: str | None = None,
     post_init: bool | None = None,
     revalidate_instances: Literal['always', 'never', 'subclass-instances'] | None = None,
@@ -3343,6 +3351,7 @@ def dataclass_schema(
     return _dict_not_none(
         type='dataclass',
         cls=cls,
+        generic_origin=generic_origin,
         fields=fields,
         cls_name=cls_name,
         schema=schema,
