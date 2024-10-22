@@ -79,7 +79,7 @@ fn exclude_default(value: &Bound<'_, PyAny>, extra: &Extra, serializer: &Combine
                 Ok(true) => Ok(true),
                 Ok(false) => Ok(false),
                 Err(_E) => Ok(false),
-            }
+            };
         }
     }
     Ok(false)
