@@ -2857,7 +2857,6 @@ class TypedDictSchema(TypedDict, total=False):
     type: Required[Literal['typed-dict']]
     fields: Required[Dict[str, TypedDictField]]
     cls: Type[TypedDict]
-    generic_origin: Type[TypedDict]
     computed_fields: List[ComputedField]
     strict: bool
     extras_schema: CoreSchema
@@ -2875,7 +2874,6 @@ def typed_dict_schema(
     fields: Dict[str, TypedDictField],
     *,
     cls: Type[TypedDict] | None = None,
-    generic_origin: Type[TypedDict] | None = None,
     computed_fields: list[ComputedField] | None = None,
     strict: bool | None = None,
     extras_schema: CoreSchema | None = None,
@@ -2922,7 +2920,6 @@ def typed_dict_schema(
         type='typed-dict',
         fields=fields,
         cls=cls,
-        generic_origin=generic_origin,
         computed_fields=computed_fields,
         strict=strict,
         extras_schema=extras_schema,
@@ -3125,6 +3122,8 @@ def model_schema(
     Args:
         cls: The class to use for the model
         schema: The schema to use for the model
+        generic_origin: The origin type used for this model, if it's a parametrized generic. Ex,
+            if this model schema represents `SomeModel[int]`, generic_origin is `SomeModel`
         custom_init: Whether the model has a custom init method
         root_model: Whether the model is a `RootModel`
         post_init: The call after init to use for the model
@@ -3336,6 +3335,8 @@ def dataclass_schema(
         schema: The schema to use for the dataclass fields
         fields: Fields of the dataclass, this is used in serialization and in validation during re-validation
             and while validating assignment
+        generic_origin: The origin type used for this dataclass, if it's a parametrized generic. Ex,
+            if this model schema represents `SomeDataclass[int]`, generic_origin is `SomeDataclass`
         cls_name: The name to use in error locs, etc; this is useful for generics (default: `cls.__name__`)
         post_init: Whether to call `__post_init__` after validation
         revalidate_instances: whether instances of models and dataclasses (including subclass instances)
