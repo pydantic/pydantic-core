@@ -187,6 +187,14 @@ def test_exclude_incomparable_default():
         def __eq__(self, other):
             raise NotImplementedError("Can't be compared!")
 
+    class NeqComparable(Incomparable):
+        def __eq__(self, other):
+            return False
+
+    class EqComparable(Incomparable):
+        def __eq__(self, other):
+            return True
+
     v = SchemaSerializer(
         core_schema.typed_dict_schema(
             {
@@ -196,9 +204,13 @@ def test_exclude_incomparable_default():
             }
         )
     )
-    instance = Incomparable()
-    assert v.to_python({'foo': instance}, exclude_defaults=True)['foo'] == [1, 2, 3]
-    assert v.to_json({'foo': instance}, exclude_defaults=True) == b'{"foo":[1,2,3]}'
+
+    assert v.to_python({'foo': Incomparable()}, exclude_defaults=True)['foo'] == [1, 2, 3]
+    assert v.to_json({'foo': Incomparable()}, exclude_defaults=True) == b'{"foo":[1,2,3]}'
+    assert v.to_python({'foo': NeqComparable()}, exclude_defaults=True)['foo'] == [1, 2, 3]
+    assert v.to_json({'foo': NeqComparable()}, exclude_defaults=True) == b'{"foo":[1,2,3]}'
+    assert v.to_python({'foo': EqComparable()}, exclude_defaults=True) == {}
+    assert v.to_json({'foo': EqComparable()}, exclude_defaults=True) == b'{}'
 
 
 def test_function_plain_field_serializer_to_python():
