@@ -169,19 +169,16 @@ def test_exclude_default():
     assert v.to_json({'foo': 1, 'bar': b'[default]'}) == b'{"foo":1,"bar":"[default]"}'
     assert v.to_json({'foo': 1, 'bar': b'[default]'}, exclude_defaults=True) == b'{"foo":1}'
 
+
 def test_exclude_incomparable_default():
     """Values that can't be compared with eq are treated as not equal to the default"""
-    def ser_x(*args):
-        return [1,2,3]
 
-    cls_schema = core_schema.any_schema(
-        serialization=core_schema.plain_serializer_function_ser_schema(
-            ser_x
-        )
-    )
+    def ser_x(*args):
+        return [1, 2, 3]
+
+    cls_schema = core_schema.any_schema(serialization=core_schema.plain_serializer_function_ser_schema(ser_x))
 
     class Incomparable:
-
         __pydantic_serializer__ = SchemaSerializer(cls_schema)
 
         def __get_pydantic_core_schema__(*args):
@@ -193,12 +190,14 @@ def test_exclude_incomparable_default():
     v = SchemaSerializer(
         core_schema.typed_dict_schema(
             {
-                'foo': core_schema.typed_dict_field(core_schema.with_default_schema(core_schema.any_schema(), default=None)),
+                'foo': core_schema.typed_dict_field(
+                    core_schema.with_default_schema(core_schema.any_schema(), default=None)
+                ),
             }
         )
     )
     instance = Incomparable()
-    assert v.to_python({'foo': instance}, exclude_defaults=True)['foo'] == [1,2,3]
+    assert v.to_python({'foo': instance}, exclude_defaults=True)['foo'] == [1, 2, 3]
     assert v.to_json({'foo': instance}, exclude_defaults=True) == b'{"foo":[1,2,3]}'
 
 
