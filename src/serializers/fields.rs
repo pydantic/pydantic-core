@@ -78,7 +78,7 @@ fn exclude_default(value: &Bound<'_, PyAny>, extra: &Extra, serializer: &Combine
             return match value.eq(default) {
                 Ok(true) => Ok(true),
                 Ok(false) => Ok(false),
-                Err(_E) => Ok(false),
+                Err(_e) => Ok(false),
             };
         }
     }
