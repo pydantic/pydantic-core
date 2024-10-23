@@ -1,5 +1,5 @@
 backports.zoneinfo==0.2.1;python_version<"3.9"
-coverage==7.6.4
+coverage==7.6.1
 dirty-equals==0.8.0
 hypothesis==6.115.3
 # pandas doesn't offer prebuilt wheels for all versions and platforms we test in CI e.g. aarch64 musllinux
