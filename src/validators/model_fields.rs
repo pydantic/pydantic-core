@@ -11,7 +11,7 @@ use crate::errors::LocItem;
 use crate::errors::{ErrorType, ErrorTypeDefaults, ValError, ValLineError, ValResult};
 use crate::input::ConsumeIterator;
 use crate::input::{BorrowInput, Input, ValidatedDict, ValidationMatch};
-use crate::lookup_key::LookupKey;
+use crate::lookup_key::{LookupKey, LookupPath};
 use crate::tools::SchemaDict;
 
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
@@ -23,6 +23,7 @@ struct Field {
     name_py: Py<PyString>,
     validator: CombinedValidator,
     frozen: bool,
+    none_as_default: bool,
 }
 
 impl_py_gc_traverse!(Field { validator });
@@ -86,12 +87,16 @@ impl BuildValidator for ModelFieldsValidator {
                 None => LookupKey::from_string(py, field_name),
             };
 
+            let none_as_default =
+                schema_or_config_same(field_info, config, intern!(py, "none_as_default"))?.unwrap_or(true);
+
             fields.push(Field {
                 name: field_name.to_string(),
                 lookup_key,
                 name_py: field_name_py.into(),
                 validator,
                 frozen: field_info.get_as::<bool>(intern!(py, "frozen"))?.unwrap_or(false),
+                none_as_default,
             });
         }
 
@@ -175,12 +180,17 @@ impl Validator for ModelFieldsValidator {
                     }
                     Err(err) => return Err(err),
                 };
+                let mut validation_line_errors: Option<Vec<ValLineError>> = None;
+                let mut validation_lookup_path: Option<&LookupPath> = None;
+
                 if let Some((lookup_path, value)) = op_key_value {
                     if let Some(ref mut used_keys) = used_keys {
                         // key is "used" whether or not validation passes, since we want to skip this key in
                         // extra logic either way
                         used_keys.insert(lookup_path.first_key());
                     }
+                    let mut none_as_default = false;
+
                     match field.validator.validate(py, value.borrow_input(), state) {
                         Ok(value) => {
                             model_dict.set_item(&field.name_py, value)?;
@@ -189,13 +199,22 @@ impl Validator for ModelFieldsValidator {
                         }
                         Err(ValError::Omit) => continue,
                         Err(ValError::LineErrors(line_errors)) => {
-                            for err in line_errors {
-                                errors.push(lookup_path.apply_error_loc(err, self.loc_by_alias, &field.name));
+                            if value.borrow_input().is_none() && field.none_as_default {
+                                none_as_default = true;
+                                validation_line_errors = Some(line_errors);
+                                validation_lookup_path = Some(lookup_path);
+                            } else {
+                                for err in line_errors {
+                                    errors.push(lookup_path.apply_error_loc(err, self.loc_by_alias, &field.name));
+                                }
                             }
                         }
                         Err(err) => return Err(err),
                     }
-                    continue;
+
+                    if !none_as_default {
+                        continue;
+                    }
                 }
 
                 match field.validator.default_value(py, Some(field.name.as_str()), state) {
@@ -204,13 +223,24 @@ impl Validator for ModelFieldsValidator {
                         model_dict.set_item(&field.name_py, value)?;
                     }
                     Ok(None) => {
-                        // This means there was no default value
-                        errors.push(field.lookup_key.error(
-                            ErrorTypeDefaults::Missing,
-                            input,
-                            self.loc_by_alias,
-                            &field.name,
-                        ));
+                        match (validation_line_errors, validation_lookup_path) {
+                            (Some(errors_vec), Some(lookup_path)) if !errors_vec.is_empty() => {
+                                // Push all line errors that arose from passing None.
+                                for err in errors_vec {
+                                    errors.push(lookup_path.apply_error_loc(err, self.loc_by_alias, &field.name));
+                                }
+                            }
+                            _ => {
+                                // This means validation_line_errors is either None or an empty vector, or lookup_path is None
+                                // This means there was no default value
+                                errors.push(field.lookup_key.error(
+                                    ErrorTypeDefaults::Missing,
+                                    input,
+                                    self.loc_by_alias,
+                                    &field.name,
+                                ));
+                            }
+                        }
                     }
                     Err(ValError::Omit) => continue,
                     Err(ValError::LineErrors(line_errors)) => {

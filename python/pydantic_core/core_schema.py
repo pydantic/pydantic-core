@@ -115,6 +115,8 @@ class CoreConfig(TypedDict, total=False):
     coerce_numbers_to_str: bool  # default: False
     regex_engine: Literal['rust-regex', 'python-re']  # default: 'rust-regex'
     cache_strings: Union[bool, Literal['all', 'keys', 'none']]  # default: 'True'
+    # used to determine whether to use default for None
+    none_as_default: bool
 
 
 IncExCall: TypeAlias = 'set[int | str] | dict[int | str, IncExCall] | None'
@@ -2945,6 +2947,7 @@ class ModelField(TypedDict, total=False):
     serialization_exclude: bool  # default: False
     frozen: bool
     metadata: Dict[str, Any]
+    none_as_default: bool
 
 
 def model_field(
@@ -2955,6 +2958,7 @@ def model_field(
     serialization_exclude: bool | None = None,
     frozen: bool | None = None,
     metadata: Dict[str, Any] | None = None,
+    none_as_default: bool | None = None,
 ) -> ModelField:
     """
     Returns a schema for a model field, e.g.:
@@ -2981,6 +2985,7 @@ def model_field(
         serialization_exclude=serialization_exclude,
         frozen=frozen,
         metadata=metadata,
+        none_as_default=none_as_default,
     )
 
 
