@@ -22,6 +22,7 @@ mod errors;
 mod input;
 mod lookup_key;
 mod recursion_guard;
+mod schema_traverse;
 mod serializers;
 mod tools;
 mod url;
@@ -35,6 +36,7 @@ pub use build_tools::SchemaError;
 pub use errors::{
     list_all_errors, PydanticCustomError, PydanticKnownError, PydanticOmit, PydanticUseDefault, ValidationError,
 };
+pub use schema_traverse::{gather_schemas_for_cleaning, GatherInvalidDefinitionError};
 pub use serializers::{
     to_json, to_jsonable_python, PydanticSerializationError, PydanticSerializationUnexpectedValue, SchemaSerializer,
     WarningsArg,
@@ -129,10 +131,15 @@ fn _pydantic_core(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<ArgsKwargs>()?;
     m.add_class::<SchemaSerializer>()?;
     m.add_class::<TzInfo>()?;
+    m.add(
+        "GatherInvalidDefinitionError",
+        py.get_type_bound::<GatherInvalidDefinitionError>(),
+    )?;
     m.add_function(wrap_pyfunction!(to_json, m)?)?;
     m.add_function(wrap_pyfunction!(from_json, m)?)?;
     m.add_function(wrap_pyfunction!(to_jsonable_python, m)?)?;
     m.add_function(wrap_pyfunction!(list_all_errors, m)?)?;
+    m.add_function(wrap_pyfunction!(gather_schemas_for_cleaning, m)?)?;
     m.add_function(wrap_pyfunction!(validate_core_schema, m)?)?;
     Ok(())
 }
