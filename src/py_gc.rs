@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use ahash::AHashMap;
 use enum_dispatch::enum_dispatch;
@@ -52,6 +52,25 @@ impl<T: PyGcTraverse> PyGcTraverse for Box<T> {
 impl<T: PyGcTraverse> PyGcTraverse for Option<T> {
     fn py_gc_traverse(&self, visit: &PyVisit<'_>) -> Result<(), PyTraverseError> {
         match self {
+            Some(item) => T::py_gc_traverse(item, visit),
+            None => Ok(()),
+        }
+    }
+}
+
+impl<T: PyGcTraverse, E> PyGcTraverse for Result<T, E> {
+    fn py_gc_traverse(&self, visit: &PyVisit<'_>) -> Result<(), PyTraverseError> {
+        match self {
+            Ok(v) => T::py_gc_traverse(v, visit),
+            // FIXME(BoxyUwU): Lol
+            Err(_) => Ok(()),
+        }
+    }
+}
+
+impl<T: PyGcTraverse> PyGcTraverse for OnceLock<T> {
+    fn py_gc_traverse(&self, visit: &PyVisit<'_>) -> Result<(), PyTraverseError> {
+        match self.get() {
             Some(item) => T::py_gc_traverse(item, visit),
             None => Ok(()),
         }
