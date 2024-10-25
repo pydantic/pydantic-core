@@ -1,10 +1,11 @@
+use std::collections::HashSet;
 // Validator for Enums, so named because "enum" is a reserved keyword in Rust.
 use std::marker::PhantomData;
 
 use pyo3::exceptions::PyTypeError;
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyFloat, PyInt, PyList, PyString, PyType};
+use pyo3::types::{PyDict, PyFloat, PyInt, PyList, PyString, PyTuple, PyType};
 
 use crate::build_tools::{is_strict, py_schema_err};
 use crate::errors::{ErrorType, ValError, ValResult};
@@ -33,7 +34,7 @@ impl BuildValidator for BuildEnumValidator {
 
         let py = schema.py();
         let value_str = intern!(py, "value");
-        let expected: Vec<(Bound<'_, PyAny>, PyObject)> = members
+        let mut expected: Vec<(Bound<'_, PyAny>, PyObject)> = members
             .iter()
             .map(|v| Ok((v.getattr(value_str)?, v.into())))
             .collect::<PyResult<_>>()?;
@@ -42,6 +43,15 @@ impl BuildValidator for BuildEnumValidator {
             .iter()
             .map(|(k, _)| k.repr()?.extract())
             .collect::<PyResult<_>>()?;
+
+        let mut addition = vec![];
+        for (k, v) in &expected {
+            if let Ok(ss) = k.downcast::<PyTuple>() {
+                let list = ss.to_list();
+                addition.push((list.into_any(), v.clone()));
+            }
+        }
+        expected.append(&mut addition);
 
         let class: Bound<PyType> = schema.get_as_req(intern!(py, "cls"))?;
         let class_repr = class_repr(schema, &class)?;
