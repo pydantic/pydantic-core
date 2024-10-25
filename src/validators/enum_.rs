@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 // Validator for Enums, so named because "enum" is a reserved keyword in Rust.
 use std::marker::PhantomData;
 
