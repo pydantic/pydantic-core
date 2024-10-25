@@ -435,6 +435,29 @@ SerSchema = Union[
 ]
 
 
+class InvalidSchema(TypedDict, total=False):
+    type: Required[Literal['invalid']]
+    ref: str
+    metadata: Dict[str, Any]
+    # note, we never plan to use this, but include it for type checking purposes to match
+    # all other CoreSchema union members
+    serialization: SerSchema
+
+
+def invalid_schema(ref: str | None = None, metadata: Dict[str, Any] | None = None) -> InvalidSchema:
+    """
+    Returns an invalid schema, used to indicate that a schema is invalid.
+
+        Returns a schema that matches any value, e.g.:
+
+    Args:
+        ref: optional unique identifier of the schema, used to reference the schema in other places
+        metadata: Any other information you want to include with the schema, not used by pydantic-core
+    """
+
+    return _dict_not_none(type='invalid', ref=ref, metadata=metadata)
+
+
 class ComputedField(TypedDict, total=False):
     type: Required[Literal['computed-field']]
     property_name: Required[str]
@@ -2352,7 +2375,8 @@ class WithDefaultSchema(TypedDict, total=False):
     type: Required[Literal['default']]
     schema: Required[CoreSchema]
     default: Any
-    default_factory: Callable[[], Any]
+    default_factory: Union[Callable[[], Any], Callable[[Dict[str, Any]], Any]]
+    default_factory_takes_data: bool
     on_error: Literal['raise', 'omit', 'default']  # default: 'raise'
     validate_default: bool  # default: False
     strict: bool
@@ -2365,7 +2389,8 @@ def with_default_schema(
     schema: CoreSchema,
     *,
     default: Any = PydanticUndefined,
-    default_factory: Callable[[], Any] | None = None,
+    default_factory: Union[Callable[[], Any], Callable[[Dict[str, Any]], Any], None] = None,
+    default_factory_takes_data: bool | None = None,
     on_error: Literal['raise', 'omit', 'default'] | None = None,
     validate_default: bool | None = None,
     strict: bool | None = None,
@@ -2390,7 +2415,8 @@ def with_default_schema(
     Args:
         schema: The schema to add a default value to
         default: The default value to use
-        default_factory: A function that returns the default value to use
+        default_factory: A callable that returns the default value to use
+        default_factory_takes_data: Whether the default factory takes a validated data argument
         on_error: What to do if the schema validation fails. One of 'raise', 'omit', 'default'
         validate_default: Whether the default value should be validated
         strict: Whether the underlying schema should be validated with strict mode
@@ -2402,6 +2428,7 @@ def with_default_schema(
         type='default',
         schema=schema,
         default_factory=default_factory,
+        default_factory_takes_data=default_factory_takes_data,
         on_error=on_error,
         validate_default=validate_default,
         strict=strict,
@@ -3033,6 +3060,7 @@ def model_fields_schema(
 class ModelSchema(TypedDict, total=False):
     type: Required[Literal['model']]
     cls: Required[Type[Any]]
+    generic_origin: Type[Any]
     schema: Required[CoreSchema]
     custom_init: bool
     root_model: bool
@@ -3051,6 +3079,7 @@ def model_schema(
     cls: Type[Any],
     schema: CoreSchema,
     *,
+    generic_origin: Type[Any] | None = None,
     custom_init: bool | None = None,
     root_model: bool | None = None,
     post_init: str | None = None,
@@ -3097,6 +3126,8 @@ def model_schema(
     Args:
         cls: The class to use for the model
         schema: The schema to use for the model
+        generic_origin: The origin type used for this model, if it's a parametrized generic. Ex,
+            if this model schema represents `SomeModel[int]`, generic_origin is `SomeModel`
         custom_init: Whether the model has a custom init method
         root_model: Whether the model is a `RootModel`
         post_init: The call after init to use for the model
@@ -3113,6 +3144,7 @@ def model_schema(
     return _dict_not_none(
         type='model',
         cls=cls,
+        generic_origin=generic_origin,
         schema=schema,
         custom_init=custom_init,
         root_model=root_model,
@@ -3266,6 +3298,7 @@ def dataclass_args_schema(
 class DataclassSchema(TypedDict, total=False):
     type: Required[Literal['dataclass']]
     cls: Required[Type[Any]]
+    generic_origin: Type[Any]
     schema: Required[CoreSchema]
     fields: Required[List[str]]
     cls_name: str
@@ -3285,6 +3318,7 @@ def dataclass_schema(
     schema: CoreSchema,
     fields: List[str],
     *,
+    generic_origin: Type[Any] | None = None,
     cls_name: str | None = None,
     post_init: bool | None = None,
     revalidate_instances: Literal['always', 'never', 'subclass-instances'] | None = None,
@@ -3305,6 +3339,8 @@ def dataclass_schema(
         schema: The schema to use for the dataclass fields
         fields: Fields of the dataclass, this is used in serialization and in validation during re-validation
             and while validating assignment
+        generic_origin: The origin type used for this dataclass, if it's a parametrized generic. Ex,
+            if this model schema represents `SomeDataclass[int]`, generic_origin is `SomeDataclass`
         cls_name: The name to use in error locs, etc; this is useful for generics (default: `cls.__name__`)
         post_init: Whether to call `__post_init__` after validation
         revalidate_instances: whether instances of models and dataclasses (including subclass instances)
@@ -3320,6 +3356,7 @@ def dataclass_schema(
     return _dict_not_none(
         type='dataclass',
         cls=cls,
+        generic_origin=generic_origin,
         fields=fields,
         cls_name=cls_name,
         schema=schema,
@@ -3826,6 +3863,7 @@ MYPY = False
 # union which kills performance not just for pydantic, but even for code using pydantic
 if not MYPY:
     CoreSchema = Union[
+        InvalidSchema,
         AnySchema,
         NoneSchema,
         BoolSchema,
@@ -3882,6 +3920,7 @@ elif False:
 
 # to update this, call `pytest -k test_core_schema_type_literal` and copy the output
 CoreSchemaType = Literal[
+    'invalid',
     'any',
     'none',
     'bool',
@@ -3942,6 +3981,7 @@ ErrorType = Literal[
     'no_such_attribute',
     'json_invalid',
     'json_type',
+    'needs_python_object',
     'recursion_loop',
     'missing',
     'frozen_field',
