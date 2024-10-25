@@ -606,13 +606,13 @@ class Url(SupportsAllComparisons):
             An instance of URL
         """
 
-    def join(self, path: str, trailing_slash: bool = True) -> Self:
+    def join(self, path: str, append_trailing_slash: bool = False) -> Self:
         """
         Parse a string `path` as an URL, using this URL as the base.
 
         Args:
             path: The string (typically a relative URL) to parse and join with the base URL.
-            trailing_slash: Whether to append a trailing slash at the end of the URL.
+            append_trailing_slash: Whether to append a trailing slash at the end of the URL.
 
         Returns:
             A new `Url` instance

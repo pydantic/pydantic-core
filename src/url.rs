@@ -199,23 +199,24 @@ impl PyUrl {
         cls.call1((url,))
     }
 
-    #[pyo3(signature=(path, trailing_slash=true))]
-    pub fn join(&self, path: &str, trailing_slash: bool) -> PyResult<Self> {
+    #[pyo3(signature=(path, append_trailing_slash=false))]
+    pub fn join(&self, path: &str, append_trailing_slash: bool) -> PyResult<Self> {
         let mut new_url = self
             .lib_url
             .join(path)
             .map_err(|err| PyValueError::new_err(err.to_string()))?;
 
-        if !trailing_slash || new_url.query().is_some() || new_url.fragment().is_some() || new_url.cannot_be_a_base() {
-            return Ok(PyUrl::new(new_url));
+        if append_trailing_slash && !(new_url.query().is_some() || new_url.fragment().is_some()) {
+            let path_segments_result = new_url.path_segments_mut().map(|mut segments| {
+                segments.pop_if_empty().push("");
+            });
+
+            if path_segments_result.is_err() {
+                let mut new_path = new_url.path().to_string();
+                new_path.push('/');
+                new_url.set_path(&new_path);
+            }
         }
-
-        new_url
-            .path_segments_mut()
-            .map_err(|()| PyValueError::new_err("Url cannot be a base"))?
-            .pop_if_empty()
-            .push("");
-
         Ok(PyUrl::new(new_url))
     }
 }

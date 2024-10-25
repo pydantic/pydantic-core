@@ -1324,7 +1324,7 @@ def test_url_build() -> None:
         ('http://a/b/c/d/e', '/../../f/g/', 'http://a/f/g/', 'http://a/f/g/'),
         ('http://a/b/c/d/e/', '../../f/g', 'http://a/b/c/f/g/', 'http://a/b/c/f/g'),
         ('http://a/b/', '../../f/g/', 'http://a/f/g/', 'http://a/f/g/'),
-        (SIMPLE_BASE, 'g:h', 'g:h', 'g:h'),
+        (SIMPLE_BASE, 'g:h', 'g:h/', 'g:h'),
         (SIMPLE_BASE, 'g', 'http://a/b/c/g/', 'http://a/b/c/g'),
         (SIMPLE_BASE, './g', 'http://a/b/c/g/', 'http://a/b/c/g'),
         (SIMPLE_BASE, 'g/', 'http://a/b/c/g/', 'http://a/b/c/g/'),
@@ -1350,7 +1350,7 @@ def test_url_build() -> None:
         (SIMPLE_BASE + '/', 'foo', SIMPLE_BASE + '/foo/', SIMPLE_BASE + '/foo'),
         (QUERY_BASE, '?y', 'http://a/b/c/d;p?y', 'http://a/b/c/d;p?y'),
         (QUERY_BASE, ';x', 'http://a/b/c/;x/', 'http://a/b/c/;x'),
-        (QUERY_BASE, 'g:h', 'g:h', 'g:h'),
+        (QUERY_BASE, 'g:h', 'g:h/', 'g:h'),
         (QUERY_BASE, 'g', 'http://a/b/c/g/', 'http://a/b/c/g'),
         (QUERY_BASE, './g', 'http://a/b/c/g/', 'http://a/b/c/g'),
         (QUERY_BASE, 'g/', 'http://a/b/c/g/', 'http://a/b/c/g/'),
@@ -1436,8 +1436,8 @@ def test_url_join(base_url, join_path, expected_with_slash, expected_without_sla
     and the URL specification from https://url.spec.whatwg.org/
     """
     url = Url(base_url)
-    assert str(url.join(join_path, trailing_slash=True)) == expected_with_slash
-    assert str(url.join(join_path, trailing_slash=False)) == expected_without_slash
+    assert str(url.join(join_path, append_trailing_slash=True)) == expected_with_slash
+    assert str(url.join(join_path, append_trailing_slash=False)) == expected_without_slash
 
 
 def test_url_join_operators() -> None:
