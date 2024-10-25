@@ -263,8 +263,6 @@ def test_plain_enum_lists():
 
 
 def test_plain_enum_tuple():
-    from pydantic import RootModel
-
     class MyEnum(Enum):
         a = 1, 2
         b = 2, 3
@@ -273,9 +271,7 @@ def test_plain_enum_tuple():
     v = SchemaValidator(core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())))
     assert v.validate_python((1, 2)) is MyEnum.a
     assert v.validate_python((2, 3)) is MyEnum.b
-    serialised = RootModel[MyEnum](MyEnum.a).model_dump_json()
-    parsed = RootModel[MyEnum].model_validate_json(serialised)
-    assert parsed.root is MyEnum.a
+    assert v.validate_json('[1, 2]') is MyEnum.a
 
 
 def test_plain_enum_empty():
