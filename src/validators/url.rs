@@ -103,7 +103,7 @@ impl Validator for UrlValidator {
                     // given that we want isinstance to work properly for subclasses of Url
                     let py_url = match either_url {
                         EitherUrl::Py(py_url) => py_url.get().clone(),
-                        EitherUrl::Rust(rust_url) => PyUrl::new(rust_url)
+                        EitherUrl::Rust(rust_url) => PyUrl::new(rust_url),
                     };
 
                     let py_url = PyUrl::build(
@@ -294,14 +294,14 @@ impl Validator for MultiHostUrlValidator {
                     // given that we want isinstance to work properly for subclasses of Url
                     let py_url = match multi_url {
                         EitherMultiHostUrl::Py(py_url) => py_url.get().clone(),
-                        EitherMultiHostUrl::Rust(rust_url) => rust_url
+                        EitherMultiHostUrl::Rust(rust_url) => rust_url,
                     };
 
                     let hosts = py_url.hosts(py).map_or(None, |hosts| {
                         let mut host_parts_vec = Vec::new();
-                        for host in hosts.iter() {
+                        for host in &hosts {
                             if let Ok(py_dict) = host.downcast::<PyDict>() {
-                                if let Some(host_parts) = UrlHostParts::extract_bound(py_dict).ok() {
+                                if let Ok(host_parts) = UrlHostParts::extract_bound(py_dict) {
                                     host_parts_vec.push(host_parts);
                                 }
                             }
@@ -319,7 +319,7 @@ impl Validator for MultiHostUrlValidator {
                         None,
                         None,
                         None,
-                        None
+                        None,
                     )?;
                     Ok(py_url.into_py(py))
                 } else {
