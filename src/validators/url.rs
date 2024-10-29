@@ -15,7 +15,6 @@ use crate::errors::{ErrorType, ErrorTypeDefaults, ValError, ValResult};
 use crate::input::downcast_python_input;
 use crate::input::Input;
 use crate::tools::SchemaDict;
-use crate::url::UrlHostParts;
 use crate::url::{schema_is_special, PyMultiHostUrl, PyUrl};
 
 use super::literal::expected_repr_name;
@@ -297,22 +296,16 @@ impl Validator for MultiHostUrlValidator {
                         EitherMultiHostUrl::Rust(rust_url) => rust_url,
                     };
 
-                    let hosts = py_url.hosts(py).map_or(None, |hosts| {
-                        let mut host_parts_vec = Vec::new();
-                        for host in &hosts {
-                            if let Ok(py_dict) = host.downcast::<PyDict>() {
-                                if let Ok(host_parts) = UrlHostParts::extract_bound(py_dict) {
-                                    host_parts_vec.push(host_parts);
-                                }
-                            }
-                        }
-                        Some(host_parts_vec)
-                    });
+                    let hosts = py_url
+                        .hosts(py)?
+                        .into_iter()
+                        .map(|host| host.extract().expect("host should be a valid UrlHostParts"))
+                        .collect();
 
                     let py_url = PyMultiHostUrl::build(
                         url_subclass.bind(py),
                         py_url.scheme(),
-                        hosts,
+                        Some(hosts),
                         py_url.path().filter(|path| *path != "/"),
                         py_url.query(),
                         py_url.fragment(),
