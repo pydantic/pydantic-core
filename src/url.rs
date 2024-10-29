@@ -156,12 +156,12 @@ impl PyUrl {
     }
 
     #[classmethod]
-    #[pyo3(signature=(*, scheme, host, username=None, password=None, port=None, path=None, query=None, fragment=None))]
+    #[pyo3(signature=(*, scheme, host=None, username=None, password=None, port=None, path=None, query=None, fragment=None))]
     #[allow(clippy::too_many_arguments)]
     pub fn build<'py>(
         cls: &Bound<'py, PyType>,
         scheme: &str,
-        host: &str,
+        host: Option<&str>,
         username: Option<&str>,
         password: Option<&str>,
         port: Option<u16>,
@@ -172,7 +172,7 @@ impl PyUrl {
         let url_host = UrlHostParts {
             username: username.map(Into::into),
             password: password.map(Into::into),
-            host: Some(host.into()),
+            host: host.map(Into::into),
             port,
         };
         let mut url = format!("{scheme}://{url_host}");
