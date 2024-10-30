@@ -98,6 +98,7 @@ import importlib
 
 await micropip.install([
     'dirty-equals',
+    'inline-snapshot',
     'hypothesis',
     'pytest-speed',
     'pytest-mock',
