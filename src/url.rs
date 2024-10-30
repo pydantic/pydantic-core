@@ -5,12 +5,13 @@ use std::hash::{Hash, Hasher};
 
 use idna::punycode::decode_to_string;
 use pyo3::exceptions::PyValueError;
-use pyo3::prelude::*;
 use pyo3::pyclass::CompareOp;
 use pyo3::sync::GILOnceCell;
 use pyo3::types::{PyDict, PyType};
+use pyo3::{intern, prelude::*};
 use url::Url;
 
+use crate::tools::SchemaDict;
 use crate::SchemaValidator;
 
 static SCHEMA_DEFINITION_URL: GILOnceCell<SchemaValidator> = GILOnceCell::new();
@@ -422,8 +423,6 @@ impl PyMultiHostUrl {
     }
 }
 
-#[derive(FromPyObject)]
-#[pyo3(from_item_all)]
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub struct UrlHostParts {
     username: Option<String>,
@@ -435,6 +434,20 @@ pub struct UrlHostParts {
 impl UrlHostParts {
     fn is_empty(&self) -> bool {
         self.host.is_none() && self.password.is_none() && self.host.is_none() && self.port.is_none()
+    }
+}
+
+impl FromPyObject<'_> for UrlHostParts {
+    fn extract_bound(ob: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let py = ob.py();
+        let dict = ob.downcast::<PyDict>()?;
+
+        Ok(UrlHostParts {
+            username: dict.get_as::<Option<_>>(intern!(py, "username"))?.flatten(),
+            password: dict.get_as::<Option<_>>(intern!(py, "password"))?.flatten(),
+            host: dict.get_as::<Option<_>>(intern!(py, "host"))?.flatten(),
+            port: dict.get_as::<Option<_>>(intern!(py, "port"))?.flatten(),
+        })
     }
 }
 
