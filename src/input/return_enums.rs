@@ -17,8 +17,7 @@ use pyo3::types::{PyBytes, PyComplex, PyFloat, PyFrozenSet, PyIterator, PyMappin
 use serde::{ser::Error, Serialize, Serializer};
 
 use crate::errors::{
-    py_err_string, sequence_valid_as_partial, ErrorType, ErrorTypeDefaults, InputValue, ToErrorValue, ValError,
-    ValLineError, ValResult,
+    py_err_string, ErrorType, ErrorTypeDefaults, InputValue, LocItem, ToErrorValue, ValError, ValLineError, ValResult,
 };
 use crate::py_gc::PyGcTraverse;
 use crate::tools::{extract_i64, extract_int, new_py_string, py_err};
@@ -131,7 +130,6 @@ pub(crate) fn validate_iter_to_vec<'py>(
     let mut errors: Vec<ValLineError> = Vec::new();
     let mut index = 0;
     for item_result in iter {
-        index += 1;
         let item = item_result.map_err(|e| any_next_error!(py, e, max_length_check.input, index))?;
         match validator.validate(py, item.borrow_input(), state) {
             Ok(item) => {
@@ -148,12 +146,30 @@ pub(crate) fn validate_iter_to_vec<'py>(
             Err(ValError::Omit) => (),
             Err(err) => return Err(err),
         }
+        index += 1;
     }
 
     if errors.is_empty() || sequence_valid_as_partial(state, index, &errors) {
         Ok(output)
     } else {
         Err(ValError::LineErrors(errors))
+    }
+}
+
+/// If we're in `allow_partial` mode, whether all errors occurred in the last element of the input.
+pub fn sequence_valid_as_partial(state: &ValidationState, input_length: usize, errors: &[ValLineError]) -> bool {
+    if !state.extra().allow_partial {
+        false
+    } else {
+        // for the error to be in the last element, the index of all errors must be `input_length - 1`
+        let last_index = (input_length - 1) as i64;
+        errors.iter().all(|error| {
+            if let Some(LocItem::I(loc_index)) = error.first_loc_item() {
+                *loc_index == last_index
+            } else {
+                false
+            }
+        })
     }
 }
 
@@ -202,7 +218,6 @@ pub(crate) fn validate_iter_to_set<'py>(
     let mut errors: Vec<ValLineError> = Vec::new();
     let mut index = 0;
     for item_result in iter {
-        index += 1;
         let item = item_result.map_err(|e| any_next_error!(py, e, input, index))?;
         match validator.validate(py, item.borrow_input(), state) {
             Ok(item) => {
@@ -233,6 +248,7 @@ pub(crate) fn validate_iter_to_set<'py>(
         if fail_fast && !errors.is_empty() {
             return Err(ValError::LineErrors(errors));
         }
+        index += 1;
     }
 
     if errors.is_empty() || sequence_valid_as_partial(state, index, &errors) {

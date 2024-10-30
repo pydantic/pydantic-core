@@ -146,11 +146,11 @@ impl ValLineError {
         self
     }
 
-    pub fn last_loc_item(&self) -> Option<&LocItem> {
+    pub fn first_loc_item(&self) -> Option<&LocItem> {
         match &self.location {
             Location::Empty => None,
-            // first because order is reversed
-            Location::List(loc_items) => loc_items.first(),
+            // last because order is reversed
+            Location::List(loc_items) => loc_items.last(),
         }
     }
 }

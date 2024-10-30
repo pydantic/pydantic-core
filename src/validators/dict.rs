@@ -3,7 +3,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use crate::build_tools::is_strict;
-use crate::errors::{sequence_valid_as_partial, LocItem, ValError, ValLineError, ValResult};
+use crate::errors::{LocItem, ValError, ValLineError, ValResult};
 use crate::input::BorrowInput;
 use crate::input::ConsumeIterator;
 use crate::input::{Input, ValidatedDict};
@@ -109,10 +109,13 @@ where
     fn consume_iterator(self, iterator: impl Iterator<Item = ValResult<(Key, Value)>>) -> ValResult<PyObject> {
         let output = PyDict::new_bound(self.py);
         let mut errors: Vec<ValLineError> = Vec::new();
-        let mut input_length = 0;
+        // this should only be set to if:
+        // we get errors in a value, there are no previous errors, and no items come after that
+        // e.g. if we get errors just in the last value
+        let mut errors_in_last = false;
 
         for item_result in iterator {
-            input_length += 1;
+            errors_in_last = false;
             let (key, value) = item_result?;
             let output_key = match self.key_validator.validate(self.py, key.borrow_input(), self.state) {
                 Ok(value) => Some(value),
@@ -127,22 +130,23 @@ where
                 Err(err) => return Err(err),
             };
             let output_value = match self.value_validator.validate(self.py, value.borrow_input(), self.state) {
-                Ok(value) => Some(value),
+                Ok(value) => value,
                 Err(ValError::LineErrors(line_errors)) => {
+                    errors_in_last = errors.is_empty();
                     for err in line_errors {
                         errors.push(err.with_outer_location(key.clone()));
                     }
-                    None
+                    continue;
                 }
                 Err(ValError::Omit) => continue,
                 Err(err) => return Err(err),
             };
-            if let (Some(key), Some(value)) = (output_key, output_value) {
-                output.set_item(key, value)?;
+            if let Some(key) = output_key {
+                output.set_item(key, output_value)?;
             }
         }
 
-        if errors.is_empty() || sequence_valid_as_partial(self.state, input_length, &errors) {
+        if errors.is_empty() || (self.state.extra().allow_partial && errors_in_last) {
             let input = self.input;
             length_check!(input, "Dictionary", self.min_length, self.max_length, output);
             Ok(output.into())

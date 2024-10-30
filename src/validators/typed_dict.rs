@@ -6,7 +6,7 @@ use ahash::AHashSet;
 
 use crate::build_tools::py_schema_err;
 use crate::build_tools::{is_strict, schema_or_config, schema_or_config_same, ExtraBehavior};
-use crate::errors::{mapping_valid_as_partial, LocItem};
+use crate::errors::LocItem;
 use crate::errors::{ErrorTypeDefaults, ValError, ValLineError, ValResult};
 use crate::input::BorrowInput;
 use crate::input::ConsumeIterator;
@@ -35,6 +35,7 @@ pub struct TypedDictValidator {
     extras_validator: Option<Box<CombinedValidator>>,
     strict: bool,
     loc_by_alias: bool,
+    allow_partial: bool,
 }
 
 impl BuildValidator for TypedDictValidator {
@@ -124,13 +125,14 @@ impl BuildValidator for TypedDictValidator {
                 required,
             });
         }
-
+        let allow_partial = fields.iter().all(|f| !f.required);
         Ok(Self {
             fields,
             extra_behavior,
             extras_validator,
             strict,
             loc_by_alias: config.get_as(intern!(py, "loc_by_alias"))?.unwrap_or(true),
+            allow_partial,
         }
         .into())
     }
@@ -322,7 +324,7 @@ impl Validator for TypedDictValidator {
             })??;
         }
 
-        if errors.is_empty() || mapping_valid_as_partial(state, dict.last_key(), &errors) {
+        if errors.is_empty() || self.valid_as_partial(state, dict.last_key(), &errors) {
             Ok(output_dict.to_object(py))
         } else {
             Err(ValError::LineErrors(errors))
@@ -331,5 +333,29 @@ impl Validator for TypedDictValidator {
 
     fn get_name(&self) -> &str {
         Self::EXPECTED_TYPE
+    }
+}
+
+impl TypedDictValidator {
+    /// If we're in `allow_partial` mode, whether all errors occurred in the last value of the dict.
+    fn valid_as_partial(
+        &self,
+        state: &ValidationState,
+        opt_last_key: Option<impl Into<LocItem>>,
+        errors: &[ValLineError],
+    ) -> bool {
+        if !state.extra().allow_partial || !self.allow_partial {
+            false
+        } else if let Some(last_key) = opt_last_key.map(Into::into) {
+            errors.iter().all(|error| {
+                if let Some(loc_item) = error.first_loc_item() {
+                    loc_item == &last_key
+                } else {
+                    false
+                }
+            })
+        } else {
+            false
+        }
     }
 }
