@@ -236,7 +236,7 @@ pub trait ValidatedDict<'py> {
         &'a self,
         consumer: impl ConsumeIterator<ValResult<(Self::Key<'a>, Self::Item<'a>)>, Output = R>,
     ) -> ValResult<R>;
-    // used in partial mode to check all errors occurred in the last key value pair
+    // used in partial mode to check all errors occurred in the last value
     fn last_key(&self) -> Option<Self::Key<'_>>;
 }
 
