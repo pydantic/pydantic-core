@@ -34,6 +34,8 @@ def test_list():
         v.validate_python([[1, 2], 'wrong', [3, 4]])
     with pytest.raises(ValidationError, match='Input should be a valid tuple'):
         v.validate_python([[1, 2], 'wrong', 'wrong'])
+    assert v.validate_json(b'[[1, 2], [3, 4]]', allow_partial=True) == [(1, 2), (3, 4)]
+    assert v.validate_json(b'[[1, 2], [3,', allow_partial=True) == [(1, 2)]
 
 
 def test_list_partial_nested():
@@ -162,6 +164,23 @@ def test_partial_typed_dict():
         ]
     )
 
+    # validate strings
+    assert v.validate_strings({'a': '11', 'b': '22'}) == snapshot({'a': 11, 'b': 22})
+    with pytest.raises(ValidationError, match='Input should be greater than 10'):
+        v.validate_strings({'a': '11', 'b': '2'})
+    assert v.validate_strings({'a': '11', 'b': '2'}, allow_partial=True) == snapshot({'a': 11})
+
+    assert v.validate_json(b'{"b": "12", "a": 11, "c": 13}', allow_partial=True) == IsStrictDict(a=11, b=12, c=13)
+    assert v.validate_json(b'{"b": "12", "a": 11, "c": 13', allow_partial=True) == IsStrictDict(a=11, b=12, c=13)
+    assert v.validate_json(b'{"a": 11, "b": "12", "c": 1', allow_partial=True) == IsStrictDict(a=11, b=12)
+    assert v.validate_json(b'{"a": 11, "b": "12", "c":', allow_partial=True) == IsStrictDict(a=11, b=12)
+    assert v.validate_json(b'{"a": 11, "b": "12", "c"', allow_partial=True) == IsStrictDict(a=11, b=12)
+    assert v.validate_json(b'{"a": 11, "b": "12", "c', allow_partial=True) == IsStrictDict(a=11, b=12)
+    assert v.validate_json(b'{"a": 11, "b": "12", "', allow_partial=True) == IsStrictDict(a=11, b=12)
+    assert v.validate_json(b'{"a": 11, "b": "12", ', allow_partial=True) == IsStrictDict(a=11, b=12)
+    assert v.validate_json(b'{"a": 11, "b": "12",', allow_partial=True) == IsStrictDict(a=11, b=12)
+    assert v.validate_json(b'{"a": 11, "b": "12"', allow_partial=True) == IsStrictDict(a=11, b=12)
+
 
 def test_non_partial_typed_dict():
     v = SchemaValidator(
@@ -212,3 +231,10 @@ def test_double_nested():
     assert v.validate_python({'a': 11, 'b': [{'a': 1, 'b': 20}, {'a': 3, 'b': 40}]}, allow_partial=True) == snapshot(
         {'a': 11}
     )
+    json = b'{"a": 11, "b": [{"a": 10, "b": 20}, {"a": 30, "b": 40}]}'
+    assert v.validate_json(json, allow_partial=True) == snapshot(
+        {'a': 11, 'b': [{'a': 10, 'b': 20}, {'a': 30, 'b': 40}]}
+    )
+    for i in range(1, len(json)):
+        value = v.validate_json(json[:i], allow_partial=True)
+        assert isinstance(value, dict)

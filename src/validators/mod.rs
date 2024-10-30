@@ -383,8 +383,8 @@ impl SchemaValidator {
         self_instance: Option<&Bound<'_, PyAny>>,
         allow_partial: bool,
     ) -> ValResult<PyObject> {
-        let json_value =
-            jiter::JsonValue::parse(json_data, true).map_err(|e| json::map_json_err(input, e, json_data))?;
+        let json_value = jiter::JsonValue::parse_with_config(json_data, true, allow_partial)
+            .map_err(|e| json::map_json_err(input, e, json_data))?;
         self._validate(
             py,
             &json_value,
