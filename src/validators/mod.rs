@@ -164,7 +164,8 @@ impl SchemaValidator {
         Ok((cls, init_args))
     }
 
-    #[pyo3(signature = (input, *, strict=None, from_attributes=None, context=None, self_instance=None))]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (input, *, strict=None, from_attributes=None, context=None, self_instance=None, allow_partial=false))]
     pub fn validate_python(
         &self,
         py: Python,
@@ -173,6 +174,7 @@ impl SchemaValidator {
         from_attributes: Option<bool>,
         context: Option<&Bound<'_, PyAny>>,
         self_instance: Option<&Bound<'_, PyAny>>,
+        allow_partial: bool,
     ) -> PyResult<PyObject> {
         self._validate(
             py,
@@ -182,6 +184,7 @@ impl SchemaValidator {
             from_attributes,
             context,
             self_instance,
+            allow_partial,
         )
         .map_err(|e| self.prepare_validation_err(py, e, InputType::Python))
     }
@@ -204,6 +207,7 @@ impl SchemaValidator {
             from_attributes,
             context,
             self_instance,
+            false,
         ) {
             Ok(_) => Ok(true),
             Err(ValError::InternalErr(err)) => Err(err),
@@ -213,7 +217,7 @@ impl SchemaValidator {
         }
     }
 
-    #[pyo3(signature = (input, *, strict=None, context=None, self_instance=None))]
+    #[pyo3(signature = (input, *, strict=None, context=None, self_instance=None, allow_partial=false))]
     pub fn validate_json(
         &self,
         py: Python,
@@ -221,6 +225,7 @@ impl SchemaValidator {
         strict: Option<bool>,
         context: Option<&Bound<'_, PyAny>>,
         self_instance: Option<&Bound<'_, PyAny>>,
+        allow_partial: bool,
     ) -> PyResult<PyObject> {
         let r = match json::validate_json_bytes(input) {
             Ok(v_match) => self._validate_json(
@@ -230,24 +235,26 @@ impl SchemaValidator {
                 strict,
                 context,
                 self_instance,
+                allow_partial,
             ),
             Err(err) => Err(err),
         };
         r.map_err(|e| self.prepare_validation_err(py, e, InputType::Json))
     }
 
-    #[pyo3(signature = (input, *, strict=None, context=None))]
+    #[pyo3(signature = (input, *, strict=None, context=None, allow_partial=false))]
     pub fn validate_strings(
         &self,
         py: Python,
         input: Bound<'_, PyAny>,
         strict: Option<bool>,
         context: Option<&Bound<'_, PyAny>>,
+        allow_partial: bool,
     ) -> PyResult<PyObject> {
         let t = InputType::String;
         let string_mapping = StringMapping::new_value(input).map_err(|e| self.prepare_validation_err(py, e, t))?;
 
-        match self._validate(py, &string_mapping, t, strict, None, context, None) {
+        match self._validate(py, &string_mapping, t, strict, None, context, None, allow_partial) {
             Ok(r) => Ok(r),
             Err(e) => Err(self.prepare_validation_err(py, e, t)),
         }
@@ -273,6 +280,7 @@ impl SchemaValidator {
             context,
             self_instance: None,
             cache_str: self.cache_str,
+            allow_partial: false,
         };
 
         let guard = &mut RecursionState::default();
@@ -297,6 +305,7 @@ impl SchemaValidator {
             context,
             self_instance: None,
             cache_str: self.cache_str,
+            allow_partial: false,
         };
         let recursion_guard = &mut RecursionState::default();
         let mut state = ValidationState::new(extra, recursion_guard);
@@ -345,6 +354,7 @@ impl SchemaValidator {
         from_attributes: Option<bool>,
         context: Option<&Bound<'py, PyAny>>,
         self_instance: Option<&Bound<'py, PyAny>>,
+        allow_partial: bool,
     ) -> ValResult<PyObject> {
         let mut recursion_guard = RecursionState::default();
         let mut state = ValidationState::new(
@@ -355,12 +365,14 @@ impl SchemaValidator {
                 self_instance,
                 input_type,
                 self.cache_str,
+                allow_partial,
             ),
             &mut recursion_guard,
         );
         self.validator.validate(py, input, &mut state)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn _validate_json(
         &self,
         py: Python,
@@ -369,10 +381,20 @@ impl SchemaValidator {
         strict: Option<bool>,
         context: Option<&Bound<'_, PyAny>>,
         self_instance: Option<&Bound<'_, PyAny>>,
+        allow_partial: bool,
     ) -> ValResult<PyObject> {
         let json_value =
             jiter::JsonValue::parse(json_data, true).map_err(|e| json::map_json_err(input, e, json_data))?;
-        self._validate(py, &json_value, InputType::Json, strict, None, context, self_instance)
+        self._validate(
+            py,
+            &json_value,
+            InputType::Json,
+            strict,
+            None,
+            context,
+            self_instance,
+            allow_partial,
+        )
     }
 
     fn prepare_validation_err(&self, py: Python, error: ValError, input_type: InputType) -> PyErr {
@@ -408,7 +430,7 @@ impl<'py> SelfValidator<'py> {
         let py = schema.py();
         let mut recursion_guard = RecursionState::default();
         let mut state = ValidationState::new(
-            Extra::new(strict, None, None, None, InputType::Python, true.into()),
+            Extra::new(strict, None, None, None, InputType::Python, true.into(), false),
             &mut recursion_guard,
         );
         match self.validator.validator.validate(py, schema, &mut state) {
@@ -606,6 +628,8 @@ pub struct Extra<'a, 'py> {
     self_instance: Option<&'a Bound<'py, PyAny>>,
     /// Whether to use a cache of short strings to accelerate python string construction
     cache_str: StringCacheMode,
+    /// Whether to allow validation of partial objects
+    pub allow_partial: bool,
 }
 
 impl<'a, 'py> Extra<'a, 'py> {
@@ -616,6 +640,7 @@ impl<'a, 'py> Extra<'a, 'py> {
         self_instance: Option<&'a Bound<'py, PyAny>>,
         input_type: InputType,
         cache_str: StringCacheMode,
+        allow_partial: bool,
     ) -> Self {
         Extra {
             input_type,
@@ -625,6 +650,7 @@ impl<'a, 'py> Extra<'a, 'py> {
             context,
             self_instance,
             cache_str,
+            allow_partial,
         }
     }
 }
@@ -639,6 +665,7 @@ impl Extra<'_, '_> {
             context: self.context,
             self_instance: self.self_instance,
             cache_str: self.cache_str,
+            allow_partial: self.allow_partial,
         }
     }
 }

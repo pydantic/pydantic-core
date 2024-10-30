@@ -3,7 +3,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use crate::build_tools::is_strict;
-use crate::errors::{LocItem, ValError, ValLineError, ValResult};
+use crate::errors::{sequence_valid_as_partial, LocItem, ValError, ValLineError, ValResult};
 use crate::input::BorrowInput;
 use crate::input::ConsumeIterator;
 use crate::input::{Input, ValidatedDict};
@@ -109,8 +109,10 @@ where
     fn consume_iterator(self, iterator: impl Iterator<Item = ValResult<(Key, Value)>>) -> ValResult<PyObject> {
         let output = PyDict::new_bound(self.py);
         let mut errors: Vec<ValLineError> = Vec::new();
+        let mut input_length = 0;
 
         for item_result in iterator {
+            input_length += 1;
             let (key, value) = item_result?;
             let output_key = match self.key_validator.validate(self.py, key.borrow_input(), self.state) {
                 Ok(value) => Some(value),
@@ -140,7 +142,7 @@ where
             }
         }
 
-        if errors.is_empty() {
+        if errors.is_empty() || sequence_valid_as_partial(self.state, input_length, &errors) {
             let input = self.input;
             length_check!(input, "Dictionary", self.min_length, self.max_length, output);
             Ok(output.into())

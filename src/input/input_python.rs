@@ -823,6 +823,14 @@ impl<'py> ValidatedDict<'py> for GenericPyMapping<'_, 'py> {
             Self::GetAttr(obj, _) => Ok(consumer.consume_iterator(iterate_attributes(obj)?)),
         }
     }
+
+    fn last_key(&self) -> Option<Self::Key<'_>> {
+        match self {
+            Self::Dict(dict) => dict.keys().iter().last(),
+            Self::Mapping(mapping) => mapping.keys().ok()?.iter().ok()?.last()?.ok(),
+            Self::GetAttr(_, _) => None,
+        }
+    }
 }
 
 /// Container for all the collections (sized iterable containers) types, which

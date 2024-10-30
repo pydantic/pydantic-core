@@ -6,7 +6,7 @@ use ahash::AHashSet;
 
 use crate::build_tools::py_schema_err;
 use crate::build_tools::{is_strict, schema_or_config, schema_or_config_same, ExtraBehavior};
-use crate::errors::LocItem;
+use crate::errors::{mapping_valid_as_partial, LocItem};
 use crate::errors::{ErrorTypeDefaults, ValError, ValLineError, ValResult};
 use crate::input::BorrowInput;
 use crate::input::ConsumeIterator;
@@ -322,10 +322,10 @@ impl Validator for TypedDictValidator {
             })??;
         }
 
-        if !errors.is_empty() {
-            Err(ValError::LineErrors(errors))
-        } else {
+        if errors.is_empty() || mapping_valid_as_partial(state, dict.last_key(), &errors) {
             Ok(output_dict.to_object(py))
+        } else {
+            Err(ValError::LineErrors(errors))
         }
     }
 

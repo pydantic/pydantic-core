@@ -17,7 +17,8 @@ use pyo3::types::{PyBytes, PyComplex, PyFloat, PyFrozenSet, PyIterator, PyMappin
 use serde::{ser::Error, Serialize, Serializer};
 
 use crate::errors::{
-    py_err_string, ErrorType, ErrorTypeDefaults, InputValue, ToErrorValue, ValError, ValLineError, ValResult,
+    py_err_string, sequence_valid_as_partial, ErrorType, ErrorTypeDefaults, InputValue, ToErrorValue, ValError,
+    ValLineError, ValResult,
 };
 use crate::py_gc::PyGcTraverse;
 use crate::tools::{extract_i64, extract_int, new_py_string, py_err};
@@ -128,7 +129,9 @@ pub(crate) fn validate_iter_to_vec<'py>(
 ) -> ValResult<Vec<PyObject>> {
     let mut output: Vec<PyObject> = Vec::with_capacity(capacity);
     let mut errors: Vec<ValLineError> = Vec::new();
-    for (index, item_result) in iter.enumerate() {
+    let mut index = 0;
+    for item_result in iter {
+        index += 1;
         let item = item_result.map_err(|e| any_next_error!(py, e, max_length_check.input, index))?;
         match validator.validate(py, item.borrow_input(), state) {
             Ok(item) => {
@@ -139,7 +142,7 @@ pub(crate) fn validate_iter_to_vec<'py>(
                 max_length_check.incr()?;
                 errors.extend(line_errors.into_iter().map(|err| err.with_outer_location(index)));
                 if fail_fast {
-                    break;
+                    return Err(ValError::LineErrors(errors));
                 }
             }
             Err(ValError::Omit) => (),
@@ -147,7 +150,7 @@ pub(crate) fn validate_iter_to_vec<'py>(
         }
     }
 
-    if errors.is_empty() {
+    if errors.is_empty() || sequence_valid_as_partial(state, index, &errors) {
         Ok(output)
     } else {
         Err(ValError::LineErrors(errors))
@@ -197,7 +200,9 @@ pub(crate) fn validate_iter_to_set<'py>(
     fail_fast: bool,
 ) -> ValResult<()> {
     let mut errors: Vec<ValLineError> = Vec::new();
-    for (index, item_result) in iter.enumerate() {
+    let mut index = 0;
+    for item_result in iter {
+        index += 1;
         let item = item_result.map_err(|e| any_next_error!(py, e, input, index))?;
         match validator.validate(py, item.borrow_input(), state) {
             Ok(item) => {
@@ -226,11 +231,11 @@ pub(crate) fn validate_iter_to_set<'py>(
             Err(err) => return Err(err),
         }
         if fail_fast && !errors.is_empty() {
-            break;
+            return Err(ValError::LineErrors(errors));
         }
     }
 
-    if errors.is_empty() {
+    if errors.is_empty() || sequence_valid_as_partial(state, index, &errors) {
         Ok(())
     } else {
         Err(ValError::LineErrors(errors))

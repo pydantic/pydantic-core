@@ -145,6 +145,14 @@ impl ValLineError {
         self.error_type = error_type;
         self
     }
+
+    pub fn last_loc_item(&self) -> Option<&LocItem> {
+        match &self.location {
+            Location::Empty => None,
+            // first because order is reversed
+            Location::List(loc_items) => loc_items.first(),
+        }
+    }
 }
 
 #[cfg_attr(debug_assertions, derive(Debug))]

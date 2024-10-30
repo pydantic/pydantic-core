@@ -43,7 +43,7 @@ def test_list_strict():
 
 def test_list_no_copy():
     v = SchemaValidator({'type': 'list'})
-    assert v.validate_python([1, 2, 3]) is not [1, 2, 3]  # noqa: F632
+    assert v.validate_python([1, 2, 3]) is not [1, 2, 3]
 
 
 def gen_ints():
@@ -547,3 +547,13 @@ def test_list_dict_items_input(testcase: ListInputTestCase) -> None:
         output = v.validate_python(testcase.input)
         assert output == testcase.output
         assert output is not testcase.input
+
+
+def test_validate_partial():
+    v = SchemaValidator(
+        core_schema.list_schema(
+            core_schema.tuple_positional_schema([core_schema.int_schema(), core_schema.int_schema()]),
+        )
+    )
+    assert v.validate_python([[1, 2], [3, 4]]) == [(1, 2), (3, 4)]
+    assert v.validate_python([[1, 2], [3, 4]], allow_partial=True) == [(1, 2), (3, 4)]
