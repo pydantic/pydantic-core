@@ -1,9 +1,10 @@
+from typing import Mapping
+
 import pytest
 from dirty_equals import IsStrictDict
 from inline_snapshot import snapshot
 
-from generate_self_schema import core_schema
-from pydantic_core import SchemaValidator, ValidationError
+from pydantic_core import SchemaValidator, ValidationError, core_schema
 
 
 def test_list():
@@ -70,10 +71,25 @@ def test_set_frozenset(collection_type):
         v.validate_python([[1, 2], 'wrong', 'wrong'])
 
 
+class MyMapping(Mapping):
+    def __init__(self, d):
+        self._d = d
+
+    def __getitem__(self, key):
+        return self._d[key]
+
+    def __iter__(self):
+        return iter(self._d)
+
+    def __len__(self):
+        return len(self._d)
+
+
 def test_dict():
     v = SchemaValidator(core_schema.dict_schema(core_schema.int_schema(), core_schema.int_schema()))
     assert v.validate_python({'1': 2, 3: '4'}) == snapshot({1: 2, 3: 4})
     assert v.validate_python({'1': 2, 3: '4'}, allow_partial=True) == snapshot({1: 2, 3: 4})
+    assert v.validate_python(MyMapping({'1': 2, 3: '4'}), allow_partial=True) == snapshot({1: 2, 3: 4})
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python({'1': 2, 3: 'wrong'})
     assert exc_info.value.errors(include_url=False) == snapshot(
@@ -86,7 +102,8 @@ def test_dict():
             }
         ]
     )
-    assert v.validate_python({'1': 2, 3: 'wrong'}, allow_partial=True) == snapshot({1: 2})
+    assert v.validate_python({'1': 2, 3: 'x'}, allow_partial=True) == snapshot({1: 2})
+    assert v.validate_python(MyMapping({'1': 2, 3: 'x'}), allow_partial=True) == snapshot({1: 2})
     assert v.validate_python({'1': 2, 3: 4, 5: '6', 7: 'x'}, allow_partial=True) == snapshot({1: 2, 3: 4, 5: 6})
     with pytest.raises(ValidationError, match='Input should be a valid integer'):
         v.validate_python({'1': 2, 3: 4, 5: 'x', 7: '8'})
