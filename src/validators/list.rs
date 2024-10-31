@@ -177,6 +177,10 @@ impl Validator for ListValidator {
             }
         }
     }
+
+    fn supports_partial(&self) -> bool {
+        true
+    }
 }
 
 struct ValidateToVec<'a, 's, 'py, I: Input<'py> + ?Sized> {

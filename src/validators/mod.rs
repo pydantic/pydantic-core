@@ -365,7 +365,7 @@ impl SchemaValidator {
                 self.cache_str,
             ),
             &mut recursion_guard,
-            allow_partial,
+            allow_partial && self.validator.supports_partial(),
         );
         self.validator.validate(py, input, &mut state)
     }
@@ -801,4 +801,10 @@ pub trait Validator: Send + Sync + Debug {
     /// `get_name` generally returns `Self::EXPECTED_TYPE` or some other clear identifier of the validator
     /// this is used in the error location in unions, and in the top level message in `ValidationError`
     fn get_name(&self) -> &str;
+
+    /// Whether this validator supports partial validation, `state.allow_partial` should only be set to true
+    /// if this is the case.
+    fn supports_partial(&self) -> bool {
+        false
+    }
 }

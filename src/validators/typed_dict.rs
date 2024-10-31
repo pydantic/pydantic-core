@@ -156,7 +156,7 @@ impl Validator for TypedDictValidator {
         let output_dict = PyDict::new_bound(py);
         let mut errors: Vec<ValLineError> = Vec::with_capacity(self.fields.len());
 
-        let partial_last_key = if self.allow_partial && state.allow_partial {
+        let partial_last_key = if state.allow_partial {
             dict.last_key().map(Into::into)
         } else {
             None
@@ -201,7 +201,7 @@ impl Validator for TypedDictValidator {
                     } else {
                         false
                     };
-                    state.allow_partial = is_last_partial;
+                    state.allow_partial = is_last_partial && field.validator.supports_partial();
                     match field.validator.validate(py, value.borrow_input(), state) {
                         Ok(value) => {
                             output_dict.set_item(&field.name_py, value)?;
@@ -316,7 +316,7 @@ impl Validator for TypedDictValidator {
                                     } else {
                                         false
                                     };
-                                    self.state.allow_partial = last_partial;
+                                    self.state.allow_partial = last_partial && validator.supports_partial();
                                     match validator.validate(self.py, value, self.state) {
                                         Ok(value) => {
                                             self.output_dict.set_item(py_key, value)?;
@@ -363,28 +363,8 @@ impl Validator for TypedDictValidator {
     fn get_name(&self) -> &str {
         Self::EXPECTED_TYPE
     }
-}
 
-// impl TypedDictValidator {
-//     /// If we're in `allow_partial` mode, whether all errors occurred in the last value of the dict.
-//     fn valid_as_partial(
-//         &self,
-//         state: &ValidationState,
-//         get_opt_last_key: impl FnOnce() -> Option<LocItem>,
-//         errors: &[ValLineError],
-//     ) -> bool {
-//         if !state.allow_partial || !self.allow_partial {
-//             false
-//         } else if let Some(last_key) = get_opt_last_key() {
-//             errors.iter().all(|error| {
-//                 if let Some(loc_item) = error.first_loc_item() {
-//                     loc_item == &last_key
-//                 } else {
-//                     false
-//                 }
-//             })
-//         } else {
-//             false
-//         }
-//     }
-// }
+    fn supports_partial(&self) -> bool {
+        self.allow_partial
+    }
+}

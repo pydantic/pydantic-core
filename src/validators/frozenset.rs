@@ -52,6 +52,10 @@ impl Validator for FrozenSetValidator {
     fn get_name(&self) -> &str {
         &self.name
     }
+
+    fn supports_partial(&self) -> bool {
+        true
+    }
 }
 
 struct ValidateToFrozenSet<'a, 's, 'py, I: Input<'py> + ?Sized> {

@@ -38,29 +38,6 @@ def test_list():
     assert v.validate_json(b'[[1, 2], [3,', allow_partial=True) == [(1, 2)]
 
 
-def test_list_partial_nested():
-    v = SchemaValidator(
-        core_schema.tuple_positional_schema(
-            [core_schema.int_schema(), core_schema.list_schema(core_schema.int_schema())]
-        ),
-    )
-    assert v.validate_python([1, [2, 3]]) == (1, [2, 3])
-    assert v.validate_python([1, [2, 3]], allow_partial=True) == (1, [2, 3])
-    with pytest.raises(ValidationError) as exc_info:
-        v.validate_python((1, [2, 3, 'x']))
-    assert exc_info.value.errors(include_url=False) == snapshot(
-        [
-            {
-                'type': 'int_parsing',
-                'loc': (1, 2),
-                'msg': 'Input should be a valid integer, unable to parse string as an integer',
-                'input': 'x',
-            }
-        ]
-    )
-    assert v.validate_python((1, [2, 3, 'x']), allow_partial=True) == (1, [2, 3])
-
-
 @pytest.mark.parametrize('collection_type', [core_schema.set_schema, core_schema.frozenset_schema])
 def test_set_frozenset(collection_type):
     v = SchemaValidator(
@@ -253,3 +230,17 @@ def test_double_nested():
     for i in range(1, len(json)):
         value = v.validate_json(json[:i], allow_partial=True)
         assert isinstance(value, dict)
+
+
+def test_tuple_list():
+    """Tuples don't support partial, so behaviour should be disabled."""
+    v = SchemaValidator(
+        core_schema.tuple_positional_schema(
+            [core_schema.list_schema(core_schema.int_schema()), core_schema.int_schema()]
+        ),
+    )
+    assert v.validate_python([['1', '2'], '3'], allow_partial=True) == snapshot(([1, 2], 3))
+    with pytest.raises(ValidationError, match=r'1\s+Input should be a valid integer'):
+        v.validate_python([['1', '2'], 'x'], allow_partial=True)
+    with pytest.raises(ValidationError, match=r'0\.1\s+Input should be a valid integer'):
+        v.validate_python([['1', 'x'], '2'], allow_partial=True)

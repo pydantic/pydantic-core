@@ -227,7 +227,6 @@ pub struct InternalValidator {
     hide_input_in_errors: bool,
     validation_error_cause: bool,
     cache_str: jiter::StringCacheMode,
-    allow_partial: bool,
 }
 
 impl fmt::Debug for InternalValidator {
@@ -260,7 +259,6 @@ impl InternalValidator {
             hide_input_in_errors,
             validation_error_cause,
             cache_str: extra.cache_str,
-            allow_partial: state.allow_partial,
         }
     }
 
@@ -281,7 +279,7 @@ impl InternalValidator {
             self_instance: self.self_instance.as_ref().map(|data| data.bind(py)),
             cache_str: self.cache_str,
         };
-        let mut state = ValidationState::new(extra, &mut self.recursion_guard, self.allow_partial);
+        let mut state = ValidationState::new(extra, &mut self.recursion_guard, false);
         state.exactness = self.exactness;
         let result = self
             .validator
@@ -316,7 +314,7 @@ impl InternalValidator {
             self_instance: self.self_instance.as_ref().map(|data| data.bind(py)),
             cache_str: self.cache_str,
         };
-        let mut state = ValidationState::new(extra, &mut self.recursion_guard, self.allow_partial);
+        let mut state = ValidationState::new(extra, &mut self.recursion_guard, false);
         state.exactness = self.exactness;
         let result = self.validator.validate(py, input, &mut state).map_err(|e| {
             ValidationError::from_val_error(

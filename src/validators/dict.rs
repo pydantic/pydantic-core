@@ -87,6 +87,10 @@ impl Validator for DictValidator {
     fn get_name(&self) -> &str {
         &self.name
     }
+
+    fn supports_partial(&self) -> bool {
+        true
+    }
 }
 
 struct ValidateToDict<'a, 's, 'py, I: Input<'py> + ?Sized> {
@@ -125,7 +129,7 @@ where
                 Err(ValError::Omit) => continue,
                 Err(err) => return Err(err),
             };
-            self.state.allow_partial = is_last_partial;
+            self.state.allow_partial = is_last_partial && self.value_validator.supports_partial();
             let output_value = match self.value_validator.validate(self.py, value.borrow_input(), self.state) {
                 Ok(value) => value,
                 Err(ValError::LineErrors(line_errors)) => {
