@@ -260,7 +260,7 @@ impl InternalValidator {
             hide_input_in_errors,
             validation_error_cause,
             cache_str: extra.cache_str,
-            allow_partial: extra.allow_partial,
+            allow_partial: state.allow_partial,
         }
     }
 
@@ -280,9 +280,8 @@ impl InternalValidator {
             context: self.context.as_ref().map(|data| data.bind(py)),
             self_instance: self.self_instance.as_ref().map(|data| data.bind(py)),
             cache_str: self.cache_str,
-            allow_partial: self.allow_partial,
         };
-        let mut state = ValidationState::new(extra, &mut self.recursion_guard);
+        let mut state = ValidationState::new(extra, &mut self.recursion_guard, self.allow_partial);
         state.exactness = self.exactness;
         let result = self
             .validator
@@ -316,9 +315,8 @@ impl InternalValidator {
             context: self.context.as_ref().map(|data| data.bind(py)),
             self_instance: self.self_instance.as_ref().map(|data| data.bind(py)),
             cache_str: self.cache_str,
-            allow_partial: self.allow_partial,
         };
-        let mut state = ValidationState::new(extra, &mut self.recursion_guard);
+        let mut state = ValidationState::new(extra, &mut self.recursion_guard, self.allow_partial);
         state.exactness = self.exactness;
         let result = self.validator.validate(py, input, &mut state).map_err(|e| {
             ValidationError::from_val_error(

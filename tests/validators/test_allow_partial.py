@@ -119,6 +119,17 @@ def test_dict():
         v.validate_python({'1': 2, 3: 4, 'x': 6})
 
 
+def test_dict_list():
+    v = SchemaValidator(
+        core_schema.dict_schema(core_schema.int_schema(), core_schema.list_schema(core_schema.int_schema(ge=10)))
+    )
+    assert v.validate_python({'1': [20, 30], 3: [40, '50']}, allow_partial=True) == snapshot({1: [20, 30], 3: [40, 50]})
+    assert v.validate_python({'1': [20, 30], 3: [40, 5]}, allow_partial=True) == snapshot({1: [20, 30], 3: [40]})
+
+    with pytest.raises(ValidationError, match=r'1\.1\s+Input should be greater than or equal to 10'):
+        v.validate_python({'1': [20, 3], 3: [40, 50]}, allow_partial=True)
+
+
 def test_partial_typed_dict():
     v = SchemaValidator(
         core_schema.typed_dict_schema(
@@ -224,10 +235,14 @@ def test_double_nested():
     assert v.validate_python({'a': 11, 'b': [{'a': 10, 'b': 20}, {'a': 30, 123: 4}]}, allow_partial=True) == snapshot(
         {'a': 11, 'b': [{'a': 10, 'b': 20}]}
     )
-    # this is not the intended behaviour, but it's okay
-    assert v.validate_python({'a': 11, 'b': [{'a': 10, 'b': 2}, {'a': 30}]}, allow_partial=True) == snapshot(
-        {'a': 11, 'b': [{'a': 10}, {'a': 30}]}
-    )
+    # the first element of the list is invalid, so the whole list is invalid
+    assert v.validate_python({'a': 11, 'b': [{'a': 10, 'b': 2}, {'a': 30}]}, allow_partial=True) == snapshot({'a': 11})
+    with pytest.raises(ValidationError, match=r'b\.0\.b\s+Input should be greater than or equal to 10'):
+        v.validate_python({'b': [{'a': 10, 'b': 2}, {'a': 30}], 'a': 11}, allow_partial=True)
+
+    with pytest.raises(ValidationError, match=r'b\.1\.a\s+Input should be greater than or equal to 10'):
+        v.validate_python({'b': [{'a': 10, 'b': 20}, {'a': 3}], 'a': 11}, allow_partial=True)
+
     assert v.validate_python({'a': 11, 'b': [{'a': 1, 'b': 20}, {'a': 3, 'b': 40}]}, allow_partial=True) == snapshot(
         {'a': 11}
     )

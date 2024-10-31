@@ -109,13 +109,9 @@ where
     fn consume_iterator(self, iterator: impl Iterator<Item = ValResult<(Key, Value)>>) -> ValResult<PyObject> {
         let output = PyDict::new_bound(self.py);
         let mut errors: Vec<ValLineError> = Vec::new();
-        // this should only be set to if:
-        // we get errors in a value, there are no previous errors, and no items come after that
-        // e.g. if we get errors just in the last value
-        let mut errors_in_last = false;
 
-        for item_result in iterator {
-            errors_in_last = false;
+        for (_, is_last_partial, item_result) in self.state.enumerate_last_partial(iterator) {
+            self.state.allow_partial = false;
             let (key, value) = item_result?;
             let output_key = match self.key_validator.validate(self.py, key.borrow_input(), self.state) {
                 Ok(value) => Some(value),
@@ -129,12 +125,12 @@ where
                 Err(ValError::Omit) => continue,
                 Err(err) => return Err(err),
             };
+            self.state.allow_partial = is_last_partial;
             let output_value = match self.value_validator.validate(self.py, value.borrow_input(), self.state) {
                 Ok(value) => value,
                 Err(ValError::LineErrors(line_errors)) => {
-                    errors_in_last = errors.is_empty();
-                    for err in line_errors {
-                        errors.push(err.with_outer_location(key.clone()));
+                    if !is_last_partial {
+                        errors.extend(line_errors.into_iter().map(|err| err.with_outer_location(key.clone())));
                     }
                     continue;
                 }
@@ -146,7 +142,7 @@ where
             }
         }
 
-        if errors.is_empty() || (self.state.extra().allow_partial && errors_in_last) {
+        if errors.is_empty() {
             let input = self.input;
             length_check!(input, "Dictionary", self.min_length, self.max_length, output);
             Ok(output.into())

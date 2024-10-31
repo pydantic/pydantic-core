@@ -280,11 +280,10 @@ impl SchemaValidator {
             context,
             self_instance: None,
             cache_str: self.cache_str,
-            allow_partial: false,
         };
 
         let guard = &mut RecursionState::default();
-        let mut state = ValidationState::new(extra, guard);
+        let mut state = ValidationState::new(extra, guard, false);
         self.validator
             .validate_assignment(py, &obj, field_name, &field_value, &mut state)
             .map_err(|e| self.prepare_validation_err(py, e, InputType::Python))
@@ -305,10 +304,9 @@ impl SchemaValidator {
             context,
             self_instance: None,
             cache_str: self.cache_str,
-            allow_partial: false,
         };
         let recursion_guard = &mut RecursionState::default();
-        let mut state = ValidationState::new(extra, recursion_guard);
+        let mut state = ValidationState::new(extra, recursion_guard, false);
         let r = self.validator.default_value(py, None::<i64>, &mut state);
         match r {
             Ok(maybe_default) => match maybe_default {
@@ -365,9 +363,9 @@ impl SchemaValidator {
                 self_instance,
                 input_type,
                 self.cache_str,
-                allow_partial,
             ),
             &mut recursion_guard,
+            allow_partial,
         );
         self.validator.validate(py, input, &mut state)
     }
@@ -430,8 +428,9 @@ impl<'py> SelfValidator<'py> {
         let py = schema.py();
         let mut recursion_guard = RecursionState::default();
         let mut state = ValidationState::new(
-            Extra::new(strict, None, None, None, InputType::Python, true.into(), false),
+            Extra::new(strict, None, None, None, InputType::Python, true.into()),
             &mut recursion_guard,
+            false,
         );
         match self.validator.validator.validate(py, schema, &mut state) {
             Ok(schema_obj) => Ok(schema_obj.into_bound(py)),
@@ -628,8 +627,6 @@ pub struct Extra<'a, 'py> {
     self_instance: Option<&'a Bound<'py, PyAny>>,
     /// Whether to use a cache of short strings to accelerate python string construction
     cache_str: StringCacheMode,
-    /// Whether to allow validation of partial objects
-    pub allow_partial: bool,
 }
 
 impl<'a, 'py> Extra<'a, 'py> {
@@ -640,7 +637,6 @@ impl<'a, 'py> Extra<'a, 'py> {
         self_instance: Option<&'a Bound<'py, PyAny>>,
         input_type: InputType,
         cache_str: StringCacheMode,
-        allow_partial: bool,
     ) -> Self {
         Extra {
             input_type,
@@ -650,7 +646,6 @@ impl<'a, 'py> Extra<'a, 'py> {
             context,
             self_instance,
             cache_str,
-            allow_partial,
         }
     }
 }
@@ -665,7 +660,6 @@ impl Extra<'_, '_> {
             context: self.context,
             self_instance: self.self_instance,
             cache_str: self.cache_str,
-            allow_partial: self.allow_partial,
         }
     }
 }
