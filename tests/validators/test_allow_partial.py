@@ -172,6 +172,8 @@ def test_partial_typed_dict():
             }
         ]
     )
+    with pytest.raises(ValidationError, match=r'c\s+Input should be greater than 10'):
+        v.validate_python(MyMapping({'a': 11, 'c': 1, 'b': 12}), allow_partial=True)
 
     # validate strings
     assert v.validate_strings({'a': '11', 'b': '22'}) == snapshot({'a': 11, 'b': 22})

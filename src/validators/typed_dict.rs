@@ -177,7 +177,7 @@ impl Validator for TypedDictValidator {
                     Ok(v) => v,
                     Err(ValError::LineErrors(line_errors)) => {
                         let field_loc: LocItem = field.name.clone().into();
-                        if partial_last_key.as_ref().map_or(false, |l| l == &field_loc) {
+                        if partial_last_key.as_ref() == Some(&field_loc) {
                             for err in line_errors {
                                 errors.push(err.with_outer_location(field_loc.clone()));
                             }
@@ -307,12 +307,10 @@ impl Validator for TypedDictValidator {
                             ExtraBehavior::Allow => {
                                 let py_key = either_str.as_py_string(self.py, self.state.cache_str());
                                 if let Some(validator) = self.extras_validator {
-                                    let last_partial = if let Some(ref last_key) = self.partial_last_key {
+                                    let last_partial = self.partial_last_key.as_ref().map_or(false, |last_key| {
                                         let key_loc: LocItem = raw_key.clone().into();
                                         &key_loc == last_key
-                                    } else {
-                                        false
-                                    };
+                                    });
                                     self.state.allow_partial = last_partial && validator.supports_partial();
                                     match validator.validate(self.py, value, self.state) {
                                         Ok(value) => {
