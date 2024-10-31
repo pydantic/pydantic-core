@@ -138,6 +138,7 @@ def test_partial_typed_dict():
 
     assert v.validate_python({'a': 11, 'b': '12', 'c': 13}) == snapshot(IsStrictDict(a=11, b=12, c=13))
     assert v.validate_python({'a': 11, 'c': 13, 'b': '12'}) == snapshot(IsStrictDict(a=11, b=12, c=13))
+    assert v.validate_python(MyMapping({'a': 11, 'c': 13, 'b': '12'})) == snapshot(IsStrictDict(a=11, b=12, c=13))
 
     assert v.validate_python({'a': 11, 'b': '12', 'c': 13}, allow_partial=True) == snapshot({'a': 11, 'b': 12, 'c': 13})
     with pytest.raises(ValidationError) as exc_info:
@@ -154,6 +155,9 @@ def test_partial_typed_dict():
         ]
     )
     assert v.validate_python({'a': 11, 'b': '12', 'c': 1}, allow_partial=True) == snapshot(IsStrictDict(a=11, b=12))
+    assert v.validate_python(MyMapping({'a': 11, 'b': '12', 'c': 1}), allow_partial=True) == snapshot(
+        IsStrictDict(a=11, b=12)
+    )
     assert v.validate_python({'a': 11, 'c': 13, 'b': 1}, allow_partial=True) == snapshot(IsStrictDict(a=11, c=13))
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python({'a': 11, 'c': 1, 'b': 12}, allow_partial=True)
@@ -202,8 +206,11 @@ def test_non_partial_typed_dict():
     assert v.validate_python({'a': 11, 'b': '12', 'c': 13}) == snapshot({'a': 11, 'b': 12, 'c': 13})
     with pytest.raises(ValidationError, match='Input should be greater than 10'):
         v.validate_python({'a': 11, 'b': '12', 'c': 1})
-    with pytest.raises(ValidationError, match='Input should be greater than 10'):
-        v.validate_python({'a': 11, 'b': '12', 'c': 1}, allow_partial=False)
+    assert v.validate_python({'a': 11, 'b': '12', 'c': 1}, allow_partial=True) == snapshot({'a': 11, 'b': 12})
+    with pytest.raises(ValidationError, match=r'b\s+Field required'):
+        v.validate_python({'a': 11, 'c': 12}, allow_partial=True)
+    with pytest.raises(ValidationError, match=r'b\s+Input should be greater than 10'):
+        v.validate_python({'a': 11, 'c': 12, 'b': 1}, allow_partial=True)
 
 
 def test_double_nested():

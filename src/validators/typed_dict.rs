@@ -35,7 +35,6 @@ pub struct TypedDictValidator {
     extras_validator: Option<Box<CombinedValidator>>,
     strict: bool,
     loc_by_alias: bool,
-    allow_partial: bool,
 }
 
 impl BuildValidator for TypedDictValidator {
@@ -125,14 +124,12 @@ impl BuildValidator for TypedDictValidator {
                 required,
             });
         }
-        let allow_partial = fields.iter().all(|f| !f.required);
         Ok(Self {
             fields,
             extra_behavior,
             extras_validator,
             strict,
             loc_by_alias: config.get_as(intern!(py, "loc_by_alias"))?.unwrap_or(true),
-            allow_partial,
         }
         .into())
     }
@@ -209,7 +206,7 @@ impl Validator for TypedDictValidator {
                         }
                         Err(ValError::Omit) => continue,
                         Err(ValError::LineErrors(line_errors)) => {
-                            if !is_last_partial {
+                            if !is_last_partial || field.required {
                                 for err in line_errors {
                                     errors.push(lookup_path.apply_error_loc(err, self.loc_by_alias, &field.name));
                                 }
@@ -365,6 +362,6 @@ impl Validator for TypedDictValidator {
     }
 
     fn supports_partial(&self) -> bool {
-        self.allow_partial
+        true
     }
 }
