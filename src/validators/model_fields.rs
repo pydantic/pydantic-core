@@ -7,7 +7,9 @@ use ahash::AHashSet;
 
 use crate::build_tools::py_schema_err;
 use crate::build_tools::{is_strict, schema_or_config_same, ExtraBehavior};
+use crate::errors::LineErrorCollector;
 use crate::errors::LocItem;
+use crate::errors::ValResultExt;
 use crate::errors::{ErrorType, ErrorTypeDefaults, ValError, ValLineError, ValResult};
 use crate::input::ConsumeIterator;
 use crate::input::{BorrowInput, Input, ValidatedDict, ValidationMatch};
@@ -148,7 +150,8 @@ impl Validator for ModelFieldsValidator {
 
         let model_dict = PyDict::new_bound(py);
         let mut model_extra_dict_op: Option<Bound<PyDict>> = None;
-        let mut errors: Vec<ValLineError> = Vec::with_capacity(self.fields.len());
+        let mut errors = LineErrorCollector::with_capacity(self.fields.len());
+
         let mut fields_set_vec: Vec<Py<PyString>> = Vec::with_capacity(self.fields.len());
         let mut fields_set_count: usize = 0;
 
@@ -165,22 +168,20 @@ impl Validator for ModelFieldsValidator {
             let state = &mut state.rebind_extra(|extra| extra.data = Some(model_dict.clone()));
 
             for field in &self.fields {
-                let op_key_value = match dict.get_item(&field.lookup_key) {
-                    Ok(v) => v,
-                    Err(ValError::LineErrors(line_errors)) => {
-                        for err in line_errors {
-                            errors.push(err.with_outer_location(&field.name));
-                        }
-                        continue;
-                    }
-                    Err(err) => return Err(err),
+                let Some(op_key_value) = dict
+                    .get_item(&field.lookup_key)
+                    .collect_line_errors(&mut errors, &field.name)?
+                else {
+                    continue;
                 };
+
                 if let Some((lookup_path, value)) = op_key_value {
                     if let Some(ref mut used_keys) = used_keys {
                         // key is "used" whether or not validation passes, since we want to skip this key in
                         // extra logic either way
                         used_keys.insert(lookup_path.first_key());
                     }
+
                     match field.validator.validate(py, value.borrow_input(), state) {
                         Ok(value) => {
                             model_dict.set_item(&field.name_py, value)?;
@@ -231,7 +232,7 @@ impl Validator for ModelFieldsValidator {
             struct ValidateToModelExtra<'a, 's, 'py> {
                 py: Python<'py>,
                 used_keys: AHashSet<&'a str>,
-                errors: &'a mut Vec<ValLineError>,
+                errors: &'a mut LineErrorCollector,
                 fields_set_vec: &'a mut Vec<Py<PyString>>,
                 extra_behavior: ExtraBehavior,
                 extras_validator: Option<&'a CombinedValidator>,
@@ -287,17 +288,12 @@ impl Validator for ModelFieldsValidator {
                             ExtraBehavior::Allow => {
                                 let py_key = either_str.as_py_string(self.py, self.state.cache_str());
                                 if let Some(validator) = self.extras_validator {
-                                    match validator.validate(self.py, value, self.state) {
-                                        Ok(value) => {
-                                            model_extra_dict.set_item(&py_key, value)?;
-                                            self.fields_set_vec.push(py_key.into());
-                                        }
-                                        Err(ValError::LineErrors(line_errors)) => {
-                                            for err in line_errors {
-                                                self.errors.push(err.with_outer_location(raw_key.clone()));
-                                            }
-                                        }
-                                        Err(err) => return Err(err),
+                                    if let Some(value) = validator
+                                        .validate(self.py, value, self.state)
+                                        .collect_line_errors(self.errors, raw_key.clone())?
+                                    {
+                                        model_extra_dict.set_item(&py_key, value)?;
+                                        self.fields_set_vec.push(py_key.into());
                                     }
                                 } else {
                                     model_extra_dict.set_item(&py_key, value.to_object(self.py))?;
@@ -325,20 +321,18 @@ impl Validator for ModelFieldsValidator {
             }
         }
 
-        if !errors.is_empty() {
-            Err(ValError::LineErrors(errors))
-        } else {
-            let fields_set = PySet::new_bound(py, &fields_set_vec)?;
-            state.add_fields_set(fields_set_count);
+        errors.ensure_empty()?;
 
-            // if we have extra=allow, but we didn't create a dict because we were validating
-            // from attributes, set it now so __pydantic_extra__ is always a dict if extra=allow
-            if matches!(self.extra_behavior, ExtraBehavior::Allow) && model_extra_dict_op.is_none() {
-                model_extra_dict_op = Some(PyDict::new_bound(py));
-            };
+        let fields_set = PySet::new_bound(py, &fields_set_vec)?;
+        state.add_fields_set(fields_set_count);
 
-            Ok((model_dict, model_extra_dict_op, fields_set).to_object(py))
-        }
+        // if we have extra=allow, but we didn't create a dict because we were validating
+        // from attributes, set it now so __pydantic_extra__ is always a dict if extra=allow
+        if matches!(self.extra_behavior, ExtraBehavior::Allow) && model_extra_dict_op.is_none() {
+            model_extra_dict_op = Some(PyDict::new_bound(py));
+        };
+
+        Ok((model_dict, model_extra_dict_op, fields_set).to_object(py))
     }
 
     fn validate_assignment<'py>(
