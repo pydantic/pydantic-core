@@ -56,15 +56,8 @@ impl<'a, 'py> ValidationState<'a, 'py> {
         &self.extra
     }
 
-    pub fn enumerate_last_partial<'i, I>(
-        &self,
-        iter: impl Iterator<Item = I> + 'i,
-    ) -> Box<dyn Iterator<Item = (usize, bool, I)> + 'i> {
-        if self.allow_partial {
-            Box::new(EnumerateLastPartial::new(iter))
-        } else {
-            Box::new(iter.enumerate().map(|(i, x)| (i, false, x)))
-        }
+    pub fn enumerate_last_partial<I>(&self, iter: impl Iterator<Item = I>) -> impl Iterator<Item = (usize, bool, I)> {
+        EnumerateLastPartial::new(iter, self.allow_partial)
     }
 
     pub fn strict_or(&self, default: bool) -> bool {
@@ -137,14 +130,16 @@ pub struct EnumerateLastPartial<I: Iterator> {
     iter: I,
     index: usize,
     next_item: Option<I::Item>,
+    allow_partial: bool,
 }
 impl<I: Iterator> EnumerateLastPartial<I> {
-    pub fn new(mut iter: I) -> Self {
+    pub fn new(mut iter: I, allow_partial: bool) -> Self {
         let next_item = iter.next();
         Self {
             iter,
             index: 0,
             next_item,
+            allow_partial,
         }
     }
 }
@@ -156,7 +151,7 @@ impl<I: Iterator> Iterator for EnumerateLastPartial<I> {
         let a = std::mem::replace(&mut self.next_item, self.iter.next())?;
         let i = self.index;
         self.index += 1;
-        Some((i, self.next_item.is_none(), a))
+        Some((i, self.allow_partial && self.next_item.is_none(), a))
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
