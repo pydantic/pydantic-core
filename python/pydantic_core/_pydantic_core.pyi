@@ -111,7 +111,7 @@ class SchemaValidator:
                 [`info.context`][pydantic_core.core_schema.ValidationInfo.context].
             self_instance: An instance of a model set attributes on from validation, this is used when running
                 validation from the `__init__` method of a model.
-            allow_partial: Whether to allow partial validation, if `True` errors in the last element of sequences
+            allow_partial: Whether to allow partial validation; if `True` errors in the last element of sequences
                 and mappings are ignored.
 
         Raises:
@@ -164,8 +164,8 @@ class SchemaValidator:
             context: The context to use for validation, this is passed to functional validators as
                 [`info.context`][pydantic_core.core_schema.ValidationInfo.context].
             self_instance: An instance of a model set attributes on from validation.
-            allow_partial: Whether to allow partial validation, if `True` errors in the last element of sequences
-                and mappings are ignored.
+            allow_partial: Whether to allow partial validation; if `True` incomplete JSON will be parsed successfully
+                and errors in the last element of sequences and mappings are ignored.
 
         Raises:
             ValidationError: If validation fails or if the JSON data is invalid.
@@ -194,7 +194,7 @@ class SchemaValidator:
                 If `None`, the value of [`CoreConfig.strict`][pydantic_core.core_schema.CoreConfig] is used.
             context: The context to use for validation, this is passed to functional validators as
                 [`info.context`][pydantic_core.core_schema.ValidationInfo.context].
-            allow_partial: Whether to allow partial validation, if `True` errors in the last element of sequences
+            allow_partial: Whether to allow partial validation; if `True` errors in the last element of sequences
                 and mappings are ignored.
 
         Raises:
