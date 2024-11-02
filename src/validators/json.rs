@@ -1,9 +1,8 @@
-use jiter::FloatMode;
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use jiter::{JsonValue, PartialMode, PythonParse};
+use jiter::{FloatMode, JsonValue, PartialMode, PythonParse};
 
 use crate::errors::{ErrorType, ErrorTypeDefaults, ValError, ValLineError, ValResult};
 use crate::input::{EitherBytes, Input, InputType, ValidationMatch};
@@ -71,7 +70,11 @@ impl Validator for JsonValidator {
                 let parse_builder = PythonParse {
                     allow_inf_nan: true,
                     cache_mode: state.cache_str(),
-                    partial_mode: PartialMode::Off,
+                    partial_mode: if state.allow_partial {
+                        PartialMode::TrailingStrings
+                    } else {
+                        PartialMode::Off
+                    },
                     catch_duplicate_keys: false,
                     float_mode: FloatMode::Float,
                 };

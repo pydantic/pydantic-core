@@ -299,3 +299,15 @@ def test_nullable():
     assert v.validate_python(None, allow_partial=True) is None
     assert v.validate_python(['ab', 'cd'], allow_partial=True) == ['ab', 'cd']
     assert v.validate_python(['ab', 'c'], allow_partial=True) == ['ab']
+
+
+@pytest.mark.parametrize(
+    'json_nested_type', [None, core_schema.dict_schema(core_schema.str_schema(), core_schema.int_schema())]
+)
+def test_json(json_nested_type):
+    v = SchemaValidator(core_schema.list_schema(core_schema.json_schema(json_nested_type)))
+
+    assert v.validate_python(['{"a": 1}', '{"b": 2}']) == snapshot([{'a': 1}, {'b': 2}])
+    assert v.validate_python(['{"a": 1}', '{"b": 2}'], allow_partial=True) == snapshot([{'a': 1}, {'b': 2}])
+    assert v.validate_python(['{"a": 1}', 'xxx'], allow_partial=True) == snapshot([{'a': 1}])
+    assert v.validate_python(['{"a": 1}', '{"b": 2'], allow_partial=True) == snapshot([{'a': 1}, {'b': 2}])
