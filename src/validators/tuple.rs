@@ -311,6 +311,10 @@ impl Validator for TupleValidator {
     fn get_name(&self) -> &str {
         &self.name
     }
+
+    fn supports_partial(&self) -> bool {
+        false
+    }
 }
 
 struct ValidateToTuple<'a, 's, 'py, I: Input<'py> + ?Sized> {

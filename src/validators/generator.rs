@@ -92,6 +92,10 @@ impl Validator for GeneratorValidator {
     fn get_name(&self) -> &str {
         &self.name
     }
+
+    fn supports_partial(&self) -> bool {
+        false
+    }
 }
 
 #[pyclass(module = "pydantic_core._pydantic_core")]

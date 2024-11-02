@@ -270,3 +270,32 @@ def test_tuple_list():
         v.validate_python([['1', '2'], 'x'], allow_partial=True)
     with pytest.raises(ValidationError, match=r'0\.1\s+Input should be a valid integer'):
         v.validate_python([['1', 'x'], '2'], allow_partial=True)
+
+
+def test_dataclass():
+    """Tuples don't support partial, so behaviour should be disabled."""
+
+    schema = core_schema.dataclass_args_schema(
+        'MyDataclass',
+        [
+            core_schema.dataclass_field(name='a', schema=core_schema.str_schema(), kw_only=False),
+            core_schema.dataclass_field(
+                name='b', schema=core_schema.list_schema(core_schema.str_schema(min_length=2)), kw_only=False
+            ),
+        ],
+    )
+    v = SchemaValidator(schema)
+    assert v.validate_python({'a': 'x', 'b': ['ab', 'cd']}) == snapshot(({'a': 'x', 'b': ['ab', 'cd']}, None))
+    assert v.validate_python({'a': 'x', 'b': ['ab', 'cd']}, allow_partial=True) == snapshot(
+        ({'a': 'x', 'b': ['ab', 'cd']}, None)
+    )
+    with pytest.raises(ValidationError, match=r'b\.1\s+String should have at least 2 characters'):
+        v.validate_python({'a': 'x', 'b': ['ab', 'c']}, allow_partial=True)
+
+
+def test_nullable():
+    v = SchemaValidator(core_schema.nullable_schema(core_schema.list_schema(core_schema.str_schema(min_length=2))))
+
+    assert v.validate_python(None, allow_partial=True) is None
+    assert v.validate_python(['ab', 'cd'], allow_partial=True) == ['ab', 'cd']
+    assert v.validate_python(['ab', 'c'], allow_partial=True) == ['ab']

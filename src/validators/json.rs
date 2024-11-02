@@ -60,7 +60,8 @@ impl Validator for JsonValidator {
         let json_bytes = json_either_bytes.as_slice();
         match self.validator {
             Some(ref validator) => {
-                let json_value = JsonValue::parse(json_bytes, true).map_err(|e| map_json_err(input, e, json_bytes))?;
+                let json_value = JsonValue::parse_with_config(json_bytes, true, state.allow_partial)
+                    .map_err(|e| map_json_err(input, e, json_bytes))?;
                 let mut json_state = state.rebind_extra(|e| {
                     e.input_type = InputType::Json;
                 });

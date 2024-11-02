@@ -87,10 +87,6 @@ impl Validator for DictValidator {
     fn get_name(&self) -> &str {
         &self.name
     }
-
-    fn supports_partial(&self) -> bool {
-        true
-    }
 }
 
 struct ValidateToDict<'a, 's, 'py, I: Input<'py> + ?Sized> {

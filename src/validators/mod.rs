@@ -803,8 +803,8 @@ pub trait Validator: Send + Sync + Debug {
     fn get_name(&self) -> &str;
 
     /// Whether this validator supports partial validation, `state.allow_partial` should only be set to true
-    /// if this is the case.
+    /// when calling a validator if this is `true`.
     fn supports_partial(&self) -> bool {
-        false
+        true
     }
 }

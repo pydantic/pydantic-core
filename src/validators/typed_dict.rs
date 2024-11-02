@@ -358,8 +358,4 @@ impl Validator for TypedDictValidator {
     fn get_name(&self) -> &str {
         Self::EXPECTED_TYPE
     }
-
-    fn supports_partial(&self) -> bool {
-        true
-    }
 }

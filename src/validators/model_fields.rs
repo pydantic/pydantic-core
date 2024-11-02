@@ -438,4 +438,8 @@ impl Validator for ModelFieldsValidator {
     fn get_name(&self) -> &str {
         Self::EXPECTED_TYPE
     }
+
+    fn supports_partial(&self) -> bool {
+        false
+    }
 }

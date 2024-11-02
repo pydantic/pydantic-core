@@ -431,6 +431,10 @@ impl Validator for DataclassArgsValidator {
     fn get_name(&self) -> &str {
         &self.validator_name
     }
+
+    fn supports_partial(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Debug)]

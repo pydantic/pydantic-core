@@ -381,4 +381,8 @@ impl Validator for ArgumentsValidator {
     fn get_name(&self) -> &str {
         Self::EXPECTED_TYPE
     }
+
+    fn supports_partial(&self) -> bool {
+        false
+    }
 }
