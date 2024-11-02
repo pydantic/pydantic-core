@@ -827,7 +827,14 @@ impl<'py> ValidatedDict<'py> for GenericPyMapping<'_, 'py> {
     fn last_key(&self) -> Option<Self::Key<'_>> {
         match self {
             Self::Dict(dict) => dict.keys().iter().last(),
-            Self::Mapping(mapping) => mapping.keys().ok()?.iter().ok()?.last()?.ok(),
+            // see https://github.com/pydantic/pydantic-core/pull/1512#discussion_r1826057970
+            Self::Mapping(mapping) => mapping
+                .call_method0(intern!(mapping.py(), "keys"))
+                .ok()?
+                .iter()
+                .ok()?
+                .last()?
+                .ok(),
             Self::GetAttr(_, _) => None,
         }
     }
