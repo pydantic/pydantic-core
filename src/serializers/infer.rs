@@ -471,7 +471,7 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
             extra
                 .config
                 .timedelta_mode
-                .timedelta_serialize(&either_delta, serializer)
+                .timedelta_serialize(value.py(), &either_delta, serializer)
         }
         ObType::Url => {
             let py_url: PyUrl = value.extract().map_err(py_err_se_err)?;
@@ -649,7 +649,7 @@ pub(crate) fn infer_json_key_known<'a>(
         }
         ObType::Timedelta => {
             let either_delta = EitherTimedelta::try_from(key)?;
-            extra.config.timedelta_mode.json_key(&either_delta)
+            extra.config.timedelta_mode.json_key(key.py(), &either_delta)
         }
         ObType::Url => {
             let py_url: PyUrl = key.extract()?;
