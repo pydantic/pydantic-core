@@ -125,7 +125,7 @@ where
                 Err(ValError::Omit) => continue,
                 Err(err) => return Err(err),
             };
-            self.state.allow_partial = is_last_partial && self.value_validator.supports_partial();
+            self.state.allow_partial = is_last_partial;
             let output_value = match self.value_validator.validate(self.py, value.borrow_input(), self.state) {
                 Ok(value) => value,
                 Err(ValError::LineErrors(line_errors)) => {

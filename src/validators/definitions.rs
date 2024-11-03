@@ -75,6 +75,9 @@ impl Validator for DefinitionRefValidator {
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
+        // this validator does not yet support partial validation, disable it to avoid incorrect results
+        state.allow_partial = false;
+
         self.definition.read(|validator| {
             let validator = validator.unwrap();
             if let Some(id) = input.as_python().map(py_identity) {
@@ -108,10 +111,6 @@ impl Validator for DefinitionRefValidator {
 
     fn get_name(&self) -> &str {
         self.definition.get_or_init_name(|v| v.get_name().into())
-    }
-
-    fn supports_partial(&self) -> bool {
-        false
     }
 }
 

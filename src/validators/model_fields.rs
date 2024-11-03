@@ -120,6 +120,9 @@ impl Validator for ModelFieldsValidator {
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
+        // this validator does not yet support partial validation, disable it to avoid incorrect results
+        state.allow_partial = false;
+
         let strict = state.strict_or(self.strict);
         let from_attributes = state.extra().from_attributes.unwrap_or(self.from_attributes);
 
@@ -437,9 +440,5 @@ impl Validator for ModelFieldsValidator {
 
     fn get_name(&self) -> &str {
         Self::EXPECTED_TYPE
-    }
-
-    fn supports_partial(&self) -> bool {
-        false
     }
 }

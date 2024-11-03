@@ -272,6 +272,9 @@ impl Validator for TupleValidator {
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
+        // this validator does not yet support partial validation, disable it to avoid incorrect results
+        state.allow_partial = false;
+
         let collection = input.validate_tuple(state.strict_or(self.strict))?.unpack(state);
         let actual_length = collection.len();
 
@@ -310,10 +313,6 @@ impl Validator for TupleValidator {
 
     fn get_name(&self) -> &str {
         &self.name
-    }
-
-    fn supports_partial(&self) -> bool {
-        false
     }
 }
 

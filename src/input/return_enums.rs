@@ -130,7 +130,7 @@ pub(crate) fn validate_iter_to_vec<'py>(
     let mut errors: Vec<ValLineError> = Vec::new();
 
     for (index, is_last_partial, item_result) in state.enumerate_last_partial(iter) {
-        state.allow_partial = is_last_partial && validator.supports_partial();
+        state.allow_partial = is_last_partial;
         let item = item_result.map_err(|e| any_next_error!(py, e, max_length_check.input, index))?;
         match validator.validate(py, item.borrow_input(), state) {
             Ok(item) => {
@@ -203,7 +203,7 @@ pub(crate) fn validate_iter_to_set<'py>(
     let mut errors: Vec<ValLineError> = Vec::new();
 
     for (index, is_last_partial, item_result) in state.enumerate_last_partial(iter) {
-        state.allow_partial = is_last_partial && validator.supports_partial();
+        state.allow_partial = is_last_partial;
         let item = item_result.map_err(|e| any_next_error!(py, e, input, index))?;
         match validator.validate(py, item.borrow_input(), state) {
             Ok(item) => {

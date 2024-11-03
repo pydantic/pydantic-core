@@ -198,7 +198,7 @@ impl Validator for TypedDictValidator {
                     } else {
                         false
                     };
-                    state.allow_partial = is_last_partial && field.validator.supports_partial();
+                    state.allow_partial = is_last_partial;
                     match field.validator.validate(py, value.borrow_input(), state) {
                         Ok(value) => {
                             output_dict.set_item(&field.name_py, value)?;
@@ -311,7 +311,7 @@ impl Validator for TypedDictValidator {
                                         let key_loc: LocItem = raw_key.clone().into();
                                         &key_loc == last_key
                                     });
-                                    self.state.allow_partial = last_partial && validator.supports_partial();
+                                    self.state.allow_partial = last_partial;
                                     match validator.validate(self.py, value, self.state) {
                                         Ok(value) => {
                                             self.output_dict.set_item(py_key, value)?;
