@@ -3,7 +3,10 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use crate::build_tools::is_strict;
-use crate::errors::{LocItem, ValError, ValLineError, ValResult};
+use crate::errors::LineErrorCollector;
+use crate::errors::ValResultExt;
+use crate::errors::ValidationControlFlow;
+use crate::errors::{LocItem, ValError, ValResult};
 use crate::input::BorrowInput;
 use crate::input::ConsumeIterator;
 use crate::input::{Input, ValidatedDict};
@@ -108,7 +111,7 @@ where
     type Output = ValResult<PyObject>;
     fn consume_iterator(self, iterator: impl Iterator<Item = ValResult<(Key, Value)>>) -> ValResult<PyObject> {
         let output = PyDict::new_bound(self.py);
-        let mut errors: Vec<ValLineError> = Vec::new();
+        let mut errors = LineErrorCollector::new();
 
         for item_result in iterator {
             let (key, value) = item_result?;
@@ -124,28 +127,24 @@ where
                 Err(ValError::Omit) => continue,
                 Err(err) => return Err(err),
             };
-            let output_value = match self.value_validator.validate(self.py, value.borrow_input(), self.state) {
-                Ok(value) => Some(value),
-                Err(ValError::LineErrors(line_errors)) => {
-                    for err in line_errors {
-                        errors.push(err.with_outer_location(key.clone()));
-                    }
-                    None
-                }
-                Err(ValError::Omit) => continue,
-                Err(err) => return Err(err),
+            let output_value = match self
+                .value_validator
+                .validate(self.py, value.borrow_input(), self.state)
+                .collect_line_errors(&mut errors, key)
+            {
+                Ok(output_value) => output_value,
+                Err(ValidationControlFlow::Omit) => continue,
+                Err(err) => return Err(err.into()),
             };
             if let (Some(key), Some(value)) = (output_key, output_value) {
                 output.set_item(key, value)?;
             }
         }
 
-        if errors.is_empty() {
-            let input = self.input;
-            length_check!(input, "Dictionary", self.min_length, self.max_length, output);
-            Ok(output.into())
-        } else {
-            Err(ValError::LineErrors(errors))
-        }
+        errors.ensure_empty()?;
+
+        let input = self.input;
+        length_check!(input, "Dictionary", self.min_length, self.max_length, output);
+        Ok(output.into())
     }
 }
