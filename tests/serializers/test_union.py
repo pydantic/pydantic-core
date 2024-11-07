@@ -958,7 +958,7 @@ def test_union_of_unions_of_models_with_tagged_union_invalid_variant(
     ],
 )
 def test_union_of_unions_of_models_with_tagged_union_json_key_serialization(
-    input: bool | int | float | str, expected: bytes
+    input: dict[bool | int | float | str, str], expected: bytes
 ) -> None:
     s = SchemaSerializer(
         core_schema.dict_schema(
@@ -969,6 +969,33 @@ def test_union_of_unions_of_models_with_tagged_union_json_key_serialization(
                 ]
             ),
             values_schema=core_schema.str_schema(),
+        )
+    )
+
+    assert s.to_json(input, warnings='error') == expected
+
+
+@pytest.mark.parametrize(
+    'input,expected',
+    [
+        ({'key': True}, b'{"key":true}'),
+        ({'key': 1}, b'{"key":1}'),
+        ({'key': 2.3}, b'{"key":2.3}'),
+        ({'key': 'a'}, b'{"key":"a"}'),
+    ],
+)
+def test_union_of_unions_of_models_with_tagged_union_json_serialization(
+    input: dict[str, bool | int | float | str], expected: bytes
+) -> None:
+    s = SchemaSerializer(
+        core_schema.dict_schema(
+            keys_schema=core_schema.str_schema(),
+            values_schema=core_schema.union_schema(
+                [
+                    core_schema.union_schema([core_schema.bool_schema(), core_schema.int_schema()]),
+                    core_schema.union_schema([core_schema.float_schema(), core_schema.str_schema()]),
+                ]
+            ),
         )
     )
 

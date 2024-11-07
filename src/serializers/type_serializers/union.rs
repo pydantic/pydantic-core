@@ -180,7 +180,8 @@ fn serde_serialize<S: serde::ser::Serializer>(
         }
     }
 
-    if retry_with_lax_check {
+    // If extra.check is SerCheck::Strict, we're in a nested union
+    if extra.check != SerCheck::Strict && retry_with_lax_check {
         new_extra.check = SerCheck::Lax;
         for comb_serializer in choices {
             if let Ok(v) = comb_serializer.to_python(value, include, exclude, &new_extra) {
@@ -189,8 +190,14 @@ fn serde_serialize<S: serde::ser::Serializer>(
         }
     }
 
-    for err in &errors {
-        extra.warnings.custom_warning(err.to_string());
+    // If extra.check is SerCheck::None, we're in a top-level union. We should thus raise the warnings
+    if extra.check == SerCheck::None {
+        for err in &errors {
+            extra.warnings.custom_warning(err.to_string());
+        }
+    } else {
+        // NOTE: if this function becomes recursive at some point, an `Err(_)` containing the errors
+        // will have to be returned here
     }
 
     infer_serialize(value, serializer, include, exclude, extra)
