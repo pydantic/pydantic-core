@@ -4,15 +4,17 @@ use std::marker::PhantomData;
 use pyo3::exceptions::PyTypeError;
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyFloat, PyInt, PyList, PyString, PyTuple, PyType};
+use pyo3::types::{PyDict, PyFloat, PyInt, PyList, PyString, PyType};
 
 use crate::build_tools::{is_strict, py_schema_err};
 use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::Input;
+use crate::serializers::{to_jsonable_python, SerializationConfig};
 use crate::tools::{safe_repr, SchemaDict};
 
 use super::is_instance::class_repr;
 use super::literal::{expected_repr_name, LiteralLookup};
+use super::InputType;
 use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, Exactness, ValidationState, Validator};
 
 #[derive(Debug, Clone)]
@@ -33,36 +35,55 @@ impl BuildValidator for BuildEnumValidator {
 
         let py = schema.py();
         let value_str = intern!(py, "value");
-        let mut expected: Vec<(Bound<'_, PyAny>, PyObject)> = members
+        let expected_py: Vec<(Bound<'_, PyAny>, PyObject)> = members
             .iter()
             .map(|v| Ok((v.getattr(value_str)?, v.into())))
             .collect::<PyResult<_>>()?;
+        let ser_config = SerializationConfig::from_config(config).unwrap_or_default();
+        let expected_json: Vec<(Bound<'_, PyAny>, PyObject)> = members
+            .iter()
+            .map(|v| {
+                Ok((
+                    to_jsonable_python(
+                        py,
+                        &v.getattr(value_str)?,
+                        None,
+                        None,
+                        false,
+                        false,
+                        false,
+                        &ser_config.timedelta_mode.to_string(),
+                        &ser_config.bytes_mode.to_string(),
+                        &ser_config.inf_nan_mode.to_string(),
+                        false,
+                        None,
+                        true,
+                        None,
+                    )?
+                    .into_bound(py),
+                    v.into(),
+                ))
+            })
+            .collect::<PyResult<_>>()?;
 
-        let repr_args: Vec<String> = expected
+        let repr_args: Vec<String> = expected_py
             .iter()
             .map(|(k, _)| k.repr()?.extract())
             .collect::<PyResult<_>>()?;
 
-        let mut addition = vec![];
-        for (k, v) in &expected {
-            if let Ok(ss) = k.downcast::<PyTuple>() {
-                let list = ss.to_list();
-                addition.push((list.into_any(), v.clone()));
-            }
-        }
-        expected.append(&mut addition);
-
         let class: Bound<PyType> = schema.get_as_req(intern!(py, "cls"))?;
         let class_repr = class_repr(schema, &class)?;
 
-        let lookup = LiteralLookup::new(py, expected.into_iter())?;
+        let py_lookup = LiteralLookup::new(py, expected_py.into_iter())?;
+        let json_lookup = LiteralLookup::new(py, expected_json.into_iter())?;
 
         macro_rules! build {
             ($vv:ty, $name_prefix:literal) => {
                 EnumValidator {
                     phantom: PhantomData::<$vv>,
                     class: class.clone().into(),
-                    lookup,
+                    py_lookup,
+                    json_lookup,
                     missing: schema.get_as(intern!(py, "missing"))?,
                     expected_repr: expected_repr_name(repr_args, "").0,
                     strict: is_strict(schema, config)?,
@@ -96,7 +117,8 @@ pub trait EnumValidateValue: std::fmt::Debug + Clone + Send + Sync {
 pub struct EnumValidator<T: EnumValidateValue> {
     phantom: PhantomData<T>,
     class: Py<PyType>,
-    lookup: LiteralLookup<PyObject>,
+    py_lookup: LiteralLookup<PyObject>,
+    json_lookup: LiteralLookup<PyObject>,
     missing: Option<PyObject>,
     expected_repr: String,
     strict: bool,
@@ -129,7 +151,11 @@ impl<T: EnumValidateValue> Validator for EnumValidator<T> {
 
         state.floor_exactness(Exactness::Lax);
 
-        if let Some(v) = T::validate_value(py, input, &self.lookup, strict)? {
+        let lookup = match state.extra().input_type {
+            InputType::Json => &self.json_lookup,
+            _ => &self.py_lookup,
+        };
+        if let Some(v) = T::validate_value(py, input, lookup, strict)? {
             return Ok(v);
         } else if let Ok(res) = class.as_unbound().call1(py, (input.as_python(),)) {
             return Ok(res);
