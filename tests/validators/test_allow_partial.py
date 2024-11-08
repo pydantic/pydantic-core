@@ -2,9 +2,10 @@ from typing import Mapping
 
 import pytest
 from dirty_equals import IsStrictDict
-from inline_snapshot import snapshot
 
 from pydantic_core import SchemaValidator, ValidationError, core_schema
+
+from ..snapshot import snapshot
 
 
 def test_list():
