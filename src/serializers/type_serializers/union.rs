@@ -4,6 +4,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
 use smallvec::SmallVec;
 use std::borrow::Cow;
+use std::sync::Arc;
 
 use crate::build_tools::py_schema_err;
 use crate::common::union::{Discriminator, SMALL_UNION_THRESHOLD};
@@ -117,6 +118,41 @@ fn union_serialize<S, R>(
     }
 
     Ok(finalizer(None))
+}
+
+fn tagged_union_serialize<S>(
+    discriminator_value: Option<Py<PyAny>>,
+    lookup: &HashMap<String, usize>,
+    // if this returns `Ok(v)`, we picked a union variant to serialize, where
+    // `S` is intermediate state which can be passed on to the finalizer
+    mut selector: impl FnMut(&CombinedSerializer, &Extra) -> PyResult<S>,
+    extra: &Extra,
+    choices: &Vec<CombinedSerializer>,
+    retry_with_lax_check: bool,
+) -> Option<S> {
+    let mut new_extra = extra.clone();
+    new_extra.check = SerCheck::Strict;
+
+    if let Some(tag) = discriminator_value {
+        let tag_str = tag.to_string();
+        if let Some(&serializer_index) = lookup.get(&tag_str) {
+            let selected_serializer = &choices[serializer_index];
+
+            match selector(&selected_serializer, &new_extra) {
+                Ok(v) => return Some(v),
+                Err(_) => {
+                    if retry_with_lax_check {
+                        new_extra.check = SerCheck::Lax;
+                        if let Ok(v) = selector(&selected_serializer, &new_extra) {
+                            return Some(v);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    None
 }
 
 impl TypeSerializer for UnionSerializer {
@@ -237,67 +273,56 @@ impl TypeSerializer for TaggedUnionSerializer {
         exclude: Option<&Bound<'_, PyAny>>,
         extra: &Extra,
     ) -> PyResult<PyObject> {
-        let mut new_extra = extra.clone();
-        new_extra.check = SerCheck::Strict;
+        let to_python_selector = |comb_serializer: &CombinedSerializer, new_extra: &Extra| {
+            comb_serializer.to_python(value, include, exclude, new_extra)
+        };
 
-        if let Some(tag) = self.get_discriminator_value(value, extra) {
-            let tag_str = tag.to_string();
-            if let Some(&serializer_index) = self.lookup.get(&tag_str) {
-                let serializer = &self.choices[serializer_index];
-
-                match serializer.to_python(value, include, exclude, &new_extra) {
-                    Ok(v) => return Ok(v),
-                    Err(_) => {
-                        if self.retry_with_lax_check() {
-                            new_extra.check = SerCheck::Lax;
-                            if let Ok(v) = serializer.to_python(value, include, exclude, &new_extra) {
-                                return Ok(v);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        union_serialize(
-            |comb_serializer, new_extra| comb_serializer.to_python(value, include, exclude, new_extra),
-            |v| v.map_or_else(|| infer_to_python(value, include, exclude, extra), Ok),
+        tagged_union_serialize(
+            self.get_discriminator_value(value, extra),
+            &self.lookup,
+            to_python_selector,
             extra,
             &self.choices,
             self.retry_with_lax_check(),
-        )?
+        )
+        .map_or_else(
+            || {
+                union_serialize(
+                    to_python_selector,
+                    |v| v.map_or_else(|| infer_to_python(value, include, exclude, extra), Ok),
+                    extra,
+                    &self.choices,
+                    self.retry_with_lax_check(),
+                )?
+            },
+            Ok,
+        )
     }
 
     fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
-        let mut new_extra = extra.clone();
-        new_extra.check = SerCheck::Strict;
+        let json_key_selector =
+            |comb_serializer: &CombinedSerializer, new_extra: &Extra| comb_serializer.json_key(key, new_extra);
 
-        if let Some(tag) = self.get_discriminator_value(key, extra) {
-            let tag_str = tag.to_string();
-            if let Some(&serializer_index) = self.lookup.get(&tag_str) {
-                let serializer = &self.choices[serializer_index];
-
-                match serializer.json_key(key, &new_extra) {
-                    Ok(v) => return Ok(v),
-                    Err(_) => {
-                        if self.retry_with_lax_check() {
-                            new_extra.check = SerCheck::Lax;
-                            if let Ok(v) = serializer.json_key(key, &new_extra) {
-                                return Ok(v);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        union_serialize(
-            |comb_serializer, new_extra| comb_serializer.json_key(key, new_extra),
-            |v| v.map_or_else(|| infer_json_key(key, extra), Ok),
+        tagged_union_serialize(
+            self.get_discriminator_value(key, extra),
+            &self.lookup,
+            json_key_selector,
             extra,
             &self.choices,
             self.retry_with_lax_check(),
-        )?
+        )
+        .map_or_else(
+            || {
+                union_serialize(
+                    json_key_selector,
+                    |v| v.map_or_else(|| infer_json_key(key, extra), Ok),
+                    extra,
+                    &self.choices,
+                    self.retry_with_lax_check(),
+                )?
+            },
+            Ok,
+        )
     }
 
     fn serde_serialize<S: serde::ser::Serializer>(
@@ -308,45 +333,39 @@ impl TypeSerializer for TaggedUnionSerializer {
         exclude: Option<&Bound<'_, PyAny>>,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
-        let py = value.py();
-        let mut new_extra = extra.clone();
-        new_extra.check = SerCheck::Strict;
+        let serde_selector = |comb_serializer: &CombinedSerializer, new_extra: &Extra| {
+            comb_serializer.to_python(value, include, exclude, new_extra)
+        };
 
-        if let Some(tag) = self.get_discriminator_value(value, extra) {
-            let tag_str = tag.to_string();
-            if let Some(&serializer_index) = self.lookup.get(&tag_str) {
-                let selected_serializer = &self.choices[serializer_index];
-
-                match selected_serializer.to_python(value, include, exclude, &new_extra) {
-                    Ok(v) => return infer_serialize(v.bind(py), serializer, None, None, extra),
-                    Err(_) => {
-                        if self.retry_with_lax_check() {
-                            new_extra.check = SerCheck::Lax;
-                            if let Ok(v) = selected_serializer.to_python(value, include, exclude, &new_extra) {
-                                return infer_serialize(v.bind(py), serializer, None, None, extra);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        union_serialize(
-            |comb_serializer, new_extra| comb_serializer.to_python(value, include, exclude, new_extra),
-            |v| {
-                infer_serialize(
-                    v.as_ref().map_or(value, |v| v.bind(value.py())),
-                    serializer,
-                    None,
-                    None,
-                    extra,
-                )
-            },
+        tagged_union_serialize(
+            None,
+            &self.lookup,
+            serde_selector,
             extra,
             &self.choices,
             self.retry_with_lax_check(),
         )
-        .map_err(|err| serde::ser::Error::custom(err.to_string()))?
+        .map_or_else(
+            || {
+                union_serialize(
+                    serde_selector,
+                    |v| {
+                        infer_serialize(
+                            v.as_ref().map_or(value, |v| v.bind(value.py())),
+                            serializer,
+                            None,
+                            None,
+                            extra,
+                        )
+                    },
+                    extra,
+                    &self.choices,
+                    self.retry_with_lax_check(),
+                )
+                .map_err(|err| serde::ser::Error::custom(err.to_string()))?
+            },
+            |v| infer_serialize(v.bind(value.py()), serializer, None, None, extra),
+        )
     }
 
     fn get_name(&self) -> &str {
