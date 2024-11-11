@@ -8,6 +8,7 @@ use std::borrow::Cow;
 use crate::build_tools::py_schema_err;
 use crate::common::union::{Discriminator, SMALL_UNION_THRESHOLD};
 use crate::definitions::DefinitionsBuilder;
+use crate::serializers::PydanticSerializationUnexpectedValue;
 use crate::tools::{truncate_safe_repr, SchemaDict};
 
 use super::{
@@ -79,7 +80,7 @@ fn union_serialize<S, R>(
     extra: &Extra,
     choices: &[CombinedSerializer],
     retry_with_lax_check: bool,
-) -> R {
+) -> PyResult<R> {
     // try the serializers in left to right order with error_on fallback=true
     let mut new_extra = extra.clone();
     new_extra.check = SerCheck::Strict;
@@ -87,7 +88,7 @@ fn union_serialize<S, R>(
 
     for comb_serializer in choices {
         match selector(comb_serializer, &new_extra) {
-            Ok(v) => return finalizer(Some(v)),
+            Ok(v) => return Ok(finalizer(Some(v))),
             Err(err) => errors.push(err),
         }
     }
@@ -97,7 +98,7 @@ fn union_serialize<S, R>(
         new_extra.check = SerCheck::Lax;
         for comb_serializer in choices {
             if let Ok(v) = selector(comb_serializer, &new_extra) {
-                return finalizer(Some(v));
+                return Ok(finalizer(Some(v)));
             }
         }
     }
@@ -110,13 +111,12 @@ fn union_serialize<S, R>(
     }
     // Otherwise, if we've encountered errors, return them to the parent union, which should take
     // care of the formatting for us
-    // TODO: change up return type to support this
-    // else if !errors.is_empty() {
-    //     let message = errors.iter().map(ToString::to_string).collect::<Vec<_>>().join("\n");
-    //     return Err(PydanticSerializationUnexpectedValue::new_err(Some(message)));
-    // }
+    else if !errors.is_empty() {
+        let message = errors.iter().map(ToString::to_string).collect::<Vec<_>>().join("\n");
+        return Err(PydanticSerializationUnexpectedValue::new_err(Some(message)));
+    }
 
-    finalizer(None)
+    Ok(finalizer(None))
 }
 
 impl TypeSerializer for UnionSerializer {
@@ -134,6 +134,7 @@ impl TypeSerializer for UnionSerializer {
             &self.choices,
             self.retry_with_lax_check(),
         )
+        .unwrap()
     }
 
     fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
@@ -144,6 +145,7 @@ impl TypeSerializer for UnionSerializer {
             &self.choices,
             self.retry_with_lax_check(),
         )
+        .unwrap()
     }
 
     fn serde_serialize<S: serde::ser::Serializer>(
@@ -169,6 +171,7 @@ impl TypeSerializer for UnionSerializer {
             &self.choices,
             self.retry_with_lax_check(),
         )
+        .unwrap()
     }
 
     fn get_name(&self) -> &str {
@@ -265,6 +268,7 @@ impl TypeSerializer for TaggedUnionSerializer {
             &self.choices,
             self.retry_with_lax_check(),
         )
+        .unwrap()
     }
 
     fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
@@ -297,6 +301,7 @@ impl TypeSerializer for TaggedUnionSerializer {
             &self.choices,
             self.retry_with_lax_check(),
         )
+        .unwrap()
     }
 
     fn serde_serialize<S: serde::ser::Serializer>(
@@ -345,6 +350,7 @@ impl TypeSerializer for TaggedUnionSerializer {
             &self.choices,
             self.retry_with_lax_check(),
         )
+        .unwrap()
     }
 
     fn get_name(&self) -> &str {
