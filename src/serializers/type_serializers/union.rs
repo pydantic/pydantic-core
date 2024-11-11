@@ -4,7 +4,6 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
 use smallvec::SmallVec;
 use std::borrow::Cow;
-use std::sync::Arc;
 
 use crate::build_tools::py_schema_err;
 use crate::common::union::{Discriminator, SMALL_UNION_THRESHOLD};
@@ -127,7 +126,7 @@ fn tagged_union_serialize<S>(
     // `S` is intermediate state which can be passed on to the finalizer
     mut selector: impl FnMut(&CombinedSerializer, &Extra) -> PyResult<S>,
     extra: &Extra,
-    choices: &Vec<CombinedSerializer>,
+    choices: &[CombinedSerializer],
     retry_with_lax_check: bool,
 ) -> Option<S> {
     let mut new_extra = extra.clone();
@@ -138,12 +137,12 @@ fn tagged_union_serialize<S>(
         if let Some(&serializer_index) = lookup.get(&tag_str) {
             let selected_serializer = &choices[serializer_index];
 
-            match selector(&selected_serializer, &new_extra) {
+            match selector(selected_serializer, &new_extra) {
                 Ok(v) => return Some(v),
                 Err(_) => {
                     if retry_with_lax_check {
                         new_extra.check = SerCheck::Lax;
-                        if let Ok(v) = selector(&selected_serializer, &new_extra) {
+                        if let Ok(v) = selector(selected_serializer, &new_extra) {
                             return Some(v);
                         }
                     }
@@ -337,35 +336,33 @@ impl TypeSerializer for TaggedUnionSerializer {
             comb_serializer.to_python(value, include, exclude, new_extra)
         };
 
-        tagged_union_serialize(
+        if let Some(v) = tagged_union_serialize(
             None,
             &self.lookup,
             serde_selector,
             extra,
             &self.choices,
             self.retry_with_lax_check(),
-        )
-        .map_or_else(
-            || {
-                union_serialize(
-                    serde_selector,
-                    |v| {
-                        infer_serialize(
-                            v.as_ref().map_or(value, |v| v.bind(value.py())),
-                            serializer,
-                            None,
-                            None,
-                            extra,
-                        )
-                    },
+        ) {
+            return infer_serialize(v.bind(value.py()), serializer, None, None, extra);
+        }
+
+        union_serialize(
+            serde_selector,
+            |v| {
+                infer_serialize(
+                    v.as_ref().map_or(value, |v| v.bind(value.py())),
+                    serializer,
+                    None,
+                    None,
                     extra,
-                    &self.choices,
-                    self.retry_with_lax_check(),
                 )
-                .map_err(|err| serde::ser::Error::custom(err.to_string()))?
             },
-            |v| infer_serialize(v.bind(value.py()), serializer, None, None, extra),
+            extra,
+            &self.choices,
+            self.retry_with_lax_check(),
         )
+        .map_err(|err| serde::ser::Error::custom(err.to_string()))?
     }
 
     fn get_name(&self) -> &str {
