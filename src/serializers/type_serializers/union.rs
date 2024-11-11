@@ -133,8 +133,7 @@ impl TypeSerializer for UnionSerializer {
             extra,
             &self.choices,
             self.retry_with_lax_check(),
-        )
-        .unwrap()
+        )?
     }
 
     fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
@@ -144,8 +143,7 @@ impl TypeSerializer for UnionSerializer {
             extra,
             &self.choices,
             self.retry_with_lax_check(),
-        )
-        .unwrap()
+        )?
     }
 
     fn serde_serialize<S: serde::ser::Serializer>(
@@ -156,7 +154,7 @@ impl TypeSerializer for UnionSerializer {
         exclude: Option<&Bound<'_, PyAny>>,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
-        union_serialize(
+        match union_serialize(
             |comb_serializer, new_extra| comb_serializer.to_python(value, include, exclude, new_extra),
             |v| {
                 infer_serialize(
@@ -170,8 +168,15 @@ impl TypeSerializer for UnionSerializer {
             extra,
             &self.choices,
             self.retry_with_lax_check(),
-        )
-        .unwrap()
+        ) {
+            Ok(v) => v,
+            // TODO: we don't expect to hit this branch, but if we do, we should change the return
+            // type of this function to return a PyResult...
+            Err(err) => {
+                let message = err.to_string();
+                Err(serde::ser::Error::custom(message))
+            }
+        }
     }
 
     fn get_name(&self) -> &str {
@@ -267,8 +272,7 @@ impl TypeSerializer for TaggedUnionSerializer {
             extra,
             &self.choices,
             self.retry_with_lax_check(),
-        )
-        .unwrap()
+        )?
     }
 
     fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
@@ -300,8 +304,7 @@ impl TypeSerializer for TaggedUnionSerializer {
             extra,
             &self.choices,
             self.retry_with_lax_check(),
-        )
-        .unwrap()
+        )?
     }
 
     fn serde_serialize<S: serde::ser::Serializer>(
@@ -335,7 +338,7 @@ impl TypeSerializer for TaggedUnionSerializer {
             }
         }
 
-        union_serialize(
+        match union_serialize(
             |comb_serializer, new_extra| comb_serializer.to_python(value, include, exclude, new_extra),
             |v| {
                 infer_serialize(
@@ -349,8 +352,15 @@ impl TypeSerializer for TaggedUnionSerializer {
             extra,
             &self.choices,
             self.retry_with_lax_check(),
-        )
-        .unwrap()
+        ) {
+            Ok(v) => v,
+            // TODO: we don't expect to hit this branch, but if we do, we should change the return
+            // type of this function to return a PyResult...
+            Err(err) => {
+                let message = err.to_string();
+                Err(serde::ser::Error::custom(message))
+            }
+        }
     }
 
     fn get_name(&self) -> &str {
