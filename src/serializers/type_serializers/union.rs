@@ -70,6 +70,45 @@ impl UnionSerializer {
 
 impl_py_gc_traverse!(UnionSerializer { choices });
 
+fn union_serialize<S, R>(
+    // if this returns `Ok(v)`, we picked a union variant to serialize, where
+    // `S` is intermediate state which can be passed on to the finalizer
+    mut selector: impl FnMut(&CombinedSerializer, &Extra) -> PyResult<S>,
+    // if called with `Some(v)`, we have intermediate state to finish
+    // if `None`, we need to just go to fallback
+    finalizer: impl FnOnce(Option<S>) -> R,
+    extra: &Extra,
+    choices: &[CombinedSerializer],
+    retry_with_lax_check: bool,
+) -> R {
+    // try the serializers in left to right order with error_on fallback=true
+    let mut new_extra = extra.clone();
+    new_extra.check = SerCheck::Strict;
+    let mut errors: SmallVec<[PyErr; SMALL_UNION_THRESHOLD]> = SmallVec::new();
+
+    for comb_serializer in choices {
+        match selector(comb_serializer, &new_extra) {
+            Ok(v) => return finalizer(Some(v)),
+            Err(err) => errors.push(err),
+        }
+    }
+
+    if retry_with_lax_check {
+        new_extra.check = SerCheck::Lax;
+        for comb_serializer in choices {
+            if let Ok(v) = selector(comb_serializer, &new_extra) {
+                return finalizer(Some(v));
+            }
+        }
+    }
+
+    for err in &errors {
+        extra.warnings.custom_warning(err.to_string());
+    }
+
+    finalizer(None)
+}
+
 fn to_python(
     value: &Bound<'_, PyAny>,
     include: Option<&Bound<'_, PyAny>>,
@@ -78,42 +117,13 @@ fn to_python(
     choices: &[CombinedSerializer],
     retry_with_lax_check: bool,
 ) -> PyResult<PyObject> {
-    // try the serializers in left to right order with error_on fallback=true
-    let mut new_extra = extra.clone();
-    new_extra.check = SerCheck::Strict;
-    let mut errors: SmallVec<[PyErr; SMALL_UNION_THRESHOLD]> = SmallVec::new();
-
-    for comb_serializer in choices {
-        match comb_serializer.to_python(value, include, exclude, &new_extra) {
-            Ok(v) => return Ok(v),
-            Err(err) => errors.push(err),
-        }
-    }
-
-    // If extra.check is SerCheck::Strict, we're in a nested union
-    if extra.check != SerCheck::Strict && retry_with_lax_check {
-        new_extra.check = SerCheck::Lax;
-        for comb_serializer in choices {
-            if let Ok(v) = comb_serializer.to_python(value, include, exclude, &new_extra) {
-                return Ok(v);
-            }
-        }
-    }
-
-    // If extra.check is SerCheck::None, we're in a top-level union. We should thus raise the warnings
-    if extra.check == SerCheck::None {
-        for err in &errors {
-            extra.warnings.custom_warning(err.to_string());
-        }
-    }
-    // Otherwise, if we've encountered errors, return them to the parent union, which should take
-    // care of the formatting for us
-    else if !errors.is_empty() {
-        let message = errors.iter().map(ToString::to_string).collect::<Vec<_>>().join("\n");
-        return Err(PydanticSerializationUnexpectedValue::new_err(Some(message)));
-    }
-
-    infer_to_python(value, include, exclude, extra)
+    union_serialize(
+        |comb_serializer, new_extra| comb_serializer.to_python(value, include, exclude, new_extra),
+        |v| v.map_or_else(|| infer_to_python(value, include, exclude, extra), Ok),
+        extra,
+        choices,
+        retry_with_lax_check,
+    )
 }
 
 fn json_key<'a>(
@@ -122,40 +132,13 @@ fn json_key<'a>(
     choices: &[CombinedSerializer],
     retry_with_lax_check: bool,
 ) -> PyResult<Cow<'a, str>> {
-    let mut new_extra = extra.clone();
-    new_extra.check = SerCheck::Strict;
-    let mut errors: SmallVec<[PyErr; SMALL_UNION_THRESHOLD]> = SmallVec::new();
-
-    for comb_serializer in choices {
-        match comb_serializer.json_key(key, &new_extra) {
-            Ok(v) => return Ok(v),
-            Err(err) => errors.push(err),
-        }
-    }
-
-    // If extra.check is SerCheck::Strict, we're in a nested union
-    if extra.check != SerCheck::Strict && retry_with_lax_check {
-        new_extra.check = SerCheck::Lax;
-        for comb_serializer in choices {
-            if let Ok(v) = comb_serializer.json_key(key, &new_extra) {
-                return Ok(v);
-            }
-        }
-    }
-
-    // If extra.check is SerCheck::None, we're in a top-level union. We should thus raise the warnings
-    if extra.check == SerCheck::None {
-        for err in &errors {
-            extra.warnings.custom_warning(err.to_string());
-        }
-    }
-    // Otherwise, if we've encountered errors, return them to the parent union, which should take
-    // care of the formatting for us
-    else if !errors.is_empty() {
-        let message = errors.iter().map(ToString::to_string).collect::<Vec<_>>().join("\n");
-        return Err(PydanticSerializationUnexpectedValue::new_err(Some(message)));
-    }
-    infer_json_key(key, extra)
+    union_serialize(
+        |comb_serializer, new_extra| comb_serializer.json_key(key, new_extra),
+        |v| v.map_or_else(|| infer_json_key(key, extra), Ok),
+        extra,
+        choices,
+        retry_with_lax_check,
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -168,39 +151,21 @@ fn serde_serialize<S: serde::ser::Serializer>(
     choices: &[CombinedSerializer],
     retry_with_lax_check: bool,
 ) -> Result<S::Ok, S::Error> {
-    let py = value.py();
-    let mut new_extra = extra.clone();
-    new_extra.check = SerCheck::Strict;
-    let mut errors: SmallVec<[PyErr; SMALL_UNION_THRESHOLD]> = SmallVec::new();
-
-    for comb_serializer in choices {
-        match comb_serializer.to_python(value, include, exclude, &new_extra) {
-            Ok(v) => return infer_serialize(v.bind(py), serializer, None, None, extra),
-            Err(err) => errors.push(err),
-        }
-    }
-
-    // If extra.check is SerCheck::Strict, we're in a nested union
-    if extra.check != SerCheck::Strict && retry_with_lax_check {
-        new_extra.check = SerCheck::Lax;
-        for comb_serializer in choices {
-            if let Ok(v) = comb_serializer.to_python(value, include, exclude, &new_extra) {
-                return infer_serialize(v.bind(py), serializer, None, None, extra);
-            }
-        }
-    }
-
-    // If extra.check is SerCheck::None, we're in a top-level union. We should thus raise the warnings
-    if extra.check == SerCheck::None {
-        for err in &errors {
-            extra.warnings.custom_warning(err.to_string());
-        }
-    } else {
-        // NOTE: if this function becomes recursive at some point, an `Err(_)` containing the errors
-        // will have to be returned here
-    }
-
-    infer_serialize(value, serializer, include, exclude, extra)
+    union_serialize(
+        |comb_serializer, new_extra| comb_serializer.to_python(value, include, exclude, new_extra),
+        |v| {
+            infer_serialize(
+                v.as_ref().map_or(value, |v| v.bind(value.py())),
+                serializer,
+                None,
+                None,
+                extra,
+            )
+        },
+        extra,
+        choices,
+        retry_with_lax_check,
+    )
 }
 
 impl TypeSerializer for UnionSerializer {
