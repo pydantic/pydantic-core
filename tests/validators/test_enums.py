@@ -1,3 +1,4 @@
+import datetime
 import re
 import sys
 from decimal import Decimal
@@ -272,6 +273,45 @@ def test_plain_enum_tuple():
     assert v.validate_python((1, 2)) is MyEnum.a
     assert v.validate_python((2, 3)) is MyEnum.b
     assert v.validate_json('[1, 2]') is MyEnum.a
+
+
+def test_plain_enum_datetime():
+    class MyEnum(Enum):
+        a = datetime.datetime.fromisoformat('2024-01-01T00:00:00Z')
+
+    v = SchemaValidator(core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())))
+    assert v.validate_python(datetime.datetime.fromisoformat('2024-01-01T00:00:00Z')) is MyEnum.a
+    assert v.validate_json('"2024-01-01T00:00:00Z"') is MyEnum.a
+
+
+def test_plain_enum_complex():
+    class MyEnum(Enum):
+        a = complex(1, 2)
+
+    v = SchemaValidator(core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())))
+    assert v.validate_python(complex(1, 2)) is MyEnum.a
+    assert v.validate_json('"1+2j"') is MyEnum.a
+
+
+def test_plain_enum_identical_serialized_form():
+    class MyEnum(Enum):
+        tuple_ = 1, 2
+        list_ = [1, 2]
+
+    v = SchemaValidator(core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())))
+    assert v.validate_python((1, 2)) is MyEnum.tuple_
+    assert v.validate_python([1, 2]) is MyEnum.list_
+    assert v.validate_json('[1,2]') is MyEnum.tuple_
+
+    # Change the order of `a` and `b` in MyEnum2; validate_json should pick [1, 2] this time
+    class MyEnum2(Enum):
+        list_ = [1, 2]
+        tuple_ = 1, 2
+
+    v = SchemaValidator(core_schema.enum_schema(MyEnum2, list(MyEnum2.__members__.values())))
+    assert v.validate_python((1, 2)) is MyEnum2.tuple_
+    assert v.validate_python([1, 2]) is MyEnum2.list_
+    assert v.validate_json('[1,2]') is MyEnum2.list_
 
 
 def test_plain_enum_empty():
