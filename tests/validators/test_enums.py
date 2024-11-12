@@ -277,11 +277,11 @@ def test_plain_enum_tuple():
 
 def test_plain_enum_datetime():
     class MyEnum(Enum):
-        a = datetime.datetime.fromisoformat('2024-01-01T00:00:00Z')
+        a = datetime.datetime.fromisoformat('2024-01-01T00:00:00')
 
     v = SchemaValidator(core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())))
-    assert v.validate_python(datetime.datetime.fromisoformat('2024-01-01T00:00:00Z')) is MyEnum.a
-    assert v.validate_json('"2024-01-01T00:00:00Z"') is MyEnum.a
+    assert v.validate_python(datetime.datetime.fromisoformat('2024-01-01T00:00:00')) is MyEnum.a
+    assert v.validate_json('"2024-01-01T00:00:00"') is MyEnum.a
 
 
 def test_plain_enum_complex():
