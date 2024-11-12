@@ -298,8 +298,7 @@ checksum = "49f1f14873335454500d59611f1cf4a4b0f786f9ac11f4312a78e4cf2566695b"
 [[package]]
 name = "jiter"
 version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f69107091dc861900882c599876b095d9db7f71064b6914d6c68b284d19f9ee8"
+source = "git+https://github.com/pydantic/jiter.git?branch=allow-partial-trailing-strings#d8d7e003ed486f96541929a33cda7187de2244a6"
 dependencies = [
  "ahash",
  "bitvec",
