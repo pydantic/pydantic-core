@@ -274,7 +274,7 @@ impl ValidationError {
                 .iter()
                 .map(|error| PyLineError::try_from(&error))
                 .collect::<PyResult<Vec<PyLineError>>>()?,
-            InputType::try_from(input_type)?,
+            InputType::try_from(input_type)?.into_py(cls.py()),
             hide_input,
         ))
     }

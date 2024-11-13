@@ -173,7 +173,9 @@ trait FilterLogic<T: Eq + Copy> {
                     next_exclude = Some(exc_value);
                 }
             } else if let Ok(exclude_set) = exclude.downcast::<PySet>() {
-                if exclude_set.contains(py_key)? || exclude_set.contains(intern!(exclude_set.py(), "__all__"))? {
+                if exclude_set.contains(py_key.to_object(exclude_set.py()))?
+                    || exclude_set.contains(intern!(exclude_set.py(), "__all__"))?
+                {
                     // index is in the exclude set, we return Ok(None) to omit this index
                     return Ok(None);
                 }
@@ -205,7 +207,9 @@ trait FilterLogic<T: Eq + Copy> {
                     return Ok(None);
                 }
             } else if let Ok(include_set) = include.downcast::<PySet>() {
-                if include_set.contains(py_key)? || include_set.contains(intern!(include_set.py(), "__all__"))? {
+                if include_set.contains(py_key.to_object(include_set.py()))?
+                    || include_set.contains(intern!(include_set.py(), "__all__"))?
+                {
                     return Ok(Some((None, next_exclude)));
                 } else if !self.explicit_include(int_key) {
                     // if the index is not in include, include exists, AND it's not in schema include,
@@ -332,7 +336,7 @@ fn merge_all_value<'py>(
     dict: &Bound<'py, PyDict>,
     py_key: impl ToPyObject + Copy,
 ) -> PyResult<Option<Bound<'py, PyAny>>> {
-    let op_item_value = dict.get_item(py_key)?;
+    let op_item_value = dict.get_item(py_key.to_object(dict.py()))?;
     let op_all_value = dict.get_item(intern!(dict.py(), "__all__"))?;
 
     match (op_item_value, op_all_value) {

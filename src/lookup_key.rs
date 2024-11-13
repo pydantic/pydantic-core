@@ -448,7 +448,7 @@ impl PathItem {
             None
         } else {
             // otherwise, blindly try getitem on v since no better logic is realistic
-            py_any.get_item(self).ok()
+            py_any.get_item(self.to_object(py_any.py())).ok()
         }
     }
 
