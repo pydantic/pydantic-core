@@ -111,3 +111,5 @@ too_many_lines = "allow"
 unnecessary_wraps = "allow"
 unused_self = "allow"
 used_underscore_binding = "allow"
+# FIXME https://github.com/PyO3/pyo3/issues/4701
+wildcard_imports = "allow"
