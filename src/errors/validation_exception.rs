@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::fmt;
 use std::fmt::{Display, Write};
 use std::str::from_utf8;
@@ -7,7 +8,7 @@ use pyo3::ffi;
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::sync::GILOnceCell;
-use pyo3::types::{PyDict, PyList, PyString, PyType};
+use pyo3::types::{PyDict, PyList, PyString, PyTuple, PyType};
 use serde::ser::{Error, SerializeMap, SerializeSeq};
 use serde::{Serialize, Serializer};
 
@@ -80,7 +81,7 @@ impl ValidationError {
                                 return cause_problem;
                             }
                         }
-                        PyErr::from_value_bound(err.into_any())
+                        PyErr::from_value(err.into_any())
                     }
                     Err(err) => err,
                 }
@@ -124,15 +125,14 @@ impl ValidationError {
                 context: _,
             } = &line_error.error_type
             {
-                let note: PyObject = if let Location::Empty = &line_error.location {
-                    "Pydantic: cause of loc: root".into_py(py)
+                let note = if let Location::Empty = &line_error.location {
+                    Cow::Borrowed("Pydantic: cause of loc: root")
                 } else {
-                    format!(
+                    Cow::Owned(format!(
                         "Pydantic: cause of loc: {}",
                         // Location formats with a newline at the end, hence the trim()
                         line_error.location.to_string().trim()
-                    )
-                    .into_py(py)
+                    ))
                 };
 
                 // Notes only support 3.11 upwards:
@@ -152,7 +152,7 @@ impl ValidationError {
                     use pyo3::exceptions::PyUserWarning;
 
                     let wrapped = PyUserWarning::new_err((note,));
-                    wrapped.set_cause(py, Some(PyErr::from_value_bound(err.clone_ref(py).into_bound(py))));
+                    wrapped.set_cause(py, Some(PyErr::from_value(err.clone_ref(py).into_bound(py))));
                     user_py_errs.push(wrapped);
                 }
             }
@@ -166,7 +166,7 @@ impl ValidationError {
             #[cfg(Py_3_11)]
             let cause = {
                 use pyo3::exceptions::PyBaseExceptionGroup;
-                Some(PyBaseExceptionGroup::new_err((title, user_py_errs)).into_py(py))
+                Some(PyBaseExceptionGroup::new_err((title, user_py_errs)).into_value(py))
             };
 
             // Pre 3.11 ExceptionGroup support, use the python backport instead:
@@ -174,10 +174,10 @@ impl ValidationError {
             #[cfg(not(Py_3_11))]
             let cause = {
                 use pyo3::exceptions::PyImportError;
-                match py.import_bound("exceptiongroup") {
+                match py.import("exceptiongroup") {
                     Ok(py_mod) => match py_mod.getattr("ExceptionGroup") {
                         Ok(group_cls) => match group_cls.call1((title, user_py_errs)) {
-                            Ok(group_instance) => Some(group_instance.into_py(py)),
+                            Ok(group_instance) => Some(group_instance),
                             Err(_) => None,
                         },
                         Err(_) => None,
@@ -209,10 +209,10 @@ fn include_url_env(py: Python) -> bool {
         match std::env::var_os("PYDANTIC_ERRORS_OMIT_URL") {
             Some(val) => {
                 // We don't care whether warning succeeded or not, hence the assignment
-                let _ = PyErr::warn_bound(
+                let _ = PyErr::warn(
                     py,
-                    &py.get_type_bound::<pyo3::exceptions::PyDeprecationWarning>(),
-                    "PYDANTIC_ERRORS_OMIT_URL is deprecated, use PYDANTIC_ERRORS_INCLUDE_URL instead",
+                    &py.get_type::<pyo3::exceptions::PyDeprecationWarning>(),
+                    c"PYDANTIC_ERRORS_OMIT_URL is deprecated, use PYDANTIC_ERRORS_INCLUDE_URL instead",
                     1,
                 );
                 // If OMIT_URL exists but is empty, we include the URL:
@@ -281,7 +281,7 @@ impl ValidationError {
                 .iter()
                 .map(|error| PyLineError::try_from(&error))
                 .collect::<PyResult<Vec<PyLineError>>>()?,
-            InputType::try_from(input_type)?.into_py(cls.py()),
+            InputType::try_from(input_type)?,
             hide_input,
         ))
     }
@@ -305,7 +305,7 @@ impl ValidationError {
     ) -> PyResult<Py<PyList>> {
         let url_prefix = get_url_prefix(py, include_url);
         let mut iteration_error = None;
-        let list = PyList::new_bound(
+        let list = PyList::new(
             py,
             // PyList::new takes ExactSizeIterator, so if an error occurs during iteration we
             // fill the list with None before returning the error; the list will then be thrown
@@ -320,11 +320,11 @@ impl ValidationError {
                         py.None()
                     })
             }),
-        );
+        )?;
         if let Some(err) = iteration_error {
             Err(err)
         } else {
-            Ok(list.into())
+            Ok(list.unbind())
         }
     }
 
@@ -375,7 +375,7 @@ impl ValidationError {
             }
         };
         let s = from_utf8(&bytes).map_err(json_py_err)?;
-        Ok(PyString::new_bound(py, s))
+        Ok(PyString::new(py, s))
     }
 
     fn __repr__(&self, py: Python) -> String {
@@ -386,17 +386,17 @@ impl ValidationError {
         self.__repr__(py)
     }
 
-    fn __reduce__<'py>(slf: &Bound<'py, Self>) -> PyResult<(Bound<'py, PyAny>, PyObject)> {
+    fn __reduce__<'py>(slf: &Bound<'py, Self>) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyTuple>)> {
         let py = slf.py();
         let callable = slf.getattr("from_exception_data")?;
         let borrow = slf.try_borrow()?;
         let args = (
-            borrow.title.bind(py),
+            &borrow.title,
             borrow.errors(py, include_url_env(py), true, true)?,
-            borrow.input_type.into_py(py),
+            borrow.input_type,
             borrow.hide_input,
         )
-            .into_py(slf.py());
+            .into_pyobject(py)?;
         Ok((callable, args))
     }
 }
@@ -461,7 +461,7 @@ impl TryFrom<&Bound<'_, PyAny>> for PyLineError {
         let location = Location::try_from(dict.get_item("loc")?.as_ref())?;
 
         let input_value = match dict.get_item("input")? {
-            Some(i) => i.into_py(py),
+            Some(i) => i.unbind(),
             None => py.None(),
         };
 
@@ -494,9 +494,9 @@ impl PyLineError {
         input_type: InputType,
         include_input: bool,
     ) -> PyResult<PyObject> {
-        let dict = PyDict::new_bound(py);
+        let dict = PyDict::new(py);
         dict.set_item("type", self.error_type.type_string())?;
-        dict.set_item("loc", self.location.to_object(py))?;
+        dict.set_item("loc", &self.location)?;
         dict.set_item("msg", self.error_type.render_message(py, input_type)?)?;
         if include_input {
             dict.set_item("input", &self.input_value)?;
@@ -516,7 +516,7 @@ impl PyLineError {
                 }
             }
         }
-        Ok(dict.into_py(py))
+        Ok(dict.into())
     }
 
     fn pretty(

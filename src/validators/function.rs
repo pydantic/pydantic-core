@@ -458,7 +458,7 @@ macro_rules! py_err_string {
             Ok(py_string) => match py_string.to_str() {
                 Ok(_) => ValError::new(
                     ErrorType::$type_member {
-                        error: Some($py_err.into_py($py)),
+                        error: Some($py_err.into_pyobject($py)),
                         context: None,
                     },
                     $input,

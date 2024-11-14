@@ -40,7 +40,7 @@ impl Validator for BoolValidator {
         // and back again, might be worth profiling?
         input
             .validate_bool(state.strict_or(self.strict))
-            .map(|val_match| val_match.unpack(state).into_py(py))
+            .map(|val_match| val_match.unpack(state).into_pyobject(py))
     }
 
     fn get_name(&self) -> &str {

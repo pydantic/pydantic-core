@@ -22,7 +22,7 @@ mod tests {
             //         'type': 'function-wrap',
             //         'function': lambda: None,
             //     },
-            let code = r"{
+            let code = cr"{
                 'type': 'definitions',
                 'schema': {'type': 'definition-ref', 'schema_ref': 'C-ref'},
                 'definitions': [
@@ -45,7 +45,7 @@ mod tests {
                     },
                 ]
             }";
-            let schema: Bound<'_, PyDict> = py.eval_bound(code, None, None).unwrap().extract().unwrap();
+            let schema: Bound<'_, PyDict> = py.eval(code, None, None).unwrap().extract().unwrap();
             SchemaSerializer::py_new(schema, None).unwrap();
         });
     }
@@ -53,7 +53,7 @@ mod tests {
     #[test]
     fn test_serialize_computed_fields() {
         Python::with_gil(|py| {
-            let code = r#"
+            let code = cr#"
 class A:
     @property
     def b(self) -> str:
@@ -73,8 +73,8 @@ schema = {
 }
 a = A()
             "#;
-            let locals = PyDict::new_bound(py);
-            py.run_bound(code, None, Some(&locals)).unwrap();
+            let locals = PyDict::new(py);
+            py.run(code, None, Some(&locals)).unwrap();
             let a = locals.get_item("a").unwrap().unwrap();
             let schema = locals
                 .get_item("schema")
@@ -109,7 +109,7 @@ a = A()
     #[test]
     fn test_literal_schema() {
         Python::with_gil(|py| {
-            let code = r#"
+            let code = cr#"
 schema = {
     "type": "dict",
     "keys_schema": {
@@ -123,8 +123,8 @@ schema = {
 }
 json_input = '{"a": "something"}'
             "#;
-            let locals = PyDict::new_bound(py);
-            py.run_bound(code, None, Some(&locals)).unwrap();
+            let locals = PyDict::new(py);
+            py.run(code, None, Some(&locals)).unwrap();
             let schema = locals.get_item("schema").unwrap().unwrap();
             let json_input = locals.get_item("json_input").unwrap().unwrap();
             let binding = SchemaValidator::py_new(py, &schema, None)
@@ -140,7 +140,7 @@ json_input = '{"a": "something"}'
     #[test]
     fn test_segfault_for_recursive_schemas() {
         Python::with_gil(|py| {
-            let code = r"
+            let code = cr"
 schema = {
     'type': 'definitions',
     'schema': {
@@ -176,8 +176,8 @@ schema = {
 dump_json_input_1 = 1
 dump_json_input_2 = {'a': 'something'}
             ";
-            let locals = PyDict::new_bound(py);
-            py.run_bound(code, None, Some(&locals)).unwrap();
+            let locals = PyDict::new(py);
+            py.run(code, None, Some(&locals)).unwrap();
             let schema = locals
                 .get_item("schema")
                 .unwrap()

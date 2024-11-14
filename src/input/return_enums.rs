@@ -546,10 +546,10 @@ impl EitherBytes<'_, '_> {
 }
 
 impl IntoPy<PyObject> for EitherBytes<'_, '_> {
-    fn into_py(self, py: Python<'_>) -> PyObject {
+    fn into_pyobject(self, py: Python<'_>) -> PyObject {
         match self {
-            EitherBytes::Cow(bytes) => PyBytes::new_bound(py, &bytes).into_py(py),
-            EitherBytes::Py(py_bytes) => py_bytes.into_py(py),
+            EitherBytes::Cow(bytes) => PyBytes::new(py, &bytes).into_pyobject(py),
+            EitherBytes::Py(py_bytes) => py_bytes.into_pyobject(py),
         }
     }
 }
@@ -578,13 +578,16 @@ impl<'a> EitherInt<'a> {
             EitherInt::I64(i) => Ok(i),
             EitherInt::U64(u) => match i64::try_from(u) {
                 Ok(u) => Ok(u),
-                Err(_) => Err(ValError::new(ErrorTypeDefaults::IntParsingSize, u.into_py(py).bind(py))),
+                Err(_) => Err(ValError::new(
+                    ErrorTypeDefaults::IntParsingSize,
+                    u.into_pyobject(py).bind(py),
+                )),
             },
             EitherInt::BigInt(u) => match i64::try_from(u) {
                 Ok(u) => Ok(u),
                 Err(e) => Err(ValError::new(
                     ErrorTypeDefaults::IntParsingSize,
-                    e.into_original().into_py(py).bind(py),
+                    e.into_original().into_pyobject(py).bind(py),
                 )),
             },
             EitherInt::Py(i) => i
@@ -634,12 +637,12 @@ impl<'a> EitherInt<'a> {
 }
 
 impl<'a> IntoPy<PyObject> for EitherInt<'a> {
-    fn into_py(self, py: Python<'_>) -> PyObject {
+    fn into_pyobject(self, py: Python<'_>) -> PyObject {
         match self {
-            Self::I64(int) => int.into_py(py),
-            Self::U64(int) => int.into_py(py),
-            Self::BigInt(int) => int.into_py(py),
-            Self::Py(int) => int.into_py(py),
+            Self::I64(int) => int.into_pyobject(py),
+            Self::U64(int) => int.into_pyobject(py),
+            Self::BigInt(int) => int.into_pyobject(py),
+            Self::Py(int) => int.into_pyobject(py),
         }
     }
 }
@@ -661,10 +664,10 @@ impl<'a> EitherFloat<'a> {
 }
 
 impl<'a> IntoPy<PyObject> for EitherFloat<'a> {
-    fn into_py(self, py: Python<'_>) -> PyObject {
+    fn into_pyobject(self, py: Python<'_>) -> PyObject {
         match self {
-            Self::F64(float) => float.into_py(py),
-            Self::Py(float) => float.into_py(py),
+            Self::F64(float) => float.into_pyobject(py),
+            Self::Py(float) => float.into_pyobject(py),
         }
     }
 }
@@ -678,10 +681,10 @@ pub enum Int {
 }
 
 impl IntoPy<PyObject> for Int {
-    fn into_py(self, py: Python<'_>) -> PyObject {
+    fn into_pyobject(self, py: Python<'_>) -> PyObject {
         match self {
-            Self::I64(i) => i.into_py(py),
-            Self::Big(big_i) => big_i.into_py(py),
+            Self::I64(i) => i.into_pyobject(py),
+            Self::Big(big_i) => big_i.into_pyobject(py),
         }
     }
 }
@@ -753,10 +756,10 @@ pub enum EitherComplex<'a> {
 }
 
 impl<'a> IntoPy<PyObject> for EitherComplex<'a> {
-    fn into_py(self, py: Python<'_>) -> PyObject {
+    fn into_pyobject(self, py: Python<'_>) -> PyObject {
         match self {
-            Self::Complex(c) => PyComplex::from_doubles_bound(py, c[0], c[1]).into_py(py),
-            Self::Py(c) => c.into_py(py),
+            Self::Complex(c) => PyComplex::from_doubles_bound(py, c[0], c[1]).into_pyobject(py),
+            Self::Py(c) => c.into_pyobject(py),
         }
     }
 }

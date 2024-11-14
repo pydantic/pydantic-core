@@ -89,7 +89,7 @@ impl Validator for GeneratorValidator {
             hide_input_in_errors: self.hide_input_in_errors,
             validation_error_cause: self.validation_error_cause,
         };
-        Ok(v_iterator.into_py(py))
+        Ok(v_iterator.into_pyobject(py))
     }
 
     fn get_name(&self) -> &str {
@@ -254,8 +254,8 @@ impl InternalValidator {
             data: extra.data.as_ref().map(|d| d.clone().into()),
             strict: extra.strict,
             from_attributes: extra.from_attributes,
-            context: extra.context.map(|d| d.into_py(py)),
-            self_instance: extra.self_instance.map(|d| d.into_py(py)),
+            context: extra.context.map(|d| d.into_pyobject(py)),
+            self_instance: extra.self_instance.map(|d| d.into_pyobject(py)),
             recursion_guard: state.recursion_guard.clone(),
             exactness: state.exactness,
             validation_mode: extra.input_type,

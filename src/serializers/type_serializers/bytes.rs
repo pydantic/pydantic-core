@@ -45,8 +45,8 @@ impl TypeSerializer for BytesSerializer {
                 SerMode::Json => self
                     .bytes_mode
                     .bytes_to_string(py, py_bytes.as_bytes())
-                    .map(|s| s.into_py(py)),
-                _ => Ok(value.into_py(py)),
+                    .map(|s| s.into_pyobject(py)),
+                _ => Ok(value.into_pyobject(py)),
             },
             Err(_) => {
                 extra.warnings.on_fallback_py(self.get_name(), value, extra)?;

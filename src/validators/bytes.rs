@@ -51,7 +51,7 @@ impl Validator for BytesValidator {
     ) -> ValResult<PyObject> {
         input
             .validate_bytes(state.strict_or(self.strict), self.bytes_mode)
-            .map(|m| m.unpack(state).into_py(py))
+            .map(|m| m.unpack(state).into_pyobject(py))
     }
 
     fn get_name(&self) -> &str {
@@ -103,7 +103,7 @@ impl Validator for BytesConstrainedValidator {
                 ));
             }
         }
-        Ok(either_bytes.into_py(py))
+        Ok(either_bytes.into_pyobject(py))
     }
 
     fn get_name(&self) -> &str {

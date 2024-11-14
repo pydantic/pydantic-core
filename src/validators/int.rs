@@ -51,7 +51,7 @@ impl Validator for IntValidator {
     ) -> ValResult<PyObject> {
         input
             .validate_int(state.strict_or(self.strict))
-            .map(|val_match| val_match.unpack(state).into_py(py))
+            .map(|val_match| val_match.unpack(state).into_pyobject(py))
     }
 
     fn get_name(&self) -> &str {
@@ -136,7 +136,7 @@ impl Validator for ConstrainedIntValidator {
                 ));
             }
         }
-        Ok(either_int.into_py(py))
+        Ok(either_int.into_pyobject(py))
     }
 
     fn get_name(&self) -> &str {

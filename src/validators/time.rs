@@ -77,7 +77,7 @@ impl Validator for TimeValidator {
                 tz_constraint.tz_check(raw_time.tz_offset, input)?;
             }
         }
-        Ok(time.try_into_py(py)?)
+        Ok(time.try_into_pyobject(py)?)
     }
 
     fn get_name(&self) -> &str {

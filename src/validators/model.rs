@@ -205,7 +205,7 @@ impl Validator for ModelValidator {
                 let output = self.validator.validate(py, field_value, state)?;
 
                 force_setattr(py, model, intern!(py, ROOT_FIELD), output)?;
-                Ok(model.into_py(py))
+                Ok(model.into_pyobject(py))
             };
         }
         let old_dict = model.getattr(intern!(py, DUNDER_DICT))?.downcast_into::<PyDict>()?;
@@ -235,7 +235,7 @@ impl Validator for ModelValidator {
 
         force_setattr(py, model, intern!(py, DUNDER_DICT), validated_dict)?;
         force_setattr(py, model, intern!(py, DUNDER_MODEL_EXTRA_KEY), validated_extra)?;
-        Ok(model.into_py(py))
+        Ok(model.into_pyobject(py))
     }
 
     fn get_name(&self) -> &str {
@@ -261,7 +261,7 @@ impl ModelValidator {
             let fields_set = if input.to_object(py)?.is(&self.undefined) {
                 PySet::empty_bound(py)?
             } else {
-                PySet::new_bound(py, [&String::from(ROOT_FIELD)])?
+                PySet::new(py, [&String::from(ROOT_FIELD)])?
             };
             force_setattr(py, self_instance, intern!(py, DUNDER_FIELDS_SET_KEY), &fields_set)?;
             force_setattr(py, self_instance, intern!(py, ROOT_FIELD), &output)?;
@@ -302,7 +302,7 @@ impl ModelValidator {
             let fields_set = if input.to_object(py)?.is(&self.undefined) {
                 PySet::empty_bound(py)?
             } else {
-                PySet::new_bound(py, [&String::from(ROOT_FIELD)])?
+                PySet::new(py, [&String::from(ROOT_FIELD)])?
             };
             force_setattr(py, &instance, intern!(py, DUNDER_FIELDS_SET_KEY), &fields_set)?;
             force_setattr(py, &instance, intern!(py, ROOT_FIELD), output)?;

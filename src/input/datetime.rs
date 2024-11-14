@@ -53,12 +53,12 @@ impl<'a> EitherDate<'a> {
         }
     }
 
-    pub fn try_into_py(self, py: Python<'_>) -> PyResult<PyObject> {
+    pub fn try_into_pyobject(self, py: Python<'_>) -> PyResult<PyObject> {
         let date = match self {
             Self::Py(date) => Ok(date),
-            Self::Raw(date) => PyDate::new_bound(py, date.year.into(), date.month, date.day),
+            Self::Raw(date) => PyDate::new(py, date.year.into(), date.month, date.day),
         }?;
-        Ok(date.into_py(py))
+        Ok(date.into_pyobject(py))
     }
 }
 
@@ -102,7 +102,7 @@ impl<'a> EitherTimedelta<'a> {
         }
     }
 
-    pub fn try_into_py(&self, py: Python<'a>) -> PyResult<Bound<'a, PyDelta>> {
+    pub fn try_into_pyobject(&self, py: Python<'a>) -> PyResult<Bound<'a, PyDelta>> {
         match self {
             Self::PyExact(timedelta) => Ok(timedelta.clone()),
             Self::PySubclass(timedelta) => Ok(timedelta.clone()),
@@ -165,7 +165,7 @@ pub fn pytimedelta_subclass_as_duration(py_timedelta: &Bound<'_, PyDelta>) -> Py
 
 pub fn duration_as_pytimedelta<'py>(py: Python<'py>, duration: &Duration) -> PyResult<Bound<'py, PyDelta>> {
     let sign = if duration.positive { 1 } else { -1 };
-    PyDelta::new_bound(
+    PyDelta::new(
         py,
         sign * duration.day as i32,
         sign * duration.second as i32,
@@ -208,10 +208,10 @@ impl<'a> EitherTime<'a> {
         }
     }
 
-    pub fn try_into_py(self, py: Python<'_>) -> PyResult<PyObject> {
+    pub fn try_into_pyobject(self, py: Python<'_>) -> PyResult<PyObject> {
         let time = match self {
             Self::Py(time) => Ok(time),
-            Self::Raw(time) => PyTime::new_bound(
+            Self::Raw(time) => PyTime::new(
                 py,
                 time.hour,
                 time.minute,
@@ -220,7 +220,7 @@ impl<'a> EitherTime<'a> {
                 time_as_tzinfo(py, &time)?.as_ref(),
             ),
         }?;
-        Ok(time.into_py(py))
+        Ok(time.into())
     }
 }
 
@@ -267,9 +267,9 @@ impl<'a> EitherDateTime<'a> {
         }
     }
 
-    pub fn try_into_py(self, py: Python<'a>) -> PyResult<PyObject> {
+    pub fn try_into_pyobject(self, py: Python<'a>) -> PyResult<PyObject> {
         let dt = match self {
-            Self::Raw(datetime) => PyDateTime::new_bound(
+            Self::Raw(datetime) => PyDateTime::new(
                 py,
                 datetime.date.year.into(),
                 datetime.date.month,
@@ -282,7 +282,7 @@ impl<'a> EitherDateTime<'a> {
             )?,
             Self::Py(dt) => dt.clone(),
         };
-        Ok(dt.into_py(py))
+        Ok(dt.into())
     }
 }
 
@@ -393,7 +393,7 @@ pub fn float_as_datetime<'py>(input: &(impl Input<'py> + ?Sized), timestamp: f64
 
 pub fn date_as_datetime<'py>(date: &Bound<'py, PyDate>) -> PyResult<EitherDateTime<'py>> {
     let py = date.py();
-    let dt = PyDateTime::new_bound(
+    let dt = PyDateTime::new(
         py,
         date.getattr(intern!(py, "year"))?.extract()?,
         date.getattr(intern!(py, "month"))?.extract()?,
@@ -502,7 +502,7 @@ pub fn float_as_duration(input: impl ToErrorValue, total_seconds: f64) -> ValRes
         .map_err(|err| map_timedelta_err(input, err))
 }
 
-#[pyclass(module = "pydantic_core._pydantic_core", extends = PyTzInfo)]
+#[pyclass(module = "pydantic_core._pydantic_core", extends = PyTzInfo, frozen)]
 #[derive(Clone)]
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub struct TzInfo {
@@ -518,7 +518,7 @@ impl TzInfo {
 
     #[allow(unused_variables)]
     fn utcoffset<'py>(&self, py: Python<'py>, dt: &Bound<'_, PyAny>) -> PyResult<Bound<'py, PyDelta>> {
-        PyDelta::new_bound(py, 0, self.seconds, 0, true)
+        PyDelta::new(py, 0, self.seconds, 0, true)
     }
 
     #[allow(unused_variables)]
@@ -575,7 +575,11 @@ impl TzInfo {
             }
             let offset_seconds: f64 = offset_delta.call_method0(intern!(py, "total_seconds"))?.extract()?;
             let offset = offset_seconds.round() as i32;
-            Ok(op.matches(self.seconds.cmp(&offset)).into_py(py))
+            Ok(op
+                .matches(self.seconds.cmp(&offset))
+                .into_pyobject(py)?
+                .to_owned()
+                .into())
         } else {
             Ok(py.NotImplemented())
         }
@@ -585,10 +589,10 @@ impl TzInfo {
         Py::new(py, self.clone())
     }
 
-    pub fn __reduce__(&self, py: Python) -> PyResult<PyObject> {
-        let args = (self.seconds,);
-        let cls = Py::new(py, self.clone())?.getattr(py, "__class__")?;
-        Ok((cls, args).into_py(py))
+    pub fn __reduce__<'py>(slf: &Bound<'py, Self>) -> Bound<'py, PyTuple> {
+        let cls = slf.get_type();
+        let args = (slf.get().seconds,);
+        PyTuple::new((cls, args))
     }
 }
 

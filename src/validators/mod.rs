@@ -97,7 +97,7 @@ impl PySome {
 
     #[classattr]
     fn __match_args__(py: Python) -> Bound<'_, PyTuple> {
-        PyTuple::new_bound(py, vec![intern!(py, "value")])
+        PyTuple::new(py, vec![intern!(py, "value")])
     }
 }
 
@@ -126,7 +126,7 @@ impl SchemaValidator {
 
         let validator = build_validator(schema, config, &mut definitions_builder)?;
         let definitions = definitions_builder.finish()?;
-        let py_schema = schema.into_py(py);
+        let py_schema = schema.into_pyobject(py);
         let py_config = match config {
             Some(c) if !c.is_empty() => Some(c.clone().into()),
             _ => None,
@@ -136,8 +136,8 @@ impl SchemaValidator {
             None => None,
         };
         let title = match config_title {
-            Some(t) => t.into_py(py),
-            None => validator.get_name().into_py(py),
+            Some(t) => t.into_pyobject(py),
+            None => validator.get_name().into_pyobject(py),
         };
         let hide_input_in_errors: bool = config.get_as(intern!(py, "hide_input_in_errors"))?.unwrap_or(false);
         let validation_error_cause: bool = config.get_as(intern!(py, "validation_error_cause"))?.unwrap_or(false);
@@ -310,8 +310,8 @@ impl SchemaValidator {
         let r = self.validator.default_value(py, None::<i64>, &mut state);
         match r {
             Ok(maybe_default) => match maybe_default {
-                Some(v) => Ok(PySome::new(v).into_py(py)),
-                None => Ok(py.None().into_py(py)),
+                Some(v) => Ok(PySome::new(v).into_pyobject(py)),
+                None => Ok(py.None().into_pyobject(py)),
             },
             Err(e) => Err(self.prepare_validation_err(py, e, InputType::Python)),
         }
@@ -440,7 +440,7 @@ impl<'py> SelfValidator<'py> {
 
     fn build(py: Python) -> PyResult<SchemaValidator> {
         let code = include_str!("../self_schema.py");
-        let locals = PyDict::new_bound(py);
+        let locals = PyDict::new(py);
         py.run_bound(code, None, Some(&locals))?;
         let self_schema = locals.get_as_req(intern!(py, "self_schema"))?;
 
@@ -456,7 +456,7 @@ impl<'py> SelfValidator<'py> {
             definitions,
             py_schema: py.None(),
             py_config: None,
-            title: "Self Schema".into_py(py),
+            title: "Self Schema".into_pyobject(py),
             hide_input_in_errors: false,
             validation_error_cause: false,
             cache_str: true.into(),

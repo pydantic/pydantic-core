@@ -130,7 +130,7 @@ impl Validator for DateTimeValidator {
                 tz_constraint.tz_check(speedate_dt.time.tz_offset, input)?;
             }
         }
-        Ok(datetime.try_into_py(py)?)
+        Ok(datetime.try_into_pyobject(py)?)
     }
 
     fn get_name(&self) -> &str {
@@ -248,7 +248,7 @@ pub struct NowConstraint {
 static TIME_LOCALTIME: GILOnceCell<PyObject> = GILOnceCell::new();
 
 fn get_localtime(py: Python) -> PyResult<PyObject> {
-    Ok(py.import_bound("time")?.getattr("localtime")?.into_py(py))
+    Ok(py.import_bound("time")?.getattr("localtime")?.into_pyobject(py))
 }
 
 impl NowConstraint {

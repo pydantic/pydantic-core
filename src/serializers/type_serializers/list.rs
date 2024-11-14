@@ -72,7 +72,7 @@ impl TypeSerializer for ListSerializer {
                         )?);
                     }
                 }
-                Ok(items.into_py(py))
+                Ok(items.into_pyobject(py))
             }
             Err(_) => {
                 extra.warnings.on_fallback_py(self.get_name(), value, extra)?;

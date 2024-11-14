@@ -68,9 +68,9 @@ macro_rules! build_serializer {
                     Ok(py_value) => match extra.mode {
                         SerMode::Json => {
                             let s = $convert_func(py_value)?;
-                            Ok(s.into_py(py))
+                            Ok(s.into_pyobject(py))
                         }
-                        _ => Ok(value.into_py(py)),
+                        _ => Ok(value.into_pyobject(py)),
                     },
                     Err(_) => {
                         extra.warnings.on_fallback_py(self.get_name(), value, extra)?;

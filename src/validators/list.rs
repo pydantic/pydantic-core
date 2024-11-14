@@ -143,7 +143,7 @@ impl Validator for ListValidator {
                 if let Some(py_list) = seq.as_py_list() {
                     length_check!(input, "List", self.min_length, self.max_length, py_list);
                     let list_copy = py_list.get_slice(0, usize::MAX);
-                    return Ok(list_copy.into_py(py));
+                    return Ok(list_copy.into_pyobject(py));
                 }
 
                 seq.iterate(ToVec {
@@ -156,7 +156,7 @@ impl Validator for ListValidator {
             }
         };
         min_length_check!(input, "List", self.min_length, output);
-        Ok(output.into_py(py))
+        Ok(output.into_pyobject(py))
     }
 
     fn get_name(&self) -> &str {

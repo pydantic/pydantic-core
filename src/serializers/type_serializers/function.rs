@@ -127,7 +127,7 @@ impl BuildSerializer for FunctionPlainSerializer {
 
         let name = format!("plain_function[{function_name}]");
         Ok(Self {
-            func: function.into_py(py),
+            func: function.into_pyobject(py),
             function_name,
             name,
             return_serializer,
@@ -169,7 +169,7 @@ impl FunctionPlainSerializer {
             };
             Ok((true, v))
         } else {
-            Ok((false, value.into_py(py)))
+            Ok((false, value.into_pyobject(py)))
         }
     }
 
@@ -371,7 +371,7 @@ impl BuildSerializer for FunctionWrapSerializer {
         let name = format!("wrap_function[{function_name}, {}]", serializer.get_name());
         Ok(Self {
             serializer: Arc::new(serializer),
-            func: function.into_py(py),
+            func: function.into_pyobject(py),
             function_name,
             name,
             return_serializer: Arc::new(return_serializer),
@@ -413,7 +413,7 @@ impl FunctionWrapSerializer {
             };
             Ok((true, v))
         } else {
-            Ok((false, value.into_py(py)))
+            Ok((false, value.into_pyobject(py)))
         }
     }
 
@@ -456,8 +456,8 @@ impl SerializationCallable {
             serializer: serializer.clone(),
             extra_owned: ExtraOwned::new(extra),
             filter: AnyFilter::new(),
-            include: include.map(|v| v.into_py(py)),
-            exclude: exclude.map(|v| v.into_py(py)),
+            include: include.map(|v| v.into_pyobject(py)),
+            exclude: exclude.map(|v| v.into_pyobject(py)),
         }
     }
 
@@ -572,9 +572,9 @@ impl SerializationInfo {
         if is_field_serializer {
             match extra.field_name {
                 Some(field_name) => Ok(Self {
-                    include: include.map(|i| i.into_py(py)),
-                    exclude: exclude.map(|e| e.into_py(py)),
-                    context: extra.context.map(|c| c.into_py(py)),
+                    include: include.map(|i| i.into_pyobject(py)),
+                    exclude: exclude.map(|e| e.into_pyobject(py)),
+                    context: extra.context.map(|c| c.into_pyobject(py)),
                     _mode: extra.mode.clone(),
                     by_alias: extra.by_alias,
                     exclude_unset: extra.exclude_unset,
@@ -590,9 +590,9 @@ impl SerializationInfo {
             }
         } else {
             Ok(Self {
-                include: include.map(|i| i.into_py(py)),
-                exclude: exclude.map(|e| e.into_py(py)),
-                context: extra.context.map(|c| c.into_py(py)),
+                include: include.map(|i| i.into_pyobject(py)),
+                exclude: exclude.map(|e| e.into_pyobject(py)),
+                context: extra.context.map(|c| c.into_pyobject(py)),
                 _mode: extra.mode.clone(),
                 by_alias: extra.by_alias,
                 exclude_unset: extra.exclude_unset,
@@ -638,7 +638,7 @@ impl SerializationInfo {
 
     #[getter]
     fn __dict__<'py>(&'py self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
-        let d = PyDict::new_bound(py);
+        let d = PyDict::new(py);
         if let Some(ref include) = self.include {
             d.set_item("include", include)?;
         }
@@ -689,7 +689,7 @@ impl SerializationInfo {
     #[getter]
     fn get_field_name<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyString>> {
         match self.field_name {
-            Some(ref field_name) => Ok(PyString::new_bound(py, field_name)),
+            Some(ref field_name) => Ok(PyString::new(py, field_name)),
             None => Err(PyAttributeError::new_err("No attribute named 'field_name'")),
         }
     }

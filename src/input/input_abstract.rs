@@ -1,7 +1,8 @@
+use std::convert::Infallible;
 use std::fmt;
 
 use pyo3::exceptions::PyValueError;
-use pyo3::types::{PyDict, PyList};
+use pyo3::types::{PyDict, PyList, PyString};
 use pyo3::{intern, prelude::*, BoundObject};
 
 use crate::errors::{ErrorTypeDefaults, InputValue, LocItem, ValError, ValResult};
@@ -20,13 +21,18 @@ pub enum InputType {
     String,
 }
 
-impl IntoPy<PyObject> for InputType {
-    fn into_py(self, py: Python<'_>) -> PyObject {
-        match self {
-            Self::Json => intern!(py, "json").into_py(py),
-            Self::Python => intern!(py, "python").into_py(py),
-            Self::String => intern!(py, "string").into_py(py),
-        }
+impl<'py> IntoPyObject<'py> for InputType {
+    type Target = PyString;
+    type Output = Borrowed<'py, 'py, PyString>;
+    type Error = Infallible;
+
+    fn into_pyobject(self, py: Python<'py>) -> Result<Borrowed<'py, 'py, PyString>, Infallible> {
+        let text = match self {
+            Self::Json => intern!(py, "json"),
+            Self::Python => intern!(py, "python"),
+            Self::String => intern!(py, "string"),
+        };
+        Ok(text.as_borrowed())
     }
 }
 
@@ -219,7 +225,7 @@ pub trait KeywordArgs<'py> {
     type Key<'a>: BorrowInput<'py> + Clone + Into<LocItem>
     where
         Self: 'a;
-    type Item<'a>: BorrowInput<'py> + ToPyObject
+    type Item<'a>: BorrowInput<'py>
     where
         Self: 'a;
     fn len(&self) -> usize;

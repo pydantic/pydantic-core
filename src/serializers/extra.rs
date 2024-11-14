@@ -408,7 +408,7 @@ impl CollectWarnings {
             let type_name = value
                 .get_type()
                 .qualname()
-                .unwrap_or_else(|_| PyString::new_bound(value.py(), "<unknown python object>"));
+                .unwrap_or_else(|_| PyString::new(value.py(), "<unknown python object>"));
 
             let value_str = truncate_safe_repr(value, None);
             Err(PydanticSerializationUnexpectedValue::new_err(Some(format!(
@@ -445,7 +445,7 @@ impl CollectWarnings {
             let type_name = value
                 .get_type()
                 .qualname()
-                .unwrap_or_else(|_| PyString::new_bound(value.py(), "<unknown python object>"));
+                .unwrap_or_else(|_| PyString::new(value.py(), "<unknown python object>"));
 
             let value_str = truncate_safe_repr(value, None);
 

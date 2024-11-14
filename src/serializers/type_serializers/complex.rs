@@ -34,8 +34,8 @@ impl TypeSerializer for ComplexSerializer {
         let py = value.py();
         match value.downcast::<PyComplex>() {
             Ok(py_complex) => Ok(match extra.mode {
-                SerMode::Json => complex_to_str(py_complex).into_py(py),
-                _ => value.into_py(py),
+                SerMode::Json => complex_to_str(py_complex).into_pyobject(py),
+                _ => value.into_pyobject(py),
             }),
             Err(_) => {
                 extra.warnings.on_fallback_py(self.get_name(), value, extra)?;
