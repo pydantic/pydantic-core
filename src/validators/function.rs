@@ -170,9 +170,9 @@ impl FunctionAfterValidator {
         let v = call(input, state)?;
         let r = if self.info_arg {
             let info = ValidationInfo::new(py, state.extra(), &self.config, self.field_name.clone());
-            self.func.call1(py, (v.to_object(py), info))
+            self.func.call1(py, (v, info))
         } else {
-            self.func.call1(py, (v.to_object(py),))
+            self.func.call1(py, (v,))
         };
         r.map_err(|e| convert_err(py, e, input))
     }

@@ -23,15 +23,16 @@ pub enum InputType {
 
 impl<'py> IntoPyObject<'py> for InputType {
     type Target = PyString;
-    type Output = Bound<'py, PyString>;
+    type Output = Borrowed<'py, 'py, PyString>;
     type Error = Infallible;
 
-    fn into_pyobject(self, py: Python<'_>) -> Result<Bound<'_, PyString>, Infallible> {
-        Ok(match self {
-            Self::Json => intern!(py, "json").clone(),
-            Self::Python => intern!(py, "python").clone(),
-            Self::String => intern!(py, "string").clone(),
-        })
+    fn into_pyobject(self, py: Python<'py>) -> Result<Borrowed<'py, 'py, PyString>, Infallible> {
+        let text = match self {
+            Self::Json => intern!(py, "json"),
+            Self::Python => intern!(py, "python"),
+            Self::String => intern!(py, "string"),
+        };
+        Ok(text.as_borrowed())
     }
 }
 
@@ -215,7 +216,7 @@ pub trait KeywordArgs<'py> {
     type Key<'a>: BorrowInput<'py> + Clone + Into<LocItem>
     where
         Self: 'a;
-    type Item<'a>: BorrowInput<'py> + ToPyObject
+    type Item<'a>: BorrowInput<'py>
     where
         Self: 'a;
     fn len(&self) -> usize;

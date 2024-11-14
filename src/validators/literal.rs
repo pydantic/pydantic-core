@@ -224,8 +224,7 @@ impl<T: Debug> LiteralLookup<T> {
         if let Some(expected_py) = &self.expected_py_dict {
             if let Ok(either_float) = input.validate_float(strict) {
                 let f = either_float.into_inner().as_f64();
-                let py_float = f.to_object(py);
-                if let Ok(Some(v)) = expected_py.bind(py).get_item(py_float.bind(py)) {
+                if let Ok(Some(v)) = expected_py.bind(py).get_item(f) {
                     let id: usize = v.extract().unwrap();
                     return Ok(Some(&self.values[id]));
                 }

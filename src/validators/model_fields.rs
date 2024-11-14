@@ -4,6 +4,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PySet, PyString, PyType};
 
 use ahash::AHashSet;
+use pyo3::IntoPyObjectExt;
 
 use crate::build_tools::py_schema_err;
 use crate::build_tools::{is_strict, schema_or_config_same, ExtraBehavior};
@@ -340,7 +341,7 @@ impl Validator for ModelFieldsValidator {
                 model_extra_dict_op = Some(PyDict::new(py));
             };
 
-            Ok((model_dict, model_extra_dict_op, fields_set).to_object(py))
+            Ok((model_dict, model_extra_dict_op, fields_set).into_py_any(py)?)
         }
     }
 
@@ -434,13 +435,13 @@ impl Validator for ModelFieldsValidator {
                 let new_extra = new_data.copy()?;
                 new_data.clear();
                 new_data.update(non_extra_data.as_mapping())?;
-                new_extra.to_object(py)
+                new_extra.into()
             }
             _ => py.None(),
         };
 
         let fields_set = PySet::new(py, &[field_name.to_string()])?;
-        Ok((new_data.to_object(py), new_extra, fields_set.to_object(py)).to_object(py))
+        Ok((new_data, new_extra, fields_set).into_py_any(py)?)
     }
 
     fn get_name(&self) -> &str {

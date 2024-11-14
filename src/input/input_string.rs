@@ -28,15 +28,6 @@ pub enum StringMapping<'py> {
     Mapping(Bound<'py, PyDict>),
 }
 
-impl ToPyObject for StringMapping<'_> {
-    fn to_object(&self, py: Python<'_>) -> PyObject {
-        match self {
-            Self::String(s) => s.to_object(py),
-            Self::Mapping(d) => d.to_object(py),
-        }
-    }
-}
-
 impl<'py> StringMapping<'py> {
     pub fn new_key(py_key: Bound<'py, PyAny>) -> ValResult<Self> {
         match py_key.downcast_into::<PyString>() {

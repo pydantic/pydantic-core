@@ -358,7 +358,7 @@ impl Validator for TypedDictValidator {
         }
 
         if errors.is_empty() {
-            Ok(output_dict.to_object(py))
+            Ok(output_dict.into())
         } else {
             Err(ValError::LineErrors(errors))
         }
