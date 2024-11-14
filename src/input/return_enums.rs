@@ -264,7 +264,7 @@ pub(crate) fn no_validator_iter_to_vec<'py>(
         .map(|(index, result)| {
             let v = result.map_err(|e| any_next_error!(py, e, input, index))?;
             max_length_check.incr()?;
-            Ok(v.borrow_input().to_object(py))
+            Ok(v.borrow_input().to_object(py)?.unbind())
         })
         .collect()
 }

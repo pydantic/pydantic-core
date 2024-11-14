@@ -57,23 +57,30 @@ impl ValidationError {
     ) -> PyErr {
         match error {
             ValError::LineErrors(raw_errors) => {
-                let line_errors: Vec<PyLineError> = match outer_location {
+                let line_errors: PyResult<Vec<PyLineError>> = match outer_location {
                     Some(outer_location) => raw_errors
                         .into_iter()
-                        .map(|e| e.with_outer_location(outer_location.clone()).into_py(py))
+                        .map(|e| PyLineError::from_val_line_error(e.with_outer_location(outer_location.clone()), py))
                         .collect(),
-                    None => raw_errors.into_iter().map(|e| e.into_py(py)).collect(),
+                    None => raw_errors
+                        .into_iter()
+                        .map(|e| PyLineError::from_val_line_error(e, py))
+                        .collect(),
+                };
+                let line_errors = match line_errors {
+                    Ok(line_errors) => line_errors,
+                    Err(err) => return err,
                 };
                 let validation_error = Self::new(line_errors, title, input_type, hide_input);
-                match Py::new(py, validation_error) {
+                match Bound::new(py, validation_error) {
                     Ok(err) => {
                         if validation_error_cause {
                             // Will return an import error if the backport was needed and not installed:
-                            if let Some(cause_problem) = ValidationError::maybe_add_cause(err.borrow(py), py) {
+                            if let Some(cause_problem) = ValidationError::maybe_add_cause(err.borrow(), py) {
                                 return cause_problem;
                             }
                         }
-                        PyErr::from_value_bound(err.into_bound(py).into_any())
+                        PyErr::from_value_bound(err.into_any())
                     }
                     Err(err) => err,
                 }
@@ -418,16 +425,6 @@ pub struct PyLineError {
     input_value: PyObject,
 }
 
-impl IntoPy<PyLineError> for ValLineError {
-    fn into_py(self, py: Python<'_>) -> PyLineError {
-        PyLineError {
-            error_type: self.error_type,
-            location: self.location,
-            input_value: self.input_value.to_object(py),
-        }
-    }
-}
-
 impl From<PyLineError> for ValLineError {
     /// Used to extract line errors from a validation error for wrap functions
     fn from(other: PyLineError) -> ValLineError {
@@ -477,6 +474,14 @@ impl TryFrom<&Bound<'_, PyAny>> for PyLineError {
 }
 
 impl PyLineError {
+    pub fn from_val_line_error(line_error: ValLineError, py: Python<'_>) -> PyResult<Self> {
+        Ok(PyLineError {
+            error_type: line_error.error_type,
+            location: line_error.location,
+            input_value: line_error.input_value.into_pyobject(py)?.unbind(),
+        })
+    }
+
     fn get_error_url(&self, url_prefix: &str) -> String {
         format!("{url_prefix}{}", self.error_type.type_string())
     }

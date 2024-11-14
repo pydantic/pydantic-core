@@ -456,7 +456,7 @@ impl CollectWarnings {
     }
 
     fn add_warning(&self, message: String) {
-        self.warnings.lock().expect("lock poisoned").push(message)
+        self.warnings.lock().expect("lock poisoned").push(message);
     }
 
     pub fn final_check(&self, py: Python) -> PyResult<()> {

@@ -101,9 +101,9 @@ impl FunctionBeforeValidator {
     ) -> ValResult<PyObject> {
         let r = if self.info_arg {
             let info = ValidationInfo::new(py, state.extra(), &self.config, self.field_name.clone());
-            self.func.call1(py, (input.to_object(py), info))
+            self.func.call1(py, (input.to_object(py)?, info))
         } else {
-            self.func.call1(py, (input.to_object(py),))
+            self.func.call1(py, (input.to_object(py)?,))
         };
         let value = r.map_err(|e| convert_err(py, e, input))?;
         call(value.into_bound(py), state)
@@ -255,9 +255,9 @@ impl Validator for FunctionPlainValidator {
     ) -> ValResult<PyObject> {
         let r = if self.info_arg {
             let info = ValidationInfo::new(py, state.extra(), &self.config, self.field_name.clone());
-            self.func.call1(py, (input.to_object(py), info))
+            self.func.call1(py, (input.to_object(py)?, info))
         } else {
-            self.func.call1(py, (input.to_object(py),))
+            self.func.call1(py, (input.to_object(py)?,))
         };
         r.map_err(|e| convert_err(py, e, input))
     }
@@ -319,9 +319,9 @@ impl FunctionWrapValidator {
     ) -> ValResult<PyObject> {
         let r = if self.info_arg {
             let info = ValidationInfo::new(py, state.extra(), &self.config, self.field_name.clone());
-            self.func.call1(py, (input.to_object(py), handler, info))
+            self.func.call1(py, (input.to_object(py)?, handler, info))
         } else {
-            self.func.call1(py, (input.to_object(py), handler))
+            self.func.call1(py, (input.to_object(py)?, handler))
         };
         r.map_err(|e| convert_err(py, e, input))
     }
@@ -374,7 +374,7 @@ impl Validator for FunctionWrapValidator {
                 self.validation_error_cause,
             ),
             updated_field_name: field_name.to_string(),
-            updated_field_value: field_value.to_object(py),
+            updated_field_value: field_value.clone().into(),
         };
         self._validate(Bound::new(py, handler)?.as_any(), py, obj, state)
     }

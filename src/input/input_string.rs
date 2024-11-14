@@ -22,7 +22,7 @@ use super::{
     KeywordArgs, ValidatedDict, ValidationMatch,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, IntoPyObject, IntoPyObjectRef)]
 pub enum StringMapping<'py> {
     String(Bound<'py, PyString>),
     Mapping(Bound<'py, PyDict>),
@@ -72,6 +72,13 @@ impl From<StringMapping<'_>> for LocItem {
 }
 
 impl<'py> Input<'py> for StringMapping<'py> {
+    type PyConverter<'a> = &'a Self where Self: 'a;
+
+    #[inline]
+    fn py_converter(&self) -> &Self {
+        self
+    }
+
     fn as_error_value(&self) -> InputValue {
         match self {
             Self::String(s) => s.as_error_value(),

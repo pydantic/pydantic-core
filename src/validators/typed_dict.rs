@@ -334,7 +334,7 @@ impl Validator for TypedDictValidator {
                                         Err(err) => return Err(err),
                                     }
                                 } else {
-                                    self.output_dict.set_item(py_key, value.to_object(self.py))?;
+                                    self.output_dict.set_item(py_key, value.to_object(self.py)?)?;
                                 };
                             }
                         }

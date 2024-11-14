@@ -140,7 +140,7 @@ impl ValidatorIterator {
                                     );
                                     return Err(ValidationError::from_val_error(
                                         py,
-                                        "ValidatorIterator".to_object(py),
+                                        "ValidatorIterator".into_pyobject(py)?.into(),
                                         InputType::Python,
                                         val_error,
                                         None,
@@ -153,7 +153,7 @@ impl ValidatorIterator {
                                 .validate(py, next.borrow_input(), Some(index.into()))
                                 .map(Some)
                         }
-                        None => Ok(Some(next.to_object(py))),
+                        None => Ok(Some(next.into_pyobject(py)?.unbind())),
                     },
                     None => {
                         if let Some(min_length) = min_length {
@@ -169,7 +169,7 @@ impl ValidatorIterator {
                                 );
                                 return Err(ValidationError::from_val_error(
                                     py,
-                                    "ValidatorIterator".to_object(py),
+                                    "ValidatorIterator".into_pyobject(py)?.into(),
                                     InputType::Python,
                                     val_error,
                                     None,

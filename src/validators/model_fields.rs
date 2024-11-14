@@ -303,7 +303,7 @@ impl Validator for ModelFieldsValidator {
                                         Err(err) => return Err(err),
                                     }
                                 } else {
-                                    model_extra_dict.set_item(&py_key, value.to_object(self.py))?;
+                                    model_extra_dict.set_item(&py_key, value.to_object(self.py)?)?;
                                     self.fields_set_vec.push(py_key.into());
                                 };
                             }
@@ -354,13 +354,13 @@ impl Validator for ModelFieldsValidator {
     ) -> ValResult<PyObject> {
         let dict = obj.downcast::<PyDict>()?;
 
-        let get_updated_dict = |output: PyObject| {
+        let get_updated_dict = |output: &Bound<'py, PyAny>| {
             dict.set_item(field_name, output)?;
             Ok(dict)
         };
 
         let prepare_result = |result: ValResult<PyObject>| match result {
-            Ok(output) => get_updated_dict(output),
+            Ok(output) => get_updated_dict(&output.into_bound(py)),
             Err(ValError::LineErrors(line_errors)) => {
                 let errors = line_errors
                     .into_iter()
@@ -402,7 +402,7 @@ impl Validator for ModelFieldsValidator {
                 match self.extra_behavior {
                     ExtraBehavior::Allow => match self.extras_validator {
                         Some(ref validator) => prepare_result(validator.validate(py, field_value, state))?,
-                        None => get_updated_dict(field_value.to_object(py))?,
+                        None => get_updated_dict(field_value)?,
                     },
                     ExtraBehavior::Forbid | ExtraBehavior::Ignore => {
                         return Err(ValError::new_with_loc(
