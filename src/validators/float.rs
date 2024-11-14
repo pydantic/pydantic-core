@@ -74,7 +74,7 @@ impl Validator for FloatValidator {
         if !self.allow_inf_nan && !either_float.as_f64().is_finite() {
             return Err(ValError::new(ErrorTypeDefaults::FiniteNumber, input));
         }
-        Ok(either_float.into_py(py))
+        Ok(either_float.into_pyobject(py))
     }
 
     fn get_name(&self) -> &str {
@@ -164,7 +164,7 @@ impl Validator for ConstrainedFloatValidator {
                 ));
             }
         }
-        Ok(either_float.into_py(py))
+        Ok(either_float.into_pyobject(py))
     }
 
     fn get_name(&self) -> &str {

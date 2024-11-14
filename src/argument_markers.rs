@@ -33,7 +33,7 @@ impl ArgsKwargs {
     #[pyo3(signature = (args, kwargs = None))]
     fn py_new(py: Python, args: &Bound<'_, PyTuple>, kwargs: Option<&Bound<'_, PyDict>>) -> Self {
         Self {
-            args: args.into_py(py),
+            args: args.into_pyobject(py),
             kwargs: match kwargs {
                 Some(d) if !d.is_empty() => Some(d.to_owned().unbind()),
                 _ => None,
@@ -44,12 +44,12 @@ impl ArgsKwargs {
     fn __richcmp__(&self, other: &Self, op: CompareOp, py: Python<'_>) -> PyObject {
         match op {
             CompareOp::Eq => match self.eq(py, other) {
-                Ok(b) => b.into_py(py),
-                Err(e) => e.into_py(py),
+                Ok(b) => b.into_pyobject(py),
+                Err(e) => e.into_pyobject(py),
             },
             CompareOp::Ne => match self.eq(py, other) {
-                Ok(b) => (!b).into_py(py),
-                Err(e) => e.into_py(py),
+                Ok(b) => (!b).into_pyobject(py),
+                Err(e) => e.into_pyobject(py),
             },
             _ => py.NotImplemented(),
         }
@@ -82,7 +82,7 @@ impl PydanticUndefinedType {
     #[staticmethod]
     pub fn new(py: Python) -> Py<Self> {
         UNDEFINED_CELL
-            .get_or_init(py, || PydanticUndefinedType {}.into_py(py).extract(py).unwrap())
+            .get_or_init(py, || PydanticUndefinedType {}.into_pyobject(py).extract(py).unwrap())
             .clone()
     }
 

@@ -46,7 +46,7 @@ impl Validator for FrozenSetValidator {
             fail_fast: self.fail_fast,
         })??;
         min_length_check!(input, "Frozenset", self.min_length, f_set);
-        Ok(f_set.into_py(py))
+        Ok(f_set.into_pyobject(py))
     }
 
     fn get_name(&self) -> &str {

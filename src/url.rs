@@ -34,7 +34,7 @@ impl PyUrl {
 }
 
 fn build_schema_validator(py: Python, schema_type: &str) -> SchemaValidator {
-    let schema = PyDict::new_bound(py);
+    let schema = PyDict::new(py);
     schema.set_item("type", schema_type).unwrap();
     SchemaValidator::py_new(py, &schema, None).unwrap()
 }
@@ -102,9 +102,9 @@ impl PyUrl {
         // `query_pairs` is a pure iterator, so can't implement `ExactSizeIterator`, hence we need the temporary `Vec`
         self.lib_url
             .query_pairs()
-            .map(|(key, value)| (key, value).into_py(py))
+            .map(|(key, value)| (key, value).into_pyobject(py))
             .collect::<Vec<PyObject>>()
-            .into_py(py)
+            .into_pyobject(py)
     }
 
     #[getter]
@@ -148,7 +148,7 @@ impl PyUrl {
 
     #[pyo3(signature = (_memo, /))]
     pub fn __deepcopy__(&self, py: Python, _memo: Bound<'_, PyAny>) -> Py<PyAny> {
-        self.clone().into_py(py)
+        self.clone().into_pyobject(py)
     }
 
     fn __getnewargs__(&self) -> (&str,) {
@@ -351,7 +351,7 @@ impl PyMultiHostUrl {
     }
 
     pub fn __deepcopy__(&self, py: Python, _memo: &Bound<'_, PyDict>) -> Py<PyAny> {
-        self.clone().into_py(py)
+        self.clone().into_pyobject(py)
     }
 
     fn __getnewargs__(&self) -> (String,) {
@@ -468,7 +468,7 @@ impl fmt::Display for UrlHostParts {
 }
 
 fn host_to_dict<'a>(py: Python<'a>, lib_url: &Url) -> PyResult<Bound<'a, PyDict>> {
-    let dict = PyDict::new_bound(py);
+    let dict = PyDict::new(py);
     dict.set_item(
         "username",
         match lib_url.username() {

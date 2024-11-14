@@ -59,7 +59,7 @@ impl BuildValidator for CallValidator {
         let name = format!("{}[{function_name}]", Self::EXPECTED_TYPE);
 
         Ok(Self {
-            function: function.to_object(py),
+            function: function.unbind(),
             arguments_validator,
             return_validator,
             name,

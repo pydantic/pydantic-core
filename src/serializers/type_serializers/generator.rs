@@ -78,7 +78,7 @@ impl TypeSerializer for GeneratorSerializer {
                                 )?);
                             }
                         }
-                        Ok(items.into_py(py))
+                        Ok(items.into_pyobject(py))
                     }
                     _ => {
                         let iter = SerializationIterator::new(
@@ -89,7 +89,7 @@ impl TypeSerializer for GeneratorSerializer {
                             exclude,
                             extra,
                         );
-                        Ok(iter.into_py(py))
+                        Ok(iter.into_pyobject(py))
                     }
                 }
             }

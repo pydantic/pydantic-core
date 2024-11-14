@@ -1,8 +1,9 @@
+use std::convert::Infallible;
 use std::fmt;
 
 use pyo3::exceptions::PyValueError;
-use pyo3::types::{PyDict, PyList};
-use pyo3::{intern, prelude::*};
+use pyo3::types::{PyDict, PyList, PyString};
+use pyo3::{intern, prelude::*, BoundObject};
 
 use crate::errors::{ErrorTypeDefaults, InputValue, LocItem, ValError, ValResult};
 use crate::lookup_key::{LookupKey, LookupPath};
@@ -20,13 +21,18 @@ pub enum InputType {
     String,
 }
 
-impl IntoPy<PyObject> for InputType {
-    fn into_py(self, py: Python<'_>) -> PyObject {
-        match self {
-            Self::Json => intern!(py, "json").into_py(py),
-            Self::Python => intern!(py, "python").into_py(py),
-            Self::String => intern!(py, "string").into_py(py),
-        }
+impl<'py> IntoPyObject<'py> for InputType {
+    type Target = PyString;
+    type Output = Borrowed<'py, 'py, PyString>;
+    type Error = Infallible;
+
+    fn into_pyobject(self, py: Python<'py>) -> Result<Borrowed<'py, 'py, PyString>, Infallible> {
+        let text = match self {
+            Self::Json => intern!(py, "json"),
+            Self::Python => intern!(py, "python"),
+            Self::String => intern!(py, "string"),
+        };
+        Ok(text.as_borrowed())
     }
 }
 
@@ -49,7 +55,23 @@ pub type ValMatch<T> = ValResult<ValidationMatch<T>>;
 /// the convention is to either implement:
 /// * `strict_*` & `lax_*` if they have different behavior
 /// * or, `validate_*` and `strict_*` to just call `validate_*` if the behavior for strict and lax is the same
-pub trait Input<'py>: fmt::Debug + ToPyObject {
+pub trait Input<'py>: fmt::Debug {
+    type PyConverter<'a>: IntoPyObject<'py>
+    where
+        Self: 'a;
+
+    fn py_converter(&self) -> Self::PyConverter<'_>;
+
+    #[inline]
+    fn to_object<'a>(&'a self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        Ok(self
+            .py_converter()
+            .into_pyobject(py)
+            .map_err(Into::into)?
+            .into_bound()
+            .into_any())
+    }
+
     fn as_error_value(&self) -> InputValue;
 
     fn is_none(&self) -> bool {
@@ -203,7 +225,7 @@ pub trait KeywordArgs<'py> {
     type Key<'a>: BorrowInput<'py> + Clone + Into<LocItem>
     where
         Self: 'a;
-    type Item<'a>: BorrowInput<'py> + ToPyObject
+    type Item<'a>: BorrowInput<'py>
     where
         Self: 'a;
     fn len(&self) -> usize;

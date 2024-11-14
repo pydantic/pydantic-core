@@ -42,8 +42,8 @@ macro_rules! build_serializer {
                 let py = value.py();
                 match value.extract::<$extract>() {
                     Ok(py_url) => match extra.mode {
-                        SerMode::Json => Ok(py_url.__str__().into_py(py)),
-                        _ => Ok(value.into_py(py)),
+                        SerMode::Json => Ok(py_url.__str__().into_pyobject(py)),
+                        _ => Ok(value.into_pyobject(py)),
                     },
                     Err(_) => {
                         extra.warnings.on_fallback_py(self.get_name(), value, extra)?;

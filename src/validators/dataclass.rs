@@ -150,7 +150,7 @@ impl Validator for DataclassArgsValidator {
 
         let args = input.validate_dataclass_args(&self.dataclass_name)?;
 
-        let output_dict = PyDict::new_bound(py);
+        let output_dict = PyDict::new(py);
         let mut init_only_args = self.init_only_count.map(Vec::with_capacity);
 
         let mut errors: Vec<ValLineError> = Vec::new();
@@ -326,8 +326,10 @@ impl Validator for DataclassArgsValidator {
                                                 Err(err) => return Err(err),
                                             }
                                         } else {
-                                            output_dict
-                                                .set_item(either_str.as_py_string(py, state.cache_str()), value)?;
+                                            output_dict.set_item(
+                                                either_str.as_py_string(py, state.cache_str()),
+                                                value.to_object(py),
+                                            )?;
                                         }
                                     }
                                 }
@@ -351,7 +353,7 @@ impl Validator for DataclassArgsValidator {
 
         if errors.is_empty() {
             if let Some(init_only_args) = init_only_args {
-                Ok((output_dict, PyTuple::new_bound(py, init_only_args)).to_object(py))
+                Ok((output_dict, PyTuple::new(py, init_only_args)).to_object(py))
             } else {
                 Ok((output_dict, py.None()).to_object(py))
             }
@@ -376,7 +378,7 @@ impl Validator for DataclassArgsValidator {
             // which doesn't make much sense in this context but we need to put something there
             // so that function validators that sit between DataclassValidator and DataclassArgsValidator
             // always get called the same shape of data.
-            Ok(PyTuple::new_bound(py, vec![dict.to_object(py), py.None()]).into_py(py))
+            Ok(PyTuple::new(py, vec![dict.to_object(py), py.None()]).into_pyobject(py))
         };
 
         if let Some(field) = self.fields.iter().find(|f| f.name == field_name) {
@@ -391,7 +393,7 @@ impl Validator for DataclassArgsValidator {
             let data_dict = dict.copy()?;
             if let Err(err) = data_dict.del_item(field_name) {
                 // KeyError is fine here as the field might not be in the dict
-                if !err.get_type_bound(py).is(&PyType::new_bound::<PyKeyError>(py)) {
+                if !err.get_type_bound(py).is(&PyType::new::<PyKeyError>(py)) {
                     return Err(err.into());
                 }
             }
@@ -418,7 +420,7 @@ impl Validator for DataclassArgsValidator {
             match self.extra_behavior {
                 // For dataclasses we allow assigning unknown fields
                 // to match stdlib dataclass behavior
-                ExtraBehavior::Allow => ok(field_value.to_object(py)),
+                ExtraBehavior::Allow => ok(field_value.clone().unbind()),
                 _ => Err(ValError::new_with_loc(
                     ErrorType::NoSuchAttribute {
                         attribute: field_name.to_string(),
@@ -474,7 +476,7 @@ impl BuildValidator for DataclassValidator {
         let validator = build_validator(&sub_schema, config, definitions)?;
 
         let post_init = if schema.get_as::<bool>(intern!(py, "post_init"))?.unwrap_or(false) {
-            Some(intern!(py, "__post_init__").into_py(py))
+            Some(intern!(py, "__post_init__").into_pyobject(py))
         } else {
             None
         };
@@ -550,7 +552,7 @@ impl Validator for DataclassValidator {
                 self.set_dict_call(py, &dc, val_output, input)?;
                 Ok(dc.into())
             } else {
-                Ok(input.to_object(py))
+                Ok(input.to_object(py)?.unbind())
             }
         } else if state.strict_or(self.strict) && state.extra().input_type == InputType::Python {
             Err(ValError::new(
@@ -600,7 +602,7 @@ impl Validator for DataclassValidator {
             force_setattr(py, obj, intern!(py, "__dict__"), dc_dict)?;
         }
 
-        Ok(obj.to_object(py))
+        Ok(obj.clone().unbind())
     }
 
     fn get_name(&self) -> &str {
@@ -624,12 +626,12 @@ impl DataclassValidator {
 
         self.set_dict_call(py, self_instance, val_output, input)?;
 
-        Ok(self_instance.into_py(py))
+        Ok(self_instance.into_pyobject(py))
     }
 
     fn dataclass_to_dict<'py>(&self, dc: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyDict>> {
         let py = dc.py();
-        let dict = PyDict::new_bound(py);
+        let dict = PyDict::new(py);
 
         for field_name in &self.fields {
             dict.set_item(field_name, dc.getattr(field_name)?)?;

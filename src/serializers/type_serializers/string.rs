@@ -43,10 +43,10 @@ impl TypeSerializer for StrSerializer {
     ) -> PyResult<PyObject> {
         let py = value.py();
         match extra.ob_type_lookup.is_type(value, ObType::Str) {
-            IsType::Exact => Ok(value.into_py(py)),
+            IsType::Exact => Ok(value.into_pyobject(py)),
             IsType::Subclass => match extra.mode {
-                SerMode::Json => Ok(value.downcast::<PyString>()?.to_str()?.into_py(py)),
-                _ => Ok(value.into_py(py)),
+                SerMode::Json => Ok(value.downcast::<PyString>()?.to_str()?.into_pyobject(py)),
+                _ => Ok(value.into_pyobject(py)),
             },
             IsType::False => {
                 extra.warnings.on_fallback_py(self.get_name(), value, extra)?;

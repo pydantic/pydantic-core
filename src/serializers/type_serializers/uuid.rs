@@ -46,8 +46,8 @@ impl TypeSerializer for UuidSerializer {
         let py = value.py();
         match extra.ob_type_lookup.is_type(value, ObType::Uuid) {
             IsType::Exact | IsType::Subclass => match extra.mode {
-                SerMode::Json => Ok(uuid_to_string(value)?.into_py(py)),
-                _ => Ok(value.into_py(py)),
+                SerMode::Json => Ok(uuid_to_string(value)?.into_pyobject(py)),
+                _ => Ok(value.into_pyobject(py)),
             },
             IsType::False => {
                 extra.warnings.on_fallback_py(self.get_name(), value, extra)?;

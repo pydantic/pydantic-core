@@ -44,6 +44,13 @@ impl From<JsonValue<'_>> for LocItem {
 }
 
 impl<'py, 'data> Input<'py> for JsonValue<'data> {
+    type PyConverter<'a> = &'a Self where Self: 'a;
+
+    #[inline]
+    fn py_converter(&self) -> &Self {
+        self
+    }
+
     fn as_error_value(&self) -> InputValue {
         // cloning JsonValue is cheap due to use of Arc
         InputValue::Json(self.to_static())
@@ -56,9 +63,9 @@ impl<'py, 'data> Input<'py> for JsonValue<'data> {
     fn as_kwargs(&self, py: Python<'py>) -> Option<Bound<'py, PyDict>> {
         match self {
             JsonValue::Object(object) => {
-                let dict = PyDict::new_bound(py);
+                let dict = PyDict::new(py);
                 for (k, v) in LazyIndexMap::iter(object) {
-                    dict.set_item(k, v.to_object(py)).unwrap();
+                    dict.set_item(k, v).unwrap();
                 }
                 Some(dict)
             }
@@ -170,10 +177,10 @@ impl<'py, 'data> Input<'py> for JsonValue<'data> {
     fn validate_decimal(&self, _strict: bool, py: Python<'py>) -> ValMatch<Bound<'py, PyAny>> {
         match self {
             JsonValue::Float(f) => {
-                create_decimal(&PyString::new_bound(py, &f.to_string()), self).map(ValidationMatch::strict)
+                create_decimal(&PyString::new(py, &f.to_string()), self).map(ValidationMatch::strict)
             }
             JsonValue::Str(..) | JsonValue::Int(..) | JsonValue::BigInt(..) => {
-                create_decimal(self.to_object(py).bind(py), self).map(ValidationMatch::strict)
+                create_decimal(&self.into_pyobject(py)?, self).map(ValidationMatch::strict)
             }
             _ => Err(ValError::new(ErrorTypeDefaults::DecimalType, self)),
         }
@@ -311,7 +318,7 @@ impl<'py, 'data> Input<'py> for JsonValue<'data> {
     fn validate_complex(&self, strict: bool, py: Python<'py>) -> ValResult<ValidationMatch<EitherComplex<'py>>> {
         match self {
             JsonValue::Str(s) => Ok(ValidationMatch::strict(EitherComplex::Py(string_to_complex(
-                &PyString::new_bound(py, s),
+                &PyString::new(py, s),
                 self,
             )?))),
             JsonValue::Float(f) => {
@@ -335,6 +342,13 @@ impl<'py, 'data> Input<'py> for JsonValue<'data> {
 
 /// Required for JSON Object keys so the string can behave like an Input
 impl<'py> Input<'py> for str {
+    type PyConverter<'a> = &'a Self;
+
+    #[inline]
+    fn py_converter(&self) -> &Self {
+        self
+    }
+
     fn as_error_value(&self) -> InputValue {
         // Justification for the clone: this is on the error pathway and we are generally ok
         // with errors having a performance penalty
@@ -401,7 +415,7 @@ impl<'py> Input<'py> for str {
     }
 
     fn validate_decimal(&self, _strict: bool, py: Python<'py>) -> ValMatch<Bound<'py, PyAny>> {
-        create_decimal(self.to_object(py).bind(py), self).map(ValidationMatch::lax)
+        create_decimal(self.into_pyobject(py)?.as_any(), self).map(ValidationMatch::lax)
     }
 
     type Dict<'a> = Never;
@@ -470,7 +484,7 @@ impl<'py> Input<'py> for str {
 
     fn validate_complex(&self, _strict: bool, py: Python<'py>) -> ValResult<ValidationMatch<EitherComplex<'py>>> {
         Ok(ValidationMatch::strict(EitherComplex::Py(string_to_complex(
-            self.to_object(py).downcast_bound::<PyString>(py)?,
+            &self.into_pyobject(py)?,
             self,
         )?)))
     }

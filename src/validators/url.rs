@@ -93,7 +93,7 @@ impl Validator for UrlValidator {
             Ok(()) => {
                 // Lax rather than strict to preserve V2.4 semantic that str wins over url in union
                 state.floor_exactness(Exactness::Lax);
-                Ok(either_url.into_py(py))
+                Ok(either_url.into_pyobject(py))
             }
             Err(error_type) => Err(ValError::new(error_type, input)),
         }
@@ -156,10 +156,10 @@ enum EitherUrl<'py> {
 }
 
 impl EitherUrl<'_> {
-    fn into_py(self, py: Python) -> PyObject {
+    fn into_pyobject(self, py: Python) -> PyObject {
         match self {
-            EitherUrl::Py(py_url) => py_url.into_py(py),
-            EitherUrl::Rust(rust_url) => PyUrl::new(rust_url).into_py(py),
+            EitherUrl::Py(py_url) => py_url.into_pyobject(py),
+            EitherUrl::Rust(rust_url) => PyUrl::new(rust_url).into_pyobject(py),
         }
     }
 }
@@ -258,7 +258,7 @@ impl Validator for MultiHostUrlValidator {
             Ok(()) => {
                 // Lax rather than strict to preserve V2.4 semantic that str wins over url in union
                 state.floor_exactness(Exactness::Lax);
-                Ok(multi_url.into_py(py))
+                Ok(multi_url.into_pyobject(py))
             }
             Err(error_type) => Err(ValError::new(error_type, input)),
         }
@@ -325,10 +325,10 @@ enum EitherMultiHostUrl<'py> {
 }
 
 impl EitherMultiHostUrl<'_> {
-    fn into_py(self, py: Python) -> PyObject {
+    fn into_pyobject(self, py: Python) -> PyObject {
         match self {
-            EitherMultiHostUrl::Py(py_multi_url) => py_multi_url.into_py(py),
-            EitherMultiHostUrl::Rust(rust_multi_url) => rust_multi_url.into_py(py),
+            EitherMultiHostUrl::Py(py_multi_url) => py_multi_url.into_pyobject(py),
+            EitherMultiHostUrl::Rust(rust_multi_url) => rust_multi_url.into_pyobject(py),
         }
     }
 }

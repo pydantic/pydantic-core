@@ -77,7 +77,7 @@ impl Validator for SetValidator {
             fail_fast: self.fail_fast,
         })??;
         min_length_check!(input, "Set", self.min_length, set);
-        Ok(set.into_py(py))
+        Ok(set.into_pyobject(py))
     }
 
     fn get_name(&self) -> &str {
