@@ -2,7 +2,7 @@ use std::ptr::null_mut;
 
 use pyo3::exceptions::PyTypeError;
 use pyo3::types::{PyDict, PySet, PyString, PyTuple, PyType};
-use pyo3::{ffi, IntoPyObjectExt};
+use pyo3::{ffi, BoundObject, IntoPyObjectExt};
 use pyo3::{intern, prelude::*};
 
 use super::function::convert_err;
@@ -172,7 +172,7 @@ impl Validator for ModelValidator {
                     self.validate_construct(py, &inner_input, Some(&fields_set), state)
                 }
             } else {
-                Ok(input.to_object(py))
+                Ok(input.to_object(py)?.unbind())
             }
         } else {
             // Having to construct a new model is not an exact match
@@ -233,13 +233,8 @@ impl Validator for ModelValidator {
             }
         }
 
-        force_setattr(py, model, intern!(py, DUNDER_DICT), validated_dict.to_object(py))?;
-        force_setattr(
-            py,
-            model,
-            intern!(py, DUNDER_MODEL_EXTRA_KEY),
-            validated_extra.to_object(py),
-        )?;
+        force_setattr(py, model, intern!(py, DUNDER_DICT), validated_dict)?;
+        force_setattr(py, model, intern!(py, DUNDER_MODEL_EXTRA_KEY), validated_extra)?;
         Ok(model.into_py_any(py)?)
     }
 
@@ -371,13 +366,13 @@ fn set_model_attrs(
     Ok(())
 }
 
-pub(super) fn force_setattr<N, V>(py: Python<'_>, obj: &Bound<'_, PyAny>, attr_name: N, value: V) -> PyResult<()>
+pub(super) fn force_setattr<'py, N, V>(py: Python<'py>, obj: &Bound<'py, PyAny>, attr_name: N, value: V) -> PyResult<()>
 where
-    N: ToPyObject,
-    V: ToPyObject,
+    N: IntoPyObject<'py>,
+    V: IntoPyObject<'py>,
 {
-    let attr_name = attr_name.to_object(py);
-    let value = value.to_object(py);
+    let attr_name = attr_name.into_pyobject_or_pyerr(py)?;
+    let value = value.into_pyobject_or_pyerr(py)?;
     unsafe {
         py_error_on_minusone(
             py,

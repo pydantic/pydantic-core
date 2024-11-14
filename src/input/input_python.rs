@@ -75,6 +75,11 @@ impl From<Bound<'_, PyAny>> for LocItem {
 }
 
 impl<'py> Input<'py> for Bound<'py, PyAny> {
+    #[inline]
+    fn py_converter(&self) -> impl IntoPyObject<'py> + '_ {
+        self
+    }
+
     fn as_error_value(&self) -> InputValue {
         InputValue::Python(self.clone().into())
     }

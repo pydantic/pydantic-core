@@ -420,7 +420,7 @@ impl Validator for DataclassArgsValidator {
             match self.extra_behavior {
                 // For dataclasses we allow assigning unknown fields
                 // to match stdlib dataclass behavior
-                ExtraBehavior::Allow => ok(field_value.to_object(py)),
+                ExtraBehavior::Allow => ok(field_value.clone().unbind()),
                 _ => Err(ValError::new_with_loc(
                     ErrorType::NoSuchAttribute {
                         attribute: field_name.to_string(),
@@ -552,7 +552,7 @@ impl Validator for DataclassValidator {
                 self.set_dict_call(py, &dc, val_output, input)?;
                 Ok(dc.into())
             } else {
-                Ok(input.to_object(py))
+                Ok(input.to_object(py)?.unbind())
             }
         } else if state.strict_or(self.strict) && state.extra().input_type == InputType::Python {
             Err(ValError::new(
@@ -602,7 +602,7 @@ impl Validator for DataclassValidator {
             force_setattr(py, obj, intern!(py, "__dict__"), dc_dict)?;
         }
 
-        Ok(obj.to_object(py))
+        Ok(obj.clone().unbind())
     }
 
     fn get_name(&self) -> &str {

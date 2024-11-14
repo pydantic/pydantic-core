@@ -72,15 +72,15 @@ impl ValidationError {
                     Err(err) => return err,
                 };
                 let validation_error = Self::new(line_errors, title, input_type, hide_input);
-                match Py::new(py, validation_error) {
+                match Bound::new(py, validation_error) {
                     Ok(err) => {
                         if validation_error_cause {
                             // Will return an import error if the backport was needed and not installed:
-                            if let Some(cause_problem) = ValidationError::maybe_add_cause(err.borrow(py), py) {
+                            if let Some(cause_problem) = ValidationError::maybe_add_cause(err.borrow(), py) {
                                 return cause_problem;
                             }
                         }
-                        PyErr::from_value(err.into_bound(py).into_any())
+                        PyErr::from_value(err.into_any())
                     }
                     Err(err) => err,
                 }

@@ -3,7 +3,7 @@ use std::fmt;
 
 use pyo3::exceptions::PyValueError;
 use pyo3::types::{PyDict, PyList, PyString};
-use pyo3::{intern, prelude::*};
+use pyo3::{intern, prelude::*, IntoPyObjectExt};
 
 use crate::errors::{ErrorTypeDefaults, InputValue, LocItem, ValError, ValResult};
 use crate::lookup_key::{LookupKey, LookupPath};
@@ -54,7 +54,14 @@ pub type ValMatch<T> = ValResult<ValidationMatch<T>>;
 /// the convention is to either implement:
 /// * `strict_*` & `lax_*` if they have different behavior
 /// * or, `validate_*` and `strict_*` to just call `validate_*` if the behavior for strict and lax is the same
-pub trait Input<'py>: fmt::Debug + ToPyObject {
+pub trait Input<'py>: fmt::Debug {
+    fn py_converter(&self) -> impl IntoPyObject<'py> + '_;
+
+    #[inline]
+    fn to_object<'a>(&'a self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        self.py_converter().into_bound_py_any(py)
+    }
+
     fn as_error_value(&self) -> InputValue;
 
     fn is_none(&self) -> bool {
