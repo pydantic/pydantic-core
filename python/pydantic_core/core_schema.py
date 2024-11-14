@@ -435,29 +435,6 @@ SerSchema = Union[
 ]
 
 
-class InvalidSchema(TypedDict, total=False):
-    type: Required[Literal['invalid']]
-    ref: str
-    metadata: Dict[str, Any]
-    # note, we never plan to use this, but include it for type checking purposes to match
-    # all other CoreSchema union members
-    serialization: SerSchema
-
-
-def invalid_schema(ref: str | None = None, metadata: Dict[str, Any] | None = None) -> InvalidSchema:
-    """
-    Returns an invalid schema, used to indicate that a schema is invalid.
-
-        Returns a schema that matches any value, e.g.:
-
-    Args:
-        ref: optional unique identifier of the schema, used to reference the schema in other places
-        metadata: Any other information you want to include with the schema, not used by pydantic-core
-    """
-
-    return _dict_not_none(type='invalid', ref=ref, metadata=metadata)
-
-
 class ComputedField(TypedDict, total=False):
     type: Required[Literal['computed-field']]
     property_name: Required[str]
@@ -3863,7 +3840,6 @@ MYPY = False
 # union which kills performance not just for pydantic, but even for code using pydantic
 if not MYPY:
     CoreSchema = Union[
-        InvalidSchema,
         AnySchema,
         NoneSchema,
         BoolSchema,
@@ -3920,7 +3896,6 @@ elif False:
 
 # to update this, call `pytest -k test_core_schema_type_literal` and copy the output
 CoreSchemaType = Literal[
-    'invalid',
     'any',
     'none',
     'bool',
