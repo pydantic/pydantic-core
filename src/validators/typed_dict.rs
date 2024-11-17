@@ -34,6 +34,7 @@ pub struct TypedDictValidator {
     extra_behavior: ExtraBehavior,
     extras_validator: Option<Box<CombinedValidator>>,
     strict: bool,
+    fail_fast: bool,
     loc_by_alias: bool,
 }
 
@@ -56,6 +57,7 @@ impl BuildValidator for TypedDictValidator {
         let total =
             schema_or_config(schema, config, intern!(py, "total"), intern!(py, "typed_dict_total"))?.unwrap_or(true);
         let populate_by_name = schema_or_config_same(schema, config, intern!(py, "populate_by_name"))?.unwrap_or(false);
+        let fail_fast = schema_or_config_same(schema, config, intern!(py, "fail_fast"))?.unwrap_or(false);
 
         let extra_behavior = ExtraBehavior::from_schema_or_config(py, schema, config, ExtraBehavior::Ignore)?;
 
@@ -129,6 +131,7 @@ impl BuildValidator for TypedDictValidator {
             extra_behavior,
             extras_validator,
             strict,
+            fail_fast,
             loc_by_alias: config.get_as(intern!(py, "loc_by_alias"))?.unwrap_or(true),
         }
         .into())
@@ -174,6 +177,10 @@ impl Validator for TypedDictValidator {
             let mut fields_set_count: usize = 0;
 
             for field in &self.fields {
+                if self.fail_fast && !errors.is_empty() {
+                    break;
+                }
+
                 let op_key_value = match dict.get_item(&field.lookup_key) {
                     Ok(v) => v,
                     Err(ValError::LineErrors(line_errors)) => {
@@ -265,6 +272,7 @@ impl Validator for TypedDictValidator {
                 extra_behavior: ExtraBehavior,
                 partial_last_key: Option<LocItem>,
                 allow_partial: PartialMode,
+                fail_fast: bool,
             }
 
             impl<'py, Key, Value> ConsumeIterator<ValResult<(Key, Value)>> for ValidateExtras<'_, '_, 'py>
@@ -275,6 +283,10 @@ impl Validator for TypedDictValidator {
                 type Output = ValResult<()>;
                 fn consume_iterator(self, iterator: impl Iterator<Item = ValResult<(Key, Value)>>) -> ValResult<()> {
                     for item_result in iterator {
+                        if self.fail_fast && !self.errors.is_empty() {
+                            break;
+                        }
+
                         let (raw_key, value) = item_result?;
                         let either_str = match raw_key
                             .borrow_input()
@@ -354,6 +366,7 @@ impl Validator for TypedDictValidator {
                 extra_behavior: self.extra_behavior,
                 partial_last_key,
                 allow_partial,
+                fail_fast: self.fail_fast,
             })??;
         }
 

@@ -1196,3 +1196,62 @@ def test_leak_typed_dict():
     gc.collect()
 
     assert ref() is None
+
+
+@pytest.mark.parametrize(
+    ('fail_fast', 'expected'),
+    [
+        pytest.param(
+            True,
+            [
+                {
+                    'input': 'c',
+                    'loc': ('a',),
+                    'msg': 'Input should be a valid integer, unable to parse string as an integer',
+                    'type': 'int_parsing',
+                },
+            ],
+            id='fail_fast',
+        ),
+        pytest.param(
+            False,
+            [
+                {
+                    'input': 'c',
+                    'loc': ('a',),
+                    'msg': 'Input should be a valid integer, unable to parse string as an integer',
+                    'type': 'int_parsing',
+                },
+                {
+                    'input': 'd',
+                    'loc': ('b',),
+                    'msg': 'Input should be a valid integer, unable to parse string as an integer',
+                    'type': 'int_parsing',
+                },
+            ],
+            id='not_fail_fast',
+        ),
+    ],
+)
+def test_typed_dict_fail_fast(fail_fast, expected):
+    v = SchemaValidator(
+        {
+            'type': 'typed-dict',
+            'fields': {
+                'a': {
+                    'type': 'typed-dict-field',
+                    'schema': {'type': 'int'},
+                },
+                'b': {
+                    'type': 'typed-dict-field',
+                    'schema': {'type': 'int'},
+                },
+            },
+            'fail_fast': fail_fast,
+        }
+    )
+
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python({'a': 'c', 'b': 'd'})
+
+    assert exc_info.value.errors(include_url=False) == expected
