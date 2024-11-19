@@ -107,7 +107,7 @@ format:
 lint-python:
 	uv run ruff check $(sources)
 	uv run ruff format --check $(sources)
-	griffe dump -f -d google -LWARNING -o/dev/null python/pydantic_core
+	uv run griffe dump -f -d google -LWARNING -o/dev/null python/pydantic_core
 
 .PHONY: lint-rust
 lint-rust:
