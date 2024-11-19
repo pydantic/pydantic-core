@@ -148,7 +148,7 @@ reviewers = ['sydney-runkle', 'davidhewitt']
 require_change_file = false
 
 [tool.pyright]
-include = ['pydantic_core', 'tests/test_typing.py']
+include = ['python/pydantic_core', 'tests/test_typing.py']
 reportUnnecessaryTypeIgnoreComment = true
 
 [tool.inline-snapshot.shortcuts]
