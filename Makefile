@@ -101,14 +101,14 @@ build-wasm:
 
 .PHONY: format
 format:
-	ruff check --fix $(sources)
-	ruff format $(sources)
+	uv run ruff check --fix $(sources)
+	uv run ruff format $(sources)
 	cargo fmt
 
 .PHONY: lint-python
 lint-python:
-	ruff check $(sources)
-	ruff format --check $(sources)
+	uv run ruff check $(sources)
+	uv run ruff format --check $(sources)
 	$(mypy-stubtest)
 	griffe dump -f -d google -LWARNING -o/dev/null python/pydantic_core
 
