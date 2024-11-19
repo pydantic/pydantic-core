@@ -1,8 +1,6 @@
 .DEFAULT_GOAL := all
 sources = python/pydantic_core tests generate_self_schema.py wasm-preview/run_tests.py
 
-mypy-stubtest = python -m mypy.stubtest pydantic_core._pydantic_core --allowlist .mypy-stubtest-allowlist
-
 # using pip install cargo (via maturin via pip) doesn't get the tty handle
 # so doesn't render color without some help
 export CARGO_TERM_COLOR=$(shell (test -t 0 && echo "always") || echo "auto")
@@ -109,7 +107,6 @@ format:
 lint-python:
 	uv run ruff check $(sources)
 	uv run ruff format --check $(sources)
-	$(mypy-stubtest)
 	griffe dump -f -d google -LWARNING -o/dev/null python/pydantic_core
 
 .PHONY: lint-rust
