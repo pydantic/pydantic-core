@@ -9,6 +9,9 @@ on:
   # performance analysis in order to generate initial data.
   workflow_dispatch:
 
+env:
+  UV_FROZEN: true
+
 jobs:
   benchmarks:
     runs-on: ubuntu-22.04
@@ -16,9 +19,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: install uv
+        uses: astral-sh/setup-uv@v3
         with:
-          python-version: '3.13'
+          enable-cache: true
+
+      - name: install python
+        run: uv python install 3.13
 
       - uses: actions/cache@v4
         id: cache-py
@@ -31,13 +38,13 @@ jobs:
             ${{ hashFiles('tests/requirements.txt') }}
             ${{ hashFiles('pyproject.toml') }}
 
-      - run: pip install -r tests/requirements.txt
+      - run: uv pip install -r tests/requirements.txt
         if: steps.cache-py.outputs.cache-hit != 'true'
 
-      - run: pip uninstall pytest-speed -y
+      - run: uv pip uninstall pytest-speed -y
         if: steps.cache-py.outputs.cache-hit != 'true'
 
-      - run: pip install pytest-benchmark==4.0.0 pytest-codspeed
+      - run: uv pip install pytest-benchmark==4.0.0 pytest-codspeed
         if: steps.cache-py.outputs.cache-hit != 'true'
 
       - name: install rust stable
@@ -70,4 +77,4 @@ jobs:
       - name: Run CodSpeed benchmarks
         uses: CodSpeedHQ/action@v3
         with:
-          run: pytest tests/benchmarks/ --codspeed
+          run: uv run pytest tests/benchmarks/ --codspeed
