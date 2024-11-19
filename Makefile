@@ -21,10 +21,13 @@ USE_MATURIN = $(shell [ "$$VIRTUAL_ENV" != "" ] && (which maturin))
 .PHONY: install
 install: .uv .pre-commit
 	uv pip install -U wheel
-	uv pip install -r tests/requirements.txt
-	uv pip install -r tests/requirements-linting.txt
+	uv sync --frozen --group all
 	uv pip install -v -e .
 	pre-commit install
+
+.PHONY: rebuild-lockfiles  ## Rebuild lockfiles from scratch, updating all dependencies
+rebuild-lockfiles: .uv
+	uv lock --upgrade
 
 .PHONY: install-rust-coverage
 install-rust-coverage:
@@ -125,7 +128,7 @@ pyright:
 
 .PHONY: test
 test:
-	pytest
+	uv run pytest
 
 .PHONY: testcov
 testcov: build-coverage

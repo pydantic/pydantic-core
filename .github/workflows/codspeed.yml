@@ -25,7 +25,7 @@ jobs:
           enable-cache: true
 
       - name: install python
-        run: uv python install 3.13
+        run: uv venv --python 3.13
 
       - uses: actions/cache@v4
         id: cache-py
@@ -38,7 +38,7 @@ jobs:
             ${{ hashFiles('tests/requirements.txt') }}
             ${{ hashFiles('pyproject.toml') }}
 
-      - run: uv pip install -r tests/requirements.txt
+      - run: uv sync --group testing
         if: steps.cache-py.outputs.cache-hit != 'true'
 
       - run: uv pip uninstall pytest-speed -y

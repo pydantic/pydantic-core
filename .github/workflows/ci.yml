@@ -36,9 +36,7 @@ jobs:
           enable-cache: true
 
       - name: install deps
-        run: |
-          uv python install 3.13
-          uv pip install -r tests/requirements.txt
+        run: uv sync --python 3.13 --group testing
 
       - run: rustc --version --verbose
 
@@ -94,9 +92,7 @@ jobs:
           enable-cache: true
 
       - name: install deps
-        run: |
-          uv python install ${{ matrix.python-version }}
-          uv pip install -r tests/requirements.txt
+        run: uv sync --python ${{ matrix.python-version }} --group testing
 
       - run: uv pip install -e .
         env:
@@ -168,9 +164,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: install deps
-        run: |
-          uv python install 3.13
-          uv pip install -r tests/requirements.txt
+        run: uv sync --python 3.13 --group testing
 
       - run: uv pip install -e .
         env:
@@ -209,9 +203,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: install deps
-        run: |
-          uv python install ${{ matrix.python-version }}
-          uv pip install -r tests/requirements.txt
+        run: uv sync --python ${{ matrix.python-version }} --group testing
 
       - run: make build-dev
 
@@ -273,10 +265,6 @@ jobs:
       - name: cache rust
         uses: Swatinem/rust-cache@v2
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-
       # used to lint js code
       - uses: actions/setup-node@v4
         with:
@@ -292,6 +280,13 @@ jobs:
             ${{ env.pythonLocation }}
             ${{ hashFiles('tests/requirements-linting.txt') }}
             ${{ hashFiles('pyproject.toml') }}
+
+      - name: install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - run: uv venv --python 3.13
 
       - run: pip install -r tests/requirements-linting.txt
         if: steps.cache-py.outputs.cache-hit != 'true'
