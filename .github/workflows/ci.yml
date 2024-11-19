@@ -30,21 +30,24 @@ jobs:
 
       - run: rustup component add llvm-tools-preview
 
-      - name: set up python
-        uses: actions/setup-python@v5
+      - name: install uv
+        uses: astral-sh/setup-uv@v3
         with:
-          python-version: '3.13'
+          enable-cache: true
 
-      - run: pip install -r tests/requirements.txt
+      - name: install deps
+        run: |
+          uv python install 3.13
+          uv pip install -r tests/requirements.txt
 
       - run: rustc --version --verbose
 
-      - run: pip install -e .
+      - run: uv pip install -e .
         env:
           RUST_BACKTRACE: 1
           RUSTFLAGS: '-C instrument-coverage'
 
-      - run: pip freeze
+      - run: uv pip freeze
 
       - run: coverage run -m pytest
 
@@ -85,21 +88,23 @@ jobs:
         with:
           key: test-v3
 
-      - name: set up python
-        uses: actions/setup-python@v5
+      - name: install uv
+        uses: astral-sh/setup-uv@v3
         with:
-          python-version: ${{ matrix.python-version }}
-          allow-prereleases: true
+          enable-cache: true
 
-      - run: pip install -r tests/requirements.txt
+      - name: install deps
+        run: |
+          uv python install ${{ matrix.python-version }}
+          uv pip install -r tests/requirements.txt
 
-      - run: pip install -e .
+      - run: uv pip install -e .
         env:
           RUST_BACKTRACE: 1
 
-      - run: pip freeze
+      - run: uv pip freeze
 
-      - run: pytest
+      - run: uv run pytest
         env:
           HYPOTHESIS_PROFILE: slow
 
@@ -145,10 +150,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: set up python
-        uses: actions/setup-python@v5
+      - name: install uv
+        uses: astral-sh/setup-uv@v3
         with:
-          python-version: '3.13'
+          enable-cache: true
 
       - name: resolve MSRV
         id: resolve-msrv
@@ -162,15 +167,18 @@ jobs:
       - name: cache rust
         uses: Swatinem/rust-cache@v2
 
-      - run: pip install -r tests/requirements.txt
+      - name: install deps
+        run: |
+          uv python install 3.13
+          uv pip install -r tests/requirements.txt
 
-      - run: pip install -e .
+      - run: uv pip install -e .
         env:
           RUST_BACKTRACE: 1
 
-      - run: pip freeze
+      - run: uv pip freeze
 
-      - run: pytest
+      - run: uv run pytest
 
       - run: cargo test
 
@@ -188,10 +196,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - name: set up python
-        uses: actions/setup-python@v5
+
+      - name: install uv
+        uses: astral-sh/setup-uv@v3
         with:
-          python-version: ${{ matrix.python-version }}
+          enable-cache: true
 
       - name: install rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -199,11 +208,15 @@ jobs:
       - name: cache rust
         uses: Swatinem/rust-cache@v2
 
-      - run: pip install -r tests/requirements.txt
+      - name: install deps
+        run: |
+          uv python install ${{ matrix.python-version }}
+          uv pip install -r tests/requirements.txt
+
       - run: make build-dev
 
-      - run: pip freeze
-      - run: pytest
+      - run: uv pip freeze
+      - run: uv run pytest
 
   test-pydantic-integration:
     runs-on: ubuntu-latest
