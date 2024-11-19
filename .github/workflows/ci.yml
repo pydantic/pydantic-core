@@ -238,8 +238,7 @@ jobs:
 
       - name: set up venv
         run: |
-          uv venv --python 3.13
-          uv sync --extra timezone --project pydantic
+          uv venv --python 3.13 --extra timezone --project pydantic ./.venv
           uv pip install maturin
           uv run bash -c 'cd ../pydantic-core && make build-dev'
 
