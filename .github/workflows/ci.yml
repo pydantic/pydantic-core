@@ -47,7 +47,7 @@ jobs:
 
       - run: uv pip freeze
 
-      - run: coverage run -m pytest
+      - run: uv run coverage run -m pytest
 
       - run: ls -lha
       - run: coverage xml
