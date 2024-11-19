@@ -77,10 +77,16 @@ linting = [
     'ruff',
     'mypy',
 ]
+wasm = [
+    'typing_extensions',
+    'maturin>=1,<2',
+    'ruff',
+]
 
 all = [
   { include-group = 'testing' },
   { include-group = 'linting' },
+  { include-group = 'wasm' },
 ]
 
 [tool.maturin]

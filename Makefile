@@ -121,7 +121,7 @@ lint: lint-python lint-rust
 
 .PHONY: pyright
 pyright:
-	pyright
+	uv run pyright
 
 .PHONY: test
 test:
