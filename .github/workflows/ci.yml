@@ -50,7 +50,7 @@ jobs:
       - run: uv run coverage run -m pytest
 
       - run: ls -lha
-      - run: coverage xml
+      - run: uv run coverage xml
 
       - run: coverage-prepare lcov python/pydantic_core/*.so
 
