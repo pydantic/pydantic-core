@@ -39,7 +39,7 @@ install-rust-coverage:
 build-dev:
 	@rm -f python/pydantic_core/*.so
 ifneq ($(USE_MATURIN),)
-	maturin develop
+	uv run maturin develop
 else
 	uv pip install -v -e . --config-settings=build-args='--profile dev'
 endif
@@ -48,7 +48,7 @@ endif
 build-prod:
 	@rm -f python/pydantic_core/*.so
 ifneq ($(USE_MATURIN),)
-	maturin develop --release
+	uv run maturin develop --release
 else
 	uv pip install -v -e .
 endif
@@ -57,7 +57,7 @@ endif
 build-profiling:
 	@rm -f python/pydantic_core/*.so
 ifneq ($(USE_MATURIN),)
-	maturin develop --profile profiling
+	uv run maturin develop --profile profiling
 else
 	uv pip install -v -e . --config-settings=build-args='--profile profiling'
 endif
@@ -66,7 +66,7 @@ endif
 build-coverage:
 	@rm -f python/pydantic_core/*.so
 ifneq ($(USE_MATURIN),)
-	RUSTFLAGS='-C instrument-coverage' maturin develop --release
+	RUSTFLAGS='-C instrument-coverage' uv run maturin develop --release
 else
 	RUSTFLAGS='-C instrument-coverage' uv pip install -v -e .
 endif
@@ -76,7 +76,7 @@ build-pgo:
 	@rm -f python/pydantic_core/*.so
 	$(eval PROFDATA := $(shell mktemp -d))
 ifneq ($(USE_MATURIN),)
-	RUSTFLAGS='-Cprofile-generate=$(PROFDATA)' maturin develop --release
+	RUSTFLAGS='-Cprofile-generate=$(PROFDATA)' uv run maturin develop --release
 else
 	RUSTFLAGS='-Cprofile-generate=$(PROFDATA)' uv pip install -v -e .
 endif
@@ -84,7 +84,7 @@ endif
 	$(eval LLVM_PROFDATA := $(shell rustup run stable bash -c 'echo $$RUSTUP_HOME/toolchains/$$RUSTUP_TOOLCHAIN/lib/rustlib/$$(rustc -Vv | grep host | cut -d " " -f 2)/bin/llvm-profdata'))
 	$(LLVM_PROFDATA) merge -o $(PROFDATA)/merged.profdata $(PROFDATA)
 ifneq ($(USE_MATURIN),)
-	RUSTFLAGS='-Cprofile-use=$(PROFDATA)/merged.profdata' maturin develop --release
+	RUSTFLAGS='-Cprofile-use=$(PROFDATA)/merged.profdata' uv run maturin develop --release
 else
 	RUSTFLAGS='-Cprofile-use=$(PROFDATA)/merged.profdata' uv pip install -v -e .
 endif
@@ -94,7 +94,7 @@ endif
 .PHONY: build-wasm
 build-wasm:
 	@echo 'This requires python 3.12, maturin and emsdk to be installed'
-	maturin build --release --target wasm32-unknown-emscripten --out dist -i 3.12
+	uv run maturin build --release --target wasm32-unknown-emscripten --out dist -i 3.12
 	ls -lh dist
 
 .PHONY: format
