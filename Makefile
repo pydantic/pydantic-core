@@ -10,12 +10,20 @@ export CARGO_TERM_COLOR=$(shell (test -t 0 && echo "always") || echo "auto")
 # more or less equivalent to pip install -e just a little nicer
 USE_MATURIN = $(shell [ "$$VIRTUAL_ENV" != "" ] && (which maturin))
 
+.PHONY: .uv  ## Check that uv is installed
+.uv:
+	@uv -V || echo 'Please install uv: https://docs.astral.sh/uv/getting-started/installation/'
+
+.PHONY: .pre-commit  ## Check that pre-commit is installed
+.pre-commit:
+	@pre-commit -V || echo 'Please install pre-commit: https://pre-commit.com/'
+
 .PHONY: install
-install:
-	pip install -U pip wheel pre-commit
-	pip install -r tests/requirements.txt
-	pip install -r tests/requirements-linting.txt
-	pip install -v -e .
+install: .uv .pre-commit
+	uv pip install -U wheel
+	uv pip install -r tests/requirements.txt
+	uv pip install -r tests/requirements-linting.txt
+	uv pip install -v -e .
 	pre-commit install
 
 .PHONY: install-rust-coverage
@@ -32,7 +40,7 @@ build-dev:
 ifneq ($(USE_MATURIN),)
 	maturin develop
 else
-	pip install -v -e . --config-settings=build-args='--profile dev'
+	uv pip install -v -e . --config-settings=build-args='--profile dev'
 endif
 
 .PHONY: build-prod
@@ -41,7 +49,7 @@ build-prod:
 ifneq ($(USE_MATURIN),)
 	maturin develop --release
 else
-	pip install -v -e .
+	uv pip install -v -e .
 endif
 
 .PHONY: build-profiling
@@ -50,7 +58,7 @@ build-profiling:
 ifneq ($(USE_MATURIN),)
 	maturin develop --profile profiling
 else
-	pip install -v -e . --config-settings=build-args='--profile profiling'
+	uv pip install -v -e . --config-settings=build-args='--profile profiling'
 endif
 
 .PHONY: build-coverage
@@ -59,7 +67,7 @@ build-coverage:
 ifneq ($(USE_MATURIN),)
 	RUSTFLAGS='-C instrument-coverage' maturin develop --release
 else
-	RUSTFLAGS='-C instrument-coverage' pip install -v -e .
+	RUSTFLAGS='-C instrument-coverage' uv pip install -v -e .
 endif
 
 .PHONY: build-pgo
@@ -69,7 +77,7 @@ build-pgo:
 ifneq ($(USE_MATURIN),)
 	RUSTFLAGS='-Cprofile-generate=$(PROFDATA)' maturin develop --release
 else
-	RUSTFLAGS='-Cprofile-generate=$(PROFDATA)' pip install -v -e .
+	RUSTFLAGS='-Cprofile-generate=$(PROFDATA)' uv pip install -v -e .
 endif
 	pytest tests/benchmarks
 	$(eval LLVM_PROFDATA := $(shell rustup run stable bash -c 'echo $$RUSTUP_HOME/toolchains/$$RUSTUP_TOOLCHAIN/lib/rustlib/$$(rustc -Vv | grep host | cut -d " " -f 2)/bin/llvm-profdata'))
@@ -77,7 +85,7 @@ endif
 ifneq ($(USE_MATURIN),)
 	RUSTFLAGS='-Cprofile-use=$(PROFDATA)/merged.profdata' maturin develop --release
 else
-	RUSTFLAGS='-Cprofile-use=$(PROFDATA)/merged.profdata' pip install -v -e .
+	RUSTFLAGS='-Cprofile-use=$(PROFDATA)/merged.profdata' uv pip install -v -e .
 endif
 	@rm -rf $(PROFDATA)
 
