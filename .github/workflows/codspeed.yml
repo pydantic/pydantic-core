@@ -24,28 +24,11 @@ jobs:
         with:
           enable-cache: true
 
-      - name: install python
-        run: uv venv --python 3.13
-
-      - uses: actions/cache@v4
-        id: cache-py
-        name: cache python
-        with:
-          path: ${{ env.pythonLocation }}
-          key: >
-            py-v2
-            ${{ env.pythonLocation }}
-            ${{ hashFiles('tests/requirements.txt') }}
-            ${{ hashFiles('pyproject.toml') }}
-
-      - run: uv sync --group testing
-        if: steps.cache-py.outputs.cache-hit != 'true'
-
-      - run: uv pip uninstall pytest-speed -y
-        if: steps.cache-py.outputs.cache-hit != 'true'
-
-      - run: uv pip install pytest-benchmark==4.0.0 pytest-codspeed
-        if: steps.cache-py.outputs.cache-hit != 'true'
+      - name: install deps
+        run: |
+          uv sync --python 3.13 --group testing
+          uv pip uninstall pytest-speed -y
+          uv pip install pytest-benchmark==4.0.0 pytest-codspeed
 
       - name: install rust stable
         id: rust-toolchain
