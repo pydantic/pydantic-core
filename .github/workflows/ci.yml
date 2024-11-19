@@ -122,20 +122,21 @@ jobs:
       - name: cache rust
         uses: Swatinem/rust-cache@v2
 
-      - name: set up python
-        uses: actions/setup-python@v5
+      - name: install uv
+        uses: astral-sh/setup-uv@v3
         with:
-          python-version: '3.13'
+          enable-cache: true
 
-      - run: pip install -r tests/requirements.txt
+      - name: install deps
+        run: uv sync --python 3.13 --group testing
 
-      - run: pip install -e .
+      - run: uv pip install -e .
         env:
           RUST_BACKTRACE: 1
 
-      - run: pip freeze
+      - run: uv pip freeze
 
-      - run: pytest
+      - run: uv run pytest
 
       - run: cargo test
 
