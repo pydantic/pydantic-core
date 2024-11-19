@@ -233,7 +233,7 @@ jobs:
       - name: install deps
         run: |
           uv sync --python 3.13 --extra timezone
-          uv run pip install maturin
+          uv pip install maturin
           uv run bash -c 'cd ../pydantic-core && make build-dev'
         working-directory: pydantic
 
