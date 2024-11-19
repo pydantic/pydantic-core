@@ -41,7 +41,7 @@ build-dev:
 ifneq ($(USE_MATURIN),)
 	uv run maturin develop
 else
-	uv pip install -v -e . --config-settings=build-args='--profile dev'
+	uv pip install --force-reinstall -v -e . --config-settings=build-args='--profile dev'
 endif
 
 .PHONY: build-prod
@@ -59,7 +59,7 @@ build-profiling:
 ifneq ($(USE_MATURIN),)
 	uv run maturin develop --profile profiling
 else
-	uv pip install -v -e . --config-settings=build-args='--profile profiling'
+	uv pip install --force-reinstall -v -e . --config-settings=build-args='--profile profiling'
 endif
 
 .PHONY: build-coverage
@@ -78,7 +78,7 @@ build-pgo:
 ifneq ($(USE_MATURIN),)
 	RUSTFLAGS='-Cprofile-generate=$(PROFDATA)' uv run maturin develop --release
 else
-	RUSTFLAGS='-Cprofile-generate=$(PROFDATA)' uv pip install -v -e .
+	RUSTFLAGS='-Cprofile-generate=$(PROFDATA)' uv pip install --force-reinstall -v -e .
 endif
 	pytest tests/benchmarks
 	$(eval LLVM_PROFDATA := $(shell rustup run stable bash -c 'echo $$RUSTUP_HOME/toolchains/$$RUSTUP_TOOLCHAIN/lib/rustlib/$$(rustc -Vv | grep host | cut -d " " -f 2)/bin/llvm-profdata'))
@@ -86,7 +86,7 @@ endif
 ifneq ($(USE_MATURIN),)
 	RUSTFLAGS='-Cprofile-use=$(PROFDATA)/merged.profdata' uv run maturin develop --release
 else
-	RUSTFLAGS='-Cprofile-use=$(PROFDATA)/merged.profdata' uv pip install -v -e .
+	RUSTFLAGS='-Cprofile-use=$(PROFDATA)/merged.profdata' uv pip install --force-reinstall -v -e .
 endif
 	@rm -rf $(PROFDATA)
 
