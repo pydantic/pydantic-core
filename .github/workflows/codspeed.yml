@@ -27,7 +27,7 @@ jobs:
       - name: install deps
         run: |
           uv sync --python 3.13 --group testing
-          uv pip uninstall pytest-speed -y
+          uv pip uninstall pytest-speed
           uv pip install pytest-benchmark==4.0.0 pytest-codspeed
 
       - name: install rust stable
