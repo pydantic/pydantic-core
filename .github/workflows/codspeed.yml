@@ -12,8 +12,6 @@ on:
 env:
   UV_FROZEN: true
   UV_PYTHON: 3.13
-  CODSPEED_LOG: debug
-  RUST_LOG: debug
 
 jobs:
   benchmarks:
@@ -21,6 +19,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      # Using this action is still necessary for CodSpeed to work:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.UV_PYTHON}}
 
       - name: install uv
         uses: astral-sh/setup-uv@v3
@@ -63,6 +66,4 @@ jobs:
       - name: Run CodSpeed benchmarks
         uses: CodSpeedHQ/action@v3
         with:
-          run: |
-            ls -l .venv/lib
-            uv --verbose run pytest tests/benchmarks/ --codspeed
+          run: uv run pytest tests/benchmarks/ --codspeed
