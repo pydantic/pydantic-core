@@ -93,7 +93,7 @@ jobs:
           enable-cache: true
 
       - name: install deps
-        run: uv sync --python ${{ matrix.python-version }} --group testing
+        run: uv sync --group testing
 
       - run: uv pip install -e .
         env:
@@ -104,6 +104,9 @@ jobs:
       - run: uv run pytest
         env:
           HYPOTHESIS_PROFILE: slow
+
+    env:
+      UV_PYTHON: ${{ matrix.python-version }}
 
   test-os:
     name: test on ${{ matrix.os }}
@@ -205,12 +208,15 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: install deps
-        run: uv sync --python ${{ matrix.python-version }} --group testing
+        run: uv sync --group testing
 
       - run: make build-dev
 
       - run: uv pip freeze
       - run: uv run pytest
+
+    env:
+      UV_PYTHON: ${{ matrix.python-version }}
 
   test-pydantic-integration:
     runs-on: ubuntu-latest
@@ -237,20 +243,15 @@ jobs:
         with:
           enable-cache: true
 
-      - name: create venv
-        run: uv venv --python 3.13
-
       - name: set up venv
         run: |
+          uv venv
           uv pip install -r pydantic/pyproject.toml --extra timezone
-          uv pip install maturin
-        env:
-          UV_PROJECT_ENVIRONMENT: .venv
+          uv pip install maturin pip
 
       - name: install pydantic-core
-        run: |
-          pwd
-          make build-dev
+        run: make build-dev
+        working-directory: pydantic-core
 
       - run: uv --version && uv pip list
 
@@ -259,7 +260,9 @@ jobs:
       - run: uv run pytest --override-ini=xfail_strict=False pydantic/tests
         env:
           PYDANTIC_PRIVATE_ALLOW_UNHANDLED_SCHEMA_TYPES: 1
-          UV_PROJECT_ENVIRONMENT: .venv
+
+    env:
+      UV_PROJECT_ENVIRONMENT: ${{ github.workspace }}/.venv
 
   lint:
     runs-on: ubuntu-latest
