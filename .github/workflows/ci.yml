@@ -38,7 +38,7 @@ jobs:
 
       - name: install deps
         run: |
-          uv sync --group testing --no-install-project
+          uv sync --group testing
           uv pip install maturin pip
 
       - run: rustc --version --verbose
@@ -210,7 +210,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: install deps
-        run: uv sync --group testing --no-install-project
+        run: uv sync --group testing
 
       - run: make build-dev
 
@@ -291,7 +291,7 @@ jobs:
 
       - name: install deps
         run: |
-          uv sync --group linting --no-install-project
+          uv sync --group linting
           make build-dev
           uv pip freeze
 
@@ -350,7 +350,7 @@ jobs:
           enable-cache: true
 
       - name: install deps
-        run: uv sync --group wasm --no-install-project
+        run: uv sync --group wasm
 
       - name: build wheels
         run: make build-wasm
@@ -582,7 +582,7 @@ jobs:
 
       - name: generate pgo data
         run: |
-          uv sync --group testing --no-install-project
+          uv sync --group testing
           uv pip install pydantic-core --no-index --no-deps --find-links pgo-wheel --force-reinstall
           uv run pytest tests/benchmarks
           rustup run ${{ steps.rust-toolchain.outputs.name }} bash -c 'echo LLVM_PROFDATA=$RUSTUP_HOME/toolchains/$RUSTUP_TOOLCHAIN/lib/rustlib/${{ env.RUST_HOST }}/bin/llvm-profdata >> "$GITHUB_ENV"'
@@ -679,11 +679,11 @@ jobs:
             if command -v apt-get &> /dev/null; then
               echo "installing python & pip with apt-get..."
               apt-get update
-              apt-get install -y --no-install-recommends python3 python3-pip python3-venv git
+              apt-get install -y --no-install-recommends python3 python3-pip python3-venv git curl
             else
               echo "installing python & pip with apk..."
               apk update
-              apk add python3 py3-pip git
+              apk add python3 py3-pip git curl
             fi
           run: |
             set -x
@@ -706,10 +706,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: set up python
-        uses: actions/setup-python@v5
+      - name: install uv
+        uses: astral-sh/setup-uv@v3
         with:
-          python-version: '3.13'
+          enable-cache: true
 
       - name: get dist artifacts
         uses: actions/download-artifact@v4
@@ -718,9 +718,9 @@ jobs:
           merge-multiple: true
           path: dist
 
-      - run: pip install -r tests/requirements.txt
-      - run: pip install pydantic-core --no-index --no-deps --find-links dist --force-reinstall
-      - run: pytest --ignore=tests/test_docstrings.py
+      - run: uv sync --group testing
+      - run: uv pip install pydantic-core --no-index --no-deps --find-links dist --force-reinstall
+      - run: uv run pytest --ignore=tests/test_docstrings.py
 
   release:
     needs: [test-builds-arch, test-builds-os, build-sdist, check]

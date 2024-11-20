@@ -528,7 +528,7 @@ wheels = [
 [[package]]
 name = "pydantic-core"
 version = "2.27.0"
-source = { editable = "." }
+source = { virtual = "." }
 dependencies = [
     { name = "typing-extensions" },
 ]
