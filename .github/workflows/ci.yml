@@ -10,6 +10,7 @@ on:
 
 env:
   COLUMNS: 150
+  UV_PYTHON: 3.13
 
 jobs:
   coverage:
@@ -36,7 +37,7 @@ jobs:
           enable-cache: true
 
       - name: install deps
-        run: uv sync --python 3.13 --group testing
+        run: uv sync --group testing
 
       - run: rustc --version --verbose
 
@@ -128,7 +129,7 @@ jobs:
           enable-cache: true
 
       - name: install deps
-        run: uv sync --python 3.13 --group testing
+        run: uv sync --group testing
 
       - run: uv pip install -e .
         env:
@@ -152,9 +153,12 @@ jobs:
         with:
           enable-cache: true
 
+      - name: install deps
+        run: uv sync --group testing
+
       - name: resolve MSRV
         id: resolve-msrv
-        run: echo MSRV=`python -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["package"]["rust-version"])'` >> $GITHUB_OUTPUT
+        run: echo MSRV=`uv run python -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["package"]["rust-version"])'` >> $GITHUB_OUTPUT
 
       - name: install rust MSRV
         uses: dtolnay/rust-toolchain@master
@@ -163,9 +167,6 @@ jobs:
 
       - name: cache rust
         uses: Swatinem/rust-cache@v2
-
-      - name: install deps
-        run: uv sync --python 3.13 --group testing
 
       - run: uv pip install -e .
         env:
@@ -286,7 +287,7 @@ jobs:
 
       - name: install deps
         run: |
-          uv sync --python 3.13 --group linting
+          uv sync --group linting
           make build-dev
           uv pip freeze
 
