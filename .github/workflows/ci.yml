@@ -247,7 +247,9 @@ jobs:
           UV_PROJECT_ENVIRONMENT: .venv
 
       - name: install pydantic-core
-        run: make build-dev
+        run: |
+          pwd
+          make build-dev
 
       - run: uv --version && uv pip list
 
