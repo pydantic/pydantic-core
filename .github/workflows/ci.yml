@@ -37,11 +37,13 @@ jobs:
           enable-cache: true
 
       - name: install deps
-        run: uv sync --group testing
+        run: |
+          uv sync --group testing --no-install-project
+          uv pip install maturin pip
 
       - run: rustc --version --verbose
 
-      - run: uv pip install -e .
+      - run: uv run maturin develop
         env:
           RUST_BACKTRACE: 1
           RUSTFLAGS: '-C instrument-coverage'
@@ -208,7 +210,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: install deps
-        run: uv sync --group testing
+        run: uv sync --group testing --no-install-project
 
       - run: make build-dev
 
@@ -243,21 +245,20 @@ jobs:
         with:
           enable-cache: true
 
-      - name: set up venv
+      - name: install deps
         run: |
-          uv venv
-          uv pip install -r pydantic/pyproject.toml --extra timezone
+          uv sync --extra timezone
           uv pip install maturin pip
-
-      - name: install pydantic-core
-        run: make build-dev
-        working-directory: pydantic-core
+          uv run bash -c 'cd ../pydantic-core && maturin develop'
+        working-directory: pydantic
 
       - run: uv --version && uv pip list
+        working-directory: pydantic
 
       # Run pytest with lax xfail because we often add tests to pydantic
         # which xfail on a pending release of pydantic-core
-      - run: uv run pytest --override-ini=xfail_strict=False pydantic/tests
+      - run: uv run pytest --override-ini=xfail_strict=False tests
+        working-directory: pydantic
         env:
           PYDANTIC_PRIVATE_ALLOW_UNHANDLED_SCHEMA_TYPES: 1
 
@@ -290,7 +291,7 @@ jobs:
 
       - name: install deps
         run: |
-          uv sync --group linting
+          uv sync --group linting --no-install-project
           make build-dev
           uv pip freeze
 
@@ -349,7 +350,7 @@ jobs:
           enable-cache: true
 
       - name: install deps
-        run: uv sync --python 3.12 --group wasm
+        run: uv sync --group wasm --no-install-project
 
       - name: build wheels
         run: make build-wasm
@@ -370,6 +371,9 @@ jobs:
         with:
           name: wasm_wheels
           path: dist
+
+    env:
+      UV_PYTHON: 3.12
 
   # https://github.com/marketplace/actions/alls-green#why used for branch protection checks
   check:
@@ -540,11 +544,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: set up python
-        uses: actions/setup-python@v5
+      - name: install uv
+        uses: astral-sh/setup-uv@v3
         with:
-          python-version: ${{ matrix.interpreter }}
-          allow-prereleases: true
+          enable-cache: true
 
       - name: install rust stable
         id: rust-toolchain
@@ -579,10 +582,9 @@ jobs:
 
       - name: generate pgo data
         run: |
-          pip install -U pip
-          pip install -r tests/requirements.txt
-          pip install pydantic-core --no-index --no-deps --find-links pgo-wheel --force-reinstall
-          pytest tests/benchmarks
+          uv sync --group testing --no-install-project
+          uv pip install pydantic-core --no-index --no-deps --find-links pgo-wheel --force-reinstall
+          uv run pytest tests/benchmarks
           rustup run ${{ steps.rust-toolchain.outputs.name }} bash -c 'echo LLVM_PROFDATA=$RUSTUP_HOME/toolchains/$RUSTUP_TOOLCHAIN/lib/rustlib/${{ env.RUST_HOST }}/bin/llvm-profdata >> "$GITHUB_ENV"'
 
       - name: merge pgo data
@@ -607,6 +609,9 @@ jobs:
         with:
           name: pypi_files_${{ matrix.os }}_${{ matrix.interpreter }}
           path: dist
+
+    env:
+      UV_PYTHON: ${{ matrix.interpreter }}
 
   inspect-pypi-assets:
     needs: [build, build-sdist, build-pgo]
@@ -682,12 +687,11 @@ jobs:
             fi
           run: |
             set -x
-            python3 -m venv venv
-            source venv/bin/activate
-            python3 -m pip install -r tests/requirements.txt
-            python3 -m pip install pydantic-core --no-index --no-deps --find-links dist --force-reinstall
-            python3 -m pytest --ignore=tests/test_docstrings.py
-            python3 -c 'import pydantic_core._pydantic_core; print(pydantic_core._pydantic_core.__version__)'
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+            uv sync --group testing
+            uv pip install pydantic-core --no-index --no-deps --find-links dist --force-reinstall
+            uv run pytest --ignore=tests/test_docstrings.py
+            uv run -c 'import pydantic_core._pydantic_core; print(pydantic_core._pydantic_core.__version__)'
 
   test-builds-os:
     name: test build on ${{ matrix.os }}
