@@ -12,6 +12,8 @@ on:
 env:
   UV_FROZEN: true
   UV_PYTHON: 3.13
+  CODSPEED_LOG: debug
+  RUST_LOG: debug
 
 jobs:
   benchmarks:
@@ -63,4 +65,4 @@ jobs:
         with:
           run: |
             ls -l .venv/lib
-            uv run pytest tests/benchmarks/ --codspeed
+            uv --verbose run pytest tests/benchmarks/ --codspeed
