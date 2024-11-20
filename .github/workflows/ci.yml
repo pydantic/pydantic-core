@@ -243,7 +243,7 @@ jobs:
         run: |
           uv pip install -r pydantic/pyproject.toml --extra timezone
           uv pip install maturin
-          uv run bash -c 'cd ../pydantic-core && make build-dev'
+          make build-dev
         env:
           UV_PROJECT_ENVIRONMENT: .venv
 
