@@ -11,6 +11,7 @@ on:
 
 env:
   UV_FROZEN: true
+  UV_PYTHON: 3.13
 
 jobs:
   benchmarks:
@@ -26,7 +27,7 @@ jobs:
 
       - name: install deps
         run: |
-          uv sync --python 3.13 --group testing
+          uv sync --group testing
           uv pip uninstall pytest-speed
           uv pip install pytest-benchmark==4.0.0 pytest-codspeed
 
@@ -60,4 +61,6 @@ jobs:
       - name: Run CodSpeed benchmarks
         uses: CodSpeedHQ/action@v3
         with:
-          run: uv run pytest tests/benchmarks/ --codspeed
+          run: |
+            ls -l .venv/lib
+            uv run pytest tests/benchmarks/ --codspeed
