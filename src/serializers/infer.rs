@@ -232,7 +232,8 @@ pub(crate) fn infer_to_python_known(
             }
             ObType::Complex => {
                 let v = value.downcast::<PyComplex>()?;
-                v.into_py(py)
+                let complex_str = type_serializers::complex::complex_to_str(v);
+                complex_str.into_py(py)
             }
             ObType::Path => value.str()?.into_py(py),
             ObType::Pattern => value.getattr(intern!(py, "pattern"))?.into_py(py),
