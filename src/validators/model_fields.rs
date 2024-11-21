@@ -23,6 +23,7 @@ struct Field {
     name_py: Py<PyString>,
     validator: CombinedValidator,
     frozen: bool,
+    deprecation_msg: Option<String>,
 }
 
 impl_py_gc_traverse!(Field { validator });
@@ -92,6 +93,7 @@ impl BuildValidator for ModelFieldsValidator {
                 name_py: field_name_py.into(),
                 validator,
                 frozen: field_info.get_as::<bool>(intern!(py, "frozen"))?.unwrap_or(false),
+                deprecation_msg: field_info.get_as::<String>(intern!(py, "deprecation_msg"))?,
             });
         }
 
@@ -122,6 +124,8 @@ impl Validator for ModelFieldsValidator {
     ) -> ValResult<PyObject> {
         // this validator does not yet support partial validation, disable it to avoid incorrect results
         state.allow_partial = false.into();
+
+        let deprecation_warning_type = py.import_bound("builtins")?.getattr("DeprecationWarning")?;
 
         let strict = state.strict_or(self.strict);
         let from_attributes = state.extra().from_attributes.unwrap_or(self.from_attributes);
@@ -183,6 +187,9 @@ impl Validator for ModelFieldsValidator {
                         // key is "used" whether or not validation passes, since we want to skip this key in
                         // extra logic either way
                         used_keys.insert(lookup_path.first_key());
+                    }
+                    if let Some(msg) = &field.deprecation_msg {
+                        PyErr::warn_bound(py, &deprecation_warning_type, msg, 2)?;
                     }
                     match field.validator.validate(py, value.borrow_input(), state) {
                         Ok(value) => {
