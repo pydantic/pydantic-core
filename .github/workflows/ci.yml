@@ -689,7 +689,7 @@ jobs:
             source $HOME/.local/bin/env
             uv sync --frozen --group testing --no-install-project
             uv pip install pydantic-core --no-index --no-deps --find-links dist --force-reinstall
-            uv run pytest --ignore=tests/test_docstrings.py
+            uv run --no-sync pytest --ignore=tests/test_docstrings.py
             uv run -c 'import pydantic_core._pydantic_core; print(pydantic_core._pydantic_core.__version__)'
 
   test-builds-os:
