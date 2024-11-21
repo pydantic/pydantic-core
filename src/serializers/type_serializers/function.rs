@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::sync::Arc;
 
 use pyo3::exceptions::{PyAttributeError, PyRecursionError, PyRuntimeError};
 use pyo3::gc::PyVisit;
@@ -71,7 +72,7 @@ impl BuildSerializer for FunctionPlainSerializerBuilder {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct FunctionPlainSerializer {
     func: PyObject,
     name: String,
@@ -178,6 +179,13 @@ impl FunctionPlainSerializer {
             .expect("fallback_serializer unexpectedly none")
             .as_ref()
     }
+
+    fn retry_with_lax_check(&self) -> bool {
+        self.fallback_serializer
+            .as_ref()
+            .map_or(false, |f| f.retry_with_lax_check())
+            || self.return_serializer.retry_with_lax_check()
+    }
 }
 
 fn on_error(py: Python, err: PyErr, function_name: &str, extra: &Extra) -> PyResult<()> {
@@ -270,6 +278,10 @@ macro_rules! function_type_serializer {
             fn get_name(&self) -> &str {
                 &self.name
             }
+
+            fn retry_with_lax_check(&self) -> bool {
+                self.retry_with_lax_check()
+            }
         }
     };
 }
@@ -314,13 +326,13 @@ impl BuildSerializer for FunctionWrapSerializerBuilder {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct FunctionWrapSerializer {
-    serializer: Box<CombinedSerializer>,
+    serializer: Arc<CombinedSerializer>,
     func: PyObject,
     name: String,
     function_name: String,
-    return_serializer: Box<CombinedSerializer>,
+    return_serializer: Arc<CombinedSerializer>,
     when_used: WhenUsed,
     is_field_serializer: bool,
     info_arg: bool,
@@ -358,11 +370,11 @@ impl BuildSerializer for FunctionWrapSerializer {
 
         let name = format!("wrap_function[{function_name}, {}]", serializer.get_name());
         Ok(Self {
-            serializer: Box::new(serializer),
+            serializer: Arc::new(serializer),
             func: function.into_py(py),
             function_name,
             name,
-            return_serializer: Box::new(return_serializer),
+            return_serializer: Arc::new(return_serializer),
             when_used: WhenUsed::new(&ser_schema, WhenUsed::Always)?,
             is_field_serializer,
             info_arg,
@@ -408,6 +420,10 @@ impl FunctionWrapSerializer {
     fn get_fallback_serializer(&self) -> &CombinedSerializer {
         self.serializer.as_ref()
     }
+
+    fn retry_with_lax_check(&self) -> bool {
+        self.serializer.retry_with_lax_check() || self.return_serializer.retry_with_lax_check()
+    }
 }
 
 impl_py_gc_traverse!(FunctionWrapSerializer {
@@ -419,10 +435,9 @@ impl_py_gc_traverse!(FunctionWrapSerializer {
 function_type_serializer!(FunctionWrapSerializer);
 
 #[pyclass(module = "pydantic_core._pydantic_core")]
-#[derive(Clone)]
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub(crate) struct SerializationCallable {
-    serializer: CombinedSerializer,
+    serializer: Arc<CombinedSerializer>,
     extra_owned: ExtraOwned,
     filter: AnyFilter,
     include: Option<PyObject>,
@@ -432,7 +447,7 @@ pub(crate) struct SerializationCallable {
 impl SerializationCallable {
     pub fn new(
         py: Python,
-        serializer: &CombinedSerializer,
+        serializer: &Arc<CombinedSerializer>,
         include: Option<&Bound<'_, PyAny>>,
         exclude: Option<&Bound<'_, PyAny>>,
         extra: &Extra,
@@ -476,6 +491,7 @@ impl SerializationCallable {
 
 #[pymethods]
 impl SerializationCallable {
+    #[pyo3(signature = (value, index_key=None))]
     fn __call__(
         &mut self,
         py: Python,

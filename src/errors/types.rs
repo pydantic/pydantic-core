@@ -56,15 +56,12 @@ fn field_from_context<'py, T: FromPyObject<'py>>(
         .map_err(|_| py_error_type!(PyTypeError; "{}: '{}' context value must be a {}", enum_name, field_name, type_name_fn()))
 }
 
-fn cow_field_from_context<'py, T: FromPyObject<'py>, B: ?Sized + 'static>(
+fn cow_field_from_context<'py, T: FromPyObject<'py>, B: ToOwned<Owned = T> + ?Sized + 'static>(
     context: Option<&Bound<'py, PyDict>>,
     field_name: &str,
     enum_name: &str,
     _type_name_fn: fn() -> &'static str,
-) -> PyResult<Cow<'static, B>>
-where
-    B: ToOwned<Owned = T>,
-{
+) -> PyResult<Cow<'static, B>> {
     let res: T = field_from_context(context, field_name, enum_name, || {
         type_name::<T>().split("::").last().unwrap()
     })?;
@@ -170,6 +167,7 @@ error_types! {
         error: {ctx_type: String, ctx_fn: field_from_context},
     },
     JsonType {},
+    NeedsPythonObject { method_name: {ctx_type: String, ctx_fn: field_from_context} },
     // ---------------------
     // recursion error
     RecursionLoop {},
@@ -292,6 +290,10 @@ error_types! {
     },
     BytesTooLong {
         max_length: {ctx_type: usize, ctx_fn: field_from_context},
+    },
+    BytesInvalidEncoding {
+        encoding: {ctx_type: String, ctx_fn: field_from_context},
+        encoding_error: {ctx_type: String, ctx_fn: field_from_context},
     },
     // ---------------------
     // python errors from functions
@@ -425,6 +427,9 @@ error_types! {
     DecimalWholeDigits {
         whole_digits: {ctx_type: u64, ctx_fn: field_from_context},
     },
+    // Complex errors
+    ComplexType {},
+    ComplexStrParsing {},
 }
 
 macro_rules! render {
@@ -462,8 +467,8 @@ static ERROR_TYPE_LOOKUP: GILOnceCell<AHashMap<String, ErrorType>> = GILOnceCell
 impl ErrorType {
     pub fn new_custom_error(py: Python, custom_error: PydanticCustomError) -> Self {
         Self::CustomError {
-            error_type: custom_error.error_type(),
-            message_template: custom_error.message_template(),
+            error_type: custom_error.error_type().to_owned(),
+            message_template: custom_error.message_template().to_owned(),
             context: custom_error.context(py),
         }
     }
@@ -473,6 +478,7 @@ impl ErrorType {
             Self::NoSuchAttribute {..} => "Object has no attribute '{attribute}'",
             Self::JsonInvalid {..} => "Invalid JSON: {error}",
             Self::JsonType {..} => "JSON input should be string, bytes or bytearray",
+            Self::NeedsPythonObject {..} => "Cannot check `{method_name}` when validating from json, use a JsonOrPython validator instead",
             Self::RecursionLoop {..} => "Recursion error - cyclic reference detected",
             Self::Missing {..} => "Field required",
             Self::FrozenField {..} => "Field is frozen",
@@ -518,6 +524,7 @@ impl ErrorType {
             Self::BytesType {..} => "Input should be a valid bytes",
             Self::BytesTooShort {..} => "Data should have at least {min_length} byte{expected_plural}",
             Self::BytesTooLong {..} => "Data should have at most {max_length} byte{expected_plural}",
+            Self::BytesInvalidEncoding { .. } => "Data should be valid {encoding}: {encoding_error}",
             Self::ValueError {..} => "Value error, {error}",
             Self::AssertionError {..} => "Assertion failed, {error}",
             Self::CustomError {..} => "",  // custom errors are handled separately
@@ -567,6 +574,8 @@ impl ErrorType {
             Self::DecimalMaxDigits {..} => "Decimal input should have no more than {max_digits} digit{expected_plural} in total",
             Self::DecimalMaxPlaces {..} => "Decimal input should have no more than {decimal_places} decimal place{expected_plural}",
             Self::DecimalWholeDigits {..} => "Decimal input should have no more than {whole_digits} digit{expected_plural} before the decimal point",
+            Self::ComplexType {..} => "Input should be a valid python complex object, a number, or a valid complex string following the rules at https://docs.python.org/3/library/functions.html#complex",
+            Self::ComplexStrParsing {..} => "Input should be a valid complex string following the rules at https://docs.python.org/3/library/functions.html#complex",
         }
     }
 
@@ -619,6 +628,7 @@ impl ErrorType {
         match self {
             Self::NoSuchAttribute { attribute, .. } => render!(tmpl, attribute),
             Self::JsonInvalid { error, .. } => render!(tmpl, error),
+            Self::NeedsPythonObject { method_name, .. } => render!(tmpl, method_name),
             Self::GetAttributeError { error, .. } => render!(tmpl, error),
             Self::ModelType { class_name, .. } => render!(tmpl, class_name),
             Self::DataclassType { class_name, .. } => render!(tmpl, class_name),
@@ -667,6 +677,11 @@ impl ErrorType {
                 let expected_plural = plural_s(*max_length);
                 to_string_render!(tmpl, max_length, expected_plural)
             }
+            Self::BytesInvalidEncoding {
+                encoding,
+                encoding_error,
+                ..
+            } => render!(tmpl, encoding, encoding_error),
             Self::ValueError { error, .. } => {
                 let error = &error
                     .as_ref()

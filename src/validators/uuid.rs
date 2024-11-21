@@ -12,8 +12,11 @@ use crate::errors::{ErrorType, ErrorTypeDefaults, ValError, ValResult};
 use crate::input::input_as_python_instance;
 use crate::input::Input;
 use crate::input::InputType;
+use crate::input::ValidationMatch;
+use crate::serializers::BytesMode;
 use crate::tools::SchemaDict;
 
+use super::config::ValBytesMode;
 use super::model::create_class;
 use super::model::force_setattr;
 use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, Exactness, ValidationState, Validator};
@@ -114,7 +117,10 @@ impl Validator for UuidValidator {
         } else if state.strict_or(self.strict) && state.extra().input_type == InputType::Python {
             Err(ValError::new(
                 ErrorType::IsInstanceOf {
-                    class: class.qualname().unwrap_or_else(|_| "UUID".to_owned()),
+                    class: class
+                        .qualname()
+                        .and_then(|name| name.extract())
+                        .unwrap_or_else(|_| "UUID".to_owned()),
                     context: None,
                 },
                 input,
@@ -152,7 +158,7 @@ impl Validator for UuidValidator {
 
 impl UuidValidator {
     fn get_uuid<'py>(&self, input: &(impl Input<'py> + ?Sized)) -> ValResult<Uuid> {
-        let uuid = match input.exact_str().ok() {
+        let uuid = match input.validate_str(true, false).ok().map(ValidationMatch::into_inner) {
             Some(either_string) => {
                 let cow = either_string.as_cow()?;
                 let uuid_str = cow.as_ref();
@@ -168,7 +174,7 @@ impl UuidValidator {
             }
             None => {
                 let either_bytes = input
-                    .validate_bytes(true)
+                    .validate_bytes(true, ValBytesMode { ser: BytesMode::Utf8 })
                     .map_err(|_| ValError::new(ErrorTypeDefaults::UuidType, input))?
                     .into_inner();
                 let bytes_slice = either_bytes.as_slice();

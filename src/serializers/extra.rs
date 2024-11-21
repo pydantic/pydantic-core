@@ -4,7 +4,7 @@ use std::fmt;
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::PyBool;
+use pyo3::types::{PyBool, PyString};
 
 use serde::ser::Error;
 
@@ -15,6 +15,7 @@ use crate::recursion_guard::ContainsRecursionState;
 use crate::recursion_guard::RecursionError;
 use crate::recursion_guard::RecursionGuard;
 use crate::recursion_guard::RecursionState;
+use crate::tools::truncate_safe_repr;
 use crate::PydanticSerializationError;
 
 /// this is ugly, would be much better if extra could be stored in `SerializationState`
@@ -196,6 +197,10 @@ impl<'a> Extra<'a> {
 
     pub fn serialize_infer<'py>(&'py self, value: &'py Bound<'py, PyAny>) -> super::infer::SerializeInfer<'py> {
         super::infer::SerializeInfer::new(value, None, None, self)
+    }
+
+    pub(crate) fn model_type_name(&self) -> Option<Bound<'a, PyString>> {
+        self.model.and_then(|model| model.get_type().name().ok())
     }
 }
 
@@ -391,7 +396,15 @@ impl CollectWarnings {
         if value.is_none() {
             Ok(())
         } else if extra.check.enabled() {
-            Err(PydanticSerializationUnexpectedValue::new_err(None))
+            let type_name = value
+                .get_type()
+                .qualname()
+                .unwrap_or_else(|_| PyString::new_bound(value.py(), "<unknown python object>"));
+
+            let value_str = truncate_safe_repr(value, None);
+            Err(PydanticSerializationUnexpectedValue::new_err(Some(format!(
+                "Expected `{field_type}` but got `{type_name}` with value `{value_str}` - serialized value may not be as expected"
+            ))))
         } else {
             self.fallback_warning(field_type, value);
             Ok(())
@@ -423,9 +436,12 @@ impl CollectWarnings {
             let type_name = value
                 .get_type()
                 .qualname()
-                .unwrap_or_else(|_| "<unknown python object>".to_owned());
+                .unwrap_or_else(|_| PyString::new_bound(value.py(), "<unknown python object>"));
+
+            let value_str = truncate_safe_repr(value, None);
+
             self.add_warning(format!(
-                "Expected `{field_type}` but got `{type_name}` - serialized value may not be as expected"
+                "Expected `{field_type}` but got `{type_name}` with value `{value_str}` - serialized value may not be as expected"
             ));
         }
     }

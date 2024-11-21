@@ -54,12 +54,12 @@ def test_generator_any():
     assert s.to_json(iter(['a', b'b', 3])) == b'["a","b",3]'
     assert s.to_json(gen_ok('a', b'b', 3)) == b'["a","b",3]'
 
-    msg = 'Expected `generator` but got `int` - serialized value may not be as expected'
+    msg = 'Expected `generator` but got `int` with value `4` - serialized value may not be as expected'
     with pytest.warns(UserWarning, match=msg):
         assert s.to_python(4) == 4
-    with pytest.warns(UserWarning, match='Expected `generator` but got `tuple`'):
+    with pytest.warns(UserWarning, match="Expected `generator` but got `tuple` with value `\\('a', b'b', 3\\)`"):
         assert s.to_python(('a', b'b', 3)) == ('a', b'b', 3)
-    with pytest.warns(UserWarning, match='Expected `generator` but got `str`'):
+    with pytest.warns(UserWarning, match="Expected `generator` but got `str` with value `'abc'`"):
         assert s.to_python('abc') == 'abc'
 
     with pytest.raises(ValueError, match='oops'):
@@ -88,14 +88,21 @@ def test_generator_int():
     with pytest.raises(ValueError, match='oops'):
         s.to_json(gen_error(1, 2))
 
-    with pytest.warns(UserWarning, match='Expected `int` but got `str` - serialized value may not be as expected'):
+    with pytest.warns(
+        UserWarning, match="Expected `int` but got `str` with value `'a'` - serialized value may not be as expected"
+    ):
         s.to_json(gen_ok(1, 'a'))
 
     gen = s.to_python(gen_ok(1, 'a'))
     assert next(gen) == 1
-    with pytest.warns(UserWarning, match='Expected `int` but got `str` - serialized value may not be as expected'):
+    with pytest.warns(
+        UserWarning, match="Expected `int` but got `str` with value `'a'` - serialized value may not be as expected"
+    ):
         assert next(gen) == 'a'
-    with pytest.warns(UserWarning, match='Expected `generator` but got `tuple` - serialized value may not.+'):
+    with pytest.warns(
+        UserWarning,
+        match='Expected `generator` but got `tuple` with value `\\(1, 2, 3\\)` - serialized value may not.+',
+    ):
         s.to_python((1, 2, 3))
 
 
@@ -122,6 +129,8 @@ def test_include():
     ]
     with pytest.raises(ValueError, match='Negative indices cannot be used to exclude items on unsized iterables'):
         v.to_python(gen_ok('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'), include={-1: None, -2: None}, mode='json')
+    # Non-integer keys are ignored
+    v.to_python(gen_ok('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'), include={'__all__': None}, mode='json')
 
 
 def test_custom_serializer():

@@ -2,8 +2,6 @@ use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString};
 
-use ahash::AHashSet;
-
 use crate::build_tools::py_schema_err;
 use crate::build_tools::{is_strict, schema_or_config, schema_or_config_same, ExtraBehavior};
 use crate::errors::LocItem;
@@ -14,6 +12,8 @@ use crate::input::ValidationMatch;
 use crate::input::{Input, ValidatedDict};
 use crate::lookup_key::LookupKey;
 use crate::tools::SchemaDict;
+use ahash::AHashSet;
+use jiter::PartialMode;
 
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
 
@@ -124,7 +124,6 @@ impl BuildValidator for TypedDictValidator {
                 required,
             });
         }
-
         Ok(Self {
             fields,
             extra_behavior,
@@ -154,6 +153,13 @@ impl Validator for TypedDictValidator {
         let output_dict = PyDict::new_bound(py);
         let mut errors: Vec<ValLineError> = Vec::with_capacity(self.fields.len());
 
+        let partial_last_key = if state.allow_partial.is_active() {
+            dict.last_key().map(Into::into)
+        } else {
+            None
+        };
+        let allow_partial = state.allow_partial;
+
         // we only care about which keys have been used if we're iterating over the object for extra after
         // the first pass
         let mut used_keys: Option<AHashSet<&str>> =
@@ -165,13 +171,17 @@ impl Validator for TypedDictValidator {
 
         {
             let state = &mut state.rebind_extra(|extra| extra.data = Some(output_dict.clone()));
+            let mut fields_set_count: usize = 0;
 
             for field in &self.fields {
                 let op_key_value = match dict.get_item(&field.lookup_key) {
                     Ok(v) => v,
                     Err(ValError::LineErrors(line_errors)) => {
-                        for err in line_errors {
-                            errors.push(err.with_outer_location(&field.name));
+                        let field_loc: LocItem = field.name.clone().into();
+                        if partial_last_key.as_ref() == Some(&field_loc) {
+                            for err in line_errors {
+                                errors.push(err.with_outer_location(field_loc.clone()));
+                            }
                         }
                         continue;
                     }
@@ -183,14 +193,27 @@ impl Validator for TypedDictValidator {
                         // extra logic either way
                         used_keys.insert(lookup_path.first_key());
                     }
+                    let is_last_partial = if let Some(ref last_key) = partial_last_key {
+                        let first_key_loc: LocItem = lookup_path.first_key().into();
+                        &first_key_loc == last_key
+                    } else {
+                        false
+                    };
+                    state.allow_partial = match is_last_partial {
+                        true => allow_partial,
+                        false => false.into(),
+                    };
                     match field.validator.validate(py, value.borrow_input(), state) {
                         Ok(value) => {
                             output_dict.set_item(&field.name_py, value)?;
+                            fields_set_count += 1;
                         }
                         Err(ValError::Omit) => continue,
                         Err(ValError::LineErrors(line_errors)) => {
-                            for err in line_errors {
-                                errors.push(lookup_path.apply_error_loc(err, self.loc_by_alias, &field.name));
+                            if !is_last_partial || field.required {
+                                for err in line_errors {
+                                    errors.push(lookup_path.apply_error_loc(err, self.loc_by_alias, &field.name));
+                                }
                             }
                         }
                         Err(err) => return Err(err),
@@ -227,6 +250,8 @@ impl Validator for TypedDictValidator {
                     Err(err) => return Err(err),
                 }
             }
+
+            state.add_fields_set(fields_set_count);
         }
 
         if let Some(used_keys) = used_keys {
@@ -238,6 +263,8 @@ impl Validator for TypedDictValidator {
                 output_dict: &'a Bound<'py, PyDict>,
                 state: &'a mut ValidationState<'s, 'py>,
                 extra_behavior: ExtraBehavior,
+                partial_last_key: Option<LocItem>,
+                allow_partial: PartialMode,
             }
 
             impl<'py, Key, Value> ConsumeIterator<ValResult<(Key, Value)>> for ValidateExtras<'_, '_, 'py>
@@ -285,13 +312,23 @@ impl Validator for TypedDictValidator {
                             ExtraBehavior::Allow => {
                                 let py_key = either_str.as_py_string(self.py, self.state.cache_str());
                                 if let Some(validator) = self.extras_validator {
+                                    let last_partial = self.partial_last_key.as_ref().map_or(false, |last_key| {
+                                        let key_loc: LocItem = raw_key.clone().into();
+                                        &key_loc == last_key
+                                    });
+                                    self.state.allow_partial = match last_partial {
+                                        true => self.allow_partial,
+                                        false => false.into(),
+                                    };
                                     match validator.validate(self.py, value, self.state) {
                                         Ok(value) => {
                                             self.output_dict.set_item(py_key, value)?;
                                         }
                                         Err(ValError::LineErrors(line_errors)) => {
-                                            for err in line_errors {
-                                                self.errors.push(err.with_outer_location(raw_key.clone()));
+                                            if !last_partial {
+                                                for err in line_errors {
+                                                    self.errors.push(err.with_outer_location(raw_key.clone()));
+                                                }
                                             }
                                         }
                                         Err(err) => return Err(err),
@@ -315,13 +352,15 @@ impl Validator for TypedDictValidator {
                 output_dict: &output_dict,
                 state,
                 extra_behavior: self.extra_behavior,
+                partial_last_key,
+                allow_partial,
             })??;
         }
 
-        if !errors.is_empty() {
-            Err(ValError::LineErrors(errors))
-        } else {
+        if errors.is_empty() {
             Ok(output_dict.to_object(py))
+        } else {
+            Err(ValError::LineErrors(errors))
         }
     }
 

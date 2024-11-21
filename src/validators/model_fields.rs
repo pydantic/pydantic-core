@@ -120,6 +120,9 @@ impl Validator for ModelFieldsValidator {
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
+        // this validator does not yet support partial validation, disable it to avoid incorrect results
+        state.allow_partial = false.into();
+
         let strict = state.strict_or(self.strict);
         let from_attributes = state.extra().from_attributes.unwrap_or(self.from_attributes);
 
@@ -150,6 +153,7 @@ impl Validator for ModelFieldsValidator {
         let mut model_extra_dict_op: Option<Bound<PyDict>> = None;
         let mut errors: Vec<ValLineError> = Vec::with_capacity(self.fields.len());
         let mut fields_set_vec: Vec<Py<PyString>> = Vec::with_capacity(self.fields.len());
+        let mut fields_set_count: usize = 0;
 
         // we only care about which keys have been used if we're iterating over the object for extra after
         // the first pass
@@ -184,6 +188,7 @@ impl Validator for ModelFieldsValidator {
                         Ok(value) => {
                             model_dict.set_item(&field.name_py, value)?;
                             fields_set_vec.push(field.name_py.clone_ref(py));
+                            fields_set_count += 1;
                         }
                         Err(ValError::Omit) => continue,
                         Err(ValError::LineErrors(line_errors)) => {
@@ -327,6 +332,7 @@ impl Validator for ModelFieldsValidator {
             Err(ValError::LineErrors(errors))
         } else {
             let fields_set = PySet::new_bound(py, &fields_set_vec)?;
+            state.add_fields_set(fields_set_count);
 
             // if we have extra=allow, but we didn't create a dict because we were validating
             // from attributes, set it now so __pydantic_extra__ is always a dict if extra=allow
@@ -415,11 +421,16 @@ impl Validator for ModelFieldsValidator {
         let new_extra = match &self.extra_behavior {
             ExtraBehavior::Allow => {
                 let non_extra_data = PyDict::new_bound(py);
-                self.fields.iter().for_each(|f| {
-                    let popped_value = PyAnyMethods::get_item(&**new_data, &f.name).unwrap();
-                    new_data.del_item(&f.name).unwrap();
-                    non_extra_data.set_item(&f.name, popped_value).unwrap();
-                });
+                self.fields.iter().try_for_each(|f| -> PyResult<()> {
+                    let Some(popped_value) = new_data.get_item(&f.name)? else {
+                        // field not present in __dict__ for some reason; let the rest of the
+                        // validation pipeline handle it later
+                        return Ok(());
+                    };
+                    new_data.del_item(&f.name)?;
+                    non_extra_data.set_item(&f.name, popped_value)?;
+                    Ok(())
+                })?;
                 let new_extra = new_data.copy()?;
                 new_data.clear();
                 new_data.update(non_extra_data.as_mapping())?;

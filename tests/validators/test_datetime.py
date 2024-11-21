@@ -7,7 +7,12 @@ from decimal import Decimal
 from typing import Dict
 
 import pytest
-import pytz
+
+try:
+    import zoneinfo
+except ImportError:
+    # TODO: can remove this once we drop support for python 3.8
+    from backports import zoneinfo
 
 from pydantic_core import SchemaError, SchemaValidator, ValidationError, core_schema, validate_core_schema
 
@@ -33,10 +38,13 @@ from ..conftest import Err, PyAndJson
         (Decimal('1654646400.1234568'), datetime(2022, 6, 8, 0, 0, 0, 123457, tzinfo=timezone.utc)),
         ('1654646400.1234568', datetime(2022, 6, 8, 0, 0, 0, 123457, tzinfo=timezone.utc)),
         (253_402_300_800_000, Err('should be a valid datetime, dates after 9999 are not supported as unix timestamps')),
-        (-20_000_000_000, Err('should be a valid datetime, dates before 1600 are not supported as unix timestamps')),
+        (
+            -80_000_000_000_000,
+            Err('should be a valid datetime, dates before 0000 are not supported as unix timestamps'),
+        ),
         (float('nan'), Err('Input should be a valid datetime, NaN values not permitted [type=datetime_parsing,')),
         (float('inf'), Err('Input should be a valid datetime, dates after 9999')),
-        (float('-inf'), Err('Input should be a valid datetime, dates before 1600')),
+        (float('-inf'), Err('Input should be a valid datetime, dates before 0000')),
         ('-', Err('Input should be a valid datetime or date, input is too short [type=datetime_from_date_parsing,')),
         ('+', Err('Input should be a valid datetime or date, input is too short [type=datetime_from_date_parsing,')),
         (
@@ -81,8 +89,8 @@ def test_datetime_strict(input_value, expected):
 
 
 def test_keep_tz():
-    tz = pytz.timezone('Europe/London')
-    dt = tz.localize(datetime(2022, 6, 14, 12, 13, 14))
+    tz = zoneinfo.ZoneInfo('Europe/London')
+    dt = datetime(2022, 6, 14, 12, 13, 14, tzinfo=tz)
     v = SchemaValidator({'type': 'datetime'})
 
     output = v.validate_python(dt)
@@ -94,8 +102,8 @@ def test_keep_tz():
 
 
 def test_keep_tz_bound():
-    tz = pytz.timezone('Europe/London')
-    dt = tz.localize(datetime(2022, 6, 14, 12, 13, 14))
+    tz = zoneinfo.ZoneInfo('Europe/London')
+    dt = datetime(2022, 6, 14, 12, 13, 14, tzinfo=tz)
     v = SchemaValidator({'type': 'datetime', 'gt': datetime(2022, 1, 1)})
 
     output = v.validate_python(dt)
@@ -106,7 +114,7 @@ def test_keep_tz_bound():
     assert output.tzinfo.dst(datetime(2022, 1, 1)) == timedelta(0)
 
     with pytest.raises(ValidationError, match=r'Input should be greater than 2022-01-01T00:00:00 \[type=greater_than'):
-        v.validate_python(tz.localize(datetime(2021, 6, 14)))
+        v.validate_python(datetime(2021, 6, 14, tzinfo=tz))
 
 
 @pytest.mark.parametrize(
@@ -186,8 +194,8 @@ def test_custom_timezone_utc_repr():
 
 
 def test_tz_comparison():
-    tz = pytz.timezone('Europe/London')
-    uk_3pm = tz.localize(datetime(2022, 1, 1, 15, 0, 0))
+    tz = zoneinfo.ZoneInfo('Europe/London')
+    uk_3pm = datetime(2022, 1, 1, 15, 0, 0, tzinfo=tz)
 
     # two times are the same instant, therefore le and ge are both ok
     v = SchemaValidator({'type': 'datetime', 'le': uk_3pm}).validate_python('2022-01-01T16:00:00+01:00')
@@ -322,22 +330,22 @@ def test_datetime_past_timezone():
     now_utc = datetime.now(timezone.utc) - timedelta(seconds=1)
     assert v.isinstance_python(now_utc)
     # "later" in the day
-    assert v.isinstance_python(now_utc.astimezone(pytz.timezone('Europe/Istanbul')))
+    assert v.isinstance_python(now_utc.astimezone(zoneinfo.ZoneInfo('Europe/Istanbul')))
     # "earlier" in the day
-    assert v.isinstance_python(now_utc.astimezone(pytz.timezone('America/Los_Angeles')))
+    assert v.isinstance_python(now_utc.astimezone(zoneinfo.ZoneInfo('America/Los_Angeles')))
 
     soon_utc = now_utc + timedelta(minutes=1)
     assert not v.isinstance_python(soon_utc)
 
     # "later" in the day
-    assert not v.isinstance_python(soon_utc.astimezone(pytz.timezone('Europe/Istanbul')))
+    assert not v.isinstance_python(soon_utc.astimezone(zoneinfo.ZoneInfo('Europe/Istanbul')))
     # "earlier" in the day
-    assert not v.isinstance_python(soon_utc.astimezone(pytz.timezone('America/Los_Angeles')))
+    assert not v.isinstance_python(soon_utc.astimezone(zoneinfo.ZoneInfo('America/Los_Angeles')))
 
     # input value is timezone naive, so we do a dumb comparison in these terms the istanbul time is later so fails
     # wile the LA time is earlier so passes
-    assert not v.isinstance_python(soon_utc.astimezone(pytz.timezone('Europe/Istanbul')).replace(tzinfo=None))
-    assert v.isinstance_python(soon_utc.astimezone(pytz.timezone('America/Los_Angeles')).replace(tzinfo=None))
+    assert not v.isinstance_python(soon_utc.astimezone(zoneinfo.ZoneInfo('Europe/Istanbul')).replace(tzinfo=None))
+    assert v.isinstance_python(soon_utc.astimezone(zoneinfo.ZoneInfo('America/Los_Angeles')).replace(tzinfo=None))
 
 
 @pytest.mark.parametrize(
@@ -368,17 +376,17 @@ def test_datetime_future_timezone():
     assert v.isinstance_python(soon_utc)
 
     # "later" in the day
-    assert v.isinstance_python(soon_utc.astimezone(pytz.timezone('Europe/Istanbul')))
+    assert v.isinstance_python(soon_utc.astimezone(zoneinfo.ZoneInfo('Europe/Istanbul')))
     # "earlier" in the day
-    assert v.isinstance_python(soon_utc.astimezone(pytz.timezone('America/Los_Angeles')))
+    assert v.isinstance_python(soon_utc.astimezone(zoneinfo.ZoneInfo('America/Los_Angeles')))
 
     past_utc = now_utc - timedelta(minutes=1)
     assert not v.isinstance_python(past_utc)
 
     # "later" in the day
-    assert not v.isinstance_python(past_utc.astimezone(pytz.timezone('Europe/Istanbul')))
+    assert not v.isinstance_python(past_utc.astimezone(zoneinfo.ZoneInfo('Europe/Istanbul')))
     # "earlier" in the day
-    assert not v.isinstance_python(past_utc.astimezone(pytz.timezone('America/Los_Angeles')))
+    assert not v.isinstance_python(past_utc.astimezone(zoneinfo.ZoneInfo('America/Los_Angeles')))
 
 
 def test_mock_utc_offset_8_hours(mocker):

@@ -109,17 +109,20 @@ def test_int_to_float_key():
 def test_simple_serializers_fallback(schema_type):
     s = SchemaSerializer({'type': schema_type})
     with pytest.warns(
-        UserWarning, match=f'Expected `{schema_type}` but got `list` - serialized value may not be as expected'
+        UserWarning,
+        match=f'Expected `{schema_type}` but got `list` with value `\\[1, 2, 3\\]` - serialized value may not be as expected',
     ):
         assert s.to_python([1, 2, 3]) == [1, 2, 3]
 
     with pytest.warns(
-        UserWarning, match=f'Expected `{schema_type}` but got `list` - serialized value may not be as expected'
+        UserWarning,
+        match=f"Expected `{schema_type}` but got `list` with value `\\[1, 2, b'bytes'\\]` - serialized value may not be as expected",
     ):
         assert s.to_python([1, 2, b'bytes'], mode='json') == [1, 2, 'bytes']
 
     with pytest.warns(
-        UserWarning, match=f'Expected `{schema_type}` but got `list` - serialized value may not be as expected'
+        UserWarning,
+        match=f'Expected `{schema_type}` but got `list` with value `\\[1, 2, 3\\]` - serialized value may not be as expected',
     ):
         assert s.to_json([1, 2, 3]) == b'[1,2,3]'
 
@@ -152,6 +155,9 @@ def test_numpy():
         (float('inf'), 'Infinity', {'ser_json_inf_nan': 'constants'}),
         (float('-inf'), '-Infinity', {'ser_json_inf_nan': 'constants'}),
         (float('nan'), 'NaN', {'ser_json_inf_nan': 'constants'}),
+        (float('inf'), '"Infinity"', {'ser_json_inf_nan': 'strings'}),
+        (float('-inf'), '"-Infinity"', {'ser_json_inf_nan': 'strings'}),
+        (float('nan'), '"NaN"', {'ser_json_inf_nan': 'strings'}),
     ],
 )
 def test_float_inf_and_nan_serializers(value, expected_json, config):

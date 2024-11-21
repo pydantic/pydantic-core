@@ -1,6 +1,7 @@
 import re
 import sys
-from enum import Enum, IntFlag
+from decimal import Decimal
+from enum import Enum, IntEnum, IntFlag
 
 import pytest
 
@@ -269,6 +270,52 @@ def test_plain_enum_empty():
         SchemaValidator(core_schema.enum_schema(MyEnum, []))
 
 
+def test_enum_with_str_subclass() -> None:
+    class MyEnum(Enum):
+        a = 'a'
+        b = 'b'
+
+    v = SchemaValidator(core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())))
+
+    assert v.validate_python(MyEnum.a) is MyEnum.a
+    assert v.validate_python('a') is MyEnum.a
+
+    class MyStr(str):
+        pass
+
+    assert v.validate_python(MyStr('a')) is MyEnum.a
+    with pytest.raises(ValidationError):
+        v.validate_python(MyStr('a'), strict=True)
+
+
+def test_enum_with_int_subclass() -> None:
+    class MyEnum(Enum):
+        a = 1
+        b = 2
+
+    v = SchemaValidator(core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())))
+
+    assert v.validate_python(MyEnum.a) is MyEnum.a
+    assert v.validate_python(1) is MyEnum.a
+
+    class MyInt(int):
+        pass
+
+    assert v.validate_python(MyInt(1)) is MyEnum.a
+    with pytest.raises(ValidationError):
+        v.validate_python(MyInt(1), strict=True)
+
+
+def test_validate_float_for_int_enum() -> None:
+    class MyEnum(int, Enum):
+        a = 1
+        b = 2
+
+    v = SchemaValidator(core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())))
+
+    assert v.validate_python(1.0) is MyEnum.a
+
+
 def test_missing_error_converted_to_val_error() -> None:
     class MyFlags(IntFlag):
         OFF = 0
@@ -285,3 +332,158 @@ def test_missing_error_converted_to_val_error() -> None:
 
     with pytest.raises(ValidationError):
         v.validate_python(None)
+
+
+def test_big_int():
+    class ColorEnum(IntEnum):
+        GREEN = 1 << 63
+        BLUE = 1 << 64
+
+    v = SchemaValidator(
+        core_schema.with_default_schema(schema=core_schema.enum_schema(ColorEnum, list(ColorEnum.__members__.values())))
+    )
+
+    assert v.validate_python(ColorEnum.GREEN) is ColorEnum.GREEN
+    assert v.validate_python(1 << 63) is ColorEnum.GREEN
+
+
+@pytest.mark.parametrize(
+    'value',
+    [-1, 0, 1],
+)
+def test_enum_int_validation_should_succeed_for_decimal(value: int):
+    class MyEnum(Enum):
+        VALUE = value
+
+    class MyIntEnum(IntEnum):
+        VALUE = value
+
+    v = SchemaValidator(
+        core_schema.with_default_schema(
+            schema=core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())),
+            default=MyEnum.VALUE,
+        )
+    )
+
+    v_int = SchemaValidator(
+        core_schema.with_default_schema(
+            schema=core_schema.enum_schema(MyIntEnum, list(MyIntEnum.__members__.values())),
+            default=MyIntEnum.VALUE,
+        )
+    )
+
+    assert v.validate_python(Decimal(value)) is MyEnum.VALUE
+    assert v.validate_python(Decimal(float(value))) is MyEnum.VALUE
+    assert v_int.validate_python(Decimal(value)) is MyIntEnum.VALUE
+    assert v_int.validate_python(Decimal(float(value))) is MyIntEnum.VALUE
+
+
+@pytest.mark.skipif(
+    sys.version_info >= (3, 13),
+    reason='Python 3.13+ enum initialization is different, see https://github.com/python/cpython/blob/ec610069637d56101896803a70d418a89afe0b4b/Lib/enum.py#L1159-L1163',
+)
+def test_enum_int_validation_should_succeed_for_custom_type():
+    class AnyWrapper:
+        def __init__(self, value):
+            self.value = value
+
+        def __eq__(self, other: object) -> bool:
+            return self.value == other
+
+    class MyEnum(Enum):
+        VALUE = 999
+        SECOND_VALUE = 1000000
+        THIRD_VALUE = 'Py03'
+
+    v = SchemaValidator(
+        core_schema.with_default_schema(
+            schema=core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())),
+            default=MyEnum.VALUE,
+        )
+    )
+
+    assert v.validate_python(AnyWrapper(999)) is MyEnum.VALUE
+    assert v.validate_python(AnyWrapper(1000000)) is MyEnum.SECOND_VALUE
+    assert v.validate_python(AnyWrapper('Py03')) is MyEnum.THIRD_VALUE
+
+
+def test_enum_str_validation_should_fail_for_decimal_when_expecting_str_value():
+    class MyEnum(Enum):
+        VALUE = '1'
+
+    v = SchemaValidator(
+        core_schema.with_default_schema(
+            schema=core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())),
+            default=MyEnum.VALUE,
+        )
+    )
+
+    with pytest.raises(ValidationError):
+        v.validate_python(Decimal(1))
+
+
+def test_enum_int_validation_should_fail_for_incorrect_decimal_value():
+    class MyEnum(Enum):
+        VALUE = 1
+
+    v = SchemaValidator(
+        core_schema.with_default_schema(
+            schema=core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())),
+            default=MyEnum.VALUE,
+        )
+    )
+
+    with pytest.raises(ValidationError):
+        v.validate_python(Decimal(2))
+
+    with pytest.raises(ValidationError):
+        v.validate_python((1, 2))
+
+    with pytest.raises(ValidationError):
+        v.validate_python(Decimal(1.1))
+
+
+def test_enum_int_validation_should_fail_for_plain_type_without_eq_checking():
+    class MyEnum(Enum):
+        VALUE = 1
+
+    class MyClass:
+        def __init__(self, value):
+            self.value = value
+
+    v = SchemaValidator(
+        core_schema.with_default_schema(
+            schema=core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())),
+            default=MyEnum.VALUE,
+        )
+    )
+
+    with pytest.raises(ValidationError):
+        v.validate_python(MyClass(1))
+
+
+def support_custom_new_method() -> None:
+    """Demonstrates support for custom new methods, as well as conceptually, multi-value enums without dependency on a 3rd party lib for testing."""
+
+    class Animal(Enum):
+        CAT = 'cat', 'meow'
+        DOG = 'dog', 'woof'
+
+        def __new__(cls, species: str, sound: str):
+            obj = object.__new__(cls)
+
+            obj._value_ = species
+            obj._all_values = (species, sound)
+
+            obj.species = species
+            obj.sound = sound
+
+            cls._value2member_map_[sound] = obj
+
+            return obj
+
+    v = SchemaValidator(core_schema.enum_schema(Animal, list(Animal.__members__.values())))
+    assert v.validate_python('cat') is Animal.CAT
+    assert v.validate_python('meow') is Animal.CAT
+    assert v.validate_python('dog') is Animal.DOG
+    assert v.validate_python('woof') is Animal.DOG

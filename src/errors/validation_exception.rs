@@ -7,7 +7,7 @@ use pyo3::ffi;
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::sync::GILOnceCell;
-use pyo3::types::{PyDict, PyList, PyString};
+use pyo3::types::{PyDict, PyList, PyString, PyType};
 use serde::ser::{Error, SerializeMap, SerializeSeq};
 use serde::{Serialize, Serializer};
 
@@ -18,7 +18,7 @@ use crate::errors::LocItem;
 use crate::get_pydantic_version;
 use crate::input::InputType;
 use crate::serializers::{DuckTypingSerMode, Extra, SerMode, SerializationState};
-use crate::tools::{safe_repr, SchemaDict};
+use crate::tools::{safe_repr, write_truncated_to_limited_bytes, SchemaDict};
 
 use super::line_error::ValLineError;
 use super::location::Location;
@@ -26,7 +26,7 @@ use super::types::ErrorType;
 use super::value_exception::PydanticCustomError;
 use super::{InputValue, ValError};
 
-#[pyclass(extends=PyValueError, module="pydantic_core._pydantic_core")]
+#[pyclass(extends=PyValueError, module="pydantic_core._pydantic_core", subclass)]
 #[derive(Clone)]
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub struct ValidationError {
@@ -248,27 +248,35 @@ impl ValidationError {
 
 #[pymethods]
 impl ValidationError {
-    #[staticmethod]
+    #[new]
     #[pyo3(signature = (title, line_errors, input_type="python", hide_input=false))]
-    fn from_exception_data(
-        py: Python,
+    fn py_new(title: PyObject, line_errors: Vec<PyLineError>, input_type: &str, hide_input: bool) -> PyResult<Self> {
+        Ok(Self {
+            line_errors,
+            title,
+            input_type: InputType::try_from(input_type)?,
+            hide_input,
+        })
+    }
+
+    #[classmethod]
+    #[pyo3(signature = (title, line_errors, input_type="python", hide_input=false))]
+    fn from_exception_data<'py>(
+        cls: &Bound<'py, PyType>,
         title: PyObject,
         line_errors: Bound<'_, PyList>,
         input_type: &str,
         hide_input: bool,
-    ) -> PyResult<Py<Self>> {
-        Py::new(
-            py,
-            Self {
-                line_errors: line_errors
-                    .iter()
-                    .map(|error| PyLineError::try_from(&error))
-                    .collect::<PyResult<_>>()?,
-                title,
-                input_type: InputType::try_from(input_type)?,
-                hide_input,
-            },
-        )
+    ) -> PyResult<Bound<'py, PyAny>> {
+        cls.call1((
+            title,
+            line_errors
+                .iter()
+                .map(|error| PyLineError::try_from(&error))
+                .collect::<PyResult<Vec<PyLineError>>>()?,
+            InputType::try_from(input_type)?,
+            hide_input,
+        ))
     }
 
     #[getter]
@@ -384,51 +392,6 @@ impl ValidationError {
             .into_py(slf.py());
         Ok((callable, args))
     }
-}
-
-// TODO: is_utf8_char_boundary, floor_char_boundary and ceil_char_boundary
-// with builtin methods once https://github.com/rust-lang/rust/issues/93743 is resolved
-// These are just copy pasted from the current implementation
-const fn is_utf8_char_boundary(value: u8) -> bool {
-    // This is bit magic equivalent to: b < 128 || b >= 192
-    (value as i8) >= -0x40
-}
-
-fn floor_char_boundary(value: &str, index: usize) -> usize {
-    if index >= value.len() {
-        value.len()
-    } else {
-        let lower_bound = index.saturating_sub(3);
-        let new_index = value.as_bytes()[lower_bound..=index]
-            .iter()
-            .rposition(|b| is_utf8_char_boundary(*b));
-
-        // SAFETY: we know that the character boundary will be within four bytes
-        unsafe { lower_bound + new_index.unwrap_unchecked() }
-    }
-}
-
-pub fn ceil_char_boundary(value: &str, index: usize) -> usize {
-    let upper_bound = Ord::min(index + 4, value.len());
-    value.as_bytes()[index..upper_bound]
-        .iter()
-        .position(|b| is_utf8_char_boundary(*b))
-        .map_or(upper_bound, |pos| pos + index)
-}
-
-macro_rules! truncate_input_value {
-    ($out:expr, $value:expr) => {
-        if $value.len() > 50 {
-            write!(
-                $out,
-                ", input_value={}...{}",
-                &$value[0..floor_char_boundary($value, 25)],
-                &$value[ceil_char_boundary($value, $value.len() - 24)..]
-            )?;
-        } else {
-            write!($out, ", input_value={}", $value)?;
-        }
-    };
 }
 
 pub fn pretty_py_line_errors<'a>(
@@ -570,7 +533,8 @@ impl PyLineError {
         if !hide_input {
             let input_value = self.input_value.bind(py);
             let input_str = safe_repr(input_value);
-            truncate_input_value!(output, &input_str.to_cow());
+            write!(output, ", input_value=")?;
+            write_truncated_to_limited_bytes(&mut output, &input_str.to_string(), 50)?;
 
             if let Ok(type_) = input_value.get_type().qualname() {
                 write!(output, ", input_type={type_}")?;

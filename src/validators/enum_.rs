@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 use pyo3::exceptions::PyTypeError;
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList, PyType};
+use pyo3::types::{PyDict, PyFloat, PyInt, PyList, PyString, PyType};
 
 use crate::build_tools::{is_strict, py_schema_err};
 use crate::errors::{ErrorType, ValError, ValResult};
@@ -116,11 +116,15 @@ impl<T: EnumValidateValue> Validator for EnumValidator<T> {
                 },
                 input,
             ));
-        } else if let Some(v) = T::validate_value(py, input, &self.lookup, strict)? {
-            state.floor_exactness(Exactness::Lax);
+        }
+
+        state.floor_exactness(Exactness::Lax);
+
+        if let Some(v) = T::validate_value(py, input, &self.lookup, strict)? {
             return Ok(v);
+        } else if let Ok(res) = class.as_unbound().call1(py, (input.as_python(),)) {
+            return Ok(res);
         } else if let Some(ref missing) = self.missing {
-            state.floor_exactness(Exactness::Lax);
             let enum_value = missing.bind(py).call1((input.to_object(py),)).map_err(|_| {
                 ValError::new(
                     ErrorType::Enum {
@@ -137,12 +141,16 @@ impl<T: EnumValidateValue> Validator for EnumValidator<T> {
             } else if !enum_value.is(&py.None()) {
                 let type_error = PyTypeError::new_err(format!(
                     "error in {}._missing_: returned {} instead of None or a valid member",
-                    class.name().unwrap_or_else(|_| "<Unknown>".into()),
+                    class
+                        .name()
+                        .and_then(|name| name.extract::<String>())
+                        .unwrap_or_else(|_| "<Unknown>".into()),
                     safe_repr(&enum_value)
                 ));
                 return Err(type_error.into());
             }
         }
+
         Err(ValError::new(
             ErrorType::Enum {
                 expected: self.expected_repr.clone(),
@@ -167,9 +175,27 @@ impl EnumValidateValue for PlainEnumValidator {
         py: Python<'py>,
         input: &I,
         lookup: &LiteralLookup<PyObject>,
-        _strict: bool,
+        strict: bool,
     ) -> ValResult<Option<PyObject>> {
-        Ok(lookup.validate(py, input)?.map(|(_, v)| v.clone_ref(py)))
+        match lookup.validate(py, input)? {
+            Some((_, v)) => Ok(Some(v.clone_ref(py))),
+            None => {
+                if !strict {
+                    if let Some(py_input) = input.as_python() {
+                        // necessary for compatibility with 2.6, where str and int subclasses are allowed
+                        if py_input.is_instance_of::<PyString>() {
+                            return Ok(lookup.validate_str(input, false)?.map(|v| v.clone_ref(py)));
+                        } else if py_input.is_instance_of::<PyInt>() {
+                            return Ok(lookup.validate_int(py, input, false)?.map(|v| v.clone_ref(py)));
+                        // necessary for compatibility with 2.6, where float values are allowed for int enums in lax mode
+                        } else if py_input.is_instance_of::<PyFloat>() {
+                            return Ok(lookup.validate_int(py, input, false)?.map(|v| v.clone_ref(py)));
+                        }
+                    }
+                }
+                Ok(None)
+            }
+        }
     }
 }
 

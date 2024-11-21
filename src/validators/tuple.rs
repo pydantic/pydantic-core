@@ -1,7 +1,8 @@
+use std::collections::VecDeque;
+
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
-use std::collections::VecDeque;
 
 use crate::build_tools::is_strict;
 use crate::errors::{py_err_string, ErrorType, ErrorTypeDefaults, ValError, ValLineError, ValResult};
@@ -19,6 +20,7 @@ pub struct TupleValidator {
     min_length: Option<usize>,
     max_length: Option<usize>,
     name: String,
+    fail_fast: bool,
 }
 
 impl BuildValidator for TupleValidator {
@@ -50,6 +52,7 @@ impl BuildValidator for TupleValidator {
             min_length: schema.get_as(intern!(py, "min_length"))?,
             max_length: schema.get_as(intern!(py, "max_length"))?,
             name,
+            fail_fast: schema.get_as(intern!(py, "fail_fast"))?.unwrap_or(false),
         }
         .into())
     }
@@ -69,6 +72,7 @@ impl TupleValidator {
         item_validators: &[CombinedValidator],
         collection_iter: &mut NextCountingIterator<impl Iterator<Item = I>>,
         actual_length: Option<usize>,
+        fail_fast: bool,
     ) -> ValResult<()> {
         // Validate the head:
         for validator in item_validators {
@@ -89,6 +93,9 @@ impl TupleValidator {
                         errors.push(ValLineError::new_with_loc(ErrorTypeDefaults::Missing, input, index));
                     }
                 }
+            }
+            if fail_fast && !errors.is_empty() {
+                return Ok(());
             }
         }
 
@@ -128,7 +135,12 @@ impl TupleValidator {
                 head_validators,
                 collection_iter,
                 actual_length,
+                self.fail_fast,
             )?;
+
+            if self.fail_fast && !errors.is_empty() {
+                return Ok(output);
+            }
 
             let n_tail_validators = tail_validators.len();
             if n_tail_validators == 0 {
@@ -140,6 +152,10 @@ impl TupleValidator {
                         }
                         Err(ValError::Omit) => (),
                         Err(err) => return Err(err),
+                    }
+
+                    if self.fail_fast && !errors.is_empty() {
+                        return Ok(output);
                     }
                 }
             } else {
@@ -172,6 +188,10 @@ impl TupleValidator {
                         Err(ValError::Omit) => (),
                         Err(err) => return Err(err),
                     }
+
+                    if self.fail_fast && !errors.is_empty() {
+                        return Ok(output);
+                    }
                 }
 
                 // Validate the buffered items using the tail validators
@@ -184,6 +204,7 @@ impl TupleValidator {
                     tail_validators,
                     &mut NextCountingIterator::new(tail_buffer.into_iter(), index),
                     actual_length,
+                    self.fail_fast,
                 )?;
             }
         } else {
@@ -197,7 +218,12 @@ impl TupleValidator {
                 &self.validators,
                 collection_iter,
                 actual_length,
+                self.fail_fast,
             )?;
+
+            if self.fail_fast && !errors.is_empty() {
+                return Ok(output);
+            }
 
             // Generate an error if there are any extra items:
             if collection_iter.next().is_some() {
@@ -247,6 +273,9 @@ impl Validator for TupleValidator {
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
+        // this validator does not yet support partial validation, disable it to avoid incorrect results
+        state.allow_partial = false.into();
+
         let collection = input.validate_tuple(state.strict_or(self.strict))?.unpack(state);
         let actual_length = collection.len();
 

@@ -4,12 +4,14 @@ use pyo3::exceptions::PyTypeError;
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::pybacked::PyBackedStr;
+use pyo3::types::PyComplex;
 use pyo3::types::{PyByteArray, PyBytes, PyDict, PyFrozenSet, PyIterator, PyList, PySet, PyString, PyTuple};
 
 use serde::ser::{Error, Serialize, SerializeMap, SerializeSeq, Serializer};
 
 use crate::input::{EitherTimedelta, Int};
-use crate::tools::{extract_i64, py_err, safe_repr};
+use crate::serializers::type_serializers;
+use crate::tools::{extract_int, py_err, safe_repr};
 use crate::url::{PyMultiHostUrl, PyUrl};
 
 use super::config::InfNanMode;
@@ -114,10 +116,13 @@ pub(crate) fn infer_to_python_known(
             // `bool` and `None` can't be subclasses, `ObType::Int`, `ObType::Float`, `ObType::Str` refer to exact types
             ObType::None | ObType::Bool | ObType::Int | ObType::Str => value.into_py(py),
             // have to do this to make sure subclasses of for example str are upcast to `str`
-            ObType::IntSubclass => match extract_i64(value) {
-                Some(v) => v.into_py(py),
-                None => return py_err!(PyTypeError; "expected int, got {}", safe_repr(value)),
-            },
+            ObType::IntSubclass => {
+                if let Some(i) = extract_int(value) {
+                    i.into_py(py)
+                } else {
+                    return py_err!(PyTypeError; "Expected int, got {}", safe_repr(value));
+                }
+            }
             ObType::Float | ObType::FloatSubclass => {
                 let v = value.extract::<f64>()?;
                 if (v.is_nan() || v.is_infinite()) && extra.config.inf_nan_mode == InfNanMode::Null {
@@ -126,7 +131,7 @@ pub(crate) fn infer_to_python_known(
                 v.into_py(py)
             }
             ObType::Decimal => value.to_string().into_py(py),
-            ObType::StrSubclass => value.downcast::<PyString>()?.to_str()?.into_py(py),
+            ObType::StrSubclass => PyString::new_bound(py, value.downcast::<PyString>()?.to_str()?).into(),
             ObType::Bytes => extra
                 .config
                 .bytes_mode
@@ -225,6 +230,11 @@ pub(crate) fn infer_to_python_known(
                 }
                 PyList::new_bound(py, items).into_py(py)
             }
+            ObType::Complex => {
+                let v = value.downcast::<PyComplex>()?;
+                let complex_str = type_serializers::complex::complex_to_str(v);
+                complex_str.into_py(py)
+            }
             ObType::Path => value.str()?.into_py(py),
             ObType::Pattern => value.getattr(intern!(py, "pattern"))?.into_py(py),
             ObType::Unknown => {
@@ -265,13 +275,18 @@ pub(crate) fn infer_to_python_known(
             ObType::Generator => {
                 let iter = super::type_serializers::generator::SerializationIterator::new(
                     value.downcast()?,
-                    super::type_serializers::any::AnySerializer.into(),
+                    super::type_serializers::any::AnySerializer::get(),
                     SchemaFilter::default(),
                     include,
                     exclude,
                     extra,
                 );
                 iter.into_py(py)
+            }
+            ObType::Complex => {
+                let v = value.downcast::<PyComplex>()?;
+                let complex_str = type_serializers::complex::complex_to_str(v);
+                complex_str.into_py(py)
             }
             ObType::Unknown => {
                 if let Some(fallback) = extra.fallback {
@@ -401,13 +416,14 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
         ObType::None => serializer.serialize_none(),
         ObType::Int | ObType::IntSubclass => serialize!(Int),
         ObType::Bool => serialize!(bool),
+        ObType::Complex => {
+            let v = value.downcast::<PyComplex>().map_err(py_err_se_err)?;
+            let complex_str = type_serializers::complex::complex_to_str(v);
+            Ok(serializer.collect_str::<String>(&complex_str)?)
+        }
         ObType::Float | ObType::FloatSubclass => {
             let v = value.extract::<f64>().map_err(py_err_se_err)?;
-            if (v.is_nan() || v.is_infinite()) && extra.config.inf_nan_mode == InfNanMode::Null {
-                serializer.serialize_none()
-            } else {
-                serializer.serialize_f64(v)
-            }
+            type_serializers::float::serialize_f64(v, serializer, extra.config.inf_nan_mode)
         }
         ObType::Decimal => value.to_string().serialize(serializer),
         ObType::Str | ObType::StrSubclass => {
@@ -593,16 +609,11 @@ pub(crate) fn infer_json_key_known<'a>(
         }
         ObType::Decimal => Ok(Cow::Owned(key.to_string())),
         ObType::Bool => super::type_serializers::simple::bool_json_key(key),
-        ObType::Str | ObType::StrSubclass => {
-            let py_str = key.downcast::<PyString>()?;
-            Ok(Cow::Owned(py_str.to_str()?.to_string()))
-        }
+        ObType::Str | ObType::StrSubclass => key.downcast::<PyString>()?.to_cow(),
         ObType::Bytes => extra
             .config
             .bytes_mode
-            .bytes_to_string(key.py(), key.downcast::<PyBytes>()?.as_bytes())
-            // FIXME it would be nice to have a "PyCow" which carries ownership of the Python type too
-            .map(|s| Cow::Owned(s.into_owned())),
+            .bytes_to_string(key.py(), key.downcast::<PyBytes>()?.as_bytes()),
         ObType::Bytearray => {
             let py_byte_array = key.downcast::<PyByteArray>()?;
             // Safety: the GIL is held while serialize_bytes is running; it doesn't run
@@ -666,6 +677,10 @@ pub(crate) fn infer_json_key_known<'a>(
         ObType::Path => {
             // FIXME it would be nice to have a "PyCow" which carries ownership of the Python type too
             Ok(Cow::Owned(key.str()?.to_string_lossy().into_owned()))
+        }
+        ObType::Complex => {
+            let v = key.downcast::<PyComplex>()?;
+            Ok(type_serializers::complex::complex_to_str(v).into())
         }
         ObType::Pattern => Ok(Cow::Owned(
             key.getattr(intern!(key.py(), "pattern"))?
