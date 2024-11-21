@@ -1792,7 +1792,12 @@ def test_deprecation_msg():
                 'b': {
                     'type': 'model-field',
                     'schema': {'type': 'default', 'schema': {'type': 'int'}, 'default': 2},
-                    'deprecation_msg': 'hi',
+                    'deprecation_msg': 'foo',
+                },
+                'c': {
+                    'type': 'model-field',
+                    'schema': {'type': 'default', 'schema': {'type': 'int'}, 'default': 2},
+                    'deprecation_msg': 'bar',
                 },
             },
         }
@@ -1802,5 +1807,9 @@ def test_deprecation_msg():
     v.validate_python({'a': 1})
 
     # validating the deprecated field: raise warning
-    with pytest.warns(DeprecationWarning, match='hi'):
-        v.validate_python({'a': 1, 'b': 1})
+    # ensure that we get two warnings
+    with pytest.warns(DeprecationWarning) as w:
+        v.validate_python({'a': 1, 'b': 1, 'c': 1})
+        assert len(w) == 2
+        assert str(w[0].message) == 'foo'
+        assert str(w[1].message) == 'bar'
