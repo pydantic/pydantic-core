@@ -556,11 +556,6 @@ jobs:
           # FIXME: Unpin when Python 3.8 support is dropped. (3.9 requires Windows 10)
           toolchain: ${{ (matrix.os == 'windows' && '1.77') || 'stable' }}
 
-      - run: pip install -U 'ruff==0.5.0' typing_extensions
-
-      # generate self-schema now, so we don't have to do so inside docker in maturin build
-      - run: python generate_self_schema.py
-
       - name: Build PGO wheel
         id: pgo-wheel
         uses: ./.github/actions/build-pgo-wheel

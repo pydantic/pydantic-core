@@ -14,6 +14,11 @@ outputs:
 runs:
   using: "composite"
   steps:
+    - name: prepare self schema
+      shell: bash
+      # generate up front so that we don't have to do this inside the docker container
+      run: uv run python generate_self_schema.py
+
     - name: build initial wheel
       uses: PyO3/maturin-action@v1
       with:
