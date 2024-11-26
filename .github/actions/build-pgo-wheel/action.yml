@@ -19,6 +19,12 @@ runs:
       # generate up front so that we don't have to do this inside the docker container
       run: uv run python generate_self_schema.py
 
+    - name: prepare profiling directory
+      shell: bash
+      # making this ahead of the compile ensures that the local user can write to this
+      # directory; the maturin action (on linux) runs in docker so would create as root
+      run: mkdir -p ${{ github.workspace }}/profdata
+
     - name: build initial wheel
       uses: PyO3/maturin-action@v1
       with:
