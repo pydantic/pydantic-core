@@ -1,7 +1,8 @@
-use pyo3::exceptions::PyKeyError;
+use pyo3::exceptions::{PyDeprecationWarning, PyKeyError};
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PySet, PyString, PyType};
+use pyo3::PyTypeInfo;
 
 use ahash::AHashSet;
 
@@ -187,7 +188,7 @@ impl Validator for ModelFieldsValidator {
                         used_keys.insert(lookup_path.first_key());
                     }
                     if let Some(msg) = &field.deprecation_msg {
-                        let deprecation_warning_type = py.import_bound("builtins")?.getattr("DeprecationWarning")?;
+                        let deprecation_warning_type = PyDeprecationWarning::type_object_bound(py);
                         PyErr::warn_bound(py, &deprecation_warning_type, msg, 2)?;
                     }
                     match field.validator.validate(py, value.borrow_input(), state) {
