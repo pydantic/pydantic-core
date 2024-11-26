@@ -2,7 +2,8 @@ version = 1
 requires-python = ">=3.8"
 resolution-markers = [
     "python_full_version < '3.9' or (python_full_version < '3.12' and implementation_name != 'cpython') or (python_full_version < '3.12' and platform_machine != 'x86_64')",
-    "(python_full_version == '3.12.*' and implementation_name != 'cpython') or (python_full_version == '3.12.*' and platform_machine != 'x86_64') or python_full_version >= '3.13'",
+    "(python_full_version == '3.12.*' and implementation_name != 'cpython') or (python_full_version == '3.12.*' and platform_machine != 'x86_64') or (python_full_version == '3.13.*' and implementation_name != 'cpython') or python_full_version >= '3.14'",
+    "python_full_version == '3.13.*' and implementation_name == 'cpython'",
     "python_full_version >= '3.9' and python_full_version < '3.11' and implementation_name == 'cpython' and platform_machine == 'x86_64'",
     "python_full_version == '3.11.*' and implementation_name == 'cpython' and platform_machine == 'x86_64'",
     "python_full_version == '3.12.*' and implementation_name == 'cpython' and platform_machine == 'x86_64'",
@@ -25,8 +26,8 @@ name = "astunparse"
 version = "1.6.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "six", marker = "python_full_version < '3.9' or python_full_version >= '3.13' or implementation_name != 'cpython' or platform_machine != 'x86_64'" },
-    { name = "wheel", marker = "python_full_version < '3.9' or python_full_version >= '3.13' or implementation_name != 'cpython' or platform_machine != 'x86_64'" },
+    { name = "six", marker = "python_full_version < '3.9' or (python_full_version < '3.12' and implementation_name != 'cpython') or (python_full_version < '3.12' and platform_machine != 'x86_64')" },
+    { name = "wheel", marker = "python_full_version < '3.9' or (python_full_version < '3.12' and implementation_name != 'cpython') or (python_full_version < '3.12' and platform_machine != 'x86_64')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/f3/af/4182184d3c338792894f34a62672919db7ca008c89abee9b564dd34d8029/astunparse-1.6.3.tar.gz", hash = "sha256:5ad93a8456f0d084c3456d059fd9a92cce667963232cbf763eac3bc5b7940872", size = 18290 }
 wheels = [
@@ -98,7 +99,7 @@ name = "cffi"
 version = "1.17.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pycparser" },
+    { name = "pycparser", marker = "python_full_version == '3.13.*' and implementation_name == 'cpython'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/fc/97/c783634659c2920c3fc70419e3af40972dbaf758daa229a7d6ea6135c90d/cffi-1.17.1.tar.gz", hash = "sha256:1c39c6016c32bc48dd54561950ebd6836e1670f2ae46128f67cf49e789c52824", size = 516621 }
 wheels = [
@@ -655,7 +656,7 @@ all = [
     { name = "tzdata" },
 ]
 codspeed = [
-    { name = "pytest-codspeed" },
+    { name = "pytest-codspeed", marker = "python_full_version == '3.13.*' and implementation_name == 'cpython'" },
 ]
 linting = [
     { name = "griffe" },
@@ -716,7 +717,7 @@ all = [
     { name = "typing-extensions" },
     { name = "tzdata" },
 ]
-codspeed = [{ name = "pytest-codspeed" }]
+codspeed = [{ name = "pytest-codspeed", marker = "python_full_version == '3.13.*' and implementation_name == 'cpython'" }]
 linting = [
     { name = "griffe" },
     { name = "mypy" },
@@ -789,17 +790,18 @@ wheels = [
 
 [[package]]
 name = "pytest-codspeed"
-version = "2.2.1"
+version = "3.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "cffi" },
-    { name = "filelock" },
-    { name = "pytest" },
-    { name = "setuptools", marker = "python_full_version >= '3.12'" },
+    { name = "cffi", marker = "python_full_version == '3.13.*' and implementation_name == 'cpython'" },
+    { name = "filelock", marker = "python_full_version == '3.13.*' and implementation_name == 'cpython'" },
+    { name = "pytest", marker = "python_full_version == '3.13.*' and implementation_name == 'cpython'" },
+    { name = "rich", marker = "python_full_version == '3.13.*' and implementation_name == 'cpython'" },
+    { name = "setuptools", marker = "python_full_version == '3.13.*' and implementation_name == 'cpython'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/40/6a/ba0b067dba286443a04c9d32ff75ef3bc169617ee347d1a97972ada62665/pytest_codspeed-2.2.1.tar.gz", hash = "sha256:0adc24baf01c64a6ca0a0b83b3cd704351708997e09ec086b7776c32227d4e0a", size = 9163 }
+sdist = { url = "https://files.pythonhosted.org/packages/ba/78/40e613268cce75b11cd35ea9fdc280fb648e2233fc4187c76112377b1869/pytest_codspeed-3.0.0.tar.gz", hash = "sha256:c5b80100ea32dd44079bb2db298288763eb8fe859eafa1650a8711bd2c32fd06", size = 12540 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/03/0b/e3541064afcf24ed54bcabfa6eb5f8083eb335d5c58c7b5b95bc31127f86/pytest_codspeed-2.2.1-py3-none-any.whl", hash = "sha256:aad08033015f3e6c8c14c8bf0eca475921a9b088e92c98b626bf8af8f516471e", size = 10126 },
+    { url = "https://files.pythonhosted.org/packages/a6/79/fa067436033410ac16e5d14b61b1a5f355688930ca8c6a8c61a52b2cbe0a/pytest_codspeed-3.0.0-py3-none-any.whl", hash = "sha256:ab1b8cb9da72e0d394718333d1abc7bea38524e09fd4854bc70a91abbcdcb20e", size = 15640 },
 ]
 
 [[package]]

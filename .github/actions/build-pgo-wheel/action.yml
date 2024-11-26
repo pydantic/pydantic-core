@@ -40,6 +40,7 @@ runs:
       run: |
         uv sync --group testing
         uv pip install pydantic-core --no-index --no-deps --find-links pgo-wheel --force-reinstall
+        ls -la ${{ github.workspace }}/profdata
         uv run pytest tests/benchmarks
         ls -la ${{ github.workspace }}/profdata
         RUST_HOST=$(rustc -Vv | grep host | cut -d ' ' -f 2)
