@@ -82,6 +82,9 @@ wasm = [
     'maturin>=1,<2',
     'ruff',
 ]
+codspeed = [
+    'pytest-codspeed'
+]
 
 all = [
   { include-group = 'testing' },
