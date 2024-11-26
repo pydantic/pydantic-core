@@ -64,5 +64,5 @@ runs:
 
     - name: find built wheel
       id: find_wheel
-      run: echo path=wheel::$(ls dist/*.whl | tee) >> "$GITHUB_OUTPUT"
+      run: echo "path=$(ls dist/*.whl)" | tee -a "$GITHUB_ENV"
       shell: bash
