@@ -486,7 +486,7 @@ impl<'a> From<&'a str> for EitherString<'a> {
     }
 }
 
-impl<'a> From<String> for EitherString<'a> {
+impl From<String> for EitherString<'_> {
     fn from(data: String) -> Self {
         Self::Cow(Cow::Owned(data))
     }
@@ -513,7 +513,7 @@ pub enum EitherBytes<'a, 'py> {
     Py(Bound<'py, PyBytes>),
 }
 
-impl<'a> From<Vec<u8>> for EitherBytes<'a, '_> {
+impl From<Vec<u8>> for EitherBytes<'_, '_> {
     fn from(bytes: Vec<u8>) -> Self {
         Self::Cow(Cow::Owned(bytes))
     }
@@ -635,7 +635,7 @@ impl<'a> EitherInt<'a> {
     }
 }
 
-impl<'a> IntoPy<PyObject> for EitherInt<'a> {
+impl IntoPy<PyObject> for EitherInt<'_> {
     fn into_py(self, py: Python<'_>) -> PyObject {
         match self {
             Self::I64(int) => int.into_py(py),
@@ -653,7 +653,7 @@ pub enum EitherFloat<'a> {
     Py(Bound<'a, PyFloat>),
 }
 
-impl<'a> EitherFloat<'a> {
+impl EitherFloat<'_> {
     pub fn as_f64(&self) -> f64 {
         match self {
             EitherFloat::F64(f) => *f,
@@ -662,7 +662,7 @@ impl<'a> EitherFloat<'a> {
     }
 }
 
-impl<'a> IntoPy<PyObject> for EitherFloat<'a> {
+impl IntoPy<PyObject> for EitherFloat<'_> {
     fn into_py(self, py: Python<'_>) -> PyObject {
         match self {
             Self::F64(float) => float.into_py(py),
@@ -717,7 +717,7 @@ impl PartialEq for Int {
     }
 }
 
-impl<'a> Rem for &'a Int {
+impl Rem for &Int {
     type Output = Int;
 
     fn rem(self, rhs: Self) -> Self::Output {
@@ -754,7 +754,7 @@ pub enum EitherComplex<'a> {
     Py(Bound<'a, PyComplex>),
 }
 
-impl<'a> IntoPy<PyObject> for EitherComplex<'a> {
+impl IntoPy<PyObject> for EitherComplex<'_> {
     fn into_py(self, py: Python<'_>) -> PyObject {
         match self {
             Self::Complex(c) => PyComplex::from_doubles_bound(py, c[0], c[1]).into_py(py),
@@ -763,7 +763,7 @@ impl<'a> IntoPy<PyObject> for EitherComplex<'a> {
     }
 }
 
-impl<'a> EitherComplex<'a> {
+impl EitherComplex<'_> {
     pub fn as_f64(&self, py: Python<'_>) -> [f64; 2] {
         match self {
             EitherComplex::Complex(f) => *f,
