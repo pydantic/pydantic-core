@@ -32,7 +32,7 @@ jobs:
       - run: rustup component add llvm-tools-preview
 
       - name: install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v4
         with:
           enable-cache: true
 
@@ -55,7 +55,7 @@ jobs:
 
       - run: coverage-prepare lcov python/pydantic_core/*.so
 
-      - uses: codecov/codecov-action@v4
+      - uses: codecov/codecov-action@v5
 
   # See https://github.com/PyO3/pyo3/discussions/2781
   # tests intermittently segfault with pypy and cpython 3.7 when using `coverage run ...`, hence separate job
@@ -88,7 +88,7 @@ jobs:
           key: test-v3
 
       - name: install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v4
         with:
           enable-cache: true
 
@@ -127,7 +127,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v4
         with:
           enable-cache: true
 
@@ -152,7 +152,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v4
         with:
           enable-cache: true
 
@@ -197,7 +197,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v4
         with:
           enable-cache: true
 
@@ -239,7 +239,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v4
         with:
           enable-cache: true
 
@@ -283,7 +283,7 @@ jobs:
           node-version: '18'
 
       - name: install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v4
         with:
           enable-cache: true
 
@@ -343,7 +343,7 @@ jobs:
           actions-cache-folder: emsdk-cache
 
       - name: install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v4
         with:
           enable-cache: true
 
@@ -543,7 +543,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v4
         with:
           enable-cache: true
 
@@ -668,7 +668,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v4
         with:
           enable-cache: true
 
