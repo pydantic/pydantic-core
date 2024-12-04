@@ -2817,7 +2817,8 @@ class TypedDictField(TypedDict, total=False):
     validation_alias: Union[str, List[Union[str, int]], List[List[Union[str, int]]]]
     serialization_alias: str
     serialization_exclude: bool  # default: False
-    metadata: Dict[str, Any]
+    exclude_if: Callable[[Any], bool]  # default None
+    metadata: Any
 
 
 def typed_dict_field(
@@ -2827,7 +2828,8 @@ def typed_dict_field(
     validation_alias: str | list[str | int] | list[list[str | int]] | None = None,
     serialization_alias: str | None = None,
     serialization_exclude: bool | None = None,
-    metadata: Dict[str, Any] | None = None,
+    exclude_if: Callable[[Any], bool] | None = None,
+    metadata: Any = None,
 ) -> TypedDictField:
     """
     Returns a schema that matches a typed dict field, e.g.:
@@ -2844,6 +2846,7 @@ def typed_dict_field(
         validation_alias: The alias(es) to use to find the field in the validation data
         serialization_alias: The alias to use as a key when serializing
         serialization_exclude: Whether to exclude the field when serializing
+        exclude_if: Callable that determines whether to exclude a field during serialization based on its value.
         metadata: Any other information you want to include with the schema, not used by pydantic-core
     """
     return _dict_not_none(
@@ -2853,6 +2856,7 @@ def typed_dict_field(
         validation_alias=validation_alias,
         serialization_alias=serialization_alias,
         serialization_exclude=serialization_exclude,
+        exclude_if=exclude_if,
         metadata=metadata,
     )
 
@@ -2943,6 +2947,7 @@ class ModelField(TypedDict, total=False):
     validation_alias: Union[str, List[Union[str, int]], List[List[Union[str, int]]]]
     serialization_alias: str
     serialization_exclude: bool  # default: False
+    exclude_if: Callable[[Any], bool]  # default: None
     frozen: bool
     metadata: Dict[str, Any]
 
@@ -2953,6 +2958,7 @@ def model_field(
     validation_alias: str | list[str | int] | list[list[str | int]] | None = None,
     serialization_alias: str | None = None,
     serialization_exclude: bool | None = None,
+    exclude_if: Callable[[Any], bool] | None = None,
     frozen: bool | None = None,
     metadata: Dict[str, Any] | None = None,
 ) -> ModelField:
@@ -2970,6 +2976,7 @@ def model_field(
         validation_alias: The alias(es) to use to find the field in the validation data
         serialization_alias: The alias to use as a key when serializing
         serialization_exclude: Whether to exclude the field when serializing
+        exclude_if: Callable that determines whether to exclude a field during serialization based on its value.
         frozen: Whether the field is frozen
         metadata: Any other information you want to include with the schema, not used by pydantic-core
     """
@@ -2979,6 +2986,7 @@ def model_field(
         validation_alias=validation_alias,
         serialization_alias=serialization_alias,
         serialization_exclude=serialization_exclude,
+        exclude_if=exclude_if,
         frozen=frozen,
         metadata=metadata,
     )
@@ -3171,7 +3179,8 @@ class DataclassField(TypedDict, total=False):
     validation_alias: Union[str, List[Union[str, int]], List[List[Union[str, int]]]]
     serialization_alias: str
     serialization_exclude: bool  # default: False
-    metadata: Dict[str, Any]
+    exclude_if: Callable[[Any], bool]  # default: None
+    metadata: Any
 
 
 def dataclass_field(
@@ -3184,7 +3193,8 @@ def dataclass_field(
     validation_alias: str | list[str | int] | list[list[str | int]] | None = None,
     serialization_alias: str | None = None,
     serialization_exclude: bool | None = None,
-    metadata: Dict[str, Any] | None = None,
+    exclude_if: Callable[[Any], bool] | None = None,
+    metadata: Any = None,
     frozen: bool | None = None,
 ) -> DataclassField:
     """
@@ -3210,6 +3220,7 @@ def dataclass_field(
         validation_alias: The alias(es) to use to find the field in the validation data
         serialization_alias: The alias to use as a key when serializing
         serialization_exclude: Whether to exclude the field when serializing
+        exclude_if: Callable that determines whether to exclude a field during serialization based on its value.
         metadata: Any other information you want to include with the schema, not used by pydantic-core
         frozen: Whether the field is frozen
     """
@@ -3223,6 +3234,7 @@ def dataclass_field(
         validation_alias=validation_alias,
         serialization_alias=serialization_alias,
         serialization_exclude=serialization_exclude,
+        exclude_if=exclude_if,
         metadata=metadata,
         frozen=frozen,
     )
