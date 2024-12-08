@@ -131,7 +131,7 @@ pub(crate) fn infer_to_python_known(
                 v.into_py(py)
             }
             ObType::Decimal => value.to_string().into_py(py),
-            ObType::StrSubclass => value.downcast::<PyString>()?.to_str()?.into_py(py),
+            ObType::StrSubclass => PyString::new_bound(py, value.downcast::<PyString>()?.to_str()?).into(),
             ObType::Bytes => extra
                 .config
                 .bytes_mode
@@ -285,8 +285,7 @@ pub(crate) fn infer_to_python_known(
             }
             ObType::Complex => {
                 let v = value.downcast::<PyComplex>()?;
-                let complex_str = type_serializers::complex::complex_to_str(v);
-                complex_str.into_py(py)
+                v.into_py(py)
             }
             ObType::Unknown => {
                 if let Some(fallback) = extra.fallback {
@@ -325,7 +324,7 @@ impl<'py> SerializeInfer<'py> {
     }
 }
 
-impl<'py> Serialize for SerializeInfer<'py> {
+impl Serialize for SerializeInfer<'_> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let ob_type = self.extra.ob_type_lookup.get_type(self.value);
         infer_serialize_known(ob_type, self.value, serializer, self.include, self.exclude, self.extra)
@@ -609,16 +608,11 @@ pub(crate) fn infer_json_key_known<'a>(
         }
         ObType::Decimal => Ok(Cow::Owned(key.to_string())),
         ObType::Bool => super::type_serializers::simple::bool_json_key(key),
-        ObType::Str | ObType::StrSubclass => {
-            let py_str = key.downcast::<PyString>()?;
-            Ok(Cow::Owned(py_str.to_str()?.to_string()))
-        }
+        ObType::Str | ObType::StrSubclass => key.downcast::<PyString>()?.to_cow(),
         ObType::Bytes => extra
             .config
             .bytes_mode
-            .bytes_to_string(key.py(), key.downcast::<PyBytes>()?.as_bytes())
-            // FIXME it would be nice to have a "PyCow" which carries ownership of the Python type too
-            .map(|s| Cow::Owned(s.into_owned())),
+            .bytes_to_string(key.py(), key.downcast::<PyBytes>()?.as_bytes()),
         ObType::Bytearray => {
             let py_byte_array = key.downcast::<PyByteArray>()?;
             // Safety: the GIL is held while serialize_bytes is running; it doesn't run

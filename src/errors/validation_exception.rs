@@ -386,7 +386,7 @@ impl ValidationError {
         let args = (
             borrow.title.bind(py),
             borrow.errors(py, include_url_env(py), true, true)?,
-            borrow.input_type.into_py(py),
+            borrow.input_type.into_pyobject(py)?,
             borrow.hide_input,
         )
             .into_py(slf.py());
@@ -582,7 +582,7 @@ struct ValidationErrorSerializer<'py> {
     input_type: &'py InputType,
 }
 
-impl<'py> Serialize for ValidationErrorSerializer<'py> {
+impl Serialize for ValidationErrorSerializer<'_> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -614,7 +614,7 @@ struct PyLineErrorSerializer<'py> {
     input_type: &'py InputType,
 }
 
-impl<'py> Serialize for PyLineErrorSerializer<'py> {
+impl Serialize for PyLineErrorSerializer<'_> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,

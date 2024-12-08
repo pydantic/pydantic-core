@@ -1,7 +1,8 @@
+use std::convert::Infallible;
 use std::fmt;
 
 use pyo3::exceptions::PyValueError;
-use pyo3::types::{PyDict, PyList};
+use pyo3::types::{PyDict, PyList, PyString};
 use pyo3::{intern, prelude::*};
 
 use crate::errors::{ErrorTypeDefaults, InputValue, LocItem, ValError, ValResult};
@@ -20,13 +21,17 @@ pub enum InputType {
     String,
 }
 
-impl IntoPy<PyObject> for InputType {
-    fn into_py(self, py: Python<'_>) -> PyObject {
-        match self {
-            Self::Json => intern!(py, "json").into_py(py),
-            Self::Python => intern!(py, "python").into_py(py),
-            Self::String => intern!(py, "string").into_py(py),
-        }
+impl<'py> IntoPyObject<'py> for InputType {
+    type Target = PyString;
+    type Output = Bound<'py, PyString>;
+    type Error = Infallible;
+
+    fn into_pyobject(self, py: Python<'_>) -> Result<Bound<'_, PyString>, Infallible> {
+        Ok(match self {
+            Self::Json => intern!(py, "json").clone(),
+            Self::Python => intern!(py, "python").clone(),
+            Self::String => intern!(py, "string").clone(),
+        })
     }
 }
 
@@ -263,7 +268,6 @@ pub trait ValidatedSet<'py> {
 
 /// This type is used for inputs which don't support certain types.
 /// It implements all the associated traits, but never actually gets called.
-
 pub enum Never {}
 
 impl<'py> ValidatedDict<'py> for Never {
@@ -325,7 +329,10 @@ impl Arguments<'_> for Never {
 }
 
 impl<'py> PositionalArgs<'py> for Never {
-    type Item<'a> = Bound<'py, PyAny> where Self: 'a;
+    type Item<'a>
+        = Bound<'py, PyAny>
+    where
+        Self: 'a;
     fn len(&self) -> usize {
         unreachable!()
     }
@@ -338,8 +345,14 @@ impl<'py> PositionalArgs<'py> for Never {
 }
 
 impl<'py> KeywordArgs<'py> for Never {
-    type Key<'a> = Bound<'py, PyAny> where Self: 'a;
-    type Item<'a> = Bound<'py, PyAny> where Self: 'a;
+    type Key<'a>
+        = Bound<'py, PyAny>
+    where
+        Self: 'a;
+    type Item<'a>
+        = Bound<'py, PyAny>
+    where
+        Self: 'a;
     fn len(&self) -> usize {
         unreachable!()
     }

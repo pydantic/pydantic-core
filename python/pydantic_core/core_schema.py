@@ -721,7 +721,7 @@ class DecimalSchema(TypedDict, total=False):
 
 def decimal_schema(
     *,
-    allow_inf_nan: bool = None,
+    allow_inf_nan: bool | None = None,
     multiple_of: Decimal | None = None,
     le: Decimal | None = None,
     ge: Decimal | None = None,
@@ -2866,7 +2866,7 @@ def typed_dict_field(
 class TypedDictSchema(TypedDict, total=False):
     type: Required[Literal['typed-dict']]
     fields: Required[Dict[str, TypedDictField]]
-    cls: Type[TypedDict]
+    cls: Type[Any]
     computed_fields: List[ComputedField]
     strict: bool
     extras_schema: CoreSchema
@@ -2884,7 +2884,7 @@ class TypedDictSchema(TypedDict, total=False):
 def typed_dict_schema(
     fields: Dict[str, TypedDictField],
     *,
-    cls: Type[TypedDict] | None = None,
+    cls: Type[Any] | None = None,
     computed_fields: list[ComputedField] | None = None,
     strict: bool | None = None,
     extras_schema: CoreSchema | None = None,
