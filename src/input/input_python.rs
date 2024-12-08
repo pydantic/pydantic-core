@@ -291,6 +291,18 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
             return Ok(ValidationMatch::exact(EitherFloat::Py(float.clone())));
         }
 
+        if self.is_instance_of::<PyComplex>() {
+            if !strict {
+                if let Ok(real) = self.getattr(intern!(self.py(), "real")) {
+                    if let Ok(float) = real.extract::<f64>() {
+                        return Ok(ValidationMatch::lax(EitherFloat::F64(float)));
+                    }
+                }
+            } else {
+                return Err(ValError::new(ErrorTypeDefaults::FloatType, self));
+            }
+        }
+
         if !strict {
             if let Some(s) = maybe_as_string(self, ErrorTypeDefaults::FloatParsing)? {
                 // checking for bytes and string is fast, so do this before isinstance(float)
