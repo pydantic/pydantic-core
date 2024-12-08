@@ -292,15 +292,12 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
         }
 
         if self.is_instance_of::<PyComplex>() {
-            if !strict {
-                if let Ok(real) = self.getattr(intern!(self.py(), "real")) {
-                    if let Ok(float) = real.extract::<f64>() {
-                        return Ok(ValidationMatch::lax(EitherFloat::F64(float)));
-                    }
-                }
-            } else {
+            if strict {
                 return Err(ValError::new(ErrorTypeDefaults::FloatType, self));
             }
+            let real = self.getattr(intern!(self.py(), "real")).unwrap();
+            let float = real.extract::<f64>().unwrap();
+            return Ok(ValidationMatch::lax(EitherFloat::F64(float)));
         }
 
         if !strict {
