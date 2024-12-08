@@ -1781,3 +1781,56 @@ def test_extra_behavior_ignore(config: Union[core_schema.CoreConfig, None], sche
         }
     ]
     assert 'not_f' not in m
+
+
+@pytest.mark.parametrize(
+    ('fail_fast', 'expected'),
+    [
+        pytest.param(
+            True,
+            [
+                {
+                    'input': 'x',
+                    'loc': ('a',),
+                    'msg': 'Input should be a valid integer, unable to parse string as an integer',
+                    'type': 'int_parsing',
+                },
+            ],
+            id='fail_fast',
+        ),
+        pytest.param(
+            False,
+            [
+                {
+                    'input': 'x',
+                    'loc': ('a',),
+                    'msg': 'Input should be a valid integer, unable to parse string as an integer',
+                    'type': 'int_parsing',
+                },
+                {
+                    'input': 'y',
+                    'loc': ('b',),
+                    'msg': 'Input should be a valid integer, unable to parse string as an integer',
+                    'type': 'int_parsing',
+                },
+            ],
+            id='not_fail_fast',
+        ),
+    ],
+)
+def test_model_fields_fail_fast(fail_fast, expected):
+    v = SchemaValidator(
+        {
+            'type': 'model-fields',
+            'fields': {
+                'a': {'type': 'model-field', 'schema': {'type': 'int'}},
+                'b': {'type': 'model-field', 'schema': {'type': 'int'}},
+            },
+            'fail_fast': fail_fast,
+        },
+    )
+
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python({'a': 'x', 'b': 'y'})
+
+    assert exc_info.value.errors(include_url=False) == expected

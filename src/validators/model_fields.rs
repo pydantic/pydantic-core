@@ -36,6 +36,7 @@ pub struct ModelFieldsValidator {
     strict: bool,
     from_attributes: bool,
     loc_by_alias: bool,
+    fail_fast: bool,
 }
 
 impl BuildValidator for ModelFieldsValidator {
@@ -51,6 +52,7 @@ impl BuildValidator for ModelFieldsValidator {
 
         let from_attributes = schema_or_config_same(schema, config, intern!(py, "from_attributes"))?.unwrap_or(false);
         let populate_by_name = schema_or_config_same(schema, config, intern!(py, "populate_by_name"))?.unwrap_or(false);
+        let fail_fast = schema_or_config_same(schema, config, intern!(py, "fail_fast"))?.unwrap_or(false);
 
         let extra_behavior = ExtraBehavior::from_schema_or_config(py, schema, config, ExtraBehavior::Ignore)?;
 
@@ -102,6 +104,7 @@ impl BuildValidator for ModelFieldsValidator {
             extras_validator,
             strict,
             from_attributes,
+            fail_fast,
             loc_by_alias: config.get_as(intern!(py, "loc_by_alias"))?.unwrap_or(true),
         }
         .into())
@@ -168,6 +171,10 @@ impl Validator for ModelFieldsValidator {
             let state = &mut state.rebind_extra(|extra| extra.data = Some(model_dict.clone()));
 
             for field in &self.fields {
+                if self.fail_fast && !errors.is_empty() {
+                    break;
+                }
+
                 let op_key_value = match dict.get_item(&field.lookup_key) {
                     Ok(v) => v,
                     Err(ValError::LineErrors(line_errors)) => {

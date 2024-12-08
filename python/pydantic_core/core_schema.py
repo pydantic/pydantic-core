@@ -96,6 +96,8 @@ class CoreConfig(TypedDict, total=False):
     validate_default: bool
     # used on typed-dicts and arguments
     populate_by_name: bool  # replaces `allow_population_by_field_name` in pydantic v1
+    # stop validation on a first error, used with typed-dict, model-fields, and dataclass fields
+    fail_fast: bool
     # fields related to string fields only
     str_max_length: int
     str_min_length: int
@@ -1885,6 +1887,7 @@ class DictSchema(TypedDict, total=False):
     values_schema: CoreSchema  # default: AnySchema
     min_length: int
     max_length: int
+    fail_fast: bool
     strict: bool
     ref: str
     metadata: Dict[str, Any]
@@ -1897,6 +1900,7 @@ def dict_schema(
     *,
     min_length: int | None = None,
     max_length: int | None = None,
+    fail_fast: bool | None = None,
     strict: bool | None = None,
     ref: str | None = None,
     metadata: Dict[str, Any] | None = None,
@@ -1920,6 +1924,7 @@ def dict_schema(
         values_schema: The value must be a dict with values that match this schema
         min_length: The value must be a dict with at least this many items
         max_length: The value must be a dict with at most this many items
+        fail_fast: Stop validation on the first error
         strict: Whether the keys and values should be validated with strict mode
         ref: optional unique identifier of the schema, used to reference the schema in other places
         metadata: Any other information you want to include with the schema, not used by pydantic-core
@@ -1931,6 +1936,7 @@ def dict_schema(
         values_schema=values_schema,
         min_length=min_length,
         max_length=max_length,
+        fail_fast=fail_fast,
         strict=strict,
         ref=ref,
         metadata=metadata,
@@ -2868,6 +2874,7 @@ class TypedDictSchema(TypedDict, total=False):
     extra_behavior: ExtraBehavior
     total: bool  # default: True
     populate_by_name: bool  # replaces `allow_population_by_field_name` in pydantic v1
+    fail_fast: bool  # default: False
     ref: str
     metadata: Dict[str, Any]
     serialization: SerSchema
@@ -2884,6 +2891,7 @@ def typed_dict_schema(
     extra_behavior: ExtraBehavior | None = None,
     total: bool | None = None,
     populate_by_name: bool | None = None,
+    fail_fast: bool | None = None,
     ref: str | None = None,
     metadata: Dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
@@ -2918,6 +2926,7 @@ def typed_dict_schema(
         extra_behavior: The extra behavior to use for the typed dict
         total: Whether the typed dict is total, otherwise uses `typed_dict_total` from config
         populate_by_name: Whether the typed dict should populate by name
+        fail_fast: Stop validation on the first error
         serialization: Custom serialization schema
     """
     return _dict_not_none(
@@ -2930,6 +2939,7 @@ def typed_dict_schema(
         extra_behavior=extra_behavior,
         total=total,
         populate_by_name=populate_by_name,
+        fail_fast=fail_fast,
         ref=ref,
         metadata=metadata,
         serialization=serialization,
@@ -2994,6 +3004,7 @@ class ModelFieldsSchema(TypedDict, total=False):
     # all these values can be set via config, equivalent fields have `typed_dict_` prefix
     extra_behavior: ExtraBehavior
     populate_by_name: bool  # replaces `allow_population_by_field_name` in pydantic v1
+    fail_fast: bool  # default: False
     from_attributes: bool
     ref: str
     metadata: Dict[str, Any]
@@ -3010,6 +3021,7 @@ def model_fields_schema(
     extra_behavior: ExtraBehavior | None = None,
     populate_by_name: bool | None = None,
     from_attributes: bool | None = None,
+    fail_fast: bool | None = None,
     ref: str | None = None,
     metadata: Dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
@@ -3039,6 +3051,7 @@ def model_fields_schema(
         extra_behavior: The extra behavior to use for the typed dict
         populate_by_name: Whether the typed dict should populate by name
         from_attributes: Whether the typed dict should be populated from attributes
+        fail_fast: Stop validation on the first error
         serialization: Custom serialization schema
     """
     return _dict_not_none(
@@ -3051,6 +3064,7 @@ def model_fields_schema(
         extra_behavior=extra_behavior,
         populate_by_name=populate_by_name,
         from_attributes=from_attributes,
+        fail_fast=fail_fast,
         ref=ref,
         metadata=metadata,
         serialization=serialization,
@@ -3234,6 +3248,7 @@ class DataclassArgsSchema(TypedDict, total=False):
     fields: Required[List[DataclassField]]
     computed_fields: List[ComputedField]
     populate_by_name: bool  # default: False
+    fail_fast: bool  # default: False
     collect_init_only: bool  # default: False
     ref: str
     metadata: Dict[str, Any]
@@ -3247,6 +3262,7 @@ def dataclass_args_schema(
     *,
     computed_fields: List[ComputedField] | None = None,
     populate_by_name: bool | None = None,
+    fail_fast: bool | None = None,
     collect_init_only: bool | None = None,
     ref: str | None = None,
     metadata: Dict[str, Any] | None = None,
@@ -3275,6 +3291,7 @@ def dataclass_args_schema(
         fields: The fields to use for the dataclass
         computed_fields: Computed fields to use when serializing the dataclass
         populate_by_name: Whether to populate by name
+        fail_fast: Stop validation on the first error
         collect_init_only: Whether to collect init only fields into a dict to pass to `__post_init__`
         ref: optional unique identifier of the schema, used to reference the schema in other places
         metadata: Any other information you want to include with the schema, not used by pydantic-core
@@ -3287,6 +3304,7 @@ def dataclass_args_schema(
         fields=fields,
         computed_fields=computed_fields,
         populate_by_name=populate_by_name,
+        fail_fast=fail_fast,
         collect_init_only=collect_init_only,
         ref=ref,
         metadata=metadata,
