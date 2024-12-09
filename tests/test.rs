@@ -116,7 +116,7 @@ a = A()
         Python::with_gil(|py| {
             let code = c_str!(
                 r#"
-hema = {
+schema = {
     "type": "dict",
     "keys_schema": {
         "type": "literal",
