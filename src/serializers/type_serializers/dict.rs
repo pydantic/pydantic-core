@@ -4,6 +4,7 @@ use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
+use pyo3::IntoPyObjectExt;
 use serde::ser::SerializeMap;
 
 use crate::definitions::DefinitionsBuilder;
@@ -83,12 +84,12 @@ impl TypeSerializer for DictSerializer {
             Ok(py_dict) => {
                 let value_serializer = self.value_serializer.as_ref();
 
-                let new_dict = PyDict::new_bound(py);
+                let new_dict = PyDict::new(py);
                 for (key, value) in py_dict.iter() {
                     let op_next = self.filter.key_filter(&key, include, exclude)?;
                     if let Some((next_include, next_exclude)) = op_next {
                         let key = match extra.mode {
-                            SerMode::Json => self.key_serializer.json_key(&key, extra)?.into_py(py),
+                            SerMode::Json => self.key_serializer.json_key(&key, extra)?.into_py_any(py)?,
                             _ => self.key_serializer.to_python(&key, None, None, extra)?,
                         };
                         let value =
@@ -96,7 +97,7 @@ impl TypeSerializer for DictSerializer {
                         new_dict.set_item(key, value)?;
                     }
                 }
-                Ok(new_dict.into_py(py))
+                Ok(new_dict.into())
             }
             Err(_) => {
                 extra.warnings.on_fallback_py(self.get_name(), value, extra)?;

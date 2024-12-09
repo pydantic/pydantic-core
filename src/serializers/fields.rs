@@ -41,9 +41,7 @@ impl SerField {
         serializer: Option<CombinedSerializer>,
         required: bool,
     ) -> Self {
-        let alias_py = alias
-            .as_ref()
-            .map(|alias| PyString::new_bound(py, alias.as_str()).into());
+        let alias_py = alias.as_ref().map(|alias| PyString::new(py, alias.as_str()).into());
         Self {
             key_py,
             alias,
@@ -153,7 +151,7 @@ impl GeneralFieldsSerializer {
         exclude: Option<&Bound<'py, PyAny>>,
         extra: Extra,
     ) -> PyResult<Bound<'py, PyDict>> {
-        let output_dict = PyDict::new_bound(py);
+        let output_dict = PyDict::new(py);
         let mut used_req_fields: usize = 0;
 
         // NOTE! we maintain the order of the input dict assuming that's right
@@ -385,7 +383,7 @@ impl TypeSerializer for GeneralFieldsSerializer {
             }
         }
         self.add_computed_fields_python(model, &output_dict, include, exclude, extra)?;
-        Ok(output_dict.into_py(py))
+        Ok(output_dict.into())
     }
 
     fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
