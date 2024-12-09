@@ -167,7 +167,7 @@ impl ValidationError {
             #[cfg(not(Py_3_11))]
             let cause = {
                 use pyo3::exceptions::PyImportError;
-                match py.import_bound("exceptiongroup") {
+                match py.import("exceptiongroup") {
                     Ok(py_mod) => match py_mod.getattr("ExceptionGroup") {
                         Ok(group_cls) => match group_cls.call1((title, user_py_errs)) {
                             Ok(group_instance) => Some(group_instance.into_py(py)),

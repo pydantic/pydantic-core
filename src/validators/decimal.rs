@@ -19,7 +19,7 @@ static DECIMAL_TYPE: GILOnceCell<Py<PyType>> = GILOnceCell::new();
 pub fn get_decimal_type(py: Python) -> &Bound<'_, PyType> {
     DECIMAL_TYPE
         .get_or_init(py, || {
-            py.import_bound("decimal")
+            py.import("decimal")
                 .and_then(|decimal_module| decimal_module.getattr("Decimal"))
                 .unwrap()
                 .extract()
@@ -267,7 +267,7 @@ pub(crate) fn create_decimal<'py>(arg: &Bound<'py, PyAny>, input: impl ToErrorVa
     let py = arg.py();
     get_decimal_type(py).call1((arg,)).map_err(|e| {
         let decimal_exception = match py
-            .import_bound("decimal")
+            .import("decimal")
             .and_then(|decimal_module| decimal_module.getattr("DecimalException"))
         {
             Ok(decimal_exception) => decimal_exception,
