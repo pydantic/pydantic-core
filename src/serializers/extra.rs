@@ -1,3 +1,4 @@
+use std::ffi::CString;
 use std::fmt;
 use std::sync::Mutex;
 
@@ -472,7 +473,7 @@ impl CollectWarnings {
         let message = format!("Pydantic serializer warnings:\n  {}", warnings.join("\n  "));
         if self.mode == WarningsMode::Warn {
             let user_warning_type = PyUserWarning::type_object(py);
-            PyErr::warn_bound(py, &user_warning_type, &message, 0)
+            PyErr::warn(py, &user_warning_type, &CString::new(message)?, 0)
         } else {
             Err(PydanticSerializationError::new_err(message))
         }

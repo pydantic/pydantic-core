@@ -3,7 +3,7 @@ use std::fmt::{Display, Write};
 use std::str::from_utf8;
 
 use pyo3::exceptions::{PyKeyError, PyTypeError, PyValueError};
-use pyo3::ffi;
+use pyo3::ffi::{self, c_str};
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::sync::GILOnceCell;
@@ -73,7 +73,7 @@ impl ValidationError {
                                 return cause_problem;
                             }
                         }
-                        PyErr::from_value_bound(err.into_bound(py).into_any())
+                        PyErr::from_value(err.into_bound(py).into_any())
                     }
                     Err(err) => err,
                 }
@@ -145,7 +145,7 @@ impl ValidationError {
                     use pyo3::exceptions::PyUserWarning;
 
                     let wrapped = PyUserWarning::new_err((note,));
-                    wrapped.set_cause(py, Some(PyErr::from_value_bound(err.clone_ref(py).into_bound(py))));
+                    wrapped.set_cause(py, Some(PyErr::from_value(err.clone_ref(py).into_bound(py))));
                     user_py_errs.push(wrapped);
                 }
             }
@@ -202,10 +202,10 @@ fn include_url_env(py: Python) -> bool {
         match std::env::var_os("PYDANTIC_ERRORS_OMIT_URL") {
             Some(val) => {
                 // We don't care whether warning succeeded or not, hence the assignment
-                let _ = PyErr::warn_bound(
+                let _ = PyErr::warn(
                     py,
-                    &py.get_type_bound::<pyo3::exceptions::PyDeprecationWarning>(),
-                    "PYDANTIC_ERRORS_OMIT_URL is deprecated, use PYDANTIC_ERRORS_INCLUDE_URL instead",
+                    &py.get_type::<pyo3::exceptions::PyDeprecationWarning>(),
+                    c_str!("PYDANTIC_ERRORS_OMIT_URL is deprecated, use PYDANTIC_ERRORS_INCLUDE_URL instead"),
                     1,
                 );
                 // If OMIT_URL exists but is empty, we include the URL:

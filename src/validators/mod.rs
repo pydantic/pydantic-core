@@ -4,6 +4,7 @@ use enum_dispatch::enum_dispatch;
 use jiter::{PartialMode, StringCacheMode};
 
 use pyo3::exceptions::PyTypeError;
+use pyo3::ffi::c_str;
 use pyo3::prelude::*;
 use pyo3::sync::GILOnceCell;
 use pyo3::types::{PyAny, PyDict, PyString, PyTuple, PyType};
@@ -444,9 +445,9 @@ impl<'py> SelfValidator<'py> {
     }
 
     fn build(py: Python) -> PyResult<SchemaValidator> {
-        let code = include_str!("../self_schema.py");
+        let code = c_str!(include_str!("../self_schema.py"));
         let locals = PyDict::new(py);
-        py.run_bound(code, None, Some(&locals))?;
+        py.run(code, None, Some(&locals))?;
         let self_schema = locals.get_as_req(intern!(py, "self_schema"))?;
 
         let mut definitions_builder = DefinitionsBuilder::new();

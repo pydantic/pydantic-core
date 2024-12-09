@@ -189,7 +189,7 @@ impl FunctionPlainSerializer {
 }
 
 fn on_error(py: Python, err: PyErr, function_name: &str, extra: &Extra) -> PyResult<()> {
-    let exception = err.value_bound(py);
+    let exception = err.value(py);
     if let Ok(ser_err) = exception.extract::<PydanticSerializationUnexpectedValue>() {
         if extra.check.enabled() {
             Err(err)

@@ -755,7 +755,7 @@ pub enum EitherComplex<'a> {
 impl IntoPy<PyObject> for EitherComplex<'_> {
     fn into_py(self, py: Python<'_>) -> PyObject {
         match self {
-            Self::Complex(c) => PyComplex::from_doubles_bound(py, c[0], c[1]).into_py(py),
+            Self::Complex(c) => PyComplex::from_doubles(py, c[0], c[1]).into_py(py),
             Self::Py(c) => c.into_py(py),
         }
     }

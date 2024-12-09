@@ -294,7 +294,7 @@ impl ModelValidator {
             if let Some(kwargs) = input.as_kwargs(py) {
                 return self
                     .class
-                    .call_bound(py, (), Some(&kwargs))
+                    .call(py, (), Some(&kwargs))
                     .map_err(|e| convert_err(py, e, input));
             }
         }

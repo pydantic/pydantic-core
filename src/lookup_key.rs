@@ -511,7 +511,7 @@ fn py_get_attrs<'py>(obj: &Bound<'py, PyAny>, attr_name: &Py<PyString>) -> PyRes
     match obj.getattr(attr_name) {
         Ok(attr) => Ok(Some(attr)),
         Err(err) => {
-            if err.get_type_bound(obj.py()).is_subclass_of::<PyAttributeError>()? {
+            if err.get_type(obj.py()).is_subclass_of::<PyAttributeError>()? {
                 Ok(None)
             } else {
                 Err(err)

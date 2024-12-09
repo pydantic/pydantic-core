@@ -192,7 +192,7 @@ impl Validator for DecimalValidator {
                 return Err(ValError::new(
                     ErrorType::MultipleOf {
                         multiple_of: multiple_of.to_string().into(),
-                        context: Some([("multiple_of", multiple_of)].into_py_dict_bound(py).into()),
+                        context: Some([("multiple_of", multiple_of)].into_py_dict(py)?.into()),
                     },
                     input,
                 ));
@@ -215,7 +215,7 @@ impl Validator for DecimalValidator {
                 return Err(ValError::new(
                     ErrorType::LessThanEqual {
                         le: Number::String(le.to_string()),
-                        context: Some([("le", le)].into_py_dict_bound(py).into()),
+                        context: Some([("le", le)].into_py_dict(py)?.into()),
                     },
                     input,
                 ));
@@ -226,7 +226,7 @@ impl Validator for DecimalValidator {
                 return Err(ValError::new(
                     ErrorType::LessThan {
                         lt: Number::String(lt.to_string()),
-                        context: Some([("lt", lt)].into_py_dict_bound(py).into()),
+                        context: Some([("lt", lt)].into_py_dict(py)?.into()),
                     },
                     input,
                 ));
@@ -237,7 +237,7 @@ impl Validator for DecimalValidator {
                 return Err(ValError::new(
                     ErrorType::GreaterThanEqual {
                         ge: Number::String(ge.to_string()),
-                        context: Some([("ge", ge)].into_py_dict_bound(py).into()),
+                        context: Some([("ge", ge)].into_py_dict(py)?.into()),
                     },
                     input,
                 ));
@@ -248,7 +248,7 @@ impl Validator for DecimalValidator {
                 return Err(ValError::new(
                     ErrorType::GreaterThan {
                         gt: Number::String(gt.to_string()),
-                        context: Some([("gt", gt)].into_py_dict_bound(py).into()),
+                        context: Some([("gt", gt)].into_py_dict(py)?.into()),
                     },
                     input,
                 ));
@@ -281,7 +281,7 @@ fn handle_decimal_new_error(input: impl ToErrorValue, error: PyErr, decimal_exce
     let py = decimal_exception.py();
     if error.matches(py, decimal_exception).unwrap_or(false) {
         ValError::new(ErrorTypeDefaults::DecimalParsing, input)
-    } else if error.matches(py, PyTypeError::type_object_bound(py)).unwrap_or(false) {
+    } else if error.matches(py, PyTypeError::type_object(py)).unwrap_or(false) {
         ValError::new(ErrorTypeDefaults::DecimalType, input)
     } else {
         ValError::InternalErr(error)
