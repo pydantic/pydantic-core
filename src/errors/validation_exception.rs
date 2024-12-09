@@ -153,7 +153,7 @@ impl ValidationError {
                 {
                     use pyo3::exceptions::PyUserWarning;
 
-                    let wrapped = PyUserWarning::new_err((note,));
+                    let wrapped = PyUserWarning::new_err((note.unbind(),));
                     wrapped.set_cause(py, Some(PyErr::from_value(err.clone_ref(py).into_bound(py))));
                     user_py_errs.push(wrapped);
                 }
@@ -168,7 +168,7 @@ impl ValidationError {
             #[cfg(Py_3_11)]
             let cause = {
                 use pyo3::exceptions::PyBaseExceptionGroup;
-                Some(PyBaseExceptionGroup::new_err((title, user_py_errs)))
+                Some(PyBaseExceptionGroup::new_err((title, user_py_errs)).into_value(py))
             };
 
             // Pre 3.11 ExceptionGroup support, use the python backport instead:
@@ -192,7 +192,7 @@ impl ValidationError {
             if let Some(cause) = cause {
                 unsafe {
                     // PyException_SetCause _steals_ a reference to cause, so must use .into_ptr()
-                    ffi::PyException_SetCause(self_.as_ptr(), cause.value(py).clone().into_ptr());
+                    ffi::PyException_SetCause(self_.as_ptr(), cause.into_ptr());
                 }
             }
         }
