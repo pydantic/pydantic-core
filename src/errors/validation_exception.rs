@@ -298,7 +298,7 @@ impl ValidationError {
     ) -> PyResult<Py<PyList>> {
         let url_prefix = get_url_prefix(py, include_url);
         let mut iteration_error = None;
-        let list = PyList::new_bound(
+        let list = PyList::new(
             py,
             // PyList::new takes ExactSizeIterator, so if an error occurs during iteration we
             // fill the list with None before returning the error; the list will then be thrown
@@ -313,7 +313,7 @@ impl ValidationError {
                         py.None()
                     })
             }),
-        );
+        )?;
         if let Some(err) = iteration_error {
             Err(err)
         } else {
@@ -368,7 +368,7 @@ impl ValidationError {
             }
         };
         let s = from_utf8(&bytes).map_err(json_py_err)?;
-        Ok(PyString::new_bound(py, s))
+        Ok(PyString::new(py, s))
     }
 
     fn __repr__(&self, py: Python) -> String {
@@ -489,7 +489,7 @@ impl PyLineError {
         input_type: InputType,
         include_input: bool,
     ) -> PyResult<PyObject> {
-        let dict = PyDict::new_bound(py);
+        let dict = PyDict::new(py);
         dict.set_item("type", self.error_type.type_string())?;
         dict.set_item("loc", self.location.to_object(py))?;
         dict.set_item("msg", self.error_type.render_message(py, input_type)?)?;

@@ -266,7 +266,7 @@ impl ModelValidator {
             let fields_set = if input.to_object(py).is(&self.undefined) {
                 PySet::empty_bound(py)?
             } else {
-                PySet::new_bound(py, [&String::from(ROOT_FIELD)])?
+                PySet::new(py, [&String::from(ROOT_FIELD)])?
             };
             force_setattr(py, self_instance, intern!(py, DUNDER_FIELDS_SET_KEY), &fields_set)?;
             force_setattr(py, self_instance, intern!(py, ROOT_FIELD), &output)?;
@@ -307,7 +307,7 @@ impl ModelValidator {
             let fields_set = if input.to_object(py).is(&self.undefined) {
                 PySet::empty_bound(py)?
             } else {
-                PySet::new_bound(py, [&String::from(ROOT_FIELD)])?
+                PySet::new(py, [&String::from(ROOT_FIELD)])?
             };
             force_setattr(py, &instance, intern!(py, DUNDER_FIELDS_SET_KEY), &fields_set)?;
             force_setattr(py, &instance, intern!(py, ROOT_FIELD), output)?;

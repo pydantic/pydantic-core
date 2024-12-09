@@ -548,7 +548,7 @@ impl EitherBytes<'_, '_> {
 impl IntoPy<PyObject> for EitherBytes<'_, '_> {
     fn into_py(self, py: Python<'_>) -> PyObject {
         match self {
-            EitherBytes::Cow(bytes) => PyBytes::new_bound(py, &bytes).into_py(py),
+            EitherBytes::Cow(bytes) => PyBytes::new(py, &bytes).into_py(py),
             EitherBytes::Py(py_bytes) => py_bytes.into_py(py),
         }
     }
