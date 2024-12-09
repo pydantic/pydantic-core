@@ -16,6 +16,7 @@ pub mod json_or_python;
 pub mod list;
 pub mod literal;
 pub mod model;
+pub mod never;
 pub mod nullable;
 pub mod other;
 pub mod set_frozenset;

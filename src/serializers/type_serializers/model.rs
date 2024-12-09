@@ -62,7 +62,12 @@ impl BuildSerializer for ModelFieldsBuilder {
                 let serializer = CombinedSerializer::build(&schema, config, definitions)
                     .map_err(|e| py_schema_error_type!("Field `{}`:\n  {}", key, e))?;
 
-                fields.insert(key, SerField::new(py, key_py, alias, Some(serializer), true));
+                match serializer {
+                    CombinedSerializer::Never(_) => {}
+                    s => {
+                        fields.insert(key, SerField::new(py, key_py, alias, Some(s), true));
+                    }
+                }
             }
         }
 
