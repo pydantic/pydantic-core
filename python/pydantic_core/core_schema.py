@@ -3873,7 +3873,7 @@ def never_schema(
     Returns a schema that represents a `typing.Never` field, e.g.:
 
     ```py
-    from pydantic_core import SchemaValidator, core_schema
+    from pydantic_core import SchemaValidator, core_schema, ValidationError
 
     schema = core_schema.never_schema()
     v = SchemaValidator(schema)
