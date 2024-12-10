@@ -410,6 +410,7 @@ all_errors = [
         'Input should be a valid complex string following the rules at https://docs.python.org/3/library/functions.html#complex',
         None,
     ),
+    ('never', 'Unexpected input for a field that should never be filled', None),
 ]
 
 

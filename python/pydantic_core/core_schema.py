@@ -3876,7 +3876,8 @@ def never_schema(
     from pydantic_core import SchemaValidator, core_schema
 
     schema = core_schema.never_schema()
-    v = SchemaValidator(schema) # should always fail
+    v = SchemaValidator(schema)
+    # Validation should always fail
     try:
         assert v.validate_python(1)
     except ValidationError:
