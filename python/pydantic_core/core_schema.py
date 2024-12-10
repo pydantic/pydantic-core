@@ -4120,6 +4120,7 @@ ErrorType = Literal[
     'decimal_whole_digits',
     'complex_type',
     'complex_str_parsing',
+    'never',
 ]
 
 
