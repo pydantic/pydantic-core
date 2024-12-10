@@ -1,6 +1,7 @@
 import dataclasses
 import json
 import platform
+import sys
 import warnings
 from random import randint
 from typing import Any, ClassVar, Dict
@@ -1152,3 +1153,28 @@ def test_warn_on_missing_field() -> None:
     with pytest.warns(UserWarning, match='Expected 2 fields but got 1 for type `.*AModel` with value `.*`.+'):
         value = BasicModel(root=AModel(type='a'))
         s.to_python(value)
+
+
+@pytest.mark.skipif(sys.version_info < (3, 11), reason='typing.Never was introduced in 3.11')
+def test_never():
+    from typing import Never
+
+    class MyModel:
+        a: int
+        b: Never
+
+    schema = core_schema.model_schema(
+        MyModel,
+        core_schema.model_fields_schema(
+            {
+                'a': core_schema.model_field(core_schema.int_schema()),
+                'b': core_schema.model_field(core_schema.never_schema()),
+            }
+        ),
+    )
+    v = SchemaValidator(schema)
+    m = v.validate_python({'a': 1})
+    s = SchemaSerializer(schema)
+    # `b` should not break the serialiser or be serialised
+    assert s.to_python(m) == {'a': 1}
+    assert json.loads(s.to_json(m)) == {'a': 1}

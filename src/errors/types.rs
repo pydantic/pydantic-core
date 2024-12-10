@@ -430,6 +430,7 @@ error_types! {
     // Complex errors
     ComplexType {},
     ComplexStrParsing {},
+    Never {},
 }
 
 macro_rules! render {
@@ -576,6 +577,7 @@ impl ErrorType {
             Self::DecimalWholeDigits {..} => "Decimal input should have no more than {whole_digits} digit{expected_plural} before the decimal point",
             Self::ComplexType {..} => "Input should be a valid python complex object, a number, or a valid complex string following the rules at https://docs.python.org/3/library/functions.html#complex",
             Self::ComplexStrParsing {..} => "Input should be a valid complex string following the rules at https://docs.python.org/3/library/functions.html#complex",
+            Self::Never { .. } => "Unexpected input for a field that should never be filled"
         }
     }
 

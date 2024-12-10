@@ -143,6 +143,7 @@ combined_serializer! {
         Recursive: super::type_serializers::definitions::DefinitionRefSerializer;
         Tuple: super::type_serializers::tuple::TupleSerializer;
         Complex: super::type_serializers::complex::ComplexSerializer;
+        Never: super::type_serializers::never::NeverSerializer;
     }
 }
 
@@ -254,6 +255,7 @@ impl PyGcTraverse for CombinedSerializer {
             CombinedSerializer::Tuple(inner) => inner.py_gc_traverse(visit),
             CombinedSerializer::Uuid(inner) => inner.py_gc_traverse(visit),
             CombinedSerializer::Complex(inner) => inner.py_gc_traverse(visit),
+            CombinedSerializer::Never(inner) => inner.py_gc_traverse(visit),
         }
     }
 }
