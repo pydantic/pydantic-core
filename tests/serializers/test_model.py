@@ -1,9 +1,10 @@
 import dataclasses
 import json
 import platform
+import sys
 import warnings
 from random import randint
-from typing import Any, ClassVar, Dict, Never
+from typing import Any, ClassVar, Dict
 
 try:
     from functools import cached_property
@@ -1154,7 +1155,10 @@ def test_warn_on_missing_field() -> None:
         s.to_python(value)
 
 
+@pytest.mark.skipif(sys.version_info < (3, 11), reason='typing.Never was introduced in 3.11')
 def test_never():
+    from typing import Never
+
     class MyModel:
         a: int
         b: Never

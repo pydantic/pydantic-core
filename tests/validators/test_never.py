@@ -1,4 +1,4 @@
-from typing import Never
+import sys
 
 import pytest
 
@@ -16,7 +16,10 @@ def test_python_never():
     assert v.validate_python(PydanticUndefined) is PydanticUndefined
 
 
+@pytest.mark.skipif(sys.version_info < (3, 11), reason='typing.Never was introduced in 3.11')
 def test_json_never():
+    from typing import Never
+
     v = SchemaValidator(core_schema.never_schema())
     with pytest.raises(ValidationError) as exc_info:
         v.validate_json('null')
