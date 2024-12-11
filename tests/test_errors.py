@@ -411,6 +411,7 @@ all_errors = [
         None,
     ),
     ('never', 'No input is allowed for `typing.Never`', None),
+    ('never_serializing', 'Type `typing.Never` cannot be serialized', None),
 ]
 
 

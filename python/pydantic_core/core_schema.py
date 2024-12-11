@@ -4122,6 +4122,7 @@ ErrorType = Literal[
     'complex_type',
     'complex_str_parsing',
     'never',
+    'never_serializing',
 ]
 
 

@@ -431,6 +431,7 @@ error_types! {
     ComplexType {},
     ComplexStrParsing {},
     Never {},
+    NeverSerializing {},
 }
 
 macro_rules! render {
@@ -577,7 +578,8 @@ impl ErrorType {
             Self::DecimalWholeDigits {..} => "Decimal input should have no more than {whole_digits} digit{expected_plural} before the decimal point",
             Self::ComplexType {..} => "Input should be a valid python complex object, a number, or a valid complex string following the rules at https://docs.python.org/3/library/functions.html#complex",
             Self::ComplexStrParsing {..} => "Input should be a valid complex string following the rules at https://docs.python.org/3/library/functions.html#complex",
-            Self::Never { .. } => "No input is allowed for `typing.Never`"
+            Self::Never { .. } => "No input is allowed for `typing.Never`",
+            Self::NeverSerializing { .. } => "Type `typing.Never` cannot be serialized"
         }
     }
 
