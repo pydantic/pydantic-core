@@ -10,7 +10,7 @@ def test_python_never():
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python(1)
     assert exc_info.value.errors(include_url=False) == [
-        {'type': 'never', 'loc': (), 'msg': 'Unexpected input for a field that should never be filled', 'input': 1}
+        {'type': 'never', 'loc': (), 'msg': 'No input is allowed for `typing.Never`', 'input': 1}
     ]
 
     assert v.validate_python(PydanticUndefined) is PydanticUndefined
@@ -24,7 +24,7 @@ def test_json_never():
     with pytest.raises(ValidationError) as exc_info:
         v.validate_json('null')
     assert exc_info.value.errors(include_url=False) == [
-        {'type': 'never', 'loc': (), 'msg': 'Unexpected input for a field that should never be filled', 'input': None}
+        {'type': 'never', 'loc': (), 'msg': 'No input is allowed for `typing.Never`', 'input': None}
     ]
 
     class MyModel:
