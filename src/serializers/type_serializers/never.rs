@@ -32,11 +32,11 @@ impl TypeSerializer for NeverSerializer {
         _exclude: Option<&Bound<'_, PyAny>>,
         _extra: &Extra,
     ) -> PyResult<PyObject> {
-        py_err!(PyTypeError; ErrorTypeDefaults::Never.message_template_python())
+        py_err!(PyTypeError; ErrorTypeDefaults::NeverSerializing.message_template_python())
     }
 
     fn json_key<'a>(&self, _key: &'a Bound<'_, PyAny>, _extra: &Extra) -> PyResult<Cow<'a, str>> {
-        py_err!(PyTypeError; ErrorTypeDefaults::Never.message_template_python())
+        py_err!(PyTypeError; ErrorTypeDefaults::NeverSerializing.message_template_python())
     }
 
     fn serde_serialize<S: serde::ser::Serializer>(
@@ -47,7 +47,7 @@ impl TypeSerializer for NeverSerializer {
         _exclude: Option<&Bound<'_, PyAny>>,
         _extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
-        py_err!(PyTypeError; ErrorTypeDefaults::Never.message_template_python()).map_err(py_err_se_err)
+        py_err!(PyTypeError; ErrorTypeDefaults::NeverSerializing.message_template_python()).map_err(py_err_se_err)
     }
 
     fn get_name(&self) -> &str {
