@@ -14,7 +14,7 @@ use crate::tools::SchemaDict;
 
 use super::errors::py_err_se_err;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 #[allow(clippy::struct_field_names)]
 pub(crate) struct SerializationConfig {
     pub timedelta_mode: TimedeltaMode,
@@ -55,6 +55,15 @@ macro_rules! serialization_mode {
         pub enum $name {
             #[default]
             $($variant,)*
+        }
+
+        impl std::fmt::Display for $name {
+            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                match self {
+                    $(Self::$variant => write!(f, $value),)*
+                }
+
+            }
         }
 
         impl FromStr for $name {
