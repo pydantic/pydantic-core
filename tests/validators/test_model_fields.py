@@ -1781,3 +1781,35 @@ def test_extra_behavior_ignore(config: Union[core_schema.CoreConfig, None], sche
         }
     ]
     assert 'not_f' not in m
+
+
+def test_deprecation_msg():
+    v = SchemaValidator(
+        {
+            'type': 'model-fields',
+            'fields': {
+                'a': {'type': 'model-field', 'schema': {'type': 'int'}},
+                'b': {
+                    'type': 'model-field',
+                    'schema': {'type': 'default', 'schema': {'type': 'int'}, 'default': 2},
+                    'deprecation_msg': 'foo',
+                },
+                'c': {
+                    'type': 'model-field',
+                    'schema': {'type': 'default', 'schema': {'type': 'int'}, 'default': 2},
+                    'deprecation_msg': 'bar',
+                },
+            },
+        }
+    )
+
+    # not touching the deprecated field: no warning
+    v.validate_python({'a': 1})
+
+    # validating the deprecated field: raise warning
+    # ensure that we get two warnings
+    with pytest.warns(DeprecationWarning) as w:
+        v.validate_python({'a': 1, 'b': 1, 'c': 1})
+        assert len(w) == 2
+        assert str(w[0].message) == 'foo'
+        assert str(w[1].message) == 'bar'
