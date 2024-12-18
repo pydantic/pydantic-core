@@ -3883,6 +3883,47 @@ def definition_reference_schema(
     )
 
 
+class NeverSchema(TypedDict, total=False):
+    type: Required[Literal['never']]
+    ref: str
+    metadata: Dict[str, Any]
+
+
+def never_schema(
+    *,
+    ref: str | None = None,
+    metadata: Dict[str, Any] | None = None,
+) -> NeverSchema:
+    """
+    Returns a schema that represents a `typing.Never` field, e.g.:
+
+    ```py
+    from pydantic_core import SchemaValidator, core_schema, ValidationError
+
+    schema = core_schema.never_schema()
+    v = SchemaValidator(schema)
+    # Validation should always fail
+    try:
+        assert v.validate_python(1)
+    except ValidationError:
+        pass
+    try:
+        assert v.validate_python('s')
+    except ValidationError:
+        pass
+    ```
+
+    Args:
+        ref: optional unique identifier of the schema, used to reference the schema in other places
+        metadata: Any other information you want to include with the schema, not used by pydantic-core
+    """
+    return _dict_not_none(
+        type='never',
+        ref=ref,
+        metadata=metadata,
+    )
+
+
 MYPY = False
 # See https://github.com/python/mypy/issues/14034 for details, in summary mypy is extremely slow to process this
 # union which kills performance not just for pydantic, but even for code using pydantic
@@ -3938,6 +3979,7 @@ if not MYPY:
         DefinitionReferenceSchema,
         UuidSchema,
         ComplexSchema,
+        NeverSchema,
     ]
 elif False:
     CoreSchema: TypeAlias = Mapping[str, Any]
@@ -3995,6 +4037,7 @@ CoreSchemaType = Literal[
     'definition-ref',
     'uuid',
     'complex',
+    'never',
 ]
 
 CoreSchemaFieldType = Literal['model-field', 'dataclass-field', 'typed-dict-field', 'computed-field']
@@ -4103,6 +4146,8 @@ ErrorType = Literal[
     'decimal_whole_digits',
     'complex_type',
     'complex_str_parsing',
+    'never',
+    'never_serializing',
 ]
 
 
