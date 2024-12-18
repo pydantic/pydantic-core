@@ -29,6 +29,10 @@ f64_max = 1.7976931348623157e308
         (False, 0),
         ('wrong', Err('Input should be a valid number, unable to parse string as a number [type=float_parsing')),
         ([1, 2], Err('Input should be a valid number [type=float_type, input_value=[1, 2], input_type=list]')),
+        (1 + 0j, 1.0),
+        (2.5 + 0j, 2.5),
+        (3 + 1j, 3.0),
+        (1j, 0),
     ],
 )
 def test_float(py_and_json: PyAndJson, input_value, expected):
@@ -37,7 +41,10 @@ def test_float(py_and_json: PyAndJson, input_value, expected):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_test(input_value)
     else:
-        output = v.validate_test(input_value)
+        if isinstance(input_value, complex):
+            output = v.validate_python(input_value)
+        else:
+            output = v.validate_test(input_value)
         assert output == expected
         assert isinstance(output, float)
 
@@ -52,6 +59,10 @@ def test_float(py_and_json: PyAndJson, input_value, expected):
         (42.5, 42.5),
         ('42', Err("Input should be a valid number [type=float_type, input_value='42', input_type=str]")),
         (True, Err('Input should be a valid number [type=float_type, input_value=True, input_type=bool]')),
+        (1 + 0j, Err('Input should be a valid number [type=float_type, input_value=(1+0j), input_type=complex]')),
+        (2.5 + 0j, Err('Input should be a valid number [type=float_type, input_value=(2.5+0j), input_type=complex]')),
+        (3 + 1j, Err('Input should be a valid number [type=float_type, input_value=(3+1j), input_type=complex]')),
+        (1j, Err('Input should be a valid number [type=float_type, input_value=1j, input_type=complex]')),
     ],
     ids=repr,
 )
@@ -59,7 +70,10 @@ def test_float_strict(py_and_json: PyAndJson, input_value, expected):
     v = py_and_json({'type': 'float', 'strict': True})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
-            v.validate_test(input_value)
+            if isinstance(input_value, complex):
+                v.validate_python(input_value)
+            else:
+                v.validate_test(input_value)
     else:
         output = v.validate_test(input_value)
         assert output == expected
