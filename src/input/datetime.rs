@@ -45,20 +45,31 @@ pub fn pydate_as_date(py_date: &Bound<'_, PyAny>) -> PyResult<Date> {
     })
 }
 
-impl EitherDate<'_> {
+impl<'py> EitherDate<'py> {
+    pub fn try_into_py(self, py: Python<'py>, input: &(impl Input<'py> + ?Sized)) -> ValResult<PyObject> {
+        match self {
+            Self::Raw(date) => {
+                if date.year == 0 {
+                    return Err(ValError::new(
+                        ErrorType::DateParsing {
+                            error: Cow::Borrowed("year 0 is out of range"),
+                            context: None,
+                        },
+                        input,
+                    ));
+                };
+                let py_date = PyDate::new_bound(py, date.year.into(), date.month, date.day)?;
+                Ok(py_date.into())
+            }
+            Self::Py(py_date) => Ok(py_date.into()),
+        }
+    }
+
     pub fn as_raw(&self) -> PyResult<Date> {
         match self {
             Self::Raw(date) => Ok(date.clone()),
             Self::Py(py_date) => pydate_as_date(py_date),
         }
-    }
-
-    pub fn try_into_py(self, py: Python<'_>) -> PyResult<PyObject> {
-        let date = match self {
-            Self::Py(date) => Ok(date),
-            Self::Raw(date) => PyDate::new_bound(py, date.year.into(), date.month, date.day),
-        }?;
-        Ok(date.into_py(py))
     }
 }
 
@@ -259,30 +270,41 @@ pub fn pydatetime_as_datetime(py_dt: &Bound<'_, PyAny>) -> PyResult<DateTime> {
     })
 }
 
-impl<'a> EitherDateTime<'a> {
+impl<'py> EitherDateTime<'py> {
+    pub fn try_into_py(self, py: Python<'py>, input: &(impl Input<'py> + ?Sized)) -> ValResult<PyObject> {
+        match self {
+            Self::Raw(dt) => {
+                if dt.date.year == 0 {
+                    return Err(ValError::new(
+                        ErrorType::DatetimeParsing {
+                            error: Cow::Borrowed("year 0 is out of range"),
+                            context: None,
+                        },
+                        input,
+                    ));
+                };
+                let py_dt = PyDateTime::new_bound(
+                    py,
+                    dt.date.year.into(),
+                    dt.date.month,
+                    dt.date.day,
+                    dt.time.hour,
+                    dt.time.minute,
+                    dt.time.second,
+                    dt.time.microsecond,
+                    time_as_tzinfo(py, &dt.time)?.as_ref(),
+                )?;
+                Ok(py_dt.into())
+            }
+            Self::Py(py_dt) => Ok(py_dt.into()),
+        }
+    }
+
     pub fn as_raw(&self) -> PyResult<DateTime> {
         match self {
             Self::Raw(dt) => Ok(dt.clone()),
             Self::Py(py_dt) => pydatetime_as_datetime(py_dt),
         }
-    }
-
-    pub fn try_into_py(self, py: Python<'a>) -> PyResult<PyObject> {
-        let dt = match self {
-            Self::Raw(datetime) => PyDateTime::new_bound(
-                py,
-                datetime.date.year.into(),
-                datetime.date.month,
-                datetime.date.day,
-                datetime.time.hour,
-                datetime.time.minute,
-                datetime.time.second,
-                datetime.time.microsecond,
-                time_as_tzinfo(py, &datetime.time)?.as_ref(),
-            )?,
-            Self::Py(dt) => dt.clone(),
-        };
-        Ok(dt.into_py(py))
     }
 }
 

@@ -97,7 +97,7 @@ impl Validator for DateValidator {
                 }
             }
         }
-        Ok(date.try_into_py(py)?)
+        date.try_into_py(py, input)
     }
 
     fn get_name(&self) -> &str {
