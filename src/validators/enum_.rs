@@ -103,10 +103,8 @@ impl<T: EnumValidateValue> Validator for EnumValidator<T> {
         state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
         let class = self.class.bind(py);
-        if let Some(py_input) = input.as_python() {
-            if py_input.is_instance(class)? {
-                return Ok(py_input.clone().unbind());
-            }
+        if let Some(exact_py_input) = input.as_python().filter(|any| any.is_exact_instance(class)) {
+            return Ok(exact_py_input.clone().unbind());
         }
         let strict = state.strict_or(self.strict);
         if strict && input.as_python().is_some() {
