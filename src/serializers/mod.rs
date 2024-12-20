@@ -9,7 +9,7 @@ use crate::definitions::{Definitions, DefinitionsBuilder};
 use crate::py_gc::PyGcTraverse;
 
 pub(crate) use config::BytesMode;
-use config::SerializationConfig;
+pub(crate) use config::SerializationConfig;
 pub use errors::{PydanticSerializationError, PydanticSerializationUnexpectedValue};
 use extra::{CollectWarnings, SerRecursionState, WarningsMode};
 pub(crate) use extra::{DuckTypingSerMode, Extra, SerMode, SerializationState};
