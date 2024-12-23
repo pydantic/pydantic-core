@@ -386,8 +386,8 @@ def test_validate_default(
     ],
 )
 def test_validate_default_flags(
-    config_validate_default: None | Literal['never', 'definition', 'init'],
-    schema_validate_default: None | Literal['never', 'definition', 'init'],
+    config_validate_default: Union[None, Literal['never', 'definition', 'init']],
+    schema_validate_default: Union[None, Literal['never', 'definition', 'init']],
 ):
     def create_schema():
         if config_validate_default is not None:
