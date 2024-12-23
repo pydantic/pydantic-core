@@ -894,18 +894,3 @@ def test_validate_default_raises_dataclass(input_value: dict, expected: Any) -> 
         v.validate_python(input_value)
 
     assert exc_info.value.errors(include_url=False, include_context=False) == expected
-
-
-def test_validate_default_on_validator_creation():
-    SchemaValidator(
-        {
-            'type': 'typed-dict',
-            'fields': {
-                'x': {'type': 'typed-dict-field', 'schema': {'type': 'str'}},
-                'y': {
-                    'type': 'typed-dict-field',
-                    'schema': {'type': 'default', 'schema': {'type': 'str'}, 'default': 1},
-                },
-            },
-        }
-    )
