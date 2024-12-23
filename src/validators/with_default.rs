@@ -1,19 +1,20 @@
+use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::sync::GILOnceCell;
-use pyo3::types::PyDict;
-use pyo3::types::PyString;
+use pyo3::types::{PyBool, PyDict, PyString};
 use pyo3::PyTraverseError;
 use pyo3::PyVisit;
 
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
-use crate::build_tools::py_schema_err;
-use crate::build_tools::schema_or_config_same;
+use crate::build_tools::{is_strict, py_schema_err, schema_or_config_same};
 use crate::errors::{LocItem, ValError, ValResult};
 use crate::input::Input;
 use crate::py_gc::PyGcTraverse;
 use crate::tools::SchemaDict;
+use crate::validators::{Extra, InputType, RecursionState};
 use crate::PydanticUndefinedType;
+use crate::SchemaError;
 
 static COPY_DEEPCOPY: GILOnceCell<PyObject> = GILOnceCell::new();
 
@@ -84,12 +85,58 @@ enum OnError {
     Default,
 }
 
+bitflags::bitflags! {
+    #[derive(Debug, Clone)]
+    struct ValidateDefaultFlag: u8 {
+        const NEVER = 0;
+        const INIT = 0x01;
+        const DEFINITION = 0x02;
+    }
+}
+
+impl<'py> FromPyObject<'py> for ValidateDefaultFlag {
+    fn extract_bound(ob: &Bound<'py, PyAny>) -> PyResult<Self> {
+        if let Ok(bool_value) = ob.downcast::<PyBool>() {
+            Ok(bool_value.is_true().into())
+        } else if let Ok(str_value) = ob.extract::<&str>() {
+            match str_value {
+                "never" => Ok(Self::NEVER),
+                "init" => Ok(Self::INIT),
+                "definition" => Ok(Self::DEFINITION),
+                _ => Err(PyValueError::new_err(
+                    "Invalid value for option `validate_default`, should be `'init'`, `'definition'`, `'never'` or a `bool`",
+                )),
+            }
+        } else {
+            Err(PyTypeError::new_err(
+                "Invalid value for option `validate_default`, should be `'init'`, `'definition'`, `'never'` or a `bool`",
+            ))
+        }
+    }
+}
+
+impl From<bool> for ValidateDefaultFlag {
+    fn from(mode: bool) -> Self {
+        if mode {
+            Self::INIT
+        } else {
+            Self::NEVER
+        }
+    }
+}
+
+impl Default for ValidateDefaultFlag {
+    fn default() -> Self {
+        Self::NEVER
+    }
+}
+
 #[derive(Debug)]
 pub struct WithDefaultValidator {
     default: DefaultType,
     on_error: OnError,
     validator: Box<CombinedValidator>,
-    validate_default: bool,
+    validate_default: ValidateDefaultFlag,
     copy_default: bool,
     name: String,
     undefined: PyObject,
@@ -134,17 +181,21 @@ impl BuildValidator for WithDefaultValidator {
         };
 
         let name = format!("{}[{}]", Self::EXPECTED_TYPE, validator.get_name());
-
-        Ok(Self {
+        let validate_default =
+            schema_or_config_same(schema, config, intern!(py, "validate_default"))?.unwrap_or_default();
+        let validator = Self {
             default,
             on_error,
             validator,
-            validate_default: schema_or_config_same(schema, config, intern!(py, "validate_default"))?.unwrap_or(false),
+            validate_default,
             copy_default,
             name,
             undefined: PydanticUndefinedType::new(py).to_object(py),
-        }
-        .into())
+        };
+
+        validator.validate_default_on_build(schema, config)?;
+
+        Ok(validator.into())
     }
 }
 
@@ -188,17 +239,8 @@ impl Validator for WithDefaultValidator {
                 } else {
                     stored_dft
                 };
-                if self.validate_default {
-                    match self.validate(py, dft.bind(py), state) {
-                        Ok(v) => Ok(Some(v)),
-                        Err(e) => {
-                            if let Some(outer_loc) = outer_loc {
-                                Err(e.with_outer_location(outer_loc))
-                            } else {
-                                Err(e)
-                            }
-                        }
-                    }
+                if self.validate_default.contains(ValidateDefaultFlag::INIT) {
+                    self.validate_default(py, outer_loc, state, dft)
                 } else {
                     Ok(Some(dft))
                 }
@@ -219,5 +261,55 @@ impl WithDefaultValidator {
 
     pub fn omit_on_error(&self) -> bool {
         matches!(self.on_error, OnError::Omit)
+    }
+
+    fn validate_default<'py>(
+        &self,
+        py: Python<'py>,
+        outer_loc: Option<impl Into<LocItem>>,
+        state: &mut ValidationState<'_, 'py>,
+        dft: Py<PyAny>,
+    ) -> ValResult<Option<PyObject>> {
+        match self.validate(py, dft.bind(py), state) {
+            Ok(v) => Ok(Some(v)),
+            Err(e) => {
+                if let Some(outer_loc) = outer_loc {
+                    Err(e.with_outer_location(outer_loc))
+                } else {
+                    Err(e)
+                }
+            }
+        }
+    }
+
+    fn validate_default_on_build(
+        &self,
+        schema: &Bound<'_, PyDict>,
+        config: Option<&Bound<'_, PyDict>>,
+    ) -> PyResult<()> {
+        if self.validate_default.contains(ValidateDefaultFlag::DEFINITION) && self.has_default() {
+            // Since this method is called in `build` where validation state is not available,
+            // we need to craft a dummy one here. This setup is basically the same as in `SchemaValidator::get_default_value`
+            let mut recursion_guard = RecursionState::default();
+            let mut state = ValidationState::new(
+                Extra::new(
+                    Some(is_strict(schema, config)?),
+                    None,
+                    None,
+                    None,
+                    InputType::Python,
+                    true.into(),
+                ),
+                &mut recursion_guard,
+                false.into(),
+            );
+            let py = schema.py();
+            if let Some(dft) = self.default.default_value(py, state.extra().data.as_ref())? {
+                if let Err(e) = self.validate_default(py, None::<usize>, &mut state, dft) {
+                    return Err(SchemaError::from_val_error(py, e));
+                }
+            }
+        }
+        Ok(())
     }
 }

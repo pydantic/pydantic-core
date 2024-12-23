@@ -3,7 +3,7 @@ import platform
 import sys
 import weakref
 from collections import deque
-from typing import Any, Callable, Dict, List, Union, cast
+from typing import Any, Callable, Dict, List, Literal, Union, cast
 
 import pytest
 
@@ -373,6 +373,75 @@ def test_validate_default(
         else '42'
     )
     assert v.validate_python({}) == {'x': expected}
+
+
+@pytest.mark.parametrize('config_validate_default', [None, 'never', 'definition', 'init'])
+@pytest.mark.parametrize(
+    'schema_validate_default',
+    [
+        None,
+        'never',
+        'definition',
+        'init',
+    ],
+)
+def test_validate_default_flags(
+    config_validate_default: None | Literal['never', 'definition', 'init'],
+    schema_validate_default: None | Literal['never', 'definition', 'init'],
+):
+    def create_schema():
+        if config_validate_default is not None:
+            config = core_schema.CoreConfig(validate_default=config_validate_default)
+        else:
+            config = None
+
+        v = SchemaValidator(
+            core_schema.typed_dict_schema(
+                {
+                    'x': core_schema.typed_dict_field(
+                        core_schema.with_default_schema(
+                            core_schema.int_schema(), default='a', validate_default=schema_validate_default
+                        )
+                    )
+                },
+                config=config,
+            ),
+        )
+        return v
+
+    def validate(v: SchemaValidator):
+        assert v.validate_python({}) == {'x': 'a'}
+
+    if (
+        schema_validate_default == 'definition'
+        or schema_validate_default is None
+        and (config_validate_default == 'definition')
+    ):
+        with pytest.raises(SchemaError, match='Input should be a valid integer'):
+            create_schema()
+    else:
+        v = create_schema()
+        if schema_validate_default == 'init' or schema_validate_default is None and config_validate_default == 'init':
+            with pytest.raises(ValidationError, match='Input should be a valid integer'):
+                validate(v)
+        else:
+            validate(v)
+
+
+def test_validate_default_flags_strict():
+    with pytest.raises(SchemaError, match='Input should be a valid integer'):
+        SchemaValidator(
+            core_schema.typed_dict_schema(
+                {
+                    'x': core_schema.typed_dict_field(
+                        core_schema.with_default_schema(
+                            core_schema.int_schema(), default='1', validate_default='definition'
+                        )
+                    )
+                },
+                config=core_schema.CoreConfig(strict=True),
+            ),
+        )
 
 
 def test_validate_default_factory():
@@ -818,3 +887,18 @@ def test_validate_default_raises_dataclass(input_value: dict, expected: Any) -> 
         v.validate_python(input_value)
 
     assert exc_info.value.errors(include_url=False, include_context=False) == expected
+
+
+def test_validate_default_on_validator_creation():
+    SchemaValidator(
+        {
+            'type': 'typed-dict',
+            'fields': {
+                'x': {'type': 'typed-dict-field', 'schema': {'type': 'str'}},
+                'y': {
+                    'type': 'typed-dict-field',
+                    'schema': {'type': 'default', 'schema': {'type': 'str'}, 'default': 1},
+                },
+            },
+        }
+    )
