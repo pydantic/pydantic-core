@@ -443,6 +443,13 @@ def test_validate_default_flags_strict():
             ),
         )
 
+    with pytest.raises(SchemaError, match='Input should be a valid integer'):
+        SchemaValidator(
+            core_schema.with_default_schema(
+                core_schema.int_schema(), default='1', validate_default='definition', strict=True
+            )
+        )
+
 
 def test_validate_default_factory():
     v = SchemaValidator(
