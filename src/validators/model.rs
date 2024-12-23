@@ -1,10 +1,5 @@
 use std::ptr::null_mut;
 
-use pyo3::exceptions::PyTypeError;
-use pyo3::ffi;
-use pyo3::types::{PyDict, PySet, PyString, PyTuple, PyType};
-use pyo3::{intern, prelude::*};
-
 use super::function::convert_err;
 use super::validation_state::Exactness;
 use super::{
@@ -16,12 +11,17 @@ use crate::errors::{ErrorType, ErrorTypeDefaults, ValError, ValResult};
 use crate::input::{input_as_python_instance, py_error_on_minusone, Input};
 use crate::tools::{py_err, SchemaDict};
 use crate::PydanticUndefinedType;
+use pyo3::exceptions::PyTypeError;
+use pyo3::types::{PyDict, PySet, PyString, PyTuple, PyType};
+use pyo3::{ffi, IntoPyObjectExt};
+use pyo3::{intern, prelude::*};
 
 const ROOT_FIELD: &str = "root";
 const DUNDER_DICT: &str = "__dict__";
 const DUNDER_FIELDS_SET_KEY: &str = "__pydantic_fields_set__";
 const DUNDER_MODEL_EXTRA_KEY: &str = "__pydantic_extra__";
 const DUNDER_MODEL_PRIVATE_KEY: &str = "__pydantic_private__";
+const DUNDER_DESCRIPTOR_FIELDS_KEY: &str = "__pydantic_descriptor_fields__";
 
 #[derive(Debug, Clone)]
 pub(super) enum Revalidate {
@@ -159,8 +159,8 @@ impl Validator for ModelValidator {
                     self.validate_construct(py, &inner_input, Some(&fields_set), state)
                 } else {
                     // get dict here so from_attributes logic doesn't apply
-                    let dict = py_input.getattr(intern!(py, DUNDER_DICT))?;
                     let model_extra = py_input.getattr(intern!(py, DUNDER_MODEL_EXTRA_KEY))?;
+                    let dict = get_model_dict(py_input)?;
 
                     let inner_input = if PyAnyMethods::is_none(&model_extra) {
                         dict
@@ -208,7 +208,7 @@ impl Validator for ModelValidator {
                 Ok(model.into_py(py))
             };
         }
-        let old_dict = model.getattr(intern!(py, DUNDER_DICT))?.downcast_into::<PyDict>()?;
+        let old_dict = get_model_dict(model)?.downcast_into::<PyDict>()?;
 
         let input_dict = old_dict.copy()?;
         if let Ok(old_extra) = model.getattr(intern!(py, DUNDER_MODEL_EXTRA_KEY))?.downcast::<PyDict>() {
@@ -233,7 +233,7 @@ impl Validator for ModelValidator {
             }
         }
 
-        force_setattr(py, model, intern!(py, DUNDER_DICT), validated_dict.to_object(py))?;
+        set_model_dict(model, &validated_dict)?;
         force_setattr(
             py,
             model,
@@ -364,10 +364,77 @@ fn set_model_attrs(
     fields_set: &Bound<'_, PyAny>,
 ) -> PyResult<()> {
     let py = instance.py();
-    force_setattr(py, instance, intern!(py, DUNDER_DICT), model_dict)?;
+
+    set_model_dict(instance, model_dict)?;
     force_setattr(py, instance, intern!(py, DUNDER_MODEL_EXTRA_KEY), model_extra)?;
     force_setattr(py, instance, intern!(py, DUNDER_MODEL_PRIVATE_KEY), py.None())?;
     force_setattr(py, instance, intern!(py, DUNDER_FIELDS_SET_KEY), fields_set)?;
+    Ok(())
+}
+
+fn get_model_dict<'py>(instance: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
+    let py = instance.py();
+    let model_dict = instance.getattr(intern!(py, DUNDER_DICT))?;
+    let try_descriptor_fields = instance.getattr(intern!(py, DUNDER_DESCRIPTOR_FIELDS_KEY));
+
+    if try_descriptor_fields.is_ok() {
+        // We have descriptor fields: copy the __dict__ and add our descriptor fields and values
+
+        let descriptor_fields = try_descriptor_fields?.downcast_into::<PySet>()?;
+        if descriptor_fields.len() > 0 {
+            let model_dict_copy = model_dict.downcast::<PyDict>()?.copy()?;
+            for f in descriptor_fields {
+                let field = f.downcast::<PyString>()?;
+                model_dict_copy.set_item(field, instance.getattr(field)?)?;
+            }
+            Ok(model_dict_copy.into_any())
+        } else {
+            model_dict.into_bound_py_any(py)
+        }
+    } else {
+        model_dict.into_bound_py_any(py)
+    }
+}
+
+fn set_model_dict(instance: &Bound<'_, PyAny>, model_dict: &Bound<'_, PyAny>) -> PyResult<()> {
+    let py = instance.py();
+    let try_descriptor_fields = instance.getattr(intern!(py, DUNDER_DESCRIPTOR_FIELDS_KEY));
+
+    if try_descriptor_fields.is_ok() {
+        // We have descriptor fields:
+        // 1. Iterate over the descriptors fields and remove them from the model dict
+        // 2. Set __dict__ with the remaining values
+        // 3. Call __setattr__ on the descriptor fields
+        //
+        // Note that the order is important: setting a descriptor value could have a side effect
+        // which depends on __dict__, such as accessing a cached property
+
+        let descriptor_fields = try_descriptor_fields?.downcast_into::<PySet>()?;
+        if descriptor_fields.len() > 0 {
+            let model_dict_copy = model_dict.downcast::<PyDict>()?.copy()?;
+            let mut descriptor_values = Vec::new();
+
+            for f in descriptor_fields {
+                let field = f.downcast_into::<PyString>()?;
+                let value = model_dict_copy.get_item(&field)?;
+                if value.is_some() {
+                    model_dict_copy.del_item(&field)?;
+                    descriptor_values.push((field, value));
+                }
+            }
+
+            force_setattr(py, instance, intern!(py, DUNDER_DICT), model_dict_copy)?;
+
+            for (field, value) in descriptor_values {
+                force_setattr(py, instance, &field, &value)?;
+            }
+        } else {
+            force_setattr(py, instance, intern!(py, DUNDER_DICT), model_dict)?;
+        }
+    } else {
+        force_setattr(py, instance, intern!(py, DUNDER_DICT), model_dict)?;
+    }
+
     Ok(())
 }
 

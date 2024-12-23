@@ -130,6 +130,15 @@ impl ModelSerializer {
     fn get_inner_value<'py>(&self, model: &Bound<'py, PyAny>, extra: &Extra) -> PyResult<Bound<'py, PyAny>> {
         let py = model.py();
         let mut attrs = model.getattr(intern!(py, "__dict__"))?.downcast_into::<PyDict>()?;
+        let try_descriptor_fields = model.getattr(intern!(py, "__pydantic_descriptor_fields__"));
+
+        if try_descriptor_fields.is_ok() {
+            let descriptor_fields = try_descriptor_fields?.downcast_into::<PySet>()?;
+            for f in descriptor_fields {
+                let field = f.downcast_into::<PyString>()?;
+                attrs.set_item(&field, model.getattr(&field)?)?
+            }
+        }
 
         if extra.exclude_unset {
             let fields_set = model
