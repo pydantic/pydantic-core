@@ -130,7 +130,7 @@ impl Validator for DateTimeValidator {
                 tz_constraint.tz_check(speedate_dt.time.tz_offset, input)?;
             }
         }
-        Ok(datetime.try_into_py(py)?)
+        datetime.try_into_py(py, input)
     }
 
     fn get_name(&self) -> &str {
@@ -247,10 +247,6 @@ pub struct NowConstraint {
 
 static TIME_LOCALTIME: GILOnceCell<PyObject> = GILOnceCell::new();
 
-fn get_localtime(py: Python) -> PyResult<PyObject> {
-    Ok(py.import("time")?.getattr("localtime")?.into_py(py))
-}
-
 impl NowConstraint {
     /// Get the UTC offset in seconds either from the utc_offset field or by calling `time.localtime().tm_gmtoff`.
     /// Note: although the attribute is called "gmtoff", it is actually the offset in the UTC direction,
@@ -259,8 +255,8 @@ impl NowConstraint {
         if let Some(utc_offset) = self.utc_offset {
             Ok(utc_offset)
         } else {
-            let localtime = TIME_LOCALTIME.get_or_init(py, || get_localtime(py).unwrap());
-            localtime.bind(py).call0()?.getattr(intern!(py, "tm_gmtoff"))?.extract()
+            let localtime = TIME_LOCALTIME.import(py, "time", "localtime")?;
+            localtime.call0()?.getattr(intern!(py, "tm_gmtoff"))?.extract()
         }
     }
 

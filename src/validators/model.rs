@@ -1,5 +1,10 @@
 use std::ptr::null_mut;
 
+use pyo3::exceptions::PyTypeError;
+use pyo3::types::{PyDict, PySet, PyString, PyTuple, PyType};
+use pyo3::{ffi, IntoPyObjectExt};
+use pyo3::{intern, prelude::*};
+
 use super::function::convert_err;
 use super::validation_state::Exactness;
 use super::{
@@ -11,10 +16,6 @@ use crate::errors::{ErrorType, ErrorTypeDefaults, ValError, ValResult};
 use crate::input::{input_as_python_instance, py_error_on_minusone, Input};
 use crate::tools::{py_err, SchemaDict};
 use crate::PydanticUndefinedType;
-use pyo3::exceptions::PyTypeError;
-use pyo3::types::{PyDict, PySet, PyString, PyTuple, PyType};
-use pyo3::{ffi, IntoPyObjectExt};
-use pyo3::{intern, prelude::*};
 
 const ROOT_FIELD: &str = "root";
 const DUNDER_DICT: &str = "__dict__";
@@ -205,7 +206,7 @@ impl Validator for ModelValidator {
                 let output = self.validator.validate(py, field_value, state)?;
 
                 force_setattr(py, model, intern!(py, ROOT_FIELD), output)?;
-                Ok(model.into_py(py))
+                Ok(model.into_py_any(py)?)
             };
         }
         let old_dict = get_model_dict(model)?.downcast_into::<PyDict>()?;
@@ -240,7 +241,7 @@ impl Validator for ModelValidator {
             intern!(py, DUNDER_MODEL_EXTRA_KEY),
             validated_extra.to_object(py),
         )?;
-        Ok(model.into_py(py))
+        Ok(model.into_py_any(py)?)
     }
 
     fn get_name(&self) -> &str {
