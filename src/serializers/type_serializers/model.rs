@@ -136,7 +136,7 @@ impl ModelSerializer {
             let descriptor_fields = try_descriptor_fields?.downcast_into::<PySet>()?;
             for f in descriptor_fields {
                 let field = f.downcast_into::<PyString>()?;
-                attrs.set_item(&field, model.getattr(&field)?)?
+                attrs.set_item(&field, model.getattr(&field)?)?;
             }
         }
 
