@@ -79,6 +79,7 @@ pub struct ModelSerializer {
     has_extra: bool,
     root_model: bool,
     name: String,
+    descriptor_fields: Py<PySet>,
 }
 
 impl BuildSerializer for ModelSerializer {
@@ -100,12 +101,21 @@ impl BuildSerializer for ModelSerializer {
         let root_model = schema.get_as(intern!(py, "root_model"))?.unwrap_or(false);
         let name = class.bind(py).getattr(intern!(py, "__name__"))?.extract()?;
 
+        let try_descriptor_fields = class.bind(py).getattr(intern!(py, "__pydantic_descriptor_fields__"));
+
+        let descriptor_fields = if try_descriptor_fields.is_ok() {
+            try_descriptor_fields?.downcast_into::<PySet>()?
+        } else {
+            PySet::empty(py)?
+        };
+
         Ok(Self {
             class,
             serializer,
             has_extra: has_extra(schema, config.as_ref())?,
             root_model,
             name,
+            descriptor_fields: descriptor_fields.into(),
         }
         .into())
     }
@@ -130,14 +140,10 @@ impl ModelSerializer {
     fn get_inner_value<'py>(&self, model: &Bound<'py, PyAny>, extra: &Extra) -> PyResult<Bound<'py, PyAny>> {
         let py = model.py();
         let mut attrs = model.getattr(intern!(py, "__dict__"))?.downcast_into::<PyDict>()?;
-        let try_descriptor_fields = model.getattr(intern!(py, "__pydantic_descriptor_fields__"));
 
-        if try_descriptor_fields.is_ok() {
-            let descriptor_fields = try_descriptor_fields?.downcast_into::<PySet>()?;
-            for f in descriptor_fields {
-                let field = f.downcast_into::<PyString>()?;
-                attrs.set_item(&field, model.getattr(&field)?)?;
-            }
+        for f in self.descriptor_fields.bind(py) {
+            let field = f.downcast_into::<PyString>()?;
+            attrs.set_item(&field, model.getattr(&field)?)?;
         }
 
         if extra.exclude_unset {

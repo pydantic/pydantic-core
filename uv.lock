@@ -1,8 +1,8 @@
 version = 1
 requires-python = ">=3.8"
 resolution-markers = [
-    "python_full_version < '3.9' or (python_full_version < '3.12' and implementation_name != 'cpython') or (python_full_version < '3.12' and platform_machine != 'x86_64')",
-    "(python_full_version == '3.12.*' and implementation_name != 'cpython') or (python_full_version == '3.12.*' and platform_machine != 'x86_64') or (python_full_version == '3.13.*' and implementation_name != 'cpython') or python_full_version >= '3.14'",
+    "(python_full_version < '3.12' and implementation_name != 'cpython') or (python_full_version < '3.9' and implementation_name == 'cpython' and platform_machine == 'x86_64') or (python_full_version < '3.12' and platform_machine != 'x86_64')",
+    "(python_full_version >= '3.12' and implementation_name != 'cpython') or (python_full_version >= '3.14' and implementation_name == 'cpython') or (python_full_version == '3.12.*' and implementation_name == 'cpython' and platform_machine != 'x86_64')",
     "python_full_version == '3.13.*' and implementation_name == 'cpython'",
     "python_full_version >= '3.9' and python_full_version < '3.11' and implementation_name == 'cpython' and platform_machine == 'x86_64'",
     "python_full_version == '3.11.*' and implementation_name == 'cpython' and platform_machine == 'x86_64'",
@@ -26,8 +26,8 @@ name = "astunparse"
 version = "1.6.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "six", marker = "python_full_version < '3.9' or (python_full_version < '3.12' and implementation_name != 'cpython') or (python_full_version < '3.12' and platform_machine != 'x86_64')" },
-    { name = "wheel", marker = "python_full_version < '3.9' or (python_full_version < '3.12' and implementation_name != 'cpython') or (python_full_version < '3.12' and platform_machine != 'x86_64')" },
+    { name = "six", marker = "(python_full_version < '3.12' and implementation_name != 'cpython') or (python_full_version < '3.9' and implementation_name == 'cpython' and platform_machine == 'x86_64') or (python_full_version < '3.12' and platform_machine != 'x86_64')" },
+    { name = "wheel", marker = "(python_full_version < '3.12' and implementation_name != 'cpython') or (python_full_version < '3.9' and implementation_name == 'cpython' and platform_machine == 'x86_64') or (python_full_version < '3.12' and platform_machine != 'x86_64')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/f3/af/4182184d3c338792894f34a62672919db7ca008c89abee9b564dd34d8029/astunparse-1.6.3.tar.gz", hash = "sha256:5ad93a8456f0d084c3456d059fd9a92cce667963232cbf763eac3bc5b7940872", size = 18290 }
 wheels = [
@@ -624,7 +624,7 @@ wheels = [
 
 [[package]]
 name = "pydantic-core"
-version = "2.27.2"
+version = "2.27.1"
 source = { virtual = "." }
 dependencies = [
     { name = "typing-extensions" },
