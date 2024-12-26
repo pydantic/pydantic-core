@@ -40,7 +40,6 @@ pub struct DataclassArgsValidator {
     validator_name: String,
     extra_behavior: ExtraBehavior,
     extras_validator: Option<Box<CombinedValidator>>,
-    fail_fast: bool,
     loc_by_alias: bool,
 }
 
@@ -55,7 +54,6 @@ impl BuildValidator for DataclassArgsValidator {
         let py = schema.py();
 
         let populate_by_name = schema_or_config_same(schema, config, intern!(py, "populate_by_name"))?.unwrap_or(false);
-        let fail_fast = schema_or_config_same(schema, config, intern!(py, "fail_fast"))?.unwrap_or(false);
 
         let extra_behavior = ExtraBehavior::from_schema_or_config(py, schema, config, ExtraBehavior::Ignore)?;
 
@@ -130,7 +128,6 @@ impl BuildValidator for DataclassArgsValidator {
             validator_name,
             extra_behavior,
             extras_validator,
-            fail_fast,
             loc_by_alias: config.get_as(intern!(py, "loc_by_alias"))?.unwrap_or(true),
         }
         .into())
@@ -177,10 +174,6 @@ impl Validator for DataclassArgsValidator {
 
         // go through fields getting the value from args or kwargs and validating it
         for (index, field) in self.fields.iter().enumerate() {
-            if self.fail_fast && !errors.is_empty() {
-                break;
-            }
-
             if !field.init {
                 match field.validator.default_value(py, Some(field.name.as_str()), state) {
                     Ok(Some(value)) => {
@@ -298,10 +291,6 @@ impl Validator for DataclassArgsValidator {
         if let Some(kwargs) = args.kwargs() {
             if kwargs.len() != used_keys.len() {
                 for result in kwargs.iter() {
-                    if self.fail_fast && !errors.is_empty() {
-                        break;
-                    }
-
                     let (raw_key, value) = result?;
                     match raw_key
                         .borrow_input()
