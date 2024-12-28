@@ -141,15 +141,22 @@ impl ModelSerializer {
         let py = model.py();
         let mut attrs = model.getattr(intern!(py, "__dict__"))?.downcast_into::<PyDict>()?;
 
-        for f in self.descriptor_fields.bind(py) {
-            let field = f.downcast_into::<PyString>()?;
-            attrs.set_item(&field, model.getattr(&field)?)?;
+        let descriptor_fields = self.descriptor_fields.bind(py);
+        if descriptor_fields.len() > 0 {
+            let new_attrs = attrs.copy()?;
+            for f in self.descriptor_fields.bind(py) {
+                let field = f.downcast_into::<PyString>()?;
+                new_attrs.set_item(&field, model.getattr(&field)?)?;
+            }
+            attrs = new_attrs;
         }
 
         if extra.exclude_unset {
             let fields_set = model
                 .getattr(intern!(py, "__pydantic_fields_set__"))?
                 .downcast_into::<PySet>()?;
+
+            // ToDo: Check if any fields actually are unset before copying?
 
             let new_attrs = attrs.copy()?;
             for key in new_attrs.keys() {
