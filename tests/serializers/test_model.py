@@ -1,6 +1,7 @@
 import dataclasses
 import json
 import platform
+import warnings
 from random import randint
 from typing import Any, ClassVar, Dict
 
@@ -12,7 +13,12 @@ except ImportError:
 import pytest
 from dirty_equals import IsJson
 
-from pydantic_core import PydanticSerializationError, SchemaSerializer, SchemaValidator, core_schema
+from pydantic_core import (
+    PydanticSerializationError,
+    SchemaSerializer,
+    SchemaValidator,
+    core_schema,
+)
 
 from ..conftest import plain_repr
 
@@ -230,14 +236,17 @@ def test_model_wrong_warn():
     assert s.to_python(None, mode='json') is None
     assert s.to_json(None) == b'null'
 
-    with pytest.warns(UserWarning, match='Expected `MyModel` but got `int` - serialized value may.+'):
+    with pytest.warns(UserWarning, match='Expected `MyModel` but got `int` with value `123` - serialized value may.+'):
         assert s.to_python(123) == 123
-    with pytest.warns(UserWarning, match='Expected `MyModel` but got `int` - serialized value may.+'):
+    with pytest.warns(UserWarning, match='Expected `MyModel` but got `int` with value `123` - serialized value may.+'):
         assert s.to_python(123, mode='json') == 123
-    with pytest.warns(UserWarning, match='Expected `MyModel` but got `int` - serialized value may.+'):
+    with pytest.warns(UserWarning, match='Expected `MyModel` but got `int` with value `123` - serialized value may.+'):
         assert s.to_json(123) == b'123'
 
-    with pytest.warns(UserWarning, match='Expected `MyModel` but got `dict` - serialized value may.+'):
+    with pytest.warns(
+        UserWarning,
+        match="Expected `MyModel` but got `dict` with value `{'foo': 1, 'bar': b'more'}` - serialized value may.+",
+    ):
         assert s.to_python({'foo': 1, 'bar': b'more'}) == {'foo': 1, 'bar': b'more'}
 
 
@@ -1077,3 +1086,69 @@ def test_extra_custom_serializer():
     m.__pydantic_extra__ = {'extra': 'extra'}
 
     assert s.to_python(m) == {'extra': 'extra bam!'}
+
+
+def test_no_warn_on_exclude() -> None:
+    with warnings.catch_warnings():
+        warnings.simplefilter('error')
+
+        s = SchemaSerializer(
+            core_schema.model_schema(
+                BasicModel,
+                core_schema.model_fields_schema(
+                    {
+                        'a': core_schema.model_field(core_schema.int_schema()),
+                        'b': core_schema.model_field(core_schema.int_schema()),
+                    }
+                ),
+            )
+        )
+
+        value = BasicModel(a=0, b=1)
+        assert s.to_python(value, exclude={'b'}) == {'a': 0}
+        assert s.to_python(value, mode='json', exclude={'b'}) == {'a': 0}
+
+
+def test_warn_on_missing_field() -> None:
+    class AModel(BasicModel): ...
+
+    class BModel(BasicModel): ...
+
+    s = SchemaSerializer(
+        core_schema.model_schema(
+            BasicModel,
+            core_schema.model_fields_schema(
+                {
+                    'root': core_schema.model_field(
+                        core_schema.tagged_union_schema(
+                            choices={
+                                'a': core_schema.model_schema(
+                                    AModel,
+                                    core_schema.model_fields_schema(
+                                        {
+                                            'type': core_schema.model_field(core_schema.literal_schema(['a'])),
+                                            'a': core_schema.model_field(core_schema.int_schema()),
+                                        }
+                                    ),
+                                ),
+                                'b': core_schema.model_schema(
+                                    BModel,
+                                    core_schema.model_fields_schema(
+                                        {
+                                            'type': core_schema.model_field(core_schema.literal_schema(['b'])),
+                                            'b': core_schema.model_field(core_schema.int_schema()),
+                                        }
+                                    ),
+                                ),
+                            },
+                            discriminator='type',
+                        )
+                    ),
+                }
+            ),
+        )
+    )
+
+    with pytest.warns(UserWarning, match='Expected 2 fields but got 1 for type `.*AModel` with value `.*`.+'):
+        value = BasicModel(root=AModel(type='a'))
+        s.to_python(value)

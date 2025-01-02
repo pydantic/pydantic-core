@@ -4,6 +4,7 @@ use std::fmt;
 use pyo3::exceptions::{PyAttributeError, PyTypeError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyMapping, PyString};
+use pyo3::IntoPyObjectExt;
 
 use jiter::{JsonObject, JsonValue};
 
@@ -62,7 +63,7 @@ impl LookupKey {
                     py_key1: alias_py.clone().into(),
                     path1,
                     key2: alt_alias.to_string(),
-                    py_key2: PyString::new_bound(py, alt_alias).into(),
+                    py_key2: PyString::new(py, alt_alias).into(),
                     path2: LookupPath::from_str(py, alt_alias, None),
                 }),
                 None => Ok(Self::simple(py, &alias, Some(alias_py.clone()))),
@@ -96,7 +97,7 @@ impl LookupKey {
     fn simple(py: Python, key: &str, opt_py_key: Option<Bound<'_, PyString>>) -> Self {
         let py_key = match &opt_py_key {
             Some(py_key) => py_key.clone(),
-            None => PyString::new_bound(py, key),
+            None => PyString::new(py, key),
         };
         Self::Simple {
             key: key.to_string(),
@@ -191,34 +192,10 @@ impl LookupKey {
         }
     }
 
-    pub fn py_get_attr<'py, 's>(
+    pub fn simple_py_get_attr<'py, 's>(
         &'s self,
         obj: &Bound<'py, PyAny>,
-        kwargs: Option<&Bound<'py, PyDict>>,
-    ) -> ValResult<Option<(&'s LookupPath, Bound<'py, PyAny>)>> {
-        match self._py_get_attr(obj, kwargs) {
-            Ok(v) => Ok(v),
-            Err(err) => {
-                let error = py_err_string(obj.py(), err);
-                Err(ValError::new(
-                    ErrorType::GetAttributeError { error, context: None },
-                    obj,
-                ))
-            }
-        }
-    }
-
-    pub fn _py_get_attr<'py, 's>(
-        &'s self,
-        obj: &Bound<'py, PyAny>,
-        kwargs: Option<&Bound<'py, PyDict>>,
     ) -> PyResult<Option<(&'s LookupPath, Bound<'py, PyAny>)>> {
-        if let Some(dict) = kwargs {
-            if let Ok(Some(item)) = self.py_get_dict_item(dict) {
-                return Ok(Some(item));
-            }
-        }
-
         match self {
             Self::Simple { py_key, path, .. } => match py_get_attrs(obj, py_key)? {
                 Some(value) => Ok(Some((path, value))),
@@ -256,6 +233,29 @@ impl LookupKey {
                 }
                 // got to the end of path_choices, without a match, return None
                 Ok(None)
+            }
+        }
+    }
+
+    pub fn py_get_attr<'py, 's>(
+        &'s self,
+        obj: &Bound<'py, PyAny>,
+        kwargs: Option<&Bound<'py, PyDict>>,
+    ) -> ValResult<Option<(&'s LookupPath, Bound<'py, PyAny>)>> {
+        if let Some(dict) = kwargs {
+            if let Ok(Some(item)) = self.py_get_dict_item(dict) {
+                return Ok(Some(item));
+            }
+        }
+
+        match self.simple_py_get_attr(obj) {
+            Ok(v) => Ok(v),
+            Err(err) => {
+                let error = py_err_string(obj.py(), err);
+                Err(ValError::new(
+                    ErrorType::GetAttributeError { error, context: None },
+                    obj,
+                ))
             }
         }
     }
@@ -346,7 +346,7 @@ impl LookupPath {
     fn from_str(py: Python, key: &str, py_key: Option<Bound<'_, PyString>>) -> Self {
         let py_key = match py_key {
             Some(py_key) => py_key,
-            None => PyString::new_bound(py, key),
+            None => PyString::new(py, key),
         };
         Self(vec![PathItem::S(key.to_string(), py_key.into())])
     }
@@ -408,14 +408,18 @@ impl fmt::Display for PathItem {
     }
 }
 
-impl ToPyObject for PathItem {
-    fn to_object(&self, py: Python<'_>) -> PyObject {
+impl<'py> IntoPyObject<'py> for &'_ PathItem {
+    type Target = PyAny;
+    type Output = Bound<'py, PyAny>;
+    type Error = PyErr;
+
+    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
         match self {
-            Self::S(_, val) => val.to_object(py),
-            Self::Pos(val) => val.to_object(py),
-            Self::Neg(val) => {
+            PathItem::S(_, val) => Ok(val.bind(py).clone().into_any()),
+            PathItem::Pos(val) => val.into_bound_py_any(py),
+            PathItem::Neg(val) => {
                 let neg_value = -(*val as i64);
-                neg_value.to_object(py)
+                neg_value.into_bound_py_any(py)
             }
         }
     }
@@ -507,7 +511,7 @@ fn py_get_attrs<'py>(obj: &Bound<'py, PyAny>, attr_name: &Py<PyString>) -> PyRes
     match obj.getattr(attr_name) {
         Ok(attr) => Ok(Some(attr)),
         Err(err) => {
-            if err.get_type_bound(obj.py()).is_subclass_of::<PyAttributeError>()? {
+            if err.get_type(obj.py()).is_subclass_of::<PyAttributeError>()? {
                 Ok(None)
             } else {
                 Err(err)

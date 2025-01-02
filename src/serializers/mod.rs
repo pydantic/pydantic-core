@@ -8,6 +8,7 @@ use pyo3::{PyTraverseError, PyVisit};
 use crate::definitions::{Definitions, DefinitionsBuilder};
 use crate::py_gc::PyGcTraverse;
 
+pub(crate) use config::BytesMode;
 use config::SerializationConfig;
 pub use errors::{PydanticSerializationError, PydanticSerializationUnexpectedValue};
 use extra::{CollectWarnings, SerRecursionState, WarningsMode};
@@ -208,7 +209,7 @@ impl SchemaSerializer {
         warnings.final_check(py)?;
 
         self.expected_json_size.store(bytes.len(), Ordering::Relaxed);
-        let py_bytes = PyBytes::new_bound(py, &bytes);
+        let py_bytes = PyBytes::new(py, &bytes);
         Ok(py_bytes.into())
     }
 
@@ -277,7 +278,7 @@ pub fn to_json(
     let serializer = type_serializers::any::AnySerializer.into();
     let bytes = to_json_bytes(value, &serializer, include, exclude, &extra, indent, 1024)?;
     state.final_check(py)?;
-    let py_bytes = PyBytes::new_bound(py, &bytes);
+    let py_bytes = PyBytes::new(py, &bytes);
     Ok(py_bytes.into())
 }
 

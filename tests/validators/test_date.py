@@ -24,10 +24,8 @@ from ..conftest import Err, PyAndJson
         pytest.param(1654646400.00, date(2022, 6, 8), id='float'),
         pytest.param('1654646400.00', date(2022, 6, 8), id='float-as-str'),
         pytest.param(Decimal('1654646400'), date(2022, 6, 8), id='decimal'),
-        # (253_402_300_800_000, Err('format YYYY-MM-DD, dates after 9999 are not supported as unix timestamps')),
         pytest.param(253_402_300_800_000, Err('Input should be a valid date'), id='int-too-high'),
-        # (-20_000_000_000, Err('format YYYY-MM-DD, dates before 1600 are not supported as unix timestamps')),
-        pytest.param(-20_000_000_000, Err('Input should be a valid date'), id='int-too-low'),
+        pytest.param(-80_000_000_000_000, Err('Input should be a valid date'), id='int-too-low'),
         pytest.param(datetime(2022, 6, 8), date(2022, 6, 8), id='datetime-exact'),
         pytest.param(
             datetime(2022, 6, 8, 12),
@@ -59,13 +57,19 @@ from ..conftest import Err, PyAndJson
         pytest.param(
             float('-inf'),
             Err(
-                'Input should be a valid date or datetime, dates before 1600 are not supported as unix timestamps '
+                'Input should be a valid date or datetime, dates before 0000 are not supported as unix timestamps '
                 '[type=date_from_datetime_parsing,'
             ),
             id='-inf',
         ),
         pytest.param('-', Err('Input should be a valid date or datetime, input is too short'), id='minus'),
         pytest.param('+', Err('Input should be a valid date or datetime, input is too short'), id='pus'),
+        pytest.param('0001-01-01', date(1, 1, 1), id='min-date'),
+        pytest.param(
+            '0000-12-31',
+            Err('Input should be a valid date in the format YYYY-MM-DD, year 0 is out of range [type=date_parsing,'),
+            id='year-0',
+        ),
     ],
 )
 def test_date(input_value, expected):

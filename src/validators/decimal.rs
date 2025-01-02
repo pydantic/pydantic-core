@@ -19,7 +19,7 @@ static DECIMAL_TYPE: GILOnceCell<Py<PyType>> = GILOnceCell::new();
 pub fn get_decimal_type(py: Python) -> &Bound<'_, PyType> {
     DECIMAL_TYPE
         .get_or_init(py, || {
-            py.import_bound("decimal")
+            py.import("decimal")
                 .and_then(|decimal_module| decimal_module.getattr("Decimal"))
                 .unwrap()
                 .extract()
@@ -122,7 +122,7 @@ impl Validator for DecimalValidator {
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
-        let decimal = input.validate_decimal(state.strict_or(self.strict), py)?;
+        let decimal = input.validate_decimal(state.strict_or(self.strict), py)?.unpack(state);
 
         if !self.allow_inf_nan || self.check_digits {
             if !decimal.call_method0(intern!(py, "is_finite"))?.extract()? {
@@ -192,7 +192,7 @@ impl Validator for DecimalValidator {
                 return Err(ValError::new(
                     ErrorType::MultipleOf {
                         multiple_of: multiple_of.to_string().into(),
-                        context: Some([("multiple_of", multiple_of)].into_py_dict_bound(py).into()),
+                        context: Some([("multiple_of", multiple_of)].into_py_dict(py)?.into()),
                     },
                     input,
                 ));
@@ -215,7 +215,7 @@ impl Validator for DecimalValidator {
                 return Err(ValError::new(
                     ErrorType::LessThanEqual {
                         le: Number::String(le.to_string()),
-                        context: Some([("le", le)].into_py_dict_bound(py).into()),
+                        context: Some([("le", le)].into_py_dict(py)?.into()),
                     },
                     input,
                 ));
@@ -226,7 +226,7 @@ impl Validator for DecimalValidator {
                 return Err(ValError::new(
                     ErrorType::LessThan {
                         lt: Number::String(lt.to_string()),
-                        context: Some([("lt", lt)].into_py_dict_bound(py).into()),
+                        context: Some([("lt", lt)].into_py_dict(py)?.into()),
                     },
                     input,
                 ));
@@ -237,7 +237,7 @@ impl Validator for DecimalValidator {
                 return Err(ValError::new(
                     ErrorType::GreaterThanEqual {
                         ge: Number::String(ge.to_string()),
-                        context: Some([("ge", ge)].into_py_dict_bound(py).into()),
+                        context: Some([("ge", ge)].into_py_dict(py)?.into()),
                     },
                     input,
                 ));
@@ -248,7 +248,7 @@ impl Validator for DecimalValidator {
                 return Err(ValError::new(
                     ErrorType::GreaterThan {
                         gt: Number::String(gt.to_string()),
-                        context: Some([("gt", gt)].into_py_dict_bound(py).into()),
+                        context: Some([("gt", gt)].into_py_dict(py)?.into()),
                     },
                     input,
                 ));
@@ -267,7 +267,7 @@ pub(crate) fn create_decimal<'py>(arg: &Bound<'py, PyAny>, input: impl ToErrorVa
     let py = arg.py();
     get_decimal_type(py).call1((arg,)).map_err(|e| {
         let decimal_exception = match py
-            .import_bound("decimal")
+            .import("decimal")
             .and_then(|decimal_module| decimal_module.getattr("DecimalException"))
         {
             Ok(decimal_exception) => decimal_exception,
@@ -279,9 +279,9 @@ pub(crate) fn create_decimal<'py>(arg: &Bound<'py, PyAny>, input: impl ToErrorVa
 
 fn handle_decimal_new_error(input: impl ToErrorValue, error: PyErr, decimal_exception: Bound<'_, PyAny>) -> ValError {
     let py = decimal_exception.py();
-    if error.matches(py, decimal_exception) {
+    if error.matches(py, decimal_exception).unwrap_or(false) {
         ValError::new(ErrorTypeDefaults::DecimalParsing, input)
-    } else if error.matches(py, PyTypeError::type_object_bound(py)) {
+    } else if error.matches(py, PyTypeError::type_object(py)).unwrap_or(false) {
         ValError::new(ErrorTypeDefaults::DecimalType, input)
     } else {
         ValError::InternalErr(error)

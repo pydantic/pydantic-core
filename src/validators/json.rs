@@ -2,12 +2,14 @@ use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use jiter::{JsonValue, PartialMode, PythonParse};
+use jiter::{FloatMode, JsonValue, PythonParse};
 
 use crate::errors::{ErrorType, ErrorTypeDefaults, ValError, ValLineError, ValResult};
 use crate::input::{EitherBytes, Input, InputType, ValidationMatch};
+use crate::serializers::BytesMode;
 use crate::tools::SchemaDict;
 
+use super::config::ValBytesMode;
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
 
 #[derive(Debug)]
@@ -57,7 +59,8 @@ impl Validator for JsonValidator {
         let json_bytes = json_either_bytes.as_slice();
         match self.validator {
             Some(ref validator) => {
-                let json_value = JsonValue::parse(json_bytes, true).map_err(|e| map_json_err(input, e, json_bytes))?;
+                let json_value = JsonValue::parse_with_config(json_bytes, true, state.allow_partial)
+                    .map_err(|e| map_json_err(input, e, json_bytes))?;
                 let mut json_state = state.rebind_extra(|e| {
                     e.input_type = InputType::Json;
                 });
@@ -67,9 +70,9 @@ impl Validator for JsonValidator {
                 let parse_builder = PythonParse {
                     allow_inf_nan: true,
                     cache_mode: state.cache_str(),
-                    partial_mode: PartialMode::Off,
+                    partial_mode: state.allow_partial,
                     catch_duplicate_keys: false,
-                    lossless_floats: false,
+                    float_mode: FloatMode::Float,
                 };
                 let obj = parse_builder
                     .python_parse(py, json_bytes)
@@ -87,7 +90,7 @@ impl Validator for JsonValidator {
 pub fn validate_json_bytes<'a, 'py>(
     input: &'a (impl Input<'py> + ?Sized),
 ) -> ValResult<ValidationMatch<EitherBytes<'a, 'py>>> {
-    match input.validate_bytes(false) {
+    match input.validate_bytes(false, ValBytesMode { ser: BytesMode::Utf8 }) {
         Ok(v_match) => Ok(v_match),
         Err(ValError::LineErrors(e)) => Err(ValError::LineErrors(
             e.into_iter().map(map_bytes_error).collect::<Vec<_>>(),

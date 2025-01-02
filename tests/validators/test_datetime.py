@@ -38,10 +38,13 @@ from ..conftest import Err, PyAndJson
         (Decimal('1654646400.1234568'), datetime(2022, 6, 8, 0, 0, 0, 123457, tzinfo=timezone.utc)),
         ('1654646400.1234568', datetime(2022, 6, 8, 0, 0, 0, 123457, tzinfo=timezone.utc)),
         (253_402_300_800_000, Err('should be a valid datetime, dates after 9999 are not supported as unix timestamps')),
-        (-20_000_000_000, Err('should be a valid datetime, dates before 1600 are not supported as unix timestamps')),
+        (
+            -80_000_000_000_000,
+            Err('should be a valid datetime, dates before 0000 are not supported as unix timestamps'),
+        ),
         (float('nan'), Err('Input should be a valid datetime, NaN values not permitted [type=datetime_parsing,')),
         (float('inf'), Err('Input should be a valid datetime, dates after 9999')),
-        (float('-inf'), Err('Input should be a valid datetime, dates before 1600')),
+        (float('-inf'), Err('Input should be a valid datetime, dates before 0000')),
         ('-', Err('Input should be a valid datetime or date, input is too short [type=datetime_from_date_parsing,')),
         ('+', Err('Input should be a valid datetime or date, input is too short [type=datetime_from_date_parsing,')),
         (
@@ -49,6 +52,14 @@ from ..conftest import Err, PyAndJson
             Err(
                 'Input should be a valid datetime or date, day value is outside expected range [type=datetime_from_date_parsing,'
             ),
+        ),
+        (
+            '0001-01-01T00:00:00.000000Z',
+            datetime(1, 1, 1, tzinfo=timezone.utc),
+        ),
+        (
+            '0000-12-31T23:59:59.999999Z',
+            Err('Input should be a valid datetime, year 0 is out of range [type=datetime_parsing,'),
         ),
     ],
 )

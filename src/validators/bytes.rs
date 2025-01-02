@@ -1,6 +1,7 @@
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
+use pyo3::IntoPyObjectExt;
 
 use crate::build_tools::is_strict;
 use crate::errors::{ErrorType, ValError, ValResult};
@@ -8,11 +9,13 @@ use crate::input::Input;
 
 use crate::tools::SchemaDict;
 
+use super::config::ValBytesMode;
 use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
 
 #[derive(Debug, Clone)]
 pub struct BytesValidator {
     strict: bool,
+    bytes_mode: ValBytesMode,
 }
 
 impl BuildValidator for BytesValidator {
@@ -31,6 +34,7 @@ impl BuildValidator for BytesValidator {
         } else {
             Ok(Self {
                 strict: is_strict(schema, config)?,
+                bytes_mode: ValBytesMode::from_config(config)?,
             }
             .into())
         }
@@ -47,8 +51,8 @@ impl Validator for BytesValidator {
         state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
         input
-            .validate_bytes(state.strict_or(self.strict))
-            .map(|m| m.unpack(state).into_py(py))
+            .validate_bytes(state.strict_or(self.strict), self.bytes_mode)
+            .and_then(|m| Ok(m.unpack(state).into_py_any(py)?))
     }
 
     fn get_name(&self) -> &str {
@@ -59,6 +63,7 @@ impl Validator for BytesValidator {
 #[derive(Debug, Clone)]
 pub struct BytesConstrainedValidator {
     strict: bool,
+    bytes_mode: ValBytesMode,
     max_length: Option<usize>,
     min_length: Option<usize>,
 }
@@ -72,7 +77,9 @@ impl Validator for BytesConstrainedValidator {
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
-        let either_bytes = input.validate_bytes(state.strict_or(self.strict))?.unpack(state);
+        let either_bytes = input
+            .validate_bytes(state.strict_or(self.strict), self.bytes_mode)?
+            .unpack(state);
         let len = either_bytes.len()?;
 
         if let Some(min_length) = self.min_length {
@@ -97,7 +104,7 @@ impl Validator for BytesConstrainedValidator {
                 ));
             }
         }
-        Ok(either_bytes.into_py(py))
+        Ok(either_bytes.into_py_any(py)?)
     }
 
     fn get_name(&self) -> &str {
@@ -110,6 +117,7 @@ impl BytesConstrainedValidator {
         let py = schema.py();
         Ok(Self {
             strict: is_strict(schema, config)?,
+            bytes_mode: ValBytesMode::from_config(config)?,
             min_length: schema.get_as(intern!(py, "min_length"))?,
             max_length: schema.get_as(intern!(py, "max_length"))?,
         }

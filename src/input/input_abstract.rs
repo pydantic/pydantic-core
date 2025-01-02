@@ -1,15 +1,17 @@
+use std::convert::Infallible;
 use std::fmt;
 
 use pyo3::exceptions::PyValueError;
-use pyo3::types::{PyDict, PyList};
+use pyo3::types::{PyDict, PyList, PyString};
 use pyo3::{intern, prelude::*};
 
 use crate::errors::{ErrorTypeDefaults, InputValue, LocItem, ValError, ValResult};
 use crate::lookup_key::{LookupKey, LookupPath};
 use crate::tools::py_err;
+use crate::validators::ValBytesMode;
 
 use super::datetime::{EitherDate, EitherDateTime, EitherTime, EitherTimedelta};
-use super::return_enums::{EitherBytes, EitherInt, EitherString};
+use super::return_enums::{EitherBytes, EitherComplex, EitherInt, EitherString};
 use super::{EitherFloat, GenericIterator, ValidationMatch};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -19,13 +21,17 @@ pub enum InputType {
     String,
 }
 
-impl IntoPy<PyObject> for InputType {
-    fn into_py(self, py: Python<'_>) -> PyObject {
-        match self {
-            Self::Json => intern!(py, "json").into_py(py),
-            Self::Python => intern!(py, "python").into_py(py),
-            Self::String => intern!(py, "string").into_py(py),
-        }
+impl<'py> IntoPyObject<'py> for InputType {
+    type Target = PyString;
+    type Output = Bound<'py, PyString>;
+    type Error = Infallible;
+
+    fn into_pyobject(self, py: Python<'_>) -> Result<Bound<'_, PyString>, Infallible> {
+        Ok(match self {
+            Self::Json => intern!(py, "json").clone(),
+            Self::Python => intern!(py, "python").clone(),
+            Self::String => intern!(py, "string").clone(),
+        })
     }
 }
 
@@ -71,7 +77,7 @@ pub trait Input<'py>: fmt::Debug + ToPyObject {
 
     fn validate_str(&self, strict: bool, coerce_numbers_to_str: bool) -> ValMatch<EitherString<'_>>;
 
-    fn validate_bytes<'a>(&'a self, strict: bool) -> ValMatch<EitherBytes<'a, 'py>>;
+    fn validate_bytes<'a>(&'a self, strict: bool, mode: ValBytesMode) -> ValMatch<EitherBytes<'a, 'py>>;
 
     fn validate_bool(&self, strict: bool) -> ValMatch<bool>;
 
@@ -97,18 +103,7 @@ pub trait Input<'py>: fmt::Debug + ToPyObject {
 
     fn validate_float(&self, strict: bool) -> ValMatch<EitherFloat<'_>>;
 
-    fn validate_decimal(&self, strict: bool, py: Python<'py>) -> ValResult<Bound<'py, PyAny>> {
-        if strict {
-            self.strict_decimal(py)
-        } else {
-            self.lax_decimal(py)
-        }
-    }
-    fn strict_decimal(&self, py: Python<'py>) -> ValResult<Bound<'py, PyAny>>;
-    #[cfg_attr(has_coverage_attribute, coverage(off))]
-    fn lax_decimal(&self, py: Python<'py>) -> ValResult<Bound<'py, PyAny>> {
-        self.strict_decimal(py)
-    }
+    fn validate_decimal(&self, strict: bool, py: Python<'py>) -> ValMatch<Bound<'py, PyAny>>;
 
     type Dict<'a>: ValidatedDict<'py>
     where
@@ -172,6 +167,8 @@ pub trait Input<'py>: fmt::Debug + ToPyObject {
         strict: bool,
         microseconds_overflow_behavior: speedate::MicrosecondsPrecisionOverflowBehavior,
     ) -> ValMatch<EitherTimedelta<'py>>;
+
+    fn validate_complex(&self, strict: bool, py: Python<'py>) -> ValMatch<EitherComplex<'py>>;
 }
 
 /// The problem to solve here is that iterating collections often returns owned
@@ -236,7 +233,6 @@ pub trait ValidatedDict<'py> {
     where
         Self: 'a;
     fn get_item<'k>(&self, key: &'k LookupKey) -> ValResult<Option<(&'k LookupPath, Self::Item<'_>)>>;
-    fn as_py_dict(&self) -> Option<&Bound<'py, PyDict>>;
     // FIXME this is a bit of a leaky abstraction
     fn is_py_get_attr(&self) -> bool {
         false
@@ -245,6 +241,8 @@ pub trait ValidatedDict<'py> {
         &'a self,
         consumer: impl ConsumeIterator<ValResult<(Self::Key<'a>, Self::Item<'a>)>, Output = R>,
     ) -> ValResult<R>;
+    // used in partial mode to check all errors occurred in the last value
+    fn last_key(&self) -> Option<Self::Key<'_>>;
 }
 
 /// For validations from a list
@@ -270,7 +268,6 @@ pub trait ValidatedSet<'py> {
 
 /// This type is used for inputs which don't support certain types.
 /// It implements all the associated traits, but never actually gets called.
-
 pub enum Never {}
 
 impl<'py> ValidatedDict<'py> for Never {
@@ -279,13 +276,13 @@ impl<'py> ValidatedDict<'py> for Never {
     fn get_item<'k>(&self, _key: &'k LookupKey) -> ValResult<Option<(&'k LookupPath, Self::Item<'_>)>> {
         unreachable!()
     }
-    fn as_py_dict(&self) -> Option<&Bound<'py, PyDict>> {
-        unreachable!()
-    }
     fn iterate<'a, R>(
         &'a self,
         _consumer: impl ConsumeIterator<ValResult<(Self::Key<'a>, Self::Item<'a>)>, Output = R>,
     ) -> ValResult<R> {
+        unreachable!()
+    }
+    fn last_key(&self) -> Option<Self::Key<'_>> {
         unreachable!()
     }
 }
@@ -332,7 +329,10 @@ impl Arguments<'_> for Never {
 }
 
 impl<'py> PositionalArgs<'py> for Never {
-    type Item<'a> = Bound<'py, PyAny> where Self: 'a;
+    type Item<'a>
+        = Bound<'py, PyAny>
+    where
+        Self: 'a;
     fn len(&self) -> usize {
         unreachable!()
     }
@@ -345,8 +345,14 @@ impl<'py> PositionalArgs<'py> for Never {
 }
 
 impl<'py> KeywordArgs<'py> for Never {
-    type Key<'a> = Bound<'py, PyAny> where Self: 'a;
-    type Item<'a> = Bound<'py, PyAny> where Self: 'a;
+    type Key<'a>
+        = Bound<'py, PyAny>
+    where
+        Self: 'a;
+    type Item<'a>
+        = Bound<'py, PyAny>
+    where
+        Self: 'a;
     fn len(&self) -> usize {
         unreachable!()
     }

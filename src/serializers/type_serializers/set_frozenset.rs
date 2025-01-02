@@ -1,8 +1,8 @@
 use std::borrow::Cow;
 
-use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyFrozenSet, PyList, PySet};
+use pyo3::{intern, IntoPyObjectExt};
 
 use serde::ser::SerializeSeq;
 
@@ -17,7 +17,7 @@ use super::{
 
 macro_rules! build_serializer {
     ($struct_name:ident, $expected_type:literal, $py_type:ty) => {
-        #[derive(Debug, Clone)]
+        #[derive(Debug)]
         pub struct $struct_name {
             item_serializer: Box<CombinedSerializer>,
             name: String,
@@ -65,8 +65,8 @@ macro_rules! build_serializer {
                             items.push(item_serializer.to_python(&element, include, exclude, extra)?);
                         }
                         match extra.mode {
-                            SerMode::Json => Ok(PyList::new_bound(py, items).into_py(py)),
-                            _ => Ok(<$py_type>::new_bound(py, &items)?.into_py(py)),
+                            SerMode::Json => Ok(PyList::new(py, items)?.into()),
+                            _ => <$py_type>::new(py, &items)?.into_py_any(py),
                         }
                     }
                     Err(_) => {
@@ -77,7 +77,7 @@ macro_rules! build_serializer {
             }
 
             fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
-                self._invalid_as_json_key(key, extra, Self::EXPECTED_TYPE)
+                self.invalid_as_json_key(key, extra, Self::EXPECTED_TYPE)
             }
 
             fn serde_serialize<S: serde::ser::Serializer>(

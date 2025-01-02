@@ -13,7 +13,7 @@ use super::{
     SerCheck, SerMode, TypeSerializer,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct NoneSerializer;
 
 impl BuildSerializer for NoneSerializer {
@@ -44,7 +44,7 @@ impl TypeSerializer for NoneSerializer {
     ) -> PyResult<PyObject> {
         let py = value.py();
         match extra.ob_type_lookup.is_type(value, ObType::None) {
-            IsType::Exact => Ok(py.None().into_py(py)),
+            IsType::Exact => Ok(py.None()),
             // I don't think subclasses of None can exist
             _ => {
                 extra.warnings.on_fallback_py(self.get_name(), value, extra)?;
@@ -87,7 +87,7 @@ impl TypeSerializer for NoneSerializer {
 
 macro_rules! build_simple_serializer {
     ($struct_name:ident, $expected_type:literal, $rust_type:ty, $ob_type:expr, $key_method:ident, $subtypes_allowed:expr) => {
-        #[derive(Debug, Clone)]
+        #[derive(Debug)]
         pub struct $struct_name;
 
         impl $struct_name {
@@ -120,7 +120,7 @@ macro_rules! build_simple_serializer {
             ) -> PyResult<PyObject> {
                 let py = value.py();
                 match extra.ob_type_lookup.is_type(value, $ob_type) {
-                    IsType::Exact => Ok(value.into_py(py)),
+                    IsType::Exact => Ok(value.clone().unbind()),
                     IsType::Subclass => match extra.check {
                         SerCheck::Strict => Err(PydanticSerializationUnexpectedValue::new_err(None)),
                         SerCheck::Lax | SerCheck::None => match extra.mode {

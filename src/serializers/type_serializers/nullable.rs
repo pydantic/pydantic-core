@@ -9,7 +9,7 @@ use crate::tools::SchemaDict;
 
 use super::{infer_json_key_known, BuildSerializer, CombinedSerializer, Extra, IsType, ObType, TypeSerializer};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct NullableSerializer {
     serializer: Box<CombinedSerializer>,
 }
@@ -42,7 +42,7 @@ impl TypeSerializer for NullableSerializer {
     ) -> PyResult<PyObject> {
         let py = value.py();
         match extra.ob_type_lookup.is_type(value, ObType::None) {
-            IsType::Exact => Ok(py.None().into_py(py)),
+            IsType::Exact => Ok(py.None()),
             // I don't think subclasses of None can exist
             _ => self.serializer.to_python(value, include, exclude, extra),
         }

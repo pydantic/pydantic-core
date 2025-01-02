@@ -75,6 +75,9 @@ impl Validator for DefinitionRefValidator {
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
+        // this validator does not yet support partial validation, disable it to avoid incorrect results
+        state.allow_partial = false.into();
+
         self.definition.read(|validator| {
             let validator = validator.unwrap();
             if let Some(id) = input.as_python().map(py_identity) {
@@ -86,6 +89,18 @@ impl Validator for DefinitionRefValidator {
             } else {
                 validator.validate(py, input, state)
             }
+        })
+    }
+
+    fn default_value<'py>(
+        &self,
+        _py: Python<'py>,
+        _outer_loc: Option<impl Into<crate::errors::LocItem>>,
+        _state: &mut ValidationState<'_, 'py>,
+    ) -> ValResult<Option<PyObject>> {
+        self.definition.read(|validator| {
+            let validator = validator.unwrap();
+            validator.default_value(_py, _outer_loc, _state)
         })
     }
 

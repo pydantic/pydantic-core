@@ -13,8 +13,10 @@ use crate::input::input_as_python_instance;
 use crate::input::Input;
 use crate::input::InputType;
 use crate::input::ValidationMatch;
+use crate::serializers::BytesMode;
 use crate::tools::SchemaDict;
 
+use super::config::ValBytesMode;
 use super::model::create_class;
 use super::model::force_setattr;
 use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, Exactness, ValidationState, Validator};
@@ -25,7 +27,7 @@ const UUID_IS_SAFE: &str = "is_safe";
 static UUID_TYPE: GILOnceCell<Py<PyType>> = GILOnceCell::new();
 
 fn import_type(py: Python, module: &str, attr: &str) -> PyResult<Py<PyType>> {
-    py.import_bound(module)?.getattr(attr)?.extract()
+    py.import(module)?.getattr(attr)?.extract()
 }
 
 fn get_uuid_type(py: Python) -> PyResult<&Bound<'_, PyType>> {
@@ -172,7 +174,7 @@ impl UuidValidator {
             }
             None => {
                 let either_bytes = input
-                    .validate_bytes(true)
+                    .validate_bytes(true, ValBytesMode { ser: BytesMode::Utf8 })
                     .map_err(|_| ValError::new(ErrorTypeDefaults::UuidType, input))?
                     .into_inner();
                 let bytes_slice = either_bytes.as_slice();
@@ -223,7 +225,7 @@ impl UuidValidator {
         let dc = create_class(py_type)?;
         let int = uuid.as_u128();
         let safe = py
-            .import_bound(intern!(py, "uuid"))?
+            .import(intern!(py, "uuid"))?
             .getattr(intern!(py, "SafeUUID"))?
             .get_item("safe")?;
         force_setattr(py, &dc, intern!(py, UUID_INT), int)?;

@@ -10,7 +10,7 @@ use crate::validators::DefaultType;
 
 use super::{BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct WithDefaultSerializer {
     default: DefaultType,
     serializer: Box<CombinedSerializer>,
@@ -72,6 +72,14 @@ impl TypeSerializer for WithDefaultSerializer {
     }
 
     fn get_default(&self, py: Python) -> PyResult<Option<PyObject>> {
-        self.default.default_value(py)
+        if let DefaultType::DefaultFactory(_, _takes_data @ true) = self.default {
+            // We currently don't compute the default if the default factory takes
+            // the data from other fields.
+            Ok(None)
+        } else {
+            self.default.default_value(
+                py, None, // Won't be used.
+            )
+        }
     }
 }

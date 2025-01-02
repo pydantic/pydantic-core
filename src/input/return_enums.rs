@@ -1,9 +1,10 @@
 use std::borrow::Cow;
 use std::cmp::Ordering;
+use std::convert::Infallible;
 use std::ops::Rem;
 use std::str::FromStr;
 
-use jiter::{JsonArray, JsonValue, StringCacheMode};
+use jiter::{JsonArray, JsonValue, PartialMode, StringCacheMode};
 use num_bigint::BigInt;
 
 use pyo3::exceptions::PyTypeError;
@@ -12,15 +13,16 @@ use pyo3::intern;
 use pyo3::prelude::*;
 #[cfg(not(PyPy))]
 use pyo3::types::PyFunction;
-use pyo3::types::{PyBytes, PyFloat, PyFrozenSet, PyIterator, PyMapping, PySet, PyString};
+use pyo3::types::{PyBytes, PyComplex, PyFloat, PyFrozenSet, PyIterator, PyMapping, PySet, PyString};
 
+use pyo3::IntoPyObjectExt;
 use serde::{ser::Error, Serialize, Serializer};
 
 use crate::errors::{
     py_err_string, ErrorType, ErrorTypeDefaults, InputValue, ToErrorValue, ValError, ValLineError, ValResult,
 };
 use crate::py_gc::PyGcTraverse;
-use crate::tools::{extract_i64, new_py_string, py_err};
+use crate::tools::{extract_i64, extract_int, new_py_string, py_err};
 use crate::validators::{CombinedValidator, Exactness, ValidationState, Validator};
 
 use super::{py_error_on_minusone, BorrowInput, Input};
@@ -128,7 +130,13 @@ pub(crate) fn validate_iter_to_vec<'py>(
 ) -> ValResult<Vec<PyObject>> {
     let mut output: Vec<PyObject> = Vec::with_capacity(capacity);
     let mut errors: Vec<ValLineError> = Vec::new();
-    for (index, item_result) in iter.enumerate() {
+    let allow_partial = state.allow_partial;
+
+    for (index, is_last_partial, item_result) in state.enumerate_last_partial(iter) {
+        state.allow_partial = match is_last_partial {
+            true => allow_partial,
+            false => PartialMode::Off,
+        };
         let item = item_result.map_err(|e| any_next_error!(py, e, max_length_check.input, index))?;
         match validator.validate(py, item.borrow_input(), state) {
             Ok(item) => {
@@ -137,9 +145,11 @@ pub(crate) fn validate_iter_to_vec<'py>(
             }
             Err(ValError::LineErrors(line_errors)) => {
                 max_length_check.incr()?;
-                errors.extend(line_errors.into_iter().map(|err| err.with_outer_location(index)));
-                if fail_fast {
-                    break;
+                if !is_last_partial {
+                    errors.extend(line_errors.into_iter().map(|err| err.with_outer_location(index)));
+                    if fail_fast {
+                        return Err(ValError::LineErrors(errors));
+                    }
                 }
             }
             Err(ValError::Omit) => (),
@@ -197,7 +207,14 @@ pub(crate) fn validate_iter_to_set<'py>(
     fail_fast: bool,
 ) -> ValResult<()> {
     let mut errors: Vec<ValLineError> = Vec::new();
-    for (index, item_result) in iter.enumerate() {
+
+    let allow_partial = state.allow_partial;
+
+    for (index, is_last_partial, item_result) in state.enumerate_last_partial(iter) {
+        state.allow_partial = match is_last_partial {
+            true => allow_partial,
+            false => PartialMode::Off,
+        };
         let item = item_result.map_err(|e| any_next_error!(py, e, input, index))?;
         match validator.validate(py, item.borrow_input(), state) {
             Ok(item) => {
@@ -220,13 +237,15 @@ pub(crate) fn validate_iter_to_set<'py>(
                 }
             }
             Err(ValError::LineErrors(line_errors)) => {
-                errors.extend(line_errors.into_iter().map(|err| err.with_outer_location(index)));
+                if !is_last_partial {
+                    errors.extend(line_errors.into_iter().map(|err| err.with_outer_location(index)));
+                }
             }
             Err(ValError::Omit) => (),
             Err(err) => return Err(err),
         }
         if fail_fast && !errors.is_empty() {
-            break;
+            return Err(ValError::LineErrors(errors));
         }
     }
 
@@ -261,9 +280,8 @@ pub(crate) fn iterate_mapping_items<'a, 'py>(
         .items()
         .map_err(|e| mapping_err(e, py, input))?
         .iter()
-        .map_err(|e| mapping_err(e, py, input))?
-        .map(move |item| match item {
-            Ok(item) => item.extract().map_err(|_| {
+        .map(move |item| {
+            item.extract().map_err(|_| {
                 ValError::new(
                     ErrorType::MappingType {
                         error: MAPPING_TUPLE_ERROR.into(),
@@ -271,8 +289,7 @@ pub(crate) fn iterate_mapping_items<'a, 'py>(
                     },
                     input,
                 )
-            }),
-            Err(e) => Err(mapping_err(e, py, input)),
+            })
         });
     Ok(iterator)
 }
@@ -469,7 +486,7 @@ impl<'a> From<&'a str> for EitherString<'a> {
     }
 }
 
-impl<'a> From<String> for EitherString<'a> {
+impl From<String> for EitherString<'_> {
     fn from(data: String) -> Self {
         Self::Cow(Cow::Owned(data))
     }
@@ -491,12 +508,13 @@ pub fn py_string_str<'a>(py_str: &'a Bound<'_, PyString>) -> ValResult<&'a str> 
 }
 
 #[cfg_attr(debug_assertions, derive(Debug))]
+#[derive(IntoPyObject)]
 pub enum EitherBytes<'a, 'py> {
     Cow(Cow<'a, [u8]>),
     Py(Bound<'py, PyBytes>),
 }
 
-impl<'a> From<Vec<u8>> for EitherBytes<'a, '_> {
+impl From<Vec<u8>> for EitherBytes<'_, '_> {
     fn from(bytes: Vec<u8>) -> Self {
         Self::Cow(Cow::Owned(bytes))
     }
@@ -530,25 +548,17 @@ impl EitherBytes<'_, '_> {
     }
 }
 
-impl IntoPy<PyObject> for EitherBytes<'_, '_> {
-    fn into_py(self, py: Python<'_>) -> PyObject {
-        match self {
-            EitherBytes::Cow(bytes) => PyBytes::new_bound(py, &bytes).into_py(py),
-            EitherBytes::Py(py_bytes) => py_bytes.into_py(py),
-        }
-    }
-}
-
 #[cfg_attr(debug_assertions, derive(Debug))]
-pub enum EitherInt<'a> {
+#[derive(IntoPyObject)]
+pub enum EitherInt<'py> {
     I64(i64),
     U64(u64),
     BigInt(BigInt),
-    Py(Bound<'a, PyAny>),
+    Py(Bound<'py, PyAny>),
 }
 
-impl<'a> EitherInt<'a> {
-    pub fn upcast(py_any: &Bound<'a, PyAny>) -> ValResult<Self> {
+impl<'py> EitherInt<'py> {
+    pub fn upcast(py_any: &Bound<'py, PyAny>) -> ValResult<Self> {
         // Safety: we know that py_any is a python int
         if let Some(int_64) = extract_i64(py_any) {
             Ok(Self::I64(int_64))
@@ -558,18 +568,21 @@ impl<'a> EitherInt<'a> {
         }
     }
 
-    pub fn into_i64(self, py: Python<'a>) -> ValResult<i64> {
+    pub fn into_i64(self, py: Python<'py>) -> ValResult<i64> {
         match self {
             EitherInt::I64(i) => Ok(i),
             EitherInt::U64(u) => match i64::try_from(u) {
                 Ok(u) => Ok(u),
-                Err(_) => Err(ValError::new(ErrorTypeDefaults::IntParsingSize, u.into_py(py).bind(py))),
+                Err(_) => Err(ValError::new(
+                    ErrorTypeDefaults::IntParsingSize,
+                    u.into_bound_py_any(py)?,
+                )),
             },
             EitherInt::BigInt(u) => match i64::try_from(u) {
                 Ok(u) => Ok(u),
                 Err(e) => Err(ValError::new(
                     ErrorTypeDefaults::IntParsingSize,
-                    e.into_original().into_py(py).bind(py),
+                    e.into_original().into_bound_py_any(py)?,
                 )),
             },
             EitherInt::Py(i) => i
@@ -618,25 +631,14 @@ impl<'a> EitherInt<'a> {
     }
 }
 
-impl<'a> IntoPy<PyObject> for EitherInt<'a> {
-    fn into_py(self, py: Python<'_>) -> PyObject {
-        match self {
-            Self::I64(int) => int.into_py(py),
-            Self::U64(int) => int.into_py(py),
-            Self::BigInt(int) => int.into_py(py),
-            Self::Py(int) => int.into_py(py),
-        }
-    }
-}
-
 #[cfg_attr(debug_assertions, derive(Debug))]
-#[derive(Clone)]
-pub enum EitherFloat<'a> {
+#[derive(Clone, IntoPyObject)]
+pub enum EitherFloat<'py> {
     F64(f64),
-    Py(Bound<'a, PyFloat>),
+    Py(Bound<'py, PyFloat>),
 }
 
-impl<'a> EitherFloat<'a> {
+impl EitherFloat<'_> {
     pub fn as_f64(&self) -> f64 {
         match self {
             EitherFloat::F64(f) => *f,
@@ -645,16 +647,7 @@ impl<'a> EitherFloat<'a> {
     }
 }
 
-impl<'a> IntoPy<PyObject> for EitherFloat<'a> {
-    fn into_py(self, py: Python<'_>) -> PyObject {
-        match self {
-            Self::F64(float) => float.into_py(py),
-            Self::Py(float) => float.into_py(py),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, IntoPyObject)]
 #[serde(untagged)]
 pub enum Int {
     I64(i64),
@@ -691,7 +684,7 @@ impl PartialEq for Int {
     }
 }
 
-impl<'a> Rem for &'a Int {
+impl Rem for &Int {
     type Output = Int;
 
     fn rem(self, rhs: Self) -> Self::Output {
@@ -706,12 +699,9 @@ impl<'a> Rem for &'a Int {
 
 impl FromPyObject<'_> for Int {
     fn extract_bound(obj: &Bound<'_, PyAny>) -> PyResult<Self> {
-        if let Some(i) = extract_i64(obj) {
-            Ok(Int::I64(i))
-        } else if let Ok(b) = obj.extract::<BigInt>() {
-            Ok(Int::Big(b))
-        } else {
-            py_err!(PyTypeError; "Expected int, got {}", obj.get_type())
+        match extract_int(obj) {
+            Some(i) => Ok(i),
+            None => py_err!(PyTypeError; "Expected int, got {}", obj.get_type()),
         }
     }
 }
@@ -721,6 +711,25 @@ impl ToPyObject for Int {
         match self {
             Self::I64(i) => i.to_object(py),
             Self::Big(big_i) => big_i.to_object(py),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub enum EitherComplex<'py> {
+    Complex([f64; 2]),
+    Py(Bound<'py, PyComplex>),
+}
+
+impl<'py> IntoPyObject<'py> for EitherComplex<'py> {
+    type Target = PyComplex;
+    type Output = Bound<'py, PyComplex>;
+    type Error = Infallible;
+
+    fn into_pyobject(self, py: Python<'py>) -> Result<Bound<'py, PyComplex>, Infallible> {
+        match self {
+            EitherComplex::Complex(c) => Ok(PyComplex::from_doubles(py, c[0], c[1])),
+            EitherComplex::Py(c) => Ok(c),
         }
     }
 }

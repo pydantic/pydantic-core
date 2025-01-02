@@ -257,6 +257,11 @@ all_errors = [
     ('no_such_attribute', "Object has no attribute 'wrong_name'", {'attribute': 'wrong_name'}),
     ('json_invalid', 'Invalid JSON: foobar', {'error': 'foobar'}),
     ('json_type', 'JSON input should be string, bytes or bytearray', None),
+    (
+        'needs_python_object',
+        'Cannot check `isinstance` when validating from json, use a JsonOrPython validator instead',
+        {'method_name': 'isinstance'},
+    ),
     ('recursion_loop', 'Recursion error - cyclic reference detected', None),
     ('model_type', 'Input should be a valid dictionary or instance of Foobar', {'class_name': 'Foobar'}),
     ('model_attributes_type', 'Input should be a valid dictionary or object to extract fields from', None),
@@ -320,6 +325,16 @@ all_errors = [
     ('bytes_too_short', 'Data should have at least 1 byte', {'min_length': 1}),
     ('bytes_too_long', 'Data should have at most 42 bytes', {'max_length': 42}),
     ('bytes_too_long', 'Data should have at most 1 byte', {'max_length': 1}),
+    (
+        'bytes_invalid_encoding',
+        'Data should be valid base64: Invalid byte 1, offset 1',
+        {'encoding': 'base64', 'encoding_error': 'Invalid byte 1, offset 1'},
+    ),
+    (
+        'bytes_invalid_encoding',
+        'Data should be valid hex: Odd number of digits',
+        {'encoding': 'hex', 'encoding_error': 'Odd number of digits'},
+    ),
     ('value_error', 'Value error, foobar', {'error': ValueError('foobar')}),
     ('assertion_error', 'Assertion failed, foobar', {'error': AssertionError('foobar')}),
     ('literal_error', 'Input should be foo', {'expected': 'foo'}),
@@ -384,6 +399,16 @@ all_errors = [
         'decimal_whole_digits',
         'Decimal input should have no more than 1 digit before the decimal point',
         {'whole_digits': 1},
+    ),
+    (
+        'complex_type',
+        'Input should be a valid python complex object, a number, or a valid complex string following the rules at https://docs.python.org/3/library/functions.html#complex',
+        None,
+    ),
+    (
+        'complex_str_parsing',
+        'Input should be a valid complex string following the rules at https://docs.python.org/3/library/functions.html#complex',
+        None,
     ),
 ]
 
@@ -486,10 +511,10 @@ def test_all_errors():
             'example_context': None,
         },
         {
-            'type': 'recursion_loop',
-            'message_template_python': 'Recursion error - cyclic reference detected',
-            'example_message_python': 'Recursion error - cyclic reference detected',
-            'example_context': None,
+            'type': 'needs_python_object',
+            'message_template_python': 'Cannot check `{method_name}` when validating from json, use a JsonOrPython validator instead',
+            'example_message_python': 'Cannot check `` when validating from json, use a JsonOrPython validator instead',
+            'example_context': {'method_name': ''},
         },
     ]
 
@@ -526,7 +551,7 @@ def test_validation_error_cause_contents():
         s2.validate_python('anything')
 
     cause_group = exc_info.value.__cause__
-    assert isinstance(cause_group, BaseExceptionGroup)
+    assert isinstance(cause_group, BaseExceptionGroup)  # noqa: F821,RUF100  # gated on 3.11+ above
     assert len(cause_group.exceptions) == 1
 
     cause = cause_group.exceptions[0]
@@ -551,7 +576,7 @@ def test_validation_error_cause_contents():
     with pytest.raises(ValidationError) as exc_info:
         s3.validate_python('anything')
 
-    assert isinstance(exc_info.value.__cause__, BaseExceptionGroup)
+    assert isinstance(exc_info.value.__cause__, BaseExceptionGroup)  # noqa: F821,RUF100  # gated on 3.11+ above
     assert len(exc_info.value.__cause__.exceptions) == 1
     cause = exc_info.value.__cause__.exceptions[0]
     assert cause.__notes__ and cause.__notes__[-1].startswith('\nPydantic: ')
@@ -560,7 +585,7 @@ def test_validation_error_cause_contents():
     assert isinstance(subcause, ValidationError)
 
     cause_group = subcause.__cause__
-    assert isinstance(cause_group, BaseExceptionGroup)
+    assert isinstance(cause_group, BaseExceptionGroup)  # noqa: F821,RUF100  # gated on 3.11+ above
     assert len(cause_group.exceptions) == 1
 
     cause = cause_group.exceptions[0]

@@ -1,13 +1,14 @@
 use std::fmt::Debug;
 
 use enum_dispatch::enum_dispatch;
-use jiter::StringCacheMode;
+use jiter::{PartialMode, StringCacheMode};
 
 use pyo3::exceptions::PyTypeError;
-use pyo3::prelude::*;
+use pyo3::ffi::c_str;
 use pyo3::sync::GILOnceCell;
 use pyo3::types::{PyAny, PyDict, PyString, PyTuple, PyType};
 use pyo3::{intern, PyTraverseError, PyVisit};
+use pyo3::{prelude::*, IntoPyObjectExt};
 
 use crate::build_tools::{py_schema_err, py_schema_error_type, SchemaError};
 use crate::definitions::{Definitions, DefinitionsBuilder};
@@ -16,6 +17,7 @@ use crate::input::{Input, InputType, StringMapping};
 use crate::py_gc::PyGcTraverse;
 use crate::recursion_guard::RecursionState;
 use crate::tools::SchemaDict;
+pub(crate) use config::ValBytesMode;
 
 mod any;
 mod arguments;
@@ -24,6 +26,8 @@ mod bytes;
 mod call;
 mod callable;
 mod chain;
+pub(crate) mod complex;
+mod config;
 mod custom_error;
 mod dataclass;
 mod date;
@@ -93,8 +97,8 @@ impl PySome {
     }
 
     #[classattr]
-    fn __match_args__(py: Python) -> Bound<'_, PyTuple> {
-        PyTuple::new_bound(py, vec![intern!(py, "value")])
+    fn __match_args__(py: Python<'_>) -> PyResult<Bound<'_, PyTuple>> {
+        (intern!(py, "value"),).into_pyobject(py)
     }
 }
 
@@ -123,7 +127,7 @@ impl SchemaValidator {
 
         let validator = build_validator(schema, config, &mut definitions_builder)?;
         let definitions = definitions_builder.finish()?;
-        let py_schema = schema.into_py(py);
+        let py_schema = schema.clone().unbind();
         let py_config = match config {
             Some(c) if !c.is_empty() => Some(c.clone().into()),
             _ => None,
@@ -133,8 +137,8 @@ impl SchemaValidator {
             None => None,
         };
         let title = match config_title {
-            Some(t) => t.into_py(py),
-            None => validator.get_name().into_py(py),
+            Some(t) => t.unbind(),
+            None => validator.get_name().into_py_any(py)?,
         };
         let hide_input_in_errors: bool = config.get_as(intern!(py, "hide_input_in_errors"))?.unwrap_or(false);
         let validation_error_cause: bool = config.get_as(intern!(py, "validation_error_cause"))?.unwrap_or(false);
@@ -161,7 +165,8 @@ impl SchemaValidator {
         Ok((cls, init_args))
     }
 
-    #[pyo3(signature = (input, *, strict=None, from_attributes=None, context=None, self_instance=None))]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (input, *, strict=None, from_attributes=None, context=None, self_instance=None, allow_partial=PartialMode::Off))]
     pub fn validate_python(
         &self,
         py: Python,
@@ -170,7 +175,9 @@ impl SchemaValidator {
         from_attributes: Option<bool>,
         context: Option<&Bound<'_, PyAny>>,
         self_instance: Option<&Bound<'_, PyAny>>,
+        allow_partial: PartialMode,
     ) -> PyResult<PyObject> {
+        #[allow(clippy::used_underscore_items)]
         self._validate(
             py,
             input,
@@ -179,6 +186,7 @@ impl SchemaValidator {
             from_attributes,
             context,
             self_instance,
+            allow_partial,
         )
         .map_err(|e| self.prepare_validation_err(py, e, InputType::Python))
     }
@@ -193,6 +201,7 @@ impl SchemaValidator {
         context: Option<&Bound<'_, PyAny>>,
         self_instance: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<bool> {
+        #[allow(clippy::used_underscore_items)]
         match self._validate(
             py,
             input,
@@ -201,6 +210,7 @@ impl SchemaValidator {
             from_attributes,
             context,
             self_instance,
+            false.into(),
         ) {
             Ok(_) => Ok(true),
             Err(ValError::InternalErr(err)) => Err(err),
@@ -210,7 +220,7 @@ impl SchemaValidator {
         }
     }
 
-    #[pyo3(signature = (input, *, strict=None, context=None, self_instance=None))]
+    #[pyo3(signature = (input, *, strict=None, context=None, self_instance=None, allow_partial=PartialMode::Off))]
     pub fn validate_json(
         &self,
         py: Python,
@@ -218,8 +228,10 @@ impl SchemaValidator {
         strict: Option<bool>,
         context: Option<&Bound<'_, PyAny>>,
         self_instance: Option<&Bound<'_, PyAny>>,
+        allow_partial: PartialMode,
     ) -> PyResult<PyObject> {
         let r = match json::validate_json_bytes(input) {
+            #[allow(clippy::used_underscore_items)]
             Ok(v_match) => self._validate_json(
                 py,
                 input,
@@ -227,24 +239,27 @@ impl SchemaValidator {
                 strict,
                 context,
                 self_instance,
+                allow_partial,
             ),
             Err(err) => Err(err),
         };
         r.map_err(|e| self.prepare_validation_err(py, e, InputType::Json))
     }
 
-    #[pyo3(signature = (input, *, strict=None, context=None))]
+    #[pyo3(signature = (input, *, strict=None, context=None, allow_partial=PartialMode::Off))]
     pub fn validate_strings(
         &self,
         py: Python,
         input: Bound<'_, PyAny>,
         strict: Option<bool>,
         context: Option<&Bound<'_, PyAny>>,
+        allow_partial: PartialMode,
     ) -> PyResult<PyObject> {
         let t = InputType::String;
         let string_mapping = StringMapping::new_value(input).map_err(|e| self.prepare_validation_err(py, e, t))?;
 
-        match self._validate(py, &string_mapping, t, strict, None, context, None) {
+        #[allow(clippy::used_underscore_items)]
+        match self._validate(py, &string_mapping, t, strict, None, context, None, allow_partial) {
             Ok(r) => Ok(r),
             Err(e) => Err(self.prepare_validation_err(py, e, t)),
         }
@@ -273,7 +288,7 @@ impl SchemaValidator {
         };
 
         let guard = &mut RecursionState::default();
-        let mut state = ValidationState::new(extra, guard);
+        let mut state = ValidationState::new(extra, guard, false.into());
         self.validator
             .validate_assignment(py, &obj, field_name, &field_value, &mut state)
             .map_err(|e| self.prepare_validation_err(py, e, InputType::Python))
@@ -296,12 +311,12 @@ impl SchemaValidator {
             cache_str: self.cache_str,
         };
         let recursion_guard = &mut RecursionState::default();
-        let mut state = ValidationState::new(extra, recursion_guard);
+        let mut state = ValidationState::new(extra, recursion_guard, false.into());
         let r = self.validator.default_value(py, None::<i64>, &mut state);
         match r {
             Ok(maybe_default) => match maybe_default {
-                Some(v) => Ok(PySome::new(v).into_py(py)),
-                None => Ok(py.None().into_py(py)),
+                Some(v) => PySome::new(v).into_py_any(py),
+                None => Ok(py.None()),
             },
             Err(e) => Err(self.prepare_validation_err(py, e, InputType::Python)),
         }
@@ -342,6 +357,7 @@ impl SchemaValidator {
         from_attributes: Option<bool>,
         context: Option<&Bound<'py, PyAny>>,
         self_instance: Option<&Bound<'py, PyAny>>,
+        allow_partial: PartialMode,
     ) -> ValResult<PyObject> {
         let mut recursion_guard = RecursionState::default();
         let mut state = ValidationState::new(
@@ -354,10 +370,12 @@ impl SchemaValidator {
                 self.cache_str,
             ),
             &mut recursion_guard,
+            allow_partial,
         );
         self.validator.validate(py, input, &mut state)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn _validate_json(
         &self,
         py: Python,
@@ -366,10 +384,21 @@ impl SchemaValidator {
         strict: Option<bool>,
         context: Option<&Bound<'_, PyAny>>,
         self_instance: Option<&Bound<'_, PyAny>>,
+        allow_partial: PartialMode,
     ) -> ValResult<PyObject> {
-        let json_value =
-            jiter::JsonValue::parse(json_data, true).map_err(|e| json::map_json_err(input, e, json_data))?;
-        self._validate(py, &json_value, InputType::Json, strict, None, context, self_instance)
+        let json_value = jiter::JsonValue::parse_with_config(json_data, true, allow_partial)
+            .map_err(|e| json::map_json_err(input, e, json_data))?;
+        #[allow(clippy::used_underscore_items)]
+        self._validate(
+            py,
+            &json_value,
+            InputType::Json,
+            strict,
+            None,
+            context,
+            self_instance,
+            allow_partial,
+        )
     }
 
     fn prepare_validation_err(&self, py: Python, error: ValError, input_type: InputType) -> PyErr {
@@ -407,6 +436,7 @@ impl<'py> SelfValidator<'py> {
         let mut state = ValidationState::new(
             Extra::new(strict, None, None, None, InputType::Python, true.into()),
             &mut recursion_guard,
+            false.into(),
         );
         match self.validator.validator.validate(py, schema, &mut state) {
             Ok(schema_obj) => Ok(schema_obj.into_bound(py)),
@@ -415,9 +445,9 @@ impl<'py> SelfValidator<'py> {
     }
 
     fn build(py: Python) -> PyResult<SchemaValidator> {
-        let code = include_str!("../self_schema.py");
-        let locals = PyDict::new_bound(py);
-        py.run_bound(code, None, Some(&locals))?;
+        let code = c_str!(include_str!("../self_schema.py"));
+        let locals = PyDict::new(py);
+        py.run(code, None, Some(&locals))?;
         let self_schema = locals.get_as_req(intern!(py, "self_schema"))?;
 
         let mut definitions_builder = DefinitionsBuilder::new();
@@ -432,7 +462,7 @@ impl<'py> SelfValidator<'py> {
             definitions,
             py_schema: py.None(),
             py_config: None,
-            title: "Self Schema".into_py(py),
+            title: "Self Schema".into_py_any(py)?,
             hide_input_in_errors: false,
             validation_error_cause: false,
             cache_str: true.into(),
@@ -476,6 +506,7 @@ macro_rules! validator_match {
             $(
                 <$validator>::EXPECTED_TYPE => build_specific_validator::<$validator>($type, $dict, $config, $definitions),
             )+
+            "invalid" => return py_schema_err!("Cannot construct schema with `InvalidSchema` member."),
             _ => return py_schema_err!(r#"Unknown schema type: "{}""#, $type),
         }
     };
@@ -580,6 +611,7 @@ pub fn build_validator(
         // recursive (self-referencing) models
         definitions::DefinitionRefValidator,
         definitions::DefinitionsValidatorBuilder,
+        complex::ComplexValidator,
     )
 }
 
@@ -733,6 +765,7 @@ pub enum CombinedValidator {
     DefinitionRef(definitions::DefinitionRefValidator),
     // input dependent
     JsonOrPython(json_or_python::JsonOrPython),
+    Complex(complex::ComplexValidator),
 }
 
 /// This trait must be implemented by all validators, it allows various validators to be accessed consistently,

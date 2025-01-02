@@ -1,8 +1,8 @@
 use std::ptr::null_mut;
 
 use pyo3::exceptions::PyTypeError;
-use pyo3::ffi;
 use pyo3::types::{PyDict, PySet, PyString, PyTuple, PyType};
+use pyo3::{ffi, IntoPyObjectExt};
 use pyo3::{intern, prelude::*};
 
 use super::function::convert_err;
@@ -55,6 +55,7 @@ pub struct ModelValidator {
     revalidate: Revalidate,
     validator: Box<CombinedValidator>,
     class: Py<PyType>,
+    generic_origin: Option<Py<PyType>>,
     post_init: Option<Py<PyString>>,
     frozen: bool,
     custom_init: bool,
@@ -76,6 +77,7 @@ impl BuildValidator for ModelValidator {
         let config = schema.get_as(intern!(py, "config"))?;
 
         let class: Bound<'_, PyType> = schema.get_as_req(intern!(py, "cls"))?;
+        let generic_origin: Option<Bound<'_, PyType>> = schema.get_as(intern!(py, "generic_origin"))?;
         let sub_schema = schema.get_as_req(intern!(py, "schema"))?;
         let validator = build_validator(&sub_schema, config.as_ref(), definitions)?;
         let name = class.getattr(intern!(py, "__name__"))?.extract()?;
@@ -93,6 +95,7 @@ impl BuildValidator for ModelValidator {
             )?,
             validator: Box::new(validator),
             class: class.into(),
+            generic_origin: generic_origin.map(std::convert::Into::into),
             post_init: schema.get_as(intern!(py, "post_init"))?,
             frozen: schema.get_as(intern!(py, "frozen"))?.unwrap_or(false),
             custom_init: schema.get_as(intern!(py, "custom_init"))?.unwrap_or(false),
@@ -105,7 +108,11 @@ impl BuildValidator for ModelValidator {
     }
 }
 
-impl_py_gc_traverse!(ModelValidator { class, validator });
+impl_py_gc_traverse!(ModelValidator {
+    class,
+    generic_origin,
+    validator
+});
 
 impl Validator for ModelValidator {
     fn validate<'py>(
@@ -119,13 +126,33 @@ impl Validator for ModelValidator {
             return self.validate_init(py, self_instance, input, state);
         }
 
+        let class = self.class.bind(py);
+        let generic_origin_class = self.generic_origin.as_ref().map(|go| go.bind(py));
+
         // if we're in strict mode, we require an exact instance of the class (from python, with JSON an object is ok)
         // if we're not in strict mode, instances subclasses are okay, as well as dicts, mappings, from attributes etc.
         // if the input is an instance of the class, we "revalidate" it - e.g. we extract and reuse `__pydantic_fields_set__`
         // but use from attributes to create a new instance of the model field type
-        let class = self.class.bind(py);
-        if let Some(py_input) = input_as_python_instance(input, class) {
-            if self.revalidate.should_revalidate(py_input, class) {
+        let (py_instance_input, force_revalidate): (Option<&Bound<'_, PyAny>>, bool) =
+            match input_as_python_instance(input, class) {
+                Some(x) => (Some(x), false),
+                None => {
+                    // if the model has a generic origin, we allow input data to be instances of the generic origin rather than the class,
+                    // as cases like isinstance(SomeModel[Int], SomeModel[Any]) fail the isinstance check, but are valid, we just have to enforce
+                    // that the data is revalidated, hence we set force_revalidate to true
+                    if generic_origin_class.is_some() {
+                        match input_as_python_instance(input, generic_origin_class.unwrap()) {
+                            Some(x) => (Some(x), true),
+                            None => (None, false),
+                        }
+                    } else {
+                        (None, false)
+                    }
+                }
+            };
+
+        if let Some(py_input) = py_instance_input {
+            if self.revalidate.should_revalidate(py_input, class) || force_revalidate {
                 let fields_set = py_input.getattr(intern!(py, DUNDER_FIELDS_SET_KEY))?;
                 if self.root_model {
                     let inner_input = py_input.getattr(intern!(py, ROOT_FIELD))?;
@@ -178,7 +205,7 @@ impl Validator for ModelValidator {
                 let output = self.validator.validate(py, field_value, state)?;
 
                 force_setattr(py, model, intern!(py, ROOT_FIELD), output)?;
-                Ok(model.into_py(py))
+                Ok(model.into_py_any(py)?)
             };
         }
         let old_dict = model.getattr(intern!(py, DUNDER_DICT))?.downcast_into::<PyDict>()?;
@@ -213,7 +240,7 @@ impl Validator for ModelValidator {
             intern!(py, DUNDER_MODEL_EXTRA_KEY),
             validated_extra.to_object(py),
         )?;
-        Ok(model.into_py(py))
+        Ok(model.into_py_any(py)?)
     }
 
     fn get_name(&self) -> &str {
@@ -236,10 +263,10 @@ impl ModelValidator {
         let output = self.validator.validate(py, input, state)?;
 
         if self.root_model {
-            let fields_set = if input.to_object(py).is(&self.undefined) {
-                PySet::empty_bound(py)?
+            let fields_set = if input.as_python().is_some_and(|py_input| py_input.is(&self.undefined)) {
+                PySet::empty(py)?
             } else {
-                PySet::new_bound(py, [&String::from(ROOT_FIELD)])?
+                PySet::new(py, [&String::from(ROOT_FIELD)])?
             };
             force_setattr(py, self_instance, intern!(py, DUNDER_FIELDS_SET_KEY), &fields_set)?;
             force_setattr(py, self_instance, intern!(py, ROOT_FIELD), &output)?;
@@ -267,7 +294,7 @@ impl ModelValidator {
             if let Some(kwargs) = input.as_kwargs(py) {
                 return self
                     .class
-                    .call_bound(py, (), Some(&kwargs))
+                    .call(py, (), Some(&kwargs))
                     .map_err(|e| convert_err(py, e, input));
             }
         }
@@ -277,10 +304,10 @@ impl ModelValidator {
         let instance = create_class(self.class.bind(py))?;
 
         if self.root_model {
-            let fields_set = if input.to_object(py).is(&self.undefined) {
-                PySet::empty_bound(py)?
+            let fields_set = if input.as_python().is_some_and(|py_input| py_input.is(&self.undefined)) {
+                PySet::empty(py)?
             } else {
-                PySet::new_bound(py, [&String::from(ROOT_FIELD)])?
+                PySet::new(py, [&String::from(ROOT_FIELD)])?
             };
             force_setattr(py, &instance, intern!(py, DUNDER_FIELDS_SET_KEY), &fields_set)?;
             force_setattr(py, &instance, intern!(py, ROOT_FIELD), output)?;
@@ -313,7 +340,7 @@ impl ModelValidator {
 /// https://github.com/PyO3/pyo3/blob/d2caa056e9aacc46374139ef491d112cb8af1a25/src/pyclass_init.rs#L35-L77
 pub(super) fn create_class<'py>(class: &Bound<'py, PyType>) -> PyResult<Bound<'py, PyAny>> {
     let py = class.py();
-    let args = PyTuple::empty_bound(py);
+    let args = PyTuple::empty(py);
     let raw_type = class.as_type_ptr();
     unsafe {
         // Safety: raw_type is known to be a non-null type object pointer

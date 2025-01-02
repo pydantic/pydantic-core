@@ -41,7 +41,7 @@ impl BuildSerializer for DataclassArgsBuilder {
             let field_info = item.downcast::<PyDict>()?;
             let name: String = field_info.get_as_req(intern!(py, "name"))?;
 
-            let key_py: Py<PyString> = PyString::new_bound(py, &name).into();
+            let key_py: Py<PyString> = PyString::new(py, &name).into();
 
             if field_info.get_as(intern!(py, "serialization_exclude"))? == Some(true) {
                 fields.insert(name, SerField::new(py, key_py, None, None, true));
@@ -61,7 +61,7 @@ impl BuildSerializer for DataclassArgsBuilder {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct DataclassSerializer {
     class: Py<PyType>,
     serializer: Box<CombinedSerializer>,
@@ -89,7 +89,7 @@ impl BuildSerializer for DataclassSerializer {
         let fields = schema
             .get_as_req::<Bound<'_, PyList>>(intern!(py, "fields"))?
             .iter()
-            .map(|s| Ok(s.downcast::<PyString>()?.into_py(py)))
+            .map(|s| Ok(s.downcast_into::<PyString>()?.unbind()))
             .collect::<PyResult<Vec<_>>>()?;
 
         Ok(Self {
@@ -113,7 +113,7 @@ impl DataclassSerializer {
 
     fn get_inner_value<'py>(&self, value: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyDict>> {
         let py = value.py();
-        let dict = PyDict::new_bound(py);
+        let dict = PyDict::new(py);
 
         for field_name in &self.fields {
             let field_name = field_name.bind(py);
@@ -155,7 +155,7 @@ impl TypeSerializer for DataclassSerializer {
                 )?;
 
                 fields_serializer.add_computed_fields_python(model, &output_dict, include, exclude, extra)?;
-                Ok(output_dict.into_py(py))
+                Ok(output_dict.into())
             } else {
                 let inner_value = self.get_inner_value(value)?;
                 self.serializer.to_python(&inner_value, include, exclude, &dc_extra)

@@ -107,10 +107,12 @@ where
 {
     type Output = ValResult<PyObject>;
     fn consume_iterator(self, iterator: impl Iterator<Item = ValResult<(Key, Value)>>) -> ValResult<PyObject> {
-        let output = PyDict::new_bound(self.py);
+        let output = PyDict::new(self.py);
         let mut errors: Vec<ValLineError> = Vec::new();
+        let allow_partial = self.state.allow_partial;
 
-        for item_result in iterator {
+        for (_, is_last_partial, item_result) in self.state.enumerate_last_partial(iterator) {
+            self.state.allow_partial = false.into();
             let (key, value) = item_result?;
             let output_key = match self.key_validator.validate(self.py, key.borrow_input(), self.state) {
                 Ok(value) => Some(value),
@@ -124,19 +126,23 @@ where
                 Err(ValError::Omit) => continue,
                 Err(err) => return Err(err),
             };
+            self.state.allow_partial = match is_last_partial {
+                true => allow_partial,
+                false => false.into(),
+            };
             let output_value = match self.value_validator.validate(self.py, value.borrow_input(), self.state) {
-                Ok(value) => Some(value),
+                Ok(value) => value,
                 Err(ValError::LineErrors(line_errors)) => {
-                    for err in line_errors {
-                        errors.push(err.with_outer_location(key.clone()));
+                    if !is_last_partial {
+                        errors.extend(line_errors.into_iter().map(|err| err.with_outer_location(key.clone())));
                     }
-                    None
+                    continue;
                 }
                 Err(ValError::Omit) => continue,
                 Err(err) => return Err(err),
             };
-            if let (Some(key), Some(value)) = (output_key, output_value) {
-                output.set_item(key, value)?;
+            if let Some(key) = output_key {
+                output.set_item(key, output_value)?;
             }
         }
 

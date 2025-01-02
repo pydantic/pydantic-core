@@ -3,9 +3,9 @@ use std::borrow::Cow;
 use std::fmt;
 
 use pyo3::exceptions::{PyKeyError, PyTypeError};
-use pyo3::prelude::*;
 use pyo3::sync::GILOnceCell;
 use pyo3::types::{PyDict, PyList};
+use pyo3::{prelude::*, IntoPyObjectExt};
 
 use ahash::AHashMap;
 use num_bigint::BigInt;
@@ -22,7 +22,7 @@ pub fn list_all_errors(py: Python) -> PyResult<Bound<'_, PyList>> {
     let mut errors: Vec<Bound<'_, PyDict>> = Vec::with_capacity(100);
     for error_type in ErrorType::iter() {
         if !matches!(error_type, ErrorType::CustomError { .. }) {
-            let d = PyDict::new_bound(py);
+            let d = PyDict::new(py);
             d.set_item("type", error_type.to_string())?;
             let message_template_python = error_type.message_template_python();
             d.set_item("message_template_python", message_template_python)?;
@@ -39,7 +39,7 @@ pub fn list_all_errors(py: Python) -> PyResult<Bound<'_, PyList>> {
             errors.push(d);
         }
     }
-    Ok(PyList::new_bound(py, errors))
+    PyList::new(py, errors)
 }
 
 fn field_from_context<'py, T: FromPyObject<'py>>(
@@ -167,6 +167,7 @@ error_types! {
         error: {ctx_type: String, ctx_fn: field_from_context},
     },
     JsonType {},
+    NeedsPythonObject { method_name: {ctx_type: String, ctx_fn: field_from_context} },
     // ---------------------
     // recursion error
     RecursionLoop {},
@@ -289,6 +290,10 @@ error_types! {
     },
     BytesTooLong {
         max_length: {ctx_type: usize, ctx_fn: field_from_context},
+    },
+    BytesInvalidEncoding {
+        encoding: {ctx_type: String, ctx_fn: field_from_context},
+        encoding_error: {ctx_type: String, ctx_fn: field_from_context},
     },
     // ---------------------
     // python errors from functions
@@ -422,6 +427,9 @@ error_types! {
     DecimalWholeDigits {
         whole_digits: {ctx_type: u64, ctx_fn: field_from_context},
     },
+    // Complex errors
+    ComplexType {},
+    ComplexStrParsing {},
 }
 
 macro_rules! render {
@@ -470,6 +478,7 @@ impl ErrorType {
             Self::NoSuchAttribute {..} => "Object has no attribute '{attribute}'",
             Self::JsonInvalid {..} => "Invalid JSON: {error}",
             Self::JsonType {..} => "JSON input should be string, bytes or bytearray",
+            Self::NeedsPythonObject {..} => "Cannot check `{method_name}` when validating from json, use a JsonOrPython validator instead",
             Self::RecursionLoop {..} => "Recursion error - cyclic reference detected",
             Self::Missing {..} => "Field required",
             Self::FrozenField {..} => "Field is frozen",
@@ -515,6 +524,7 @@ impl ErrorType {
             Self::BytesType {..} => "Input should be a valid bytes",
             Self::BytesTooShort {..} => "Data should have at least {min_length} byte{expected_plural}",
             Self::BytesTooLong {..} => "Data should have at most {max_length} byte{expected_plural}",
+            Self::BytesInvalidEncoding { .. } => "Data should be valid {encoding}: {encoding_error}",
             Self::ValueError {..} => "Value error, {error}",
             Self::AssertionError {..} => "Assertion failed, {error}",
             Self::CustomError {..} => "",  // custom errors are handled separately
@@ -564,6 +574,8 @@ impl ErrorType {
             Self::DecimalMaxDigits {..} => "Decimal input should have no more than {max_digits} digit{expected_plural} in total",
             Self::DecimalMaxPlaces {..} => "Decimal input should have no more than {decimal_places} decimal place{expected_plural}",
             Self::DecimalWholeDigits {..} => "Decimal input should have no more than {whole_digits} digit{expected_plural} before the decimal point",
+            Self::ComplexType {..} => "Input should be a valid python complex object, a number, or a valid complex string following the rules at https://docs.python.org/3/library/functions.html#complex",
+            Self::ComplexStrParsing {..} => "Input should be a valid complex string following the rules at https://docs.python.org/3/library/functions.html#complex",
         }
     }
 
@@ -616,6 +628,7 @@ impl ErrorType {
         match self {
             Self::NoSuchAttribute { attribute, .. } => render!(tmpl, attribute),
             Self::JsonInvalid { error, .. } => render!(tmpl, error),
+            Self::NeedsPythonObject { method_name, .. } => render!(tmpl, method_name),
             Self::GetAttributeError { error, .. } => render!(tmpl, error),
             Self::ModelType { class_name, .. } => render!(tmpl, class_name),
             Self::DataclassType { class_name, .. } => render!(tmpl, class_name),
@@ -664,6 +677,11 @@ impl ErrorType {
                 let expected_plural = plural_s(*max_length);
                 to_string_render!(tmpl, max_length, expected_plural)
             }
+            Self::BytesInvalidEncoding {
+                encoding,
+                encoding_error,
+                ..
+            } => render!(tmpl, encoding, encoding_error),
             Self::ValueError { error, .. } => {
                 let error = &error
                     .as_ref()
@@ -727,7 +745,7 @@ impl ErrorType {
     }
 
     pub fn py_dict(&self, py: Python) -> PyResult<Option<Py<PyDict>>> {
-        let dict = PyDict::new_bound(py);
+        let dict = PyDict::new(py);
         let custom_ctx_used = self.py_dict_update_ctx(py, &dict)?;
 
         if let Self::CustomError { .. } = self {
@@ -748,7 +766,7 @@ impl ErrorType {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, IntoPyObject, IntoPyObjectRef)]
 pub enum Number {
     Int(i64),
     BigInt(BigInt),
@@ -808,11 +826,6 @@ impl fmt::Display for Number {
 }
 impl ToPyObject for Number {
     fn to_object(&self, py: Python<'_>) -> PyObject {
-        match self {
-            Self::Int(i) => i.into_py(py),
-            Self::BigInt(i) => i.clone().into_py(py),
-            Self::Float(f) => f.into_py(py),
-            Self::String(s) => s.into_py(py),
-        }
+        self.into_py_any(py).unwrap()
     }
 }

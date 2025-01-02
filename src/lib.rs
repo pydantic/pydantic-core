@@ -1,12 +1,15 @@
 #![cfg_attr(has_coverage_attribute, feature(coverage_attribute))]
+#![allow(deprecated)] // FIXME: just used during upgrading PyO3 to 0.23
 
 extern crate core;
 
 use std::sync::OnceLock;
 
-use jiter::{map_json_error, PartialMode, PythonParse, StringCacheMode};
+use jiter::{map_json_error, FloatMode, PartialMode, PythonParse, StringCacheMode};
 use pyo3::exceptions::PyTypeError;
 use pyo3::{prelude::*, sync::GILOnceCell};
+use serializers::BytesMode;
+use validators::ValBytesMode;
 
 // parse this first to get access to the contained macro
 #[macro_use]
@@ -14,6 +17,7 @@ mod py_gc;
 
 mod argument_markers;
 mod build_tools;
+mod common;
 mod definitions;
 mod errors;
 mod input;
@@ -40,40 +44,25 @@ pub use validators::{validate_core_schema, PySome, SchemaValidator};
 
 use crate::input::Input;
 
-#[derive(FromPyObject)]
-pub enum CacheStringsArg {
-    Bool(bool),
-    Literal(StringCacheMode),
-}
-
-#[pyfunction(signature = (data, *, allow_inf_nan=true, cache_strings=CacheStringsArg::Bool(true), allow_partial=false))]
+#[pyfunction(signature = (data, *, allow_inf_nan=true, cache_strings=StringCacheMode::All, allow_partial=PartialMode::Off))]
 pub fn from_json<'py>(
     py: Python<'py>,
     data: &Bound<'_, PyAny>,
     allow_inf_nan: bool,
-    cache_strings: CacheStringsArg,
-    allow_partial: bool,
+    cache_strings: StringCacheMode,
+    allow_partial: PartialMode,
 ) -> PyResult<Bound<'py, PyAny>> {
     let v_match = data
-        .validate_bytes(false)
+        .validate_bytes(false, ValBytesMode { ser: BytesMode::Utf8 })
         .map_err(|_| PyTypeError::new_err("Expected bytes, bytearray or str"))?;
     let json_either_bytes = v_match.into_inner();
     let json_bytes = json_either_bytes.as_slice();
-    let cache_mode = match cache_strings {
-        CacheStringsArg::Bool(b) => b.into(),
-        CacheStringsArg::Literal(mode) => mode,
-    };
-    let partial_mode = if allow_partial {
-        PartialMode::On
-    } else {
-        PartialMode::Off
-    };
     let parse_builder = PythonParse {
         allow_inf_nan,
-        cache_mode,
-        partial_mode,
+        cache_mode: cache_strings,
+        partial_mode: allow_partial,
         catch_duplicate_keys: false,
-        lossless_floats: false,
+        float_mode: FloatMode::Float,
     };
     parse_builder
         .python_parse(py, json_bytes)
@@ -100,7 +89,7 @@ fn get_pydantic_version(py: Python<'_>) -> Option<&'static str> {
 
     PYDANTIC_VERSION
         .get_or_init(py, || {
-            py.import_bound("pydantic")
+            py.import("pydantic")
                 .and_then(|pydantic| pydantic.getattr("__version__")?.extract())
                 .ok()
         })
@@ -111,7 +100,10 @@ pub fn build_info() -> String {
     format!(
         "profile={} pgo={}",
         env!("PROFILE"),
-        option_env!("RUSTFLAGS").unwrap_or("").contains("-Cprofile-use="),
+        // We use a `cfg!` here not `env!`/`option_env!` as those would
+        // embed `RUSTFLAGS` into the generated binary which causes problems
+        // with reproducable builds.
+        cfg!(specified_profile_use),
     )
 }
 

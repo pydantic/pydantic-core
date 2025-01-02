@@ -1,8 +1,8 @@
 use pyo3::prelude::*;
 use pyo3::sync::GILOnceCell;
 use pyo3::types::{
-    PyBool, PyByteArray, PyBytes, PyDate, PyDateTime, PyDelta, PyDict, PyFloat, PyFrozenSet, PyInt, PyIterator, PyList,
-    PyNone, PySet, PyString, PyTime, PyTuple, PyType,
+    PyBool, PyByteArray, PyBytes, PyComplex, PyDate, PyDateTime, PyDelta, PyDict, PyFloat, PyFrozenSet, PyInt,
+    PyIterator, PyList, PyNone, PySet, PyString, PyTime, PyTuple, PyType,
 };
 use pyo3::{intern, PyTypeInfo};
 
@@ -48,6 +48,7 @@ pub struct ObTypeLookup {
     pattern_object: PyObject,
     // uuid type
     uuid_object: PyObject,
+    complex: usize,
 }
 
 static TYPE_LOOKUP: GILOnceCell<ObTypeLookup> = GILOnceCell::new();
@@ -68,12 +69,7 @@ impl ObTypeLookup {
             float: PyFloat::type_object_raw(py) as usize,
             list: PyList::type_object_raw(py) as usize,
             dict: PyDict::type_object_raw(py) as usize,
-            decimal_object: py
-                .import_bound("decimal")
-                .unwrap()
-                .getattr("Decimal")
-                .unwrap()
-                .to_object(py),
+            decimal_object: py.import("decimal").unwrap().getattr("Decimal").unwrap().to_object(py),
             string: PyString::type_object_raw(py) as usize,
             bytes: PyBytes::type_object_raw(py) as usize,
             bytearray: PyByteArray::type_object_raw(py) as usize,
@@ -86,21 +82,17 @@ impl ObTypeLookup {
             timedelta: PyDelta::type_object_raw(py) as usize,
             url: PyUrl::type_object_raw(py) as usize,
             multi_host_url: PyMultiHostUrl::type_object_raw(py) as usize,
-            enum_object: py.import_bound("enum").unwrap().getattr("Enum").unwrap().to_object(py),
+            enum_object: py.import("enum").unwrap().getattr("Enum").unwrap().to_object(py),
             generator_object: py
-                .import_bound("types")
+                .import("types")
                 .unwrap()
                 .getattr("GeneratorType")
                 .unwrap()
                 .to_object(py),
-            path_object: py
-                .import_bound("pathlib")
-                .unwrap()
-                .getattr("Path")
-                .unwrap()
-                .to_object(py),
-            pattern_object: py.import_bound("re").unwrap().getattr("Pattern").unwrap().to_object(py),
-            uuid_object: py.import_bound("uuid").unwrap().getattr("UUID").unwrap().to_object(py),
+            path_object: py.import("pathlib").unwrap().getattr("Path").unwrap().to_object(py),
+            pattern_object: py.import("re").unwrap().getattr("Pattern").unwrap().to_object(py),
+            uuid_object: py.import("uuid").unwrap().getattr("UUID").unwrap().to_object(py),
+            complex: PyComplex::type_object_raw(py) as usize,
         }
     }
 
@@ -171,6 +163,7 @@ impl ObTypeLookup {
             ObType::Pattern => self.path_object.as_ptr() as usize == ob_type,
             ObType::Uuid => self.uuid_object.as_ptr() as usize == ob_type,
             ObType::Unknown => false,
+            ObType::Complex => self.complex == ob_type,
         };
 
         if ans {
@@ -249,6 +242,8 @@ impl ObTypeLookup {
             ObType::Url
         } else if ob_type == self.multi_host_url {
             ObType::MultiHostUrl
+        } else if ob_type == self.complex {
+            ObType::Complex
         } else if ob_type == self.uuid_object.as_ptr() as usize {
             ObType::Uuid
         } else if is_pydantic_serializable(op_value) {
@@ -290,7 +285,8 @@ impl ObTypeLookup {
     /// We care about order here since:
     /// 1. we pay a price for each `isinstance` call
     /// 2. some types are subclasses of others, e.g. `bool` is a subclass of `int`
-    /// hence we put common types first
+    ///    hence we put common types first
+    ///
     /// In addition, some types have inheritance set as a bitflag on the type object:
     /// https://github.com/python/cpython/blob/v3.12.0rc1/Include/object.h#L546-L553
     /// Hence they come first
@@ -425,6 +421,7 @@ pub enum ObType {
     Uuid,
     // unknown type
     Unknown,
+    Complex,
 }
 
 impl PartialEq for ObType {

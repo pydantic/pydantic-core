@@ -7,6 +7,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
 use ahash::AHashSet;
+use pyo3::IntoPyObjectExt;
 use url::{ParseError, SyntaxViolation, Url};
 
 use crate::build_tools::{is_strict, py_schema_err};
@@ -86,14 +87,14 @@ impl Validator for UrlValidator {
         match check_sub_defaults(
             &mut either_url,
             self.host_required,
-            &self.default_host,
+            self.default_host.as_ref(),
             self.default_port,
-            &self.default_path,
+            self.default_path.as_ref(),
         ) {
             Ok(()) => {
                 // Lax rather than strict to preserve V2.4 semantic that str wins over url in union
                 state.floor_exactness(Exactness::Lax);
-                Ok(either_url.into_py(py))
+                Ok(either_url.into_py_any(py)?)
             }
             Err(error_type) => Err(ValError::new(error_type, input)),
         }
@@ -155,11 +156,15 @@ enum EitherUrl<'py> {
     Rust(Url),
 }
 
-impl EitherUrl<'_> {
-    fn into_py(self, py: Python) -> PyObject {
+impl<'py> IntoPyObject<'py> for EitherUrl<'py> {
+    type Target = PyUrl;
+    type Output = Bound<'py, PyUrl>;
+    type Error = PyErr;
+
+    fn into_pyobject(self, py: Python<'py>) -> PyResult<Self::Output> {
         match self {
-            EitherUrl::Py(py_url) => py_url.into_py(py),
-            EitherUrl::Rust(rust_url) => PyUrl::new(rust_url).into_py(py),
+            EitherUrl::Py(py_url) => Ok(py_url),
+            EitherUrl::Rust(rust_url) => Bound::new(py, PyUrl::new(rust_url)),
         }
     }
 }
@@ -251,14 +256,14 @@ impl Validator for MultiHostUrlValidator {
         match check_sub_defaults(
             &mut multi_url,
             self.host_required,
-            &self.default_host,
+            self.default_host.as_ref(),
             self.default_port,
-            &self.default_path,
+            self.default_path.as_ref(),
         ) {
             Ok(()) => {
                 // Lax rather than strict to preserve V2.4 semantic that str wins over url in union
                 state.floor_exactness(Exactness::Lax);
-                Ok(multi_url.into_py(py))
+                Ok(multi_url.into_py_any(py)?)
             }
             Err(error_type) => Err(ValError::new(error_type, input)),
         }
@@ -324,11 +329,15 @@ enum EitherMultiHostUrl<'py> {
     Rust(PyMultiHostUrl),
 }
 
-impl EitherMultiHostUrl<'_> {
-    fn into_py(self, py: Python) -> PyObject {
+impl<'py> IntoPyObject<'py> for EitherMultiHostUrl<'py> {
+    type Target = PyMultiHostUrl;
+    type Output = Bound<'py, PyMultiHostUrl>;
+    type Error = PyErr;
+
+    fn into_pyobject(self, py: Python<'py>) -> PyResult<Self::Output> {
         match self {
-            EitherMultiHostUrl::Py(py_multi_url) => py_multi_url.into_py(py),
-            EitherMultiHostUrl::Rust(rust_multi_url) => rust_multi_url.into_py(py),
+            EitherMultiHostUrl::Py(py_multi_url) => Ok(py_multi_url),
+            EitherMultiHostUrl::Rust(rust_multi_url) => Bound::new(py, rust_multi_url),
         }
     }
 }
@@ -536,16 +545,17 @@ fn parse_url(url_str: &str, input: impl ToErrorValue, strict: bool) -> ValResult
 fn check_sub_defaults(
     url: &mut impl CopyFromPyUrl,
     host_required: bool,
-    default_host: &Option<String>,
+    default_host: Option<&String>,
     default_port: Option<u16>,
-    default_path: &Option<String>,
+    default_path: Option<&String>,
 ) -> Result<(), ErrorType> {
     let map_parse_err = |e: ParseError| ErrorType::UrlParsing {
         error: e.to_string(),
         context: None,
     };
-    if let Some(ref default_host) = default_host {
-        if !url.url().has_host() {
+
+    if !url.url().has_host() {
+        if let Some(default_host) = default_host {
             url.url_mut().set_host(Some(default_host)).map_err(map_parse_err)?;
         } else if host_required {
             return Err(ErrorType::UrlParsing {
@@ -561,7 +571,7 @@ fn check_sub_defaults(
                 .map_err(|()| map_parse_err(ParseError::EmptyHost))?;
         }
     }
-    if let Some(ref default_path) = default_path {
+    if let Some(default_path) = default_path {
         let path = url.url().path();
         if path.is_empty() || path == "/" {
             url.url_mut().set_path(default_path);

@@ -14,7 +14,7 @@ use crate::tools::SchemaDict;
 use super::errors::py_err_se_err;
 use super::Extra;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(super) struct ComputedFields(Vec<ComputedField>);
 
 impl ComputedFields {
@@ -109,7 +109,7 @@ impl ComputedFields {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct ComputedField {
     property_name: String,
     property_name_py: Py<PyString>,
@@ -135,10 +135,10 @@ impl ComputedField {
             .unwrap_or_else(|| property_name.clone());
         Ok(Self {
             property_name: property_name.extract()?,
-            property_name_py: property_name.into_py(py),
+            property_name_py: property_name.into(),
             serializer,
             alias: alias_py.extract()?,
-            alias_py: alias_py.into_py(py),
+            alias_py: alias_py.into(),
         })
     }
 
@@ -191,7 +191,7 @@ impl PyGcTraverse for ComputedFields {
 
 impl_py_gc_traverse!(ComputedFieldSerializer<'_> { computed_field });
 
-impl<'py> Serialize for ComputedFieldSerializer<'py> {
+impl Serialize for ComputedFieldSerializer<'_> {
     fn serialize<S: serde::ser::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let py = self.model.py();
         let property_name_py = self.computed_field.property_name_py.bind(py);

@@ -17,7 +17,7 @@ use super::{
     PydanticSerializer, SchemaFilter, SerMode, TypeSerializer,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct TupleSerializer {
     serializers: Vec<CombinedSerializer>,
     variadic_item_index: Option<usize>,
@@ -82,8 +82,8 @@ impl TypeSerializer for TupleSerializer {
                 })??;
 
                 match extra.mode {
-                    SerMode::Json => Ok(PyList::new_bound(py, items).into_py(py)),
-                    _ => Ok(PyTuple::new_bound(py, items).into_py(py)),
+                    SerMode::Json => Ok(PyList::new(py, items)?.into()),
+                    _ => Ok(PyTuple::new(py, items)?.into()),
                 }
             }
             Err(_) => {

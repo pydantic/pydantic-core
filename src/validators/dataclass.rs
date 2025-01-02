@@ -145,9 +145,12 @@ impl Validator for DataclassArgsValidator {
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
+        // this validator does not yet support partial validation, disable it to avoid incorrect results
+        state.allow_partial = false.into();
+
         let args = input.validate_dataclass_args(&self.dataclass_name)?;
 
-        let output_dict = PyDict::new_bound(py);
+        let output_dict = PyDict::new(py);
         let mut init_only_args = self.init_only_count.map(Vec::with_capacity);
 
         let mut errors: Vec<ValLineError> = Vec::new();
@@ -323,8 +326,10 @@ impl Validator for DataclassArgsValidator {
                                                 Err(err) => return Err(err),
                                             }
                                         } else {
-                                            output_dict
-                                                .set_item(either_str.as_py_string(py, state.cache_str()), value)?;
+                                            output_dict.set_item(
+                                                either_str.as_py_string(py, state.cache_str()),
+                                                value.to_object(py),
+                                            )?;
                                         }
                                     }
                                 }
@@ -348,7 +353,7 @@ impl Validator for DataclassArgsValidator {
 
         if errors.is_empty() {
             if let Some(init_only_args) = init_only_args {
-                Ok((output_dict, PyTuple::new_bound(py, init_only_args)).to_object(py))
+                Ok((output_dict, PyTuple::new(py, init_only_args)?).to_object(py))
             } else {
                 Ok((output_dict, py.None()).to_object(py))
             }
@@ -373,7 +378,7 @@ impl Validator for DataclassArgsValidator {
             // which doesn't make much sense in this context but we need to put something there
             // so that function validators that sit between DataclassValidator and DataclassArgsValidator
             // always get called the same shape of data.
-            Ok(PyTuple::new_bound(py, vec![dict.to_object(py), py.None()]).into_py(py))
+            Ok(PyTuple::new(py, vec![dict.to_object(py), py.None()])?.into())
         };
 
         if let Some(field) = self.fields.iter().find(|f| f.name == field_name) {
@@ -388,7 +393,7 @@ impl Validator for DataclassArgsValidator {
             let data_dict = dict.copy()?;
             if let Err(err) = data_dict.del_item(field_name) {
                 // KeyError is fine here as the field might not be in the dict
-                if !err.get_type_bound(py).is(&PyType::new_bound::<PyKeyError>(py)) {
+                if !err.get_type(py).is(&PyType::new::<PyKeyError>(py)) {
                     return Err(err.into());
                 }
             }
@@ -438,6 +443,7 @@ pub struct DataclassValidator {
     strict: bool,
     validator: Box<CombinedValidator>,
     class: Py<PyType>,
+    generic_origin: Option<Py<PyType>>,
     fields: Vec<Py<PyString>>,
     post_init: Option<Py<PyString>>,
     revalidate: Revalidate,
@@ -461,6 +467,7 @@ impl BuildValidator for DataclassValidator {
         let config = config.as_ref();
 
         let class = schema.get_as_req::<Bound<'_, PyType>>(intern!(py, "cls"))?;
+        let generic_origin: Option<Bound<'_, PyType>> = schema.get_as(intern!(py, "generic_origin"))?;
         let name = match schema.get_as_req::<String>(intern!(py, "cls_name")) {
             Ok(name) => name,
             Err(_) => class.getattr(intern!(py, "__name__"))?.extract()?,
@@ -469,7 +476,7 @@ impl BuildValidator for DataclassValidator {
         let validator = build_validator(&sub_schema, config, definitions)?;
 
         let post_init = if schema.get_as::<bool>(intern!(py, "post_init"))?.unwrap_or(false) {
-            Some(intern!(py, "__post_init__").into_py(py))
+            Some(intern!(py, "__post_init__").clone().unbind())
         } else {
             None
         };
@@ -480,6 +487,7 @@ impl BuildValidator for DataclassValidator {
             strict: is_strict(schema, config)?,
             validator: Box::new(validator),
             class: class.into(),
+            generic_origin: generic_origin.map(std::convert::Into::into),
             fields,
             post_init,
             revalidate: Revalidate::from_str(
@@ -496,7 +504,11 @@ impl BuildValidator for DataclassValidator {
     }
 }
 
-impl_py_gc_traverse!(DataclassValidator { class, validator });
+impl_py_gc_traverse!(DataclassValidator {
+    class,
+    generic_origin,
+    validator
+});
 
 impl Validator for DataclassValidator {
     fn validate<'py>(
@@ -510,10 +522,30 @@ impl Validator for DataclassValidator {
             return self.validate_init(py, self_instance, input, state);
         }
 
-        // same logic as on models
+        // same logic as on models, see more explicit comment in model.rs
         let class = self.class.bind(py);
-        if let Some(py_input) = input_as_python_instance(input, class) {
-            if self.revalidate.should_revalidate(py_input, class) {
+        let generic_origin_class = self.generic_origin.as_ref().map(|go| go.bind(py));
+
+        let (py_instance_input, force_revalidate): (Option<&Bound<'_, PyAny>>, bool) =
+            match input_as_python_instance(input, class) {
+                Some(x) => (Some(x), false),
+                None => {
+                    // if the model has a generic origin, we allow input data to be instances of the generic origin rather than the class,
+                    // as cases like isinstance(SomeModel[Int], SomeModel[Any]) fail the isinstance check, but are valid, we just have to enforce
+                    // that the data is revalidated, hence we set force_revalidate to true
+                    if generic_origin_class.is_some() {
+                        match input_as_python_instance(input, generic_origin_class.unwrap()) {
+                            Some(x) => (Some(x), true),
+                            None => (None, false),
+                        }
+                    } else {
+                        (None, false)
+                    }
+                }
+            };
+
+        if let Some(py_input) = py_instance_input {
+            if self.revalidate.should_revalidate(py_input, class) || force_revalidate {
                 let input_dict = self.dataclass_to_dict(py_input)?;
                 let val_output = self.validator.validate(py, input_dict.as_any(), state)?;
                 let dc = create_class(self.class.bind(py))?;
@@ -594,12 +626,12 @@ impl DataclassValidator {
 
         self.set_dict_call(py, self_instance, val_output, input)?;
 
-        Ok(self_instance.into_py(py))
+        Ok(self_instance.clone().unbind())
     }
 
     fn dataclass_to_dict<'py>(&self, dc: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyDict>> {
         let py = dc.py();
-        let dict = PyDict::new_bound(py);
+        let dict = PyDict::new(py);
 
         for field_name in &self.fields {
             dict.set_item(field_name, dc.getattr(field_name)?)?;

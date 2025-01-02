@@ -1,9 +1,11 @@
 use std::borrow::Cow;
+use std::sync::Arc;
 
 use pyo3::gc::PyVisit;
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyIterator};
+use pyo3::IntoPyObjectExt;
 use pyo3::PyTraverseError;
 
 use serde::ser::SerializeSeq;
@@ -17,9 +19,9 @@ use super::{
     PydanticSerializer, SchemaFilter, SerMode, TypeSerializer,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct GeneratorSerializer {
-    item_serializer: Box<CombinedSerializer>,
+    item_serializer: Arc<CombinedSerializer>,
     filter: SchemaFilter<usize>,
 }
 
@@ -37,7 +39,7 @@ impl BuildSerializer for GeneratorSerializer {
             None => AnySerializer::build(schema, config, definitions)?,
         };
         Ok(Self {
-            item_serializer: Box::new(item_serializer),
+            item_serializer: Arc::new(item_serializer),
             filter: SchemaFilter::from_schema(schema)?,
         }
         .into())
@@ -77,18 +79,18 @@ impl TypeSerializer for GeneratorSerializer {
                                 )?);
                             }
                         }
-                        Ok(items.into_py(py))
+                        items.into_py_any(py)
                     }
                     _ => {
                         let iter = SerializationIterator::new(
                             py_iter,
-                            self.item_serializer.as_ref().clone(),
+                            &self.item_serializer,
                             self.filter.clone(),
                             include,
                             exclude,
                             extra,
                         );
-                        Ok(iter.into_py(py))
+                        iter.into_py_any(py)
                     }
                 }
             }
@@ -100,7 +102,7 @@ impl TypeSerializer for GeneratorSerializer {
     }
 
     fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
-        self._invalid_as_json_key(key, extra, Self::EXPECTED_TYPE)
+        self.invalid_as_json_key(key, extra, Self::EXPECTED_TYPE)
     }
 
     fn serde_serialize<S: serde::ser::Serializer>(
@@ -152,13 +154,12 @@ impl TypeSerializer for GeneratorSerializer {
 }
 
 #[pyclass(module = "pydantic_core._pydantic_core")]
-#[derive(Clone)]
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub(crate) struct SerializationIterator {
     iterator: Py<PyIterator>,
     #[pyo3(get)]
     index: usize,
-    item_serializer: CombinedSerializer,
+    item_serializer: Arc<CombinedSerializer>,
     extra_owned: ExtraOwned,
     filter: SchemaFilter<usize>,
     include: Option<PyObject>,
@@ -168,7 +169,7 @@ pub(crate) struct SerializationIterator {
 impl SerializationIterator {
     pub fn new(
         py_iter: &Bound<'_, PyIterator>,
-        item_serializer: CombinedSerializer,
+        item_serializer: &Arc<CombinedSerializer>,
         filter: SchemaFilter<usize>,
         include: Option<&Bound<'_, PyAny>>,
         exclude: Option<&Bound<'_, PyAny>>,
@@ -177,7 +178,7 @@ impl SerializationIterator {
         Self {
             iterator: py_iter.clone().into(),
             index: 0,
-            item_serializer,
+            item_serializer: item_serializer.clone(),
             extra_owned: ExtraOwned::new(extra),
             filter,
             include: include.map(|v| v.clone().into()),

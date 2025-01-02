@@ -53,7 +53,7 @@ impl WhenUsed {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct FormatSerializer {
     format_func: PyObject,
     formatting_string: Py<PyString>,
@@ -70,16 +70,15 @@ impl BuildSerializer for FormatSerializer {
     ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
         let formatting_string: Bound<'_, PyString> = schema.get_as_req(intern!(py, "formatting_string"))?;
-        let formatting_string = formatting_string.to_str()?;
-        if formatting_string.is_empty() {
+        if formatting_string.is_empty()? {
             ToStringSerializer::build(schema, config, definitions)
         } else {
             Ok(Self {
                 format_func: py
-                    .import_bound(intern!(py, "builtins"))?
+                    .import(intern!(py, "builtins"))?
                     .getattr(intern!(py, "format"))?
-                    .into_py(py),
-                formatting_string: PyString::new_bound(py, formatting_string).into(),
+                    .unbind(),
+                formatting_string: formatting_string.unbind(),
                 when_used: WhenUsed::new(schema, WhenUsed::JsonUnlessNone)?,
             }
             .into())
@@ -118,7 +117,7 @@ impl TypeSerializer for FormatSerializer {
         if self.when_used.should_use(value, extra) {
             self.call(value).map_err(PydanticSerializationError::new_err)
         } else {
-            Ok(value.into_py(value.py()))
+            Ok(value.clone().unbind())
         }
     }
 
@@ -161,7 +160,7 @@ impl TypeSerializer for FormatSerializer {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ToStringSerializer {
     when_used: WhenUsed,
 }
@@ -192,9 +191,9 @@ impl TypeSerializer for ToStringSerializer {
         extra: &Extra,
     ) -> PyResult<PyObject> {
         if self.when_used.should_use(value, extra) {
-            value.str().map(|s| s.into_py(value.py()))
+            value.str().map(Into::into)
         } else {
-            Ok(value.into_py(value.py()))
+            Ok(value.clone().unbind())
         }
     }
 
