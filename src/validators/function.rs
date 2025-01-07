@@ -24,6 +24,7 @@ struct FunctionInfo {
     /// The actual function object that will get called
     pub function: Py<PyAny>,
     pub field_name: Option<Py<PyString>>,
+    pub model_type: Option<Py<PyAny>>,
     pub info_arg: bool,
 }
 
@@ -37,9 +38,11 @@ fn destructure_function_schema(schema: &Bound<'_, PyDict>) -> PyResult<FunctionI
         _ => unreachable!(),
     };
     let field_name = func_dict.get_as(intern!(schema.py(), "field_name"))?;
+    let model_type = func_dict.get_as(intern!(schema.py(), "model_type"))?;
     Ok(FunctionInfo {
         function,
         field_name,
+        model_type,
         info_arg,
     })
 }
@@ -71,6 +74,7 @@ macro_rules! impl_build {
                     },
                     name,
                     field_name: func_info.field_name,
+                    model_type: func_info.model_type,
                     info_arg: func_info.info_arg,
                 }
                 .into())
@@ -86,6 +90,7 @@ pub struct FunctionBeforeValidator {
     config: PyObject,
     name: String,
     field_name: Option<Py<PyString>>,
+    model_type: Option<Py<PyAny>>,
     info_arg: bool,
 }
 
@@ -100,7 +105,13 @@ impl FunctionBeforeValidator {
         state: &'s mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
         let r = if self.info_arg {
-            let info = ValidationInfo::new(py, state.extra(), &self.config, self.field_name.clone());
+            let info = ValidationInfo::new(
+                py,
+                state.extra(),
+                &self.config,
+                self.field_name.clone(),
+                self.model_type.clone(),
+            );
             self.func.call1(py, (input.to_object(py), info))
         } else {
             self.func.call1(py, (input.to_object(py),))
@@ -154,6 +165,7 @@ pub struct FunctionAfterValidator {
     config: PyObject,
     name: String,
     field_name: Option<Py<PyString>>,
+    model_type: Option<Py<PyAny>>,
     info_arg: bool,
 }
 
@@ -169,7 +181,13 @@ impl FunctionAfterValidator {
     ) -> ValResult<PyObject> {
         let v = call(input, state)?;
         let r = if self.info_arg {
-            let info = ValidationInfo::new(py, state.extra(), &self.config, self.field_name.clone());
+            let info = ValidationInfo::new(
+                py,
+                state.extra(),
+                &self.config,
+                self.field_name.clone(),
+                self.model_type.clone(),
+            );
             self.func.call1(py, (v.to_object(py), info))
         } else {
             self.func.call1(py, (v.to_object(py),))
@@ -221,6 +239,7 @@ pub struct FunctionPlainValidator {
     config: PyObject,
     name: String,
     field_name: Option<Py<PyString>>,
+    model_type: Option<Py<PyAny>>,
     info_arg: bool,
 }
 
@@ -242,6 +261,7 @@ impl BuildValidator for FunctionPlainValidator {
             },
             name: format!("function-plain[{}()]", function_name(function_info.function.bind(py))?),
             field_name: function_info.field_name.clone(),
+            model_type: function_info.model_type,
             info_arg: function_info.info_arg,
         }
         .into())
@@ -258,7 +278,13 @@ impl Validator for FunctionPlainValidator {
         state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
         let r = if self.info_arg {
-            let info = ValidationInfo::new(py, state.extra(), &self.config, self.field_name.clone());
+            let info = ValidationInfo::new(
+                py,
+                state.extra(),
+                &self.config,
+                self.field_name.clone(),
+                self.model_type.clone(),
+            );
             self.func.call1(py, (input.to_object(py), info))
         } else {
             self.func.call1(py, (input.to_object(py),))
@@ -278,6 +304,7 @@ pub struct FunctionWrapValidator {
     config: PyObject,
     name: String,
     field_name: Option<Py<PyString>>,
+    model_type: Option<Py<PyAny>>,
     info_arg: bool,
     hide_input_in_errors: bool,
     validation_error_cause: bool,
@@ -305,6 +332,7 @@ impl BuildValidator for FunctionWrapValidator {
             },
             name: format!("function-wrap[{}()]", function_name(function_info.function.bind(py))?),
             field_name: function_info.field_name.clone(),
+            model_type: function_info.model_type,
             info_arg: function_info.info_arg,
             hide_input_in_errors,
             validation_error_cause,
@@ -322,7 +350,13 @@ impl FunctionWrapValidator {
         state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
         let r = if self.info_arg {
-            let info = ValidationInfo::new(py, state.extra(), &self.config, self.field_name.clone());
+            let info = ValidationInfo::new(
+                py,
+                state.extra(),
+                &self.config,
+                self.field_name.clone(),
+                self.model_type.clone(),
+            );
             self.func.call1(py, (input.to_object(py), handler, info))
         } else {
             self.func.call1(py, (input.to_object(py), handler))
@@ -505,15 +539,23 @@ pub struct ValidationInfo {
     context: Option<PyObject>,
     data: Option<Py<PyDict>>,
     field_name: Option<Py<PyString>>,
+    model_type: Option<Py<PyAny>>,
     mode: InputType,
 }
 
 impl ValidationInfo {
-    fn new(py: Python, extra: &Extra, config: &PyObject, field_name: Option<Py<PyString>>) -> Self {
+    fn new(
+        py: Python,
+        extra: &Extra,
+        config: &PyObject,
+        field_name: Option<Py<PyString>>,
+        model_type: Option<Py<PyAny>>,
+    ) -> Self {
         Self {
             config: config.clone_ref(py),
             context: extra.context.map(|ctx| ctx.clone().into()),
             field_name,
+            model_type: model_type.map(|t| t.clone().into()),
             data: extra.data.as_ref().map(|data| data.clone().into()),
             mode: extra.input_type,
         }
@@ -548,8 +590,12 @@ impl ValidationInfo {
             Some(ref field_name) => safe_repr(field_name.bind(py)).to_string(),
             None => "None".into(),
         };
+        let model_type = match self.model_type {
+            Some(ref model_type) => safe_repr(model_type.bind(py)).to_string(),
+            None => "None".into(),
+        };
         Ok(format!(
-            "ValidationInfo(config={config}, context={context}, data={data}, field_name={field_name})"
+            "ValidationInfo(config={config}, context={context}, data={data}, field_name={field_name}, model_type={model_type})"
         ))
     }
 }

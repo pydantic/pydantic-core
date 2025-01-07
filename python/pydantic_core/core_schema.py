@@ -163,6 +163,9 @@ class FieldSerializationInfo(SerializationInfo, Protocol):
     @property
     def field_name(self) -> str: ...
 
+    @property
+    def model_type(self) -> type: ...
+
 
 class ValidationInfo(Protocol):
     """
@@ -193,6 +196,14 @@ class ValidationInfo(Protocol):
     def field_name(self) -> str | None:
         """
         The name of the current field being validated if this validator is
+        attached to a model field.
+        """
+        ...
+
+    @property
+    def model_type(self) -> type | None:
+        """
+        The type of the current model being validated if this validator is
         attached to a model field.
         """
         ...
@@ -1956,6 +1967,7 @@ class WithInfoValidatorFunctionSchema(TypedDict, total=False):
     type: Required[Literal['with-info']]
     function: Required[WithInfoValidatorFunction]
     field_name: str
+    model_type: type
 
 
 ValidationFunction = Union[NoInfoValidatorFunctionSchema, WithInfoValidatorFunctionSchema]
@@ -2025,6 +2037,7 @@ def with_info_before_validator_function(
     schema: CoreSchema,
     *,
     field_name: str | None = None,
+    model_type: type | None = None,
     ref: str | None = None,
     json_schema_input_schema: CoreSchema | None = None,
     metadata: Dict[str, Any] | None = None,
@@ -2062,7 +2075,7 @@ def with_info_before_validator_function(
     """
     return _dict_not_none(
         type='function-before',
-        function=_dict_not_none(type='with-info', function=function, field_name=field_name),
+        function=_dict_not_none(type='with-info', function=function, field_name=field_name, model_type=model_type),
         schema=schema,
         ref=ref,
         json_schema_input_schema=json_schema_input_schema,
@@ -2189,6 +2202,7 @@ class WithInfoWrapValidatorFunctionSchema(TypedDict, total=False):
     type: Required[Literal['with-info']]
     function: Required[WithInfoWrapValidatorFunction]
     field_name: str
+    model_type: type
 
 
 WrapValidatorFunction = Union[NoInfoWrapValidatorFunctionSchema, WithInfoWrapValidatorFunctionSchema]
