@@ -880,7 +880,7 @@ def test_validate_assignment_function():
                     core_schema.dataclass_field(
                         'field_b',
                         core_schema.with_info_after_validator_function(
-                            func, core_schema.int_schema(), field_name='field_b'
+                            func, core_schema.int_schema(), field_name='field_b', model_type=MyDataclass
                         ),
                     ),
                     core_schema.dataclass_field('field_c', core_schema.int_schema()),
@@ -894,14 +894,16 @@ def test_validate_assignment_function():
     assert m.field_a == 'x'
     assert m.field_b == 246
     assert m.field_c == 456
-    assert calls == ["ValidationInfo(config=None, context=None, data={'field_a': 'x'}, field_name='field_b')"]
+    assert calls == [
+        "ValidationInfo(config=None, context=None, data={'field_a': 'x'}, field_name='field_b', model_type=<class 'tests.validators.test_dataclasses.test_validate_assignment_function.<locals>.MyDataclass'>)"
+    ]
 
     v.validate_assignment(m, 'field_b', '111')
 
     assert m.field_b == 222
     assert calls == [
-        "ValidationInfo(config=None, context=None, data={'field_a': 'x'}, field_name='field_b')",
-        "ValidationInfo(config=None, context=None, data={'field_a': 'x', 'field_c': 456}, field_name='field_b')",
+        "ValidationInfo(config=None, context=None, data={'field_a': 'x'}, field_name='field_b', model_type=<class 'tests.validators.test_dataclasses.test_validate_assignment_function.<locals>.MyDataclass'>)",
+        "ValidationInfo(config=None, context=None, data={'field_a': 'x', 'field_c': 456}, field_name='field_b', model_type=<class 'tests.validators.test_dataclasses.test_validate_assignment_function.<locals>.MyDataclass'>)",
     ]
 
 

@@ -145,10 +145,22 @@ def test_function_before_error_model():
 @pytest.mark.parametrize(
     'config,kwargs,expected_repr',
     [
-        (None, {}, 'ValidationInfo(config=None, context=None, data=None, field_name=None)'),
-        (None, {'context': {1: 2}}, 'ValidationInfo(config=None, context={1: 2}, data=None, field_name=None)'),
-        (None, {'context': None}, 'ValidationInfo(config=None, context=None, data=None, field_name=None)'),
-        ({'title': 'hello'}, {}, "ValidationInfo(config={'title': 'hello'}, context=None, data=None, field_name=None)"),
+        (None, {}, 'ValidationInfo(config=None, context=None, data=None, field_name=None, model_type=None)'),
+        (
+            None,
+            {'context': {1: 2}},
+            'ValidationInfo(config=None, context={1: 2}, data=None, field_name=None, model_type=None)',
+        ),
+        (
+            None,
+            {'context': None},
+            'ValidationInfo(config=None, context=None, data=None, field_name=None, model_type=None)',
+        ),
+        (
+            {'title': 'hello'},
+            {},
+            "ValidationInfo(config={'title': 'hello'}, context=None, data=None, field_name=None, model_type=None)",
+        ),
     ],
 )
 def test_val_info_repr(config, kwargs, expected_repr):
@@ -591,8 +603,14 @@ def test_model_field_before_validator() -> None:
     def f(input_value: Any, info: core_schema.ValidationInfo) -> Any:
         assert info.field_name == 'x'
         assert info.data == {}
-        assert repr(info) == "ValidationInfo(config=None, context=None, data={}, field_name='x')"
-        assert str(info) == "ValidationInfo(config=None, context=None, data={}, field_name='x')"
+        assert (
+            repr(info)
+            == "ValidationInfo(config=None, context=None, data={}, field_name='x', model_type=<class 'tests.validators.test_function.test_model_field_before_validator.<locals>.Model'>)"
+        )
+        assert (
+            str(info)
+            == "ValidationInfo(config=None, context=None, data={}, field_name='x', model_type=<class 'tests.validators.test_function.test_model_field_before_validator.<locals>.Model'>)"
+        )
         assert isinstance(input_value, bytes)
         return f'input: {input_value.decode()}'
 
@@ -602,7 +620,9 @@ def test_model_field_before_validator() -> None:
             core_schema.model_fields_schema(
                 {
                     'x': core_schema.model_field(
-                        core_schema.with_info_before_validator_function(f, core_schema.str_schema(), field_name='x')
+                        core_schema.with_info_before_validator_function(
+                            f, core_schema.str_schema(), field_name='x', model_type=Model
+                        )
                     )
                 }
             ),
@@ -628,7 +648,9 @@ def test_model_field_after_validator() -> None:
             core_schema.model_fields_schema(
                 {
                     'x': core_schema.model_field(
-                        core_schema.with_info_after_validator_function(f, core_schema.str_schema(), field_name='x')
+                        core_schema.with_info_after_validator_function(
+                            f, core_schema.str_schema(), field_name='x', model_type=Model
+                        )
                     )
                 }
             ),
@@ -652,7 +674,11 @@ def test_model_field_plain_validator() -> None:
         core_schema.model_schema(
             Model,
             core_schema.model_fields_schema(
-                {'x': core_schema.model_field(core_schema.with_info_plain_validator_function(f, field_name='x'))}
+                {
+                    'x': core_schema.model_field(
+                        core_schema.with_info_plain_validator_function(f, field_name='x', model_type=Model)
+                    )
+                }
             ),
         )
     )
@@ -676,7 +702,9 @@ def test_model_field_wrap_validator() -> None:
             core_schema.model_fields_schema(
                 {
                     'x': core_schema.model_field(
-                        core_schema.with_info_wrap_validator_function(f, core_schema.str_schema(), field_name='x')
+                        core_schema.with_info_wrap_validator_function(
+                            f, core_schema.str_schema(), field_name='x', model_type=Model
+                        )
                     )
                 }
             ),
@@ -921,25 +949,27 @@ def test_reprs() -> None:
         reprs.append(repr(info))
         return v
 
+    class Foo:
+        def __repr__(self) -> str:
+            return 'This is Foo!'
+
     v = SchemaValidator(
         core_schema.chain_schema(
             [
                 core_schema.with_info_plain_validator_function(sample_repr),
                 core_schema.with_info_plain_validator_function(sample_repr, field_name='x'),
+                core_schema.with_info_plain_validator_function(sample_repr, field_name='x', model_type=Foo),
             ]
         )
     )
-
-    class Foo:
-        def __repr__(self) -> str:
-            return 'This is Foo!'
 
     v.validate_python(Foo())
 
     # insert_assert(reprs)
     assert reprs == [
-        'ValidationInfo(config=None, context=None, data=None, field_name=None)',
-        "ValidationInfo(config=None, context=None, data=None, field_name='x')",
+        'ValidationInfo(config=None, context=None, data=None, field_name=None, model_type=None)',
+        "ValidationInfo(config=None, context=None, data=None, field_name='x', model_type=None)",
+        "ValidationInfo(config=None, context=None, data=None, field_name='x', model_type=<class 'tests.validators.test_function.test_reprs.<locals>.Foo'>)",
     ]
 
 

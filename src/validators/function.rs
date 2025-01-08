@@ -555,7 +555,7 @@ impl ValidationInfo {
             config: config.clone_ref(py),
             context: extra.context.map(|ctx| ctx.clone().into()),
             field_name,
-            model_type: model_type.map(|t| t.clone().into()),
+            model_type,
             data: extra.data.as_ref().map(|data| data.clone().into()),
             mode: extra.input_type,
         }

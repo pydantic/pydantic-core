@@ -140,21 +140,25 @@ def test_field_function():
     v = SchemaValidator(
         core_schema.model_schema(
             RootModel,
-            core_schema.with_info_after_validator_function(f, core_schema.str_schema(), field_name='root'),
+            core_schema.with_info_after_validator_function(
+                f, core_schema.str_schema(), field_name='root', model_type=RootModel
+            ),
             root_model=True,
         )
     )
     m = v.validate_python('foobar', context='call 1')
     assert isinstance(m, RootModel)
     assert m.root == 'foobar validated'
-    assert call_infos == ["ValidationInfo(config=None, context='call 1', data=None, field_name='root')"]
+    assert call_infos == [
+        "ValidationInfo(config=None, context='call 1', data=None, field_name='root', model_type=<class 'tests.validators.test_model_root.test_field_function.<locals>.RootModel'>)"
+    ]
 
     m2 = v.validate_assignment(m, 'root', 'baz', context='assignment call')
     assert m2 is m
     assert m.root == 'baz validated'
     assert call_infos == [
-        "ValidationInfo(config=None, context='call 1', data=None, field_name='root')",
-        "ValidationInfo(config=None, context='assignment call', data=None, field_name='root')",
+        "ValidationInfo(config=None, context='call 1', data=None, field_name='root', model_type=<class 'tests.validators.test_model_root.test_field_function.<locals>.RootModel'>)",
+        "ValidationInfo(config=None, context='assignment call', data=None, field_name='root', model_type=<class 'tests.validators.test_model_root.test_field_function.<locals>.RootModel'>)",
     ]
 
 
