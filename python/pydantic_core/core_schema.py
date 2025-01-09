@@ -57,7 +57,7 @@ class CoreConfig(TypedDict, total=False):
         loc_by_alias: Whether to use the used alias (or first alias for "field required" errors) instead of
             `field_names` to construct error `loc`s. Default is `True`.
         revalidate_instances: Whether instances of models and dataclasses should re-validate. Default is 'never'.
-        validate_default: Whether to validate default values during validation. Default is `False`.
+        validate_default: Whether to validate default values during validation. Default is `never`.
         populate_by_name: Whether an aliased field may be populated by its name as given by the model attribute,
             as well as the alias. (Replaces 'allow_population_by_field_name' in Pydantic v1.) Default is `False`.
         str_max_length: The maximum length for string fields.
@@ -92,8 +92,8 @@ class CoreConfig(TypedDict, total=False):
     loc_by_alias: bool
     # whether instances of models and dataclasses (including subclass instances) should re-validate, default 'never'
     revalidate_instances: Literal['always', 'never', 'subclass-instances']
-    # whether to validate default values during validation, default False
-    validate_default: bool
+    # whether to validate default values during validation, default 'never'
+    validate_default: Union[bool, Literal['never', 'definition', 'init']]
     # used on typed-dicts and arguments
     populate_by_name: bool  # replaces `allow_population_by_field_name` in pydantic v1
     # fields related to string fields only
@@ -2403,7 +2403,7 @@ class WithDefaultSchema(TypedDict, total=False):
     default_factory: Union[Callable[[], Any], Callable[[Dict[str, Any]], Any]]
     default_factory_takes_data: bool
     on_error: Literal['raise', 'omit', 'default']  # default: 'raise'
-    validate_default: bool  # default: False
+    validate_default: Union[bool, Literal['never', 'definition', 'init']]  # default: 'never'
     strict: bool
     ref: str
     metadata: Dict[str, Any]
@@ -2417,7 +2417,7 @@ def with_default_schema(
     default_factory: Union[Callable[[], Any], Callable[[Dict[str, Any]], Any], None] = None,
     default_factory_takes_data: bool | None = None,
     on_error: Literal['raise', 'omit', 'default'] | None = None,
-    validate_default: bool | None = None,
+    validate_default: bool | Literal['never', 'definition', 'init'] | None = None,
     strict: bool | None = None,
     ref: str | None = None,
     metadata: Dict[str, Any] | None = None,
@@ -2443,7 +2443,7 @@ def with_default_schema(
         default_factory: A callable that returns the default value to use
         default_factory_takes_data: Whether the default factory takes a validated data argument
         on_error: What to do if the schema validation fails. One of 'raise', 'omit', 'default'
-        validate_default: Whether the default value should be validated
+        validate_default: Whether the default value should be validated. One of 'never', 'definition', 'init' or True/False
         strict: Whether the underlying schema should be validated with strict mode
         ref: optional unique identifier of the schema, used to reference the schema in other places
         metadata: Any other information you want to include with the schema, not used by pydantic-core
