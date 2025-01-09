@@ -2969,6 +2969,7 @@ class ModelField(TypedDict, total=False):
     serialization_alias: str
     serialization_exclude: bool  # default: False
     frozen: bool
+    deprecation_msg: str
     metadata: Dict[str, Any]
 
 
@@ -2979,6 +2980,7 @@ def model_field(
     serialization_alias: str | None = None,
     serialization_exclude: bool | None = None,
     frozen: bool | None = None,
+    deprecation_msg: str | None = None,
     metadata: Dict[str, Any] | None = None,
 ) -> ModelField:
     """
@@ -2996,6 +2998,7 @@ def model_field(
         serialization_alias: The alias to use as a key when serializing
         serialization_exclude: Whether to exclude the field when serializing
         frozen: Whether the field is frozen
+        deprecation_msg: A deprecation message indicating that the field is deprecated. `None` means that the field is not deprecated.
         metadata: Any other information you want to include with the schema, not used by pydantic-core
     """
     return _dict_not_none(
@@ -3005,6 +3008,7 @@ def model_field(
         serialization_alias=serialization_alias,
         serialization_exclude=serialization_exclude,
         frozen=frozen,
+        deprecation_msg=deprecation_msg,
         metadata=metadata,
     )
 

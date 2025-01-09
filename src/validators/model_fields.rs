@@ -1,7 +1,8 @@
-use pyo3::exceptions::PyKeyError;
+use pyo3::exceptions::{PyDeprecationWarning, PyKeyError};
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PySet, PyString, PyType};
+use pyo3::PyTypeInfo;
 
 use ahash::AHashSet;
 
@@ -23,6 +24,7 @@ struct Field {
     name_py: Py<PyString>,
     validator: CombinedValidator,
     frozen: bool,
+    deprecation_msg: Option<String>,
 }
 
 impl_py_gc_traverse!(Field { validator });
@@ -92,6 +94,7 @@ impl BuildValidator for ModelFieldsValidator {
                 name_py: field_name_py.into(),
                 validator,
                 frozen: field_info.get_as::<bool>(intern!(py, "frozen"))?.unwrap_or(false),
+                deprecation_msg: field_info.get_as::<String>(intern!(py, "deprecation_msg"))?,
             });
         }
 
@@ -183,6 +186,10 @@ impl Validator for ModelFieldsValidator {
                         // key is "used" whether or not validation passes, since we want to skip this key in
                         // extra logic either way
                         used_keys.insert(lookup_path.first_key());
+                    }
+                    if let Some(msg) = &field.deprecation_msg {
+                        let deprecation_warning_type = PyDeprecationWarning::type_object_bound(py);
+                        PyErr::warn_bound(py, &deprecation_warning_type, msg, 2)?;
                     }
                     match field.validator.validate(py, value.borrow_input(), state) {
                         Ok(value) => {
