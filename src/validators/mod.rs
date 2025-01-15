@@ -470,12 +470,6 @@ impl<'py> SelfValidator<'py> {
     }
 }
 
-#[pyfunction(signature = (schema, *, strict = None))]
-pub fn validate_core_schema<'py>(schema: &Bound<'py, PyAny>, strict: Option<bool>) -> PyResult<Bound<'py, PyAny>> {
-    let self_validator = SelfValidator::new(schema.py())?;
-    self_validator.validate_schema(schema, strict)
-}
-
 pub trait BuildValidator: Sized {
     const EXPECTED_TYPE: &'static str;
 

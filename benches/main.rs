@@ -8,7 +8,7 @@ use test::{black_box, Bencher};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString};
 
-use _pydantic_core::{validate_core_schema, SchemaValidator};
+use _pydantic_core::SchemaValidator;
 
 fn build_schema_validator_with_globals(
     py: Python,
@@ -16,7 +16,6 @@ fn build_schema_validator_with_globals(
     globals: Option<&Bound<'_, PyDict>>,
 ) -> SchemaValidator {
     let mut schema = py.eval(code, globals, None).unwrap().extract().unwrap();
-    schema = validate_core_schema(&schema, None).unwrap().extract().unwrap();
     SchemaValidator::py_new(py, &schema, None).unwrap()
 }
 
