@@ -2,7 +2,7 @@ import datetime
 import platform
 import re
 from copy import deepcopy
-from typing import Any, Type
+from typing import Any
 
 import pytest
 from dirty_equals import HasRepr
@@ -560,7 +560,7 @@ def test_raise_assertion_error_plain():
 
 
 @pytest.mark.parametrize('base_error', [ValueError, AssertionError])
-def test_error_with_error(base_error: Type[Exception]):
+def test_error_with_error(base_error: type[Exception]):
     class MyError(base_error):
         def __str__(self):
             raise RuntimeError('internal error')

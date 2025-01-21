@@ -7,7 +7,7 @@ import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal, Type
+from typing import Any, Literal
 
 import hypothesis
 import pytest
@@ -82,7 +82,7 @@ class PyAndJsonValidator:
             return self.validator.isinstance_python(py_input, strict=strict, context=context)
 
 
-PyAndJson = Type[PyAndJsonValidator]
+PyAndJson = type[PyAndJsonValidator]
 
 
 @pytest.fixture(params=['python', 'json'])
