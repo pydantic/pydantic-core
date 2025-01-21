@@ -100,6 +100,7 @@ features = ["pyo3/extension-module"]
 
 [tool.ruff]
 line-length = 120
+target-version = 'py39'
 
 [tool.ruff.lint]
 extend-select = ['Q', 'RUF100', 'C90', 'I']

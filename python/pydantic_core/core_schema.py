@@ -10,7 +10,7 @@ import warnings
 from collections.abc import Mapping
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, Callable, Dict, Hashable, List, Pattern, Set, Tuple, Type, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Hashable, List, Literal, Pattern, Set, Tuple, Type, Union
 
 from typing_extensions import deprecated
 
@@ -23,11 +23,6 @@ if sys.version_info < (3, 11):
     from typing_extensions import Protocol, Required, TypeAlias
 else:
     from typing import Protocol, Required, TypeAlias
-
-if sys.version_info < (3, 9):
-    from typing_extensions import Literal
-else:
-    from typing import Literal
 
 if TYPE_CHECKING:
     from pydantic_core import PydanticUndefined

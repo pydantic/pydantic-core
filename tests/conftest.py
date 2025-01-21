@@ -7,11 +7,10 @@ import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Type
+from typing import Any, Literal, Type
 
 import hypothesis
 import pytest
-from typing_extensions import Literal
 
 from pydantic_core import ArgsKwargs, SchemaValidator, ValidationError, validate_core_schema
 from pydantic_core.core_schema import CoreConfig
