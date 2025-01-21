@@ -45,8 +45,8 @@ impl BuildSerializer for DataclassArgsBuilder {
 
             if field_info.get_as(intern!(py, "init_only"))? == Some(true) {
                 // skip fields that are init_only
-                continue
-            } if field_info.get_as(intern!(py, "serialization_exclude"))? == Some(true) {
+                continue;
+            } else if field_info.get_as(intern!(py, "serialization_exclude"))? == Some(true) {
                 fields.insert(name, SerField::new(py, key_py, None, None, true));
             } else {
                 let schema = field_info.get_as_req(intern!(py, "schema"))?;
