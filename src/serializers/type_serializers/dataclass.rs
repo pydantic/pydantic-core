@@ -43,10 +43,11 @@ impl BuildSerializer for DataclassArgsBuilder {
 
             let key_py: Py<PyString> = PyString::new(py, &name).into();
 
-            if field_info.get_as(intern!(py, "serialization_exclude"))? == Some(true) {
+            if field_info.get_as(intern!(py, "init_only"))? == Some(true) {
+                // skip fields that are init_only
+                continue
+            } if field_info.get_as(intern!(py, "serialization_exclude"))? == Some(true) {
                 fields.insert(name, SerField::new(py, key_py, None, None, true));
-            } else if field_info.get_as(intern!(py, "init_only"))? == Some(true) {
-                fields.insert(name, SerField::new(py, key_py, None, None, false));
             } else {
                 let schema = field_info.get_as_req(intern!(py, "schema"))?;
                 let serializer = CombinedSerializer::build(&schema, config, definitions)
