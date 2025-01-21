@@ -200,10 +200,6 @@ def test_dataclass_initvar_not_required_on_union_ser() -> None:
         x: int
         init_var: dataclasses.InitVar[int] = 1
 
-        def __post_init__(self, init_var: int) -> None:
-            # no op just for testing purposes
-            pass
-
     @dataclasses.dataclass
     class Bar:
         x: int
@@ -222,7 +218,6 @@ def test_dataclass_initvar_not_required_on_union_ser() -> None:
                             schema=core_schema.with_default_schema(core_schema.int_schema(), default=1),
                         ),
                     ],
-                    collect_init_only=True,
                 ),
                 ['x'],
                 post_init=True,
