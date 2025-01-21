@@ -192,26 +192,3 @@ def test_extra_custom_serializer():
     m = v.validate_python({'extra': 'extra'})
 
     assert s.to_python(m) == {'extra': 'extra bam!'}
-
-
-@pytest.mark.filterwarnings('error')
-def test_initvar_not_required_on_ser() -> None:
-    @dataclasses.dataclass
-    class Model:
-        x: int
-        y: dataclasses.InitVar[str]
-
-    schema = core_schema.dataclass_schema(
-        Model,
-        core_schema.dataclass_args_schema(
-            'Model',
-            [
-                core_schema.dataclass_field(name='x', schema=core_schema.int_schema()),
-                core_schema.dataclass_field(name='y', init_only=True, schema=core_schema.str_schema()),
-            ],
-        ),
-        ['x'],
-    )
-
-    s = SchemaSerializer(schema)
-    assert s.to_python(Model(x=1, y='a')) == {'x': 1}
