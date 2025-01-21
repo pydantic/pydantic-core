@@ -140,7 +140,7 @@ def type_dict_schema(  # noqa: C901
                     schema = {'type': 'dict', 'keys_schema': {'type': 'str'}, 'values_schema': schema_ref_validator}
                 elif fr_arg == 'dict[Hashable, CoreSchema]':
                     schema = {'type': 'dict', 'keys_schema': {'type': 'any'}, 'values_schema': schema_ref_validator}
-                elif fr_arg == 'list[Union[CoreSchema, Tuple[CoreSchema, str]]]':
+                elif fr_arg == 'list[Union[CoreSchema, tuple[CoreSchema, str]]]':
                     schema = {
                         'type': 'list',
                         'items_schema': {
