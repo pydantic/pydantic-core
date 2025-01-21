@@ -10,7 +10,7 @@ import warnings
 from collections.abc import Mapping
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, Callable, Dict, Hashable, List, Literal, Pattern, Set, Tuple, Type, Union
+from typing import TYPE_CHECKING, Any, Callable, Hashable, Literal, Pattern, Union
 
 from typing_extensions import deprecated
 
@@ -180,7 +180,7 @@ class ValidationInfo(Protocol):
         ...
 
     @property
-    def data(self) -> Dict[str, Any]:
+    def data(self) -> dict[str, Any]:
         """The data being validated for this model."""
         ...
 
@@ -406,11 +406,11 @@ def to_string_ser_schema(*, when_used: WhenUsed = 'json-unless-none') -> ToStrin
 
 class ModelSerSchema(TypedDict, total=False):
     type: Required[Literal['model']]
-    cls: Required[Type[Any]]
+    cls: Required[type[Any]]
     schema: Required[CoreSchema]
 
 
-def model_ser_schema(cls: Type[Any], schema: CoreSchema) -> ModelSerSchema:
+def model_ser_schema(cls: type[Any], schema: CoreSchema) -> ModelSerSchema:
     """
     Returns a schema for serialization using a model.
 
@@ -434,13 +434,13 @@ SerSchema = Union[
 class InvalidSchema(TypedDict, total=False):
     type: Required[Literal['invalid']]
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     # note, we never plan to use this, but include it for type checking purposes to match
     # all other CoreSchema union members
     serialization: SerSchema
 
 
-def invalid_schema(ref: str | None = None, metadata: Dict[str, Any] | None = None) -> InvalidSchema:
+def invalid_schema(ref: str | None = None, metadata: dict[str, Any] | None = None) -> InvalidSchema:
     """
     Returns an invalid schema, used to indicate that a schema is invalid.
 
@@ -459,11 +459,11 @@ class ComputedField(TypedDict, total=False):
     property_name: Required[str]
     return_schema: Required[CoreSchema]
     alias: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
 
 
 def computed_field(
-    property_name: str, return_schema: CoreSchema, *, alias: str | None = None, metadata: Dict[str, Any] | None = None
+    property_name: str, return_schema: CoreSchema, *, alias: str | None = None, metadata: dict[str, Any] | None = None
 ) -> ComputedField:
     """
     ComputedFields are properties of a model or dataclass that are included in serialization.
@@ -482,12 +482,12 @@ def computed_field(
 class AnySchema(TypedDict, total=False):
     type: Required[Literal['any']]
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
 
 
 def any_schema(
-    *, ref: str | None = None, metadata: Dict[str, Any] | None = None, serialization: SerSchema | None = None
+    *, ref: str | None = None, metadata: dict[str, Any] | None = None, serialization: SerSchema | None = None
 ) -> AnySchema:
     """
     Returns a schema that matches any value, e.g.:
@@ -511,12 +511,12 @@ def any_schema(
 class NoneSchema(TypedDict, total=False):
     type: Required[Literal['none']]
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
 
 
 def none_schema(
-    *, ref: str | None = None, metadata: Dict[str, Any] | None = None, serialization: SerSchema | None = None
+    *, ref: str | None = None, metadata: dict[str, Any] | None = None, serialization: SerSchema | None = None
 ) -> NoneSchema:
     """
     Returns a schema that matches a None value, e.g.:
@@ -541,14 +541,14 @@ class BoolSchema(TypedDict, total=False):
     type: Required[Literal['bool']]
     strict: bool
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
 
 
 def bool_schema(
     strict: bool | None = None,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> BoolSchema:
     """
@@ -580,7 +580,7 @@ class IntSchema(TypedDict, total=False):
     gt: int
     strict: bool
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
 
 
@@ -593,7 +593,7 @@ def int_schema(
     gt: int | None = None,
     strict: bool | None = None,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> IntSchema:
     """
@@ -642,7 +642,7 @@ class FloatSchema(TypedDict, total=False):
     gt: float
     strict: bool
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
 
 
@@ -656,7 +656,7 @@ def float_schema(
     gt: float | None = None,
     strict: bool | None = None,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> FloatSchema:
     """
@@ -709,7 +709,7 @@ class DecimalSchema(TypedDict, total=False):
     decimal_places: int
     strict: bool
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
 
 
@@ -725,7 +725,7 @@ def decimal_schema(
     decimal_places: int | None = None,
     strict: bool | None = None,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> DecimalSchema:
     """
@@ -775,7 +775,7 @@ class ComplexSchema(TypedDict, total=False):
     type: Required[Literal['complex']]
     strict: bool
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
 
 
@@ -783,7 +783,7 @@ def complex_schema(
     *,
     strict: bool | None = None,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> ComplexSchema:
     """
@@ -825,7 +825,7 @@ class StringSchema(TypedDict, total=False):
     strict: bool
     coerce_numbers_to_str: bool
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
 
 
@@ -841,7 +841,7 @@ def str_schema(
     strict: bool | None = None,
     coerce_numbers_to_str: bool | None = None,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> StringSchema:
     """
@@ -897,7 +897,7 @@ class BytesSchema(TypedDict, total=False):
     min_length: int
     strict: bool
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
 
 
@@ -907,7 +907,7 @@ def bytes_schema(
     min_length: int | None = None,
     strict: bool | None = None,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> BytesSchema:
     """
@@ -952,7 +952,7 @@ class DateSchema(TypedDict, total=False):
     # value is restricted to -86_400 < offset < 86_400 by bounds in generate_self_schema.py
     now_utc_offset: int
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
 
 
@@ -966,7 +966,7 @@ def date_schema(
     now_op: Literal['past', 'future'] | None = None,
     now_utc_offset: int | None = None,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> DateSchema:
     """
@@ -1018,7 +1018,7 @@ class TimeSchema(TypedDict, total=False):
     tz_constraint: Union[Literal['aware', 'naive'], int]
     microseconds_precision: Literal['truncate', 'error']
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
 
 
@@ -1032,7 +1032,7 @@ def time_schema(
     tz_constraint: Literal['aware', 'naive'] | int | None = None,
     microseconds_precision: Literal['truncate', 'error'] = 'truncate',
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> TimeSchema:
     """
@@ -1088,7 +1088,7 @@ class DatetimeSchema(TypedDict, total=False):
     now_utc_offset: int
     microseconds_precision: Literal['truncate', 'error']  # default: 'truncate'
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
 
 
@@ -1104,7 +1104,7 @@ def datetime_schema(
     now_utc_offset: int | None = None,
     microseconds_precision: Literal['truncate', 'error'] = 'truncate',
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> DatetimeSchema:
     """
@@ -1161,7 +1161,7 @@ class TimedeltaSchema(TypedDict, total=False):
     gt: timedelta
     microseconds_precision: Literal['truncate', 'error']
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
 
 
@@ -1174,7 +1174,7 @@ def timedelta_schema(
     gt: timedelta | None = None,
     microseconds_precision: Literal['truncate', 'error'] = 'truncate',
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> TimedeltaSchema:
     """
@@ -1216,9 +1216,9 @@ def timedelta_schema(
 
 class LiteralSchema(TypedDict, total=False):
     type: Required[Literal['literal']]
-    expected: Required[List[Any]]
+    expected: Required[list[Any]]
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
 
 
@@ -1226,7 +1226,7 @@ def literal_schema(
     expected: list[Any],
     *,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> LiteralSchema:
     """
@@ -1252,12 +1252,12 @@ def literal_schema(
 class EnumSchema(TypedDict, total=False):
     type: Required[Literal['enum']]
     cls: Required[Any]
-    members: Required[List[Any]]
+    members: Required[list[Any]]
     sub_type: Literal['str', 'int', 'float']
     missing: Callable[[Any], Any]
     strict: bool
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
 
 
@@ -1269,7 +1269,7 @@ def enum_schema(
     missing: Callable[[Any], Any] | None = None,
     strict: bool | None = None,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> EnumSchema:
     """
@@ -1321,7 +1321,7 @@ class IsInstanceSchema(TypedDict, total=False):
     cls: Required[Any]
     cls_repr: str
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
 
 
@@ -1330,7 +1330,7 @@ def is_instance_schema(
     *,
     cls_repr: str | None = None,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> IsInstanceSchema:
     """
@@ -1361,19 +1361,19 @@ def is_instance_schema(
 
 class IsSubclassSchema(TypedDict, total=False):
     type: Required[Literal['is-subclass']]
-    cls: Required[Type[Any]]
+    cls: Required[type[Any]]
     cls_repr: str
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
 
 
 def is_subclass_schema(
-    cls: Type[Any],
+    cls: type[Any],
     *,
     cls_repr: str | None = None,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> IsInstanceSchema:
     """
@@ -1408,12 +1408,12 @@ def is_subclass_schema(
 class CallableSchema(TypedDict, total=False):
     type: Required[Literal['callable']]
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
 
 
 def callable_schema(
-    *, ref: str | None = None, metadata: Dict[str, Any] | None = None, serialization: SerSchema | None = None
+    *, ref: str | None = None, metadata: dict[str, Any] | None = None, serialization: SerSchema | None = None
 ) -> CallableSchema:
     """
     Returns a schema that checks if a value is callable, equivalent to python's `callable` method, e.g.:
@@ -1439,7 +1439,7 @@ class UuidSchema(TypedDict, total=False):
     version: Literal[1, 3, 4, 5]
     strict: bool
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
 
 
@@ -1448,7 +1448,7 @@ def uuid_schema(
     version: Literal[1, 3, 4, 5] | None = None,
     strict: bool | None = None,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> UuidSchema:
     return _dict_not_none(
@@ -1458,11 +1458,11 @@ def uuid_schema(
 
 class IncExSeqSerSchema(TypedDict, total=False):
     type: Required[Literal['include-exclude-sequence']]
-    include: Set[int]
-    exclude: Set[int]
+    include: set[int]
+    exclude: set[int]
 
 
-def filter_seq_schema(*, include: Set[int] | None = None, exclude: Set[int] | None = None) -> IncExSeqSerSchema:
+def filter_seq_schema(*, include: set[int] | None = None, exclude: set[int] | None = None) -> IncExSeqSerSchema:
     return _dict_not_none(type='include-exclude-sequence', include=include, exclude=exclude)
 
 
@@ -1477,7 +1477,7 @@ class ListSchema(TypedDict, total=False):
     fail_fast: bool
     strict: bool
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: IncExSeqOrElseSerSchema
 
 
@@ -1489,7 +1489,7 @@ def list_schema(
     fail_fast: bool | None = None,
     strict: bool | None = None,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: IncExSeqOrElseSerSchema | None = None,
 ) -> ListSchema:
     """
@@ -1533,7 +1533,7 @@ def tuple_positional_schema(
     extras_schema: CoreSchema | None = None,
     strict: bool | None = None,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: IncExSeqOrElseSerSchema | None = None,
 ) -> TupleSchema:
     """
@@ -1583,7 +1583,7 @@ def tuple_variable_schema(
     max_length: int | None = None,
     strict: bool | None = None,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: IncExSeqOrElseSerSchema | None = None,
 ) -> TupleSchema:
     """
@@ -1622,14 +1622,14 @@ def tuple_variable_schema(
 
 class TupleSchema(TypedDict, total=False):
     type: Required[Literal['tuple']]
-    items_schema: Required[List[CoreSchema]]
+    items_schema: Required[list[CoreSchema]]
     variadic_item_index: int
     min_length: int
     max_length: int
     fail_fast: bool
     strict: bool
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: IncExSeqOrElseSerSchema
 
 
@@ -1642,7 +1642,7 @@ def tuple_schema(
     fail_fast: bool | None = None,
     strict: bool | None = None,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: IncExSeqOrElseSerSchema | None = None,
 ) -> TupleSchema:
     """
@@ -1692,7 +1692,7 @@ class SetSchema(TypedDict, total=False):
     fail_fast: bool
     strict: bool
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
 
 
@@ -1704,7 +1704,7 @@ def set_schema(
     fail_fast: bool | None = None,
     strict: bool | None = None,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> SetSchema:
     """
@@ -1751,7 +1751,7 @@ class FrozenSetSchema(TypedDict, total=False):
     fail_fast: bool
     strict: bool
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
 
 
@@ -1763,7 +1763,7 @@ def frozenset_schema(
     fail_fast: bool | None = None,
     strict: bool | None = None,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> FrozenSetSchema:
     """
@@ -1808,7 +1808,7 @@ class GeneratorSchema(TypedDict, total=False):
     min_length: int
     max_length: int
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: IncExSeqOrElseSerSchema
 
 
@@ -1818,7 +1818,7 @@ def generator_schema(
     min_length: int | None = None,
     max_length: int | None = None,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: IncExSeqOrElseSerSchema | None = None,
 ) -> GeneratorSchema:
     """
@@ -1859,7 +1859,7 @@ def generator_schema(
     )
 
 
-IncExDict = Set[Union[int, str]]
+IncExDict = set[Union[int, str]]
 
 
 class IncExDictSerSchema(TypedDict, total=False):
@@ -1883,7 +1883,7 @@ class DictSchema(TypedDict, total=False):
     max_length: int
     strict: bool
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: IncExDictOrElseSerSchema
 
 
@@ -1895,7 +1895,7 @@ def dict_schema(
     max_length: int | None = None,
     strict: bool | None = None,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> DictSchema:
     """
@@ -1960,7 +1960,7 @@ class _ValidatorFunctionSchema(TypedDict, total=False):
     function: Required[ValidationFunction]
     schema: Required[CoreSchema]
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
 
 
@@ -1975,7 +1975,7 @@ def no_info_before_validator_function(
     *,
     ref: str | None = None,
     json_schema_input_schema: CoreSchema | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> BeforeValidatorFunctionSchema:
     """
@@ -2022,7 +2022,7 @@ def with_info_before_validator_function(
     field_name: str | None = None,
     ref: str | None = None,
     json_schema_input_schema: CoreSchema | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> BeforeValidatorFunctionSchema:
     """
@@ -2076,7 +2076,7 @@ def no_info_after_validator_function(
     *,
     ref: str | None = None,
     json_schema_input_schema: CoreSchema | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> AfterValidatorFunctionSchema:
     """
@@ -2120,7 +2120,7 @@ def with_info_after_validator_function(
     *,
     field_name: str | None = None,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> AfterValidatorFunctionSchema:
     """
@@ -2195,7 +2195,7 @@ class WrapValidatorFunctionSchema(TypedDict, total=False):
     schema: Required[CoreSchema]
     ref: str
     json_schema_input_schema: CoreSchema
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
 
 
@@ -2205,7 +2205,7 @@ def no_info_wrap_validator_function(
     *,
     ref: str | None = None,
     json_schema_input_schema: CoreSchema | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> WrapValidatorFunctionSchema:
     """
@@ -2255,7 +2255,7 @@ def with_info_wrap_validator_function(
     field_name: str | None = None,
     json_schema_input_schema: CoreSchema | None = None,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> WrapValidatorFunctionSchema:
     """
@@ -2305,7 +2305,7 @@ class PlainValidatorFunctionSchema(TypedDict, total=False):
     function: Required[ValidationFunction]
     ref: str
     json_schema_input_schema: CoreSchema
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
 
 
@@ -2314,7 +2314,7 @@ def no_info_plain_validator_function(
     *,
     ref: str | None = None,
     json_schema_input_schema: CoreSchema | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> PlainValidatorFunctionSchema:
     """
@@ -2355,7 +2355,7 @@ def with_info_plain_validator_function(
     field_name: str | None = None,
     ref: str | None = None,
     json_schema_input_schema: CoreSchema | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> PlainValidatorFunctionSchema:
     """
@@ -2395,13 +2395,13 @@ class WithDefaultSchema(TypedDict, total=False):
     type: Required[Literal['default']]
     schema: Required[CoreSchema]
     default: Any
-    default_factory: Union[Callable[[], Any], Callable[[Dict[str, Any]], Any]]
+    default_factory: Union[Callable[[], Any], Callable[[dict[str, Any]], Any]]
     default_factory_takes_data: bool
     on_error: Literal['raise', 'omit', 'default']  # default: 'raise'
     validate_default: bool  # default: False
     strict: bool
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
 
 
@@ -2409,13 +2409,13 @@ def with_default_schema(
     schema: CoreSchema,
     *,
     default: Any = PydanticUndefined,
-    default_factory: Union[Callable[[], Any], Callable[[Dict[str, Any]], Any], None] = None,
+    default_factory: Union[Callable[[], Any], Callable[[dict[str, Any]], Any], None] = None,
     default_factory_takes_data: bool | None = None,
     on_error: Literal['raise', 'omit', 'default'] | None = None,
     validate_default: bool | None = None,
     strict: bool | None = None,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> WithDefaultSchema:
     """
@@ -2466,7 +2466,7 @@ class NullableSchema(TypedDict, total=False):
     schema: Required[CoreSchema]
     strict: bool
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
 
 
@@ -2475,7 +2475,7 @@ def nullable_schema(
     *,
     strict: bool | None = None,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> NullableSchema:
     """
@@ -2503,16 +2503,16 @@ def nullable_schema(
 
 class UnionSchema(TypedDict, total=False):
     type: Required[Literal['union']]
-    choices: Required[List[Union[CoreSchema, Tuple[CoreSchema, str]]]]
+    choices: Required[list[Union[CoreSchema, tuple[CoreSchema, str]]]]
     # default true, whether to automatically collapse unions with one element to the inner validator
     auto_collapse: bool
     custom_error_type: str
     custom_error_message: str
-    custom_error_context: Dict[str, Union[str, int, float]]
+    custom_error_context: dict[str, Union[str, int, float]]
     mode: Literal['smart', 'left_to_right']  # default: 'smart'
     strict: bool
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
 
 
@@ -2526,7 +2526,7 @@ def union_schema(
     mode: Literal['smart', 'left_to_right'] | None = None,
     strict: bool | None = None,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> UnionSchema:
     """
@@ -2572,20 +2572,20 @@ def union_schema(
 
 class TaggedUnionSchema(TypedDict, total=False):
     type: Required[Literal['tagged-union']]
-    choices: Required[Dict[Hashable, CoreSchema]]
-    discriminator: Required[Union[str, List[Union[str, int]], List[List[Union[str, int]]], Callable[[Any], Hashable]]]
+    choices: Required[dict[Hashable, CoreSchema]]
+    discriminator: Required[Union[str, list[Union[str, int]], list[list[Union[str, int]]], Callable[[Any], Hashable]]]
     custom_error_type: str
     custom_error_message: str
-    custom_error_context: Dict[str, Union[str, int, float]]
+    custom_error_context: dict[str, Union[str, int, float]]
     strict: bool
     from_attributes: bool  # default: True
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
 
 
 def tagged_union_schema(
-    choices: Dict[Any, CoreSchema],
+    choices: dict[Any, CoreSchema],
     discriminator: str | list[str | int] | list[list[str | int]] | Callable[[Any], Any],
     *,
     custom_error_type: str | None = None,
@@ -2594,7 +2594,7 @@ def tagged_union_schema(
     strict: bool | None = None,
     from_attributes: bool | None = None,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> TaggedUnionSchema:
     """
@@ -2669,9 +2669,9 @@ def tagged_union_schema(
 
 class ChainSchema(TypedDict, total=False):
     type: Required[Literal['chain']]
-    steps: Required[List[CoreSchema]]
+    steps: Required[list[CoreSchema]]
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
 
 
@@ -2679,7 +2679,7 @@ def chain_schema(
     steps: list[CoreSchema],
     *,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> ChainSchema:
     """
@@ -2715,7 +2715,7 @@ class LaxOrStrictSchema(TypedDict, total=False):
     strict_schema: Required[CoreSchema]
     strict: bool
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
 
 
@@ -2725,7 +2725,7 @@ def lax_or_strict_schema(
     *,
     strict: bool | None = None,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> LaxOrStrictSchema:
     """
@@ -2778,7 +2778,7 @@ class JsonOrPythonSchema(TypedDict, total=False):
     json_schema: Required[CoreSchema]
     python_schema: Required[CoreSchema]
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
 
 
@@ -2787,7 +2787,7 @@ def json_or_python_schema(
     python_schema: CoreSchema,
     *,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> JsonOrPythonSchema:
     """
@@ -2834,10 +2834,10 @@ class TypedDictField(TypedDict, total=False):
     type: Required[Literal['typed-dict-field']]
     schema: Required[CoreSchema]
     required: bool
-    validation_alias: Union[str, List[Union[str, int]], List[List[Union[str, int]]]]
+    validation_alias: Union[str, list[Union[str, int]], list[list[Union[str, int]]]]
     serialization_alias: str
     serialization_exclude: bool  # default: False
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
 
 
 def typed_dict_field(
@@ -2847,7 +2847,7 @@ def typed_dict_field(
     validation_alias: str | list[str | int] | list[list[str | int]] | None = None,
     serialization_alias: str | None = None,
     serialization_exclude: bool | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> TypedDictField:
     """
     Returns a schema that matches a typed dict field, e.g.:
@@ -2879,9 +2879,9 @@ def typed_dict_field(
 
 class TypedDictSchema(TypedDict, total=False):
     type: Required[Literal['typed-dict']]
-    fields: Required[Dict[str, TypedDictField]]
-    cls: Type[Any]
-    computed_fields: List[ComputedField]
+    fields: Required[dict[str, TypedDictField]]
+    cls: type[Any]
+    computed_fields: list[ComputedField]
     strict: bool
     extras_schema: CoreSchema
     # all these values can be set via config, equivalent fields have `typed_dict_` prefix
@@ -2889,15 +2889,15 @@ class TypedDictSchema(TypedDict, total=False):
     total: bool  # default: True
     populate_by_name: bool  # replaces `allow_population_by_field_name` in pydantic v1
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
     config: CoreConfig
 
 
 def typed_dict_schema(
-    fields: Dict[str, TypedDictField],
+    fields: dict[str, TypedDictField],
     *,
-    cls: Type[Any] | None = None,
+    cls: type[Any] | None = None,
     computed_fields: list[ComputedField] | None = None,
     strict: bool | None = None,
     extras_schema: CoreSchema | None = None,
@@ -2905,7 +2905,7 @@ def typed_dict_schema(
     total: bool | None = None,
     populate_by_name: bool | None = None,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
     config: CoreConfig | None = None,
 ) -> TypedDictSchema:
@@ -2960,11 +2960,11 @@ def typed_dict_schema(
 class ModelField(TypedDict, total=False):
     type: Required[Literal['model-field']]
     schema: Required[CoreSchema]
-    validation_alias: Union[str, List[Union[str, int]], List[List[Union[str, int]]]]
+    validation_alias: Union[str, list[Union[str, int]], list[list[Union[str, int]]]]
     serialization_alias: str
     serialization_exclude: bool  # default: False
     frozen: bool
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
 
 
 def model_field(
@@ -2974,7 +2974,7 @@ def model_field(
     serialization_alias: str | None = None,
     serialization_exclude: bool | None = None,
     frozen: bool | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> ModelField:
     """
     Returns a schema for a model field, e.g.:
@@ -3006,9 +3006,9 @@ def model_field(
 
 class ModelFieldsSchema(TypedDict, total=False):
     type: Required[Literal['model-fields']]
-    fields: Required[Dict[str, ModelField]]
+    fields: Required[dict[str, ModelField]]
     model_name: str
-    computed_fields: List[ComputedField]
+    computed_fields: list[ComputedField]
     strict: bool
     extras_schema: CoreSchema
     # all these values can be set via config, equivalent fields have `typed_dict_` prefix
@@ -3016,12 +3016,12 @@ class ModelFieldsSchema(TypedDict, total=False):
     populate_by_name: bool  # replaces `allow_population_by_field_name` in pydantic v1
     from_attributes: bool
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
 
 
 def model_fields_schema(
-    fields: Dict[str, ModelField],
+    fields: dict[str, ModelField],
     *,
     model_name: str | None = None,
     computed_fields: list[ComputedField] | None = None,
@@ -3031,7 +3031,7 @@ def model_fields_schema(
     populate_by_name: bool | None = None,
     from_attributes: bool | None = None,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> ModelFieldsSchema:
     """
@@ -3079,8 +3079,8 @@ def model_fields_schema(
 
 class ModelSchema(TypedDict, total=False):
     type: Required[Literal['model']]
-    cls: Required[Type[Any]]
-    generic_origin: Type[Any]
+    cls: Required[type[Any]]
+    generic_origin: type[Any]
     schema: Required[CoreSchema]
     custom_init: bool
     root_model: bool
@@ -3091,15 +3091,15 @@ class ModelSchema(TypedDict, total=False):
     extra_behavior: ExtraBehavior
     config: CoreConfig
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
 
 
 def model_schema(
-    cls: Type[Any],
+    cls: type[Any],
     schema: CoreSchema,
     *,
-    generic_origin: Type[Any] | None = None,
+    generic_origin: type[Any] | None = None,
     custom_init: bool | None = None,
     root_model: bool | None = None,
     post_init: str | None = None,
@@ -3109,7 +3109,7 @@ def model_schema(
     extra_behavior: ExtraBehavior | None = None,
     config: CoreConfig | None = None,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> ModelSchema:
     """
@@ -3188,10 +3188,10 @@ class DataclassField(TypedDict, total=False):
     init: bool  # default: True
     init_only: bool  # default: False
     frozen: bool  # default: False
-    validation_alias: Union[str, List[Union[str, int]], List[List[Union[str, int]]]]
+    validation_alias: Union[str, list[Union[str, int]], list[list[Union[str, int]]]]
     serialization_alias: str
     serialization_exclude: bool  # default: False
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
 
 
 def dataclass_field(
@@ -3204,7 +3204,7 @@ def dataclass_field(
     validation_alias: str | list[str | int] | list[list[str | int]] | None = None,
     serialization_alias: str | None = None,
     serialization_exclude: bool | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     frozen: bool | None = None,
 ) -> DataclassField:
     """
@@ -3251,12 +3251,12 @@ def dataclass_field(
 class DataclassArgsSchema(TypedDict, total=False):
     type: Required[Literal['dataclass-args']]
     dataclass_name: Required[str]
-    fields: Required[List[DataclassField]]
-    computed_fields: List[ComputedField]
+    fields: Required[list[DataclassField]]
+    computed_fields: list[ComputedField]
     populate_by_name: bool  # default: False
     collect_init_only: bool  # default: False
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
     extra_behavior: ExtraBehavior
 
@@ -3265,11 +3265,11 @@ def dataclass_args_schema(
     dataclass_name: str,
     fields: list[DataclassField],
     *,
-    computed_fields: List[ComputedField] | None = None,
+    computed_fields: list[ComputedField] | None = None,
     populate_by_name: bool | None = None,
     collect_init_only: bool | None = None,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
     extra_behavior: ExtraBehavior | None = None,
 ) -> DataclassArgsSchema:
@@ -3317,34 +3317,34 @@ def dataclass_args_schema(
 
 class DataclassSchema(TypedDict, total=False):
     type: Required[Literal['dataclass']]
-    cls: Required[Type[Any]]
-    generic_origin: Type[Any]
+    cls: Required[type[Any]]
+    generic_origin: type[Any]
     schema: Required[CoreSchema]
-    fields: Required[List[str]]
+    fields: Required[list[str]]
     cls_name: str
     post_init: bool  # default: False
     revalidate_instances: Literal['always', 'never', 'subclass-instances']  # default: 'never'
     strict: bool  # default: False
     frozen: bool  # default False
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
     slots: bool
     config: CoreConfig
 
 
 def dataclass_schema(
-    cls: Type[Any],
+    cls: type[Any],
     schema: CoreSchema,
-    fields: List[str],
+    fields: list[str],
     *,
-    generic_origin: Type[Any] | None = None,
+    generic_origin: type[Any] | None = None,
     cls_name: str | None = None,
     post_init: bool | None = None,
     revalidate_instances: Literal['always', 'never', 'subclass-instances'] | None = None,
     strict: bool | None = None,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
     frozen: bool | None = None,
     slots: bool | None = None,
@@ -3396,7 +3396,7 @@ class ArgumentsParameter(TypedDict, total=False):
     name: Required[str]
     schema: Required[CoreSchema]
     mode: Literal['positional_only', 'positional_or_keyword', 'keyword_only']  # default positional_or_keyword
-    alias: Union[str, List[Union[str, int]], List[List[Union[str, int]]]]
+    alias: Union[str, list[Union[str, int]], list[list[Union[str, int]]]]
 
 
 def arguments_parameter(
@@ -3434,13 +3434,13 @@ VarKwargsMode: TypeAlias = Literal['uniform', 'unpacked-typed-dict']
 
 class ArgumentsSchema(TypedDict, total=False):
     type: Required[Literal['arguments']]
-    arguments_schema: Required[List[ArgumentsParameter]]
+    arguments_schema: Required[list[ArgumentsParameter]]
     populate_by_name: bool
     var_args_schema: CoreSchema
     var_kwargs_mode: VarKwargsMode
     var_kwargs_schema: CoreSchema
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
 
 
@@ -3452,7 +3452,7 @@ def arguments_schema(
     var_kwargs_mode: VarKwargsMode | None = None,
     var_kwargs_schema: CoreSchema | None = None,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> ArgumentsSchema:
     """
@@ -3504,7 +3504,7 @@ class CallSchema(TypedDict, total=False):
     function_name: str  # default function.__name__
     return_schema: CoreSchema
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
 
 
@@ -3515,7 +3515,7 @@ def call_schema(
     function_name: str | None = None,
     return_schema: CoreSchema | None = None,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> CallSchema:
     """
@@ -3567,9 +3567,9 @@ class CustomErrorSchema(TypedDict, total=False):
     schema: Required[CoreSchema]
     custom_error_type: Required[str]
     custom_error_message: str
-    custom_error_context: Dict[str, Union[str, int, float]]
+    custom_error_context: dict[str, Union[str, int, float]]
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
 
 
@@ -3580,7 +3580,7 @@ def custom_error_schema(
     custom_error_message: str | None = None,
     custom_error_context: dict[str, Any] | None = None,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> CustomErrorSchema:
     """
@@ -3623,7 +3623,7 @@ class JsonSchema(TypedDict, total=False):
     type: Required[Literal['json']]
     schema: CoreSchema
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
 
 
@@ -3631,7 +3631,7 @@ def json_schema(
     schema: CoreSchema | None = None,
     *,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> JsonSchema:
     """
@@ -3676,14 +3676,14 @@ def json_schema(
 class UrlSchema(TypedDict, total=False):
     type: Required[Literal['url']]
     max_length: int
-    allowed_schemes: List[str]
+    allowed_schemes: list[str]
     host_required: bool  # default False
     default_host: str
     default_port: int
     default_path: str
     strict: bool
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
 
 
@@ -3697,7 +3697,7 @@ def url_schema(
     default_path: str | None = None,
     strict: bool | None = None,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> UrlSchema:
     """
@@ -3742,14 +3742,14 @@ def url_schema(
 class MultiHostUrlSchema(TypedDict, total=False):
     type: Required[Literal['multi-host-url']]
     max_length: int
-    allowed_schemes: List[str]
+    allowed_schemes: list[str]
     host_required: bool  # default False
     default_host: str
     default_port: int
     default_path: str
     strict: bool
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
 
 
@@ -3763,7 +3763,7 @@ def multi_host_url_schema(
     default_path: str | None = None,
     strict: bool | None = None,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> MultiHostUrlSchema:
     """
@@ -3808,8 +3808,8 @@ def multi_host_url_schema(
 class DefinitionsSchema(TypedDict, total=False):
     type: Required[Literal['definitions']]
     schema: Required[CoreSchema]
-    definitions: Required[List[CoreSchema]]
-    metadata: Dict[str, Any]
+    definitions: Required[list[CoreSchema]]
+    metadata: dict[str, Any]
     serialization: SerSchema
 
 
@@ -3840,14 +3840,14 @@ class DefinitionReferenceSchema(TypedDict, total=False):
     type: Required[Literal['definition-ref']]
     schema_ref: Required[str]
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     serialization: SerSchema
 
 
 def definition_reference_schema(
     schema_ref: str,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
 ) -> DefinitionReferenceSchema:
     """

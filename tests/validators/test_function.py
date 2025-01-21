@@ -2,7 +2,7 @@ import datetime
 import platform
 import re
 from copy import deepcopy
-from typing import Any, Dict, List, Type
+from typing import Any, Type
 
 import pytest
 from dirty_equals import HasRepr
@@ -12,7 +12,7 @@ from pydantic_core import SchemaError, SchemaValidator, ValidationError, core_sc
 from ..conftest import plain_repr
 
 
-def deepcopy_info(info: core_schema.ValidationInfo) -> Dict[str, Any]:
+def deepcopy_info(info: core_schema.ValidationInfo) -> dict[str, Any]:
     return {
         'context': deepcopy(info.context),
         'data': deepcopy(info.data),
@@ -915,7 +915,7 @@ def test_function_validation_info_mode():
 
 
 def test_reprs() -> None:
-    reprs: List[str] = []
+    reprs: list[str] = []
 
     def sample_repr(v: Any, info: core_schema.ValidationInfo) -> Any:
         reprs.append(repr(info))

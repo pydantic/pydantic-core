@@ -5,7 +5,6 @@ import re
 import zoneinfo
 from datetime import date, datetime, time, timedelta, timezone, tzinfo
 from decimal import Decimal
-from typing import Dict
 
 import pytest
 
@@ -503,7 +502,7 @@ def test_tz_constraint_wrong():
 
 def test_tz_hash() -> None:
     v = SchemaValidator(core_schema.datetime_schema())
-    lookup: Dict[datetime, str] = {}
+    lookup: dict[datetime, str] = {}
     for day in range(1, 10):
         input_str = f'2022-06-{day:02}T12:13:14-12:15'
         validated = v.validate_python(input_str)
