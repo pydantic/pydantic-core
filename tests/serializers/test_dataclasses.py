@@ -234,3 +234,4 @@ def test_dataclass_initvar_not_required_on_union_ser() -> None:
 
     s = SchemaSerializer(schema)
     assert s.to_python(Foo(x=1), warnings='error') == {'x': 1}
+    assert s.to_python(Foo(x=1, init_var=2), warnings='error') == {'x': 1}
