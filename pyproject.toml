@@ -112,6 +112,9 @@ flake8-quotes = {inline-quotes = 'single', multiline-quotes = 'double'}
 mccabe = { max-complexity = 13 }
 isort = { known-first-party = ['pydantic_core', 'tests'] }
 
+[tool.ruff.lint.pyupgrade]
+keep-runtime-typing = true
+
 [tool.ruff.format]
 quote-style = 'single'
 

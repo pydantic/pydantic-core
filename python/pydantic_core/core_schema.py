@@ -7,10 +7,11 @@ from __future__ import annotations as _annotations
 
 import sys
 import warnings
-from collections.abc import Mapping
+from collections.abc import Hashable, Mapping
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, Callable, Hashable, Literal, Pattern, Union
+from re import Pattern
+from typing import TYPE_CHECKING, Any, Callable, Literal, Union
 
 from typing_extensions import deprecated
 

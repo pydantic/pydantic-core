@@ -127,7 +127,7 @@ def tmp_work_path(tmp_path: Path):
 
 @pytest.fixture
 def import_execute(request, tmp_work_path: Path):
-    def _import_execute(source: str, *, custom_module_name: 'str | None' = None):
+    def _import_execute(source: str, *, custom_module_name: str | None = None):
         module_name = custom_module_name or request.node.name
 
         module_path = tmp_work_path / f'{module_name}.py'

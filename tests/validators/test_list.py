@@ -1,8 +1,9 @@
 import collections.abc
 import re
 from collections import deque
+from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Any, Iterator, Union
+from typing import Any, Union
 
 import pytest
 from dirty_equals import Contains, HasRepr, IsInstance, IsList, IsStr

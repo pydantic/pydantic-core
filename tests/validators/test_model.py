@@ -2,7 +2,7 @@ import re
 import sys
 from copy import deepcopy
 from decimal import Decimal
-from typing import Any, Callable, Set, Tuple
+from typing import Any, Callable
 
 import pytest
 from dirty_equals import HasRepr, IsInstance
@@ -278,7 +278,7 @@ def test_model_class_root_validator_after():
         def __init__(self, **kwargs: Any) -> None:
             self.__dict__.update(kwargs)
 
-    def f(input_value_and_fields_set: Tuple[dict[str, Any], Set[str]]):
+    def f(input_value_and_fields_set: tuple[dict[str, Any], set[str]]):
         input_value, _, _ = input_value_and_fields_set
         assert input_value['field_a'] == 123
         return input_value_and_fields_set

@@ -14,7 +14,8 @@ import sys
 from collections.abc import Callable
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ForwardRef, Pattern, Union
+from re import Pattern
+from typing import TYPE_CHECKING, Any, ForwardRef, Union
 
 from typing_extensions import TypedDict, get_args, get_origin, is_typeddict
 

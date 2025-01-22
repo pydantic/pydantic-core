@@ -3,7 +3,8 @@ import math
 import platform
 import re
 import weakref
-from typing import Any, Mapping, Union
+from collections.abc import Mapping
+from typing import Any, Union
 
 import pytest
 from dirty_equals import FunctionCheck
