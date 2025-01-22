@@ -75,6 +75,7 @@ linting = [
     'pyright',
     'ruff',
     'mypy',
+    'pyupgrade',
 ]
 wasm = [
     'typing_extensions',
@@ -103,7 +104,7 @@ line-length = 120
 target-version = 'py39'
 
 [tool.ruff.lint]
-extend-select = ['Q', 'RUF100', 'C90', 'I']
+extend-select = ['Q', 'RUF100', 'C90', 'I', 'UP']
 extend-ignore = [
     'E721',  # using type() instead of isinstance() - we use this in tests
 ]
