@@ -79,7 +79,7 @@ impl BuildValidator for ModelValidator {
         let class: Bound<'_, PyType> = schema.get_as_req(intern!(py, "cls"))?;
         let generic_origin: Option<Bound<'_, PyType>> = schema.get_as(intern!(py, "generic_origin"))?;
         let sub_schema = schema.get_as_req(intern!(py, "schema"))?;
-        let validator = build_validator(&sub_schema, config.as_ref(), definitions)?;
+        let validator: CombinedValidator = build_validator(&sub_schema, config.as_ref(), definitions)?;
         let name = class.getattr(intern!(py, "__name__"))?.extract()?;
 
         Ok(Self {
