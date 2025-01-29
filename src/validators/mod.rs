@@ -50,6 +50,7 @@ mod list;
 mod literal;
 mod model;
 mod model_fields;
+mod never;
 mod none;
 mod nullable;
 mod set;
@@ -609,6 +610,7 @@ pub fn build_validator(
         definitions::DefinitionRefValidator,
         definitions::DefinitionsValidatorBuilder,
         complex::ComplexValidator,
+        never::NeverValidator,
     )
 }
 
@@ -763,6 +765,7 @@ pub enum CombinedValidator {
     // input dependent
     JsonOrPython(json_or_python::JsonOrPython),
     Complex(complex::ComplexValidator),
+    Never(never::NeverValidator),
 }
 
 /// This trait must be implemented by all validators, it allows various validators to be accessed consistently,
