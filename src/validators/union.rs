@@ -155,7 +155,7 @@ impl UnionValidator {
                                 .map_or(true, |(_, cur_exactness, cur_fields_set_count, cur_num_fields)| {
                                     match (*cur_fields_set_count, new_fields_set_count) {
                                         (Some(cur), Some(new)) if cur != new => cur < new,
-                                        (Some(cur), Some(new)) if cur == new => cur_num_fields < new_num_fields,
+                                        (Some(cur), Some(new)) if cur == new => *cur_num_fields < new_num_fields,
                                         _ => *cur_exactness < new_exactness,
                                     }
                                 });
