@@ -1333,3 +1333,252 @@ def test_smart_union_extra_behavior(extra_behavior) -> None:
 
     assert isinstance(validator.validate_python({'x': {'foo': 'foo'}}).x, Foo)
     assert isinstance(validator.validate_python({'x': {'bar': 'bar'}}).x, Bar)
+
+
+def test_union_greatest_number_of_matching_fields():
+    class ModelA:
+        a: int
+        b: int
+
+    class ModelB:
+        a: int
+        b: int
+        c: int
+
+    schema = core_schema.union_schema(
+        [
+            core_schema.model_schema(
+                ModelA,
+                core_schema.model_fields_schema(
+                    {
+                        'a': core_schema.model_field(core_schema.int_schema()),
+                        'b': core_schema.model_field(core_schema.int_schema()),
+                    }
+                ),
+            ),
+            core_schema.model_schema(
+                ModelB,
+                core_schema.model_fields_schema(
+                    {
+                        'a': core_schema.model_field(core_schema.int_schema()),
+                        'b': core_schema.model_field(core_schema.int_schema()),
+                        'c': core_schema.model_field(core_schema.int_schema()),
+                    }
+                ),
+            ),
+        ]
+    )
+
+    validator = SchemaValidator(schema)
+
+    result = validator.validate_python({'a': 1, 'b': 2, 'c': 3})
+    assert isinstance(result, ModelB)
+    assert result.a == 1
+    assert result.b == 2
+    assert result.c == 3
+
+    result = validator.validate_python({'a': 1, 'b': 2})
+    assert isinstance(result, ModelA)
+    assert result.a == 1
+    assert result.b == 2
+
+
+def test_union_equal_percentage_different_number_of_matching_fields():
+    class ModelA:
+        a: int
+        b: int
+
+    class ModelB:
+        a: int
+        b: int
+        c: int
+        d: int
+
+    schema = core_schema.union_schema(
+        [
+            core_schema.model_schema(
+                ModelA,
+                core_schema.model_fields_schema(
+                    {
+                        'a': core_schema.model_field(core_schema.int_schema()),
+                        'b': core_schema.model_field(core_schema.int_schema()),
+                    }
+                ),
+            ),
+            core_schema.model_schema(
+                ModelB,
+                core_schema.model_fields_schema(
+                    {
+                        'a': core_schema.model_field(core_schema.int_schema()),
+                        'b': core_schema.model_field(core_schema.int_schema()),
+                        'c': core_schema.model_field(core_schema.int_schema()),
+                        'd': core_schema.model_field(core_schema.int_schema()),
+                    }
+                ),
+            ),
+        ]
+    )
+
+    validator = SchemaValidator(schema)
+
+    result = validator.validate_python({'a': 1, 'b': 2, 'c': 3, 'd': 4})
+    assert isinstance(result, ModelB)
+    assert result.a == 1
+    assert result.b == 2
+    assert result.c == 3
+    assert result.d == 4
+
+    result = validator.validate_python({'a': 1, 'b': 2})
+    assert isinstance(result, ModelA)
+    assert result.a == 1
+    assert result.b == 2
+
+
+def test_union_greatest_number_of_matching_fields_with_defaults():
+    class ModelA:
+        a: int
+        b: int
+
+    class ModelB:
+        a: int
+        b: int
+        c: int = 3
+
+    schema = core_schema.union_schema(
+        [
+            core_schema.model_schema(
+                ModelA,
+                core_schema.model_fields_schema(
+                    {
+                        'a': core_schema.model_field(core_schema.int_schema()),
+                        'b': core_schema.model_field(core_schema.int_schema()),
+                    }
+                ),
+            ),
+            core_schema.model_schema(
+                ModelB,
+                core_schema.model_fields_schema(
+                    {
+                        'a': core_schema.model_field(core_schema.int_schema()),
+                        'b': core_schema.model_field(core_schema.int_schema()),
+                        'c': core_schema.model_field(core_schema.with_default_schema(core_schema.int_schema(), default=3)),
+                    }
+                ),
+            ),
+        ]
+    )
+
+    validator = SchemaValidator(schema)
+
+    result = validator.validate_python({'a': 1, 'b': 2})
+    assert isinstance(result, ModelB)
+    assert result.a == 1
+    assert result.b == 2
+    assert result.c == 3
+
+
+def test_union_greatest_number_of_matching_fields_nested():
+    class SubModelA:
+        a: int
+
+    class SubModelB:
+        a: int
+        b: int
+
+    class ModelA:
+        sub: SubModelA
+
+    class ModelB:
+        sub: SubModelB
+
+    schema = core_schema.union_schema(
+        [
+            core_schema.model_schema(
+                ModelA,
+                core_schema.model_fields_schema(
+                    {
+                        'sub': core_schema.model_field(
+                            core_schema.model_schema(
+                                SubModelA,
+                                core_schema.model_fields_schema(
+                                    {
+                                        'a': core_schema.model_field(core_schema.int_schema()),
+                                    }
+                                ),
+                            )
+                        )
+                    }
+                ),
+            ),
+            core_schema.model_schema(
+                ModelB,
+                core_schema.model_fields_schema(
+                    {
+                        'sub': core_schema.model_field(
+                            core_schema.model_schema(
+                                SubModelB,
+                                core_schema.model_fields_schema(
+                                    {
+                                        'a': core_schema.model_field(core_schema.int_schema()),
+                                        'b': core_schema.model_field(core_schema.int_schema()),
+                                    }
+                                ),
+                            )
+                        )
+                    }
+                ),
+            ),
+        ]
+    )
+
+    validator = SchemaValidator(schema)
+
+    result = validator.validate_python({'sub': {'a': 1, 'b': 2}})
+    assert isinstance(result, ModelB)
+    assert result.sub.a == 1
+    assert result.sub.b == 2
+
+    result = validator.validate_python({'sub': {'a': 1}})
+    assert isinstance(result, ModelA)
+    assert result.sub.a == 1
+
+
+def test_union_inheritance():
+    class BaseModel:
+        a: int
+
+    class SubModel(BaseModel):
+        b: int
+
+    schema = core_schema.union_schema(
+        [
+            core_schema.model_schema(
+                BaseModel,
+                core_schema.model_fields_schema(
+                    {
+                        'a': core_schema.model_field(core_schema.int_schema()),
+                    }
+                ),
+            ),
+            core_schema.model_schema(
+                SubModel,
+                core_schema.model_fields_schema(
+                    {
+                        'a': core_schema.model_field(core_schema.int_schema()),
+                        'b': core_schema.model_field(core_schema.int_schema()),
+                    }
+                ),
+            ),
+        ]
+    )
+
+    validator = SchemaValidator(schema)
+
+    result = validator.validate_python({'a': 1, 'b': 2})
+    assert isinstance(result, SubModel)
+    assert result.a == 1
+    assert result.b == 2
+
+    result = validator.validate_python({'a': 1})
+    assert isinstance(result, BaseModel)
+    assert result.a == 1
