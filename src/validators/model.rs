@@ -1,4 +1,5 @@
 use std::ptr::null_mut;
+use std::sync::Arc;
 
 use pyo3::exceptions::PyTypeError;
 use pyo3::types::{PyDict, PySet, PyString, PyTuple, PyType};
@@ -8,7 +9,7 @@ use pyo3::{intern, prelude::*};
 use super::function::convert_err;
 use super::validation_state::Exactness;
 use super::{
-    build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, ValidationState, Validator,
+    build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Extra, ValidationState, Validator, SchemaValidator
 };
 use crate::build_tools::py_schema_err;
 use crate::build_tools::schema_or_config_same;
@@ -53,7 +54,7 @@ impl Revalidate {
 #[derive(Debug)]
 pub struct ModelValidator {
     revalidate: Revalidate,
-    validator: Box<CombinedValidator>,
+    validator: Arc<CombinedValidator>,
     class: Py<PyType>,
     generic_origin: Option<Py<PyType>>,
     post_init: Option<Py<PyString>>,
@@ -79,7 +80,18 @@ impl BuildValidator for ModelValidator {
         let class: Bound<'_, PyType> = schema.get_as_req(intern!(py, "cls"))?;
         let generic_origin: Option<Bound<'_, PyType>> = schema.get_as(intern!(py, "generic_origin"))?;
         let sub_schema = schema.get_as_req(intern!(py, "schema"))?;
-        let validator = build_validator(&sub_schema, config.as_ref(), definitions)?;
+
+        let validator = if class.getattr("__pydantic_complete__")?.extract::<bool>()? {
+            if let Ok(prebuilt_validator) = class.getattr("__pydantic_validator__") {
+                let schema_validator: PyRef<SchemaValidator> = prebuilt_validator.extract()?;
+                schema_validator.validator.clone()
+            } else {
+                Arc::new(build_validator(&sub_schema, config.as_ref(), definitions)?)
+            }
+        } else {
+            Arc::new(build_validator(&sub_schema, config.as_ref(), definitions)?)
+        };
+
         let name = class.getattr(intern!(py, "__name__"))?.extract()?;
 
         Ok(Self {
@@ -93,7 +105,7 @@ impl BuildValidator for ModelValidator {
                 .map(|s| s.to_str())
                 .transpose()?,
             )?,
-            validator: Box::new(validator),
+            validator,
             class: class.into(),
             generic_origin: generic_origin.map(std::convert::Into::into),
             post_init: schema.get_as(intern!(py, "post_init"))?,
