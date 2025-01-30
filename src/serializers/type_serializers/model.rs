@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::sync::Arc;
 
 use pyo3::intern;
 use pyo3::prelude::*;
@@ -18,6 +19,7 @@ use crate::definitions::DefinitionsBuilder;
 use crate::serializers::errors::PydanticSerializationUnexpectedValue;
 use crate::serializers::extra::DuckTypingSerMode;
 use crate::tools::SchemaDict;
+use crate::SchemaSerializer;
 
 const ROOT_FIELD: &str = "root";
 
@@ -76,7 +78,7 @@ impl BuildSerializer for ModelFieldsBuilder {
 #[derive(Debug)]
 pub struct ModelSerializer {
     class: Py<PyType>,
-    serializer: Box<CombinedSerializer>,
+    serializer: Arc<CombinedSerializer>,
     has_extra: bool,
     root_model: bool,
     name: String,
@@ -97,8 +99,21 @@ impl BuildSerializer for ModelSerializer {
 
         let class: Py<PyType> = schema.get_as_req(intern!(py, "cls"))?;
         let sub_schema = schema.get_as_req(intern!(py, "schema"))?;
-        let serializer = Box::new(CombinedSerializer::build(&sub_schema, config.as_ref(), definitions)?);
+
+        let bound_class = class.bind(py);
+        let serializer = if bound_class.getattr("__pydantic_complete__")?.extract::<bool>()? {
+            if let Ok(prebuilt_serializer) = bound_class.getattr("__pydantic_serializer__") {
+                let schema_serializer: PyRef<SchemaSerializer> = prebuilt_serializer.extract()?;
+                schema_serializer.serializer.clone()
+            } else {
+                Arc::new(CombinedSerializer::build(&sub_schema, config.as_ref(), definitions)?)
+            }
+        } else {
+            Arc::new(CombinedSerializer::build(&sub_schema, config.as_ref(), definitions)?)
+        };
+
         let root_model = schema.get_as(intern!(py, "root_model"))?.unwrap_or(false);
+
         let name = class.bind(py).getattr(intern!(py, "__name__"))?.extract()?;
 
         Ok(Self {

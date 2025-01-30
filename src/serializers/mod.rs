@@ -1,5 +1,6 @@
 use std::fmt::Debug;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyTuple, PyType};
@@ -37,7 +38,7 @@ pub enum WarningsArg {
 #[pyclass(module = "pydantic_core._pydantic_core", frozen)]
 #[derive(Debug)]
 pub struct SchemaSerializer {
-    serializer: CombinedSerializer,
+    serializer: Arc<CombinedSerializer>,
     definitions: Definitions<CombinedSerializer>,
     expected_json_size: AtomicUsize,
     config: SerializationConfig,
@@ -92,7 +93,7 @@ impl SchemaSerializer {
         let mut definitions_builder = DefinitionsBuilder::new();
         let serializer = CombinedSerializer::build(schema.downcast()?, config, &mut definitions_builder)?;
         Ok(Self {
-            serializer,
+            serializer: Arc::new(serializer),
             definitions: definitions_builder.finish()?,
             expected_json_size: AtomicUsize::new(1024),
             config: SerializationConfig::from_config(config)?,
