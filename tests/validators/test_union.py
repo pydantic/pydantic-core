@@ -1333,3 +1333,45 @@ def test_smart_union_extra_behavior(extra_behavior) -> None:
 
     assert isinstance(validator.validate_python({'x': {'foo': 'foo'}}).x, Foo)
     assert isinstance(validator.validate_python({'x': {'bar': 'bar'}}).x, Bar)
+
+
+class A:
+    a: int
+
+
+class B(A):
+    b: int
+
+
+def test_discriminated_union():
+    v = SchemaValidator(
+        {
+            'type': 'union',
+            'choices': [
+                {
+                    'type': 'model',
+                    'cls': A,
+                    'schema': {
+                        'type': 'model-fields',
+                        'fields': {
+                            'a': {'type': 'model-field', 'schema': {'type': 'int'}},
+                        },
+                    },
+                },
+                {
+                    'type': 'model',
+                    'cls': B,
+                    'schema': {
+                        'type': 'model-fields',
+                        'fields': {
+                            'a': {'type': 'model-field', 'schema': {'type': 'int'}},
+                            'b': {'type': 'model-field', 'schema': {'type': 'int'}},
+                        },
+                    },
+                },
+            ],
+        }
+    )
+
+    assert isinstance(v.validate_python({'a': 1}), A)
+    assert isinstance(v.validate_python({'a': 1, 'b': 2}), B)
