@@ -264,8 +264,9 @@ impl LookupKey {
         &'s self,
         dict: &'a JsonObject<'data>,
     ) -> ValResult<Option<(&'s LookupPath, &'a JsonValue<'data>)>> {
+        // FIXME: use of find_map in here probably leads to quadratic complexity
         match self {
-            Self::Simple { key, path, .. } => match dict.get(key.as_str()) {
+            Self::Simple { key, path, .. } => match dict.iter().rev().find_map(|(k, v)| (k == key).then_some(v)) {
                 Some(value) => Ok(Some((path, value))),
                 None => Ok(None),
             },
@@ -275,9 +276,9 @@ impl LookupKey {
                 key2,
                 path2,
                 ..
-            } => match dict.get(key1.as_str()) {
+            } => match dict.iter().rev().find_map(|(k, v)| (k == key1).then_some(v)) {
                 Some(value) => Ok(Some((path1, value))),
-                None => match dict.get(key2.as_str()) {
+                None => match dict.iter().rev().find_map(|(k, v)| (k == key2).then_some(v)) {
                     Some(value) => Ok(Some((path2, value))),
                     None => Ok(None),
                 },
@@ -499,7 +500,8 @@ impl PathItem {
 
     pub fn json_obj_get<'a, 'data>(&self, json_obj: &'a JsonObject<'data>) -> Option<&'a JsonValue<'data>> {
         match self {
-            Self::S(key, _) => json_obj.get(key.as_str()),
+            // FIXME: use of find_map in here probably leads to quadratic complexity
+            Self::S(key, _) => json_obj.iter().rev().find_map(|(k, v)| (k == key).then_some(v)),
             _ => None,
         }
     }

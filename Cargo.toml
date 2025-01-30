@@ -45,7 +45,7 @@ idna = "1.0.3"
 base64 = "0.22.1"
 num-bigint = "0.4.6"
 uuid = "1.11.0"
-jiter = { version = "0.8.2", features = ["python"] }
+jiter = { git = "https://github.com/pydantic/jiter", branch = "dh/simpler-value", features = ["python"] }
 hex = "0.4.3"
 
 [lib]
