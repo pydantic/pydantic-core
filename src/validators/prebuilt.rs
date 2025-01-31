@@ -3,7 +3,7 @@ use std::sync::Arc;
 use pyo3::exceptions::PyValueError;
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::{PyBool, PyDict, PyType};
+use pyo3::types::{PyDict, PyType};
 
 use crate::errors::ValResult;
 use crate::input::Input;
@@ -29,13 +29,14 @@ impl BuildValidator for PrebuiltValidator {
         let py = schema.py();
         let class: Bound<'_, PyType> = schema.get_as_req(intern!(py, "cls"))?;
 
-        // note: we NEED to use the __dict__ here (and perform get_item calls rather than getattr)
-        // because we don't want to fetch prebuilt validators from parent classes
-        let class_dict: Bound<'_, PyDict> = class.getattr(intern!(py, "__dict__"))?.extract()?;
+        // Note: we NEED to use the __dict__ here (and perform get_item calls rather than getattr)
+        // because we don't want to fetch prebuilt validators from parent classes.
+        // We don't downcast here because __dict__ on a class is a readonly mappingproxy,
+        // so we can just leave it as is and do get_item checks.
+        let class_dict = class.getattr(intern!(py, "__dict__"))?;
 
-        // Ensure the class has completed its Pydantic validation setup
         let is_complete: bool = class_dict
-            .get_as_req::<Bound<'_, PyBool>>(intern!(py, "__pydantic_complete__"))
+            .get_item(intern!(py, "__pydantic_complete__"))
             .is_ok_and(|b| b.extract().unwrap_or(false));
 
         if !is_complete {
@@ -43,7 +44,7 @@ impl BuildValidator for PrebuiltValidator {
         }
 
         // Retrieve the prebuilt validator if available
-        let prebuilt_validator: Bound<'_, PyAny> = class_dict.get_as_req(intern!(py, "__pydantic_validator__"))?;
+        let prebuilt_validator = class_dict.get_item(intern!(py, "__pydantic_validator__"))?;
         let schema_validator: PyRef<SchemaValidator> = prebuilt_validator.extract()?;
         let combined_validator: Arc<CombinedValidator> = schema_validator.validator.clone();
         let name: String = class.getattr(intern!(py, "__name__"))?.extract()?;
