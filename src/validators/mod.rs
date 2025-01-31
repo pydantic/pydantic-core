@@ -522,9 +522,8 @@ pub fn build_validator(
 
     // if we have a SchemaValidator on the type already, use it
     if matches!(type_, "model" | "dataclass" | "typed-dict") {
-        match prebuilt::PrebuiltValidator::build(dict, config, definitions) {
-            Ok(prebuilt_validator) => return Ok(prebuilt_validator),
-            Err(_) => (),
+        if let Ok(prebuilt_validator) = prebuilt::PrebuiltValidator::build(dict, config, definitions) {
+            return Ok(prebuilt_validator);
         }
     }
 

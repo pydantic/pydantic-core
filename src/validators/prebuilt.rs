@@ -3,7 +3,7 @@ use std::sync::Arc;
 use pyo3::exceptions::PyValueError;
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyType};
+use pyo3::types::{PyBool, PyDict, PyType};
 
 use crate::errors::ValResult;
 use crate::input::Input;
@@ -29,23 +29,30 @@ impl BuildValidator for PrebuiltValidator {
         let py = schema.py();
         let class: Bound<'_, PyType> = schema.get_as_req(intern!(py, "cls"))?;
 
-        if class
-            .getattr(intern!(py, "__pydantic_complete__"))
-            .map_or(false, |pc| pc.extract::<bool>().unwrap_or(false))
-        {
-            if let Ok(prebuilt_validator) = class.getattr(intern!(py, "__pydantic_validator__")) {
-                let schema_validator: PyRef<SchemaValidator> = prebuilt_validator.extract()?;
-                let combined_validator: Arc<CombinedValidator> = schema_validator.validator.clone();
-                let name = class.getattr(intern!(py, "__name__"))?.extract()?;
+        // note: we NEED to use the __dict__ here (and perform get_item calls rather than getattr)
+        // because we don't want to fetch prebuilt validators from parent classes
+        let class_dict: Bound<'_, PyDict> = class.getattr(intern!(py, "__dict__"))?.extract()?;
 
-                return Ok(Self {
-                    validator: combined_validator,
-                    name,
-                }
-                .into());
-            }
+        // Ensure the class has completed its Pydantic validation setup
+        let is_complete: bool = class_dict
+            .get_as_req::<Bound<'_, PyBool>>(intern!(py, "__pydantic_complete__"))
+            .is_ok_and(|b| b.extract().unwrap_or(false));
+
+        if !is_complete {
+            return Err(PyValueError::new_err("Prebuilt validator not found."));
         }
-        Err(PyValueError::new_err("Prebuilt validator not found."))
+
+        // Retrieve the prebuilt validator if available
+        let prebuilt_validator: Bound<'_, PyAny> = class_dict.get_as_req(intern!(py, "__pydantic_validator__"))?;
+        let schema_validator: PyRef<SchemaValidator> = prebuilt_validator.extract()?;
+        let combined_validator: Arc<CombinedValidator> = schema_validator.validator.clone();
+        let name: String = class.getattr(intern!(py, "__name__"))?.extract()?;
+
+        Ok(Self {
+            validator: combined_validator,
+            name,
+        }
+        .into())
     }
 }
 
