@@ -1,4 +1,5 @@
 use std::fmt::Debug;
+use std::sync::Arc;
 
 use enum_dispatch::enum_dispatch;
 use jiter::{PartialMode, StringCacheMode};
@@ -52,6 +53,7 @@ mod model;
 mod model_fields;
 mod none;
 mod nullable;
+mod prebuilt;
 mod set;
 mod string;
 mod time;
@@ -105,7 +107,7 @@ impl PySome {
 #[pyclass(module = "pydantic_core._pydantic_core", frozen)]
 #[derive(Debug)]
 pub struct SchemaValidator {
-    validator: CombinedValidator,
+    validator: Arc<CombinedValidator>,
     definitions: Definitions<CombinedValidator>,
     // References to the Python schema and config objects are saved to enable
     // reconstructing the object for cloudpickle support (see `__reduce__`).
@@ -146,7 +148,7 @@ impl SchemaValidator {
             .get_as(intern!(py, "cache_strings"))?
             .unwrap_or(StringCacheMode::All);
         Ok(Self {
-            validator,
+            validator: Arc::new(validator),
             definitions,
             py_schema,
             py_config,
@@ -455,7 +457,7 @@ impl<'py> SelfValidator<'py> {
         };
         let definitions = definitions_builder.finish()?;
         Ok(SchemaValidator {
-            validator,
+            validator: Arc::new(validator),
             definitions,
             py_schema: py.None(),
             py_config: None,
@@ -517,6 +519,15 @@ pub fn build_validator(
     let dict = schema.downcast::<PyDict>()?;
     let type_: Bound<'_, PyString> = dict.get_as_req(intern!(schema.py(), "type"))?;
     let type_ = type_.to_str()?;
+
+    // if we have a SchemaValidator on the type already, use it
+    if matches!(type_, "model" | "dataclass" | "typed-dict") {
+        match prebuilt::PrebuiltValidator::build(dict, config, definitions) {
+            Ok(prebuilt_validator) => return Ok(prebuilt_validator),
+            Err(_) => (),
+        }
+    }
+
     validator_match!(
         type_,
         dict,
@@ -763,6 +774,8 @@ pub enum CombinedValidator {
     // input dependent
     JsonOrPython(json_or_python::JsonOrPython),
     Complex(complex::ComplexValidator),
+    // uses a reference to an existing SchemaValidator to reduce memory usage
+    Prebuilt(prebuilt::PrebuiltValidator),
 }
 
 /// This trait must be implemented by all validators, it allows various validators to be accessed consistently,
