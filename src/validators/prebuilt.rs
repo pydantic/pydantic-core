@@ -1,16 +1,16 @@
 use std::sync::Arc;
 
+use pyo3::exceptions::PyValueError;
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyType};
-use pyo3::exceptions::PyValueError;
 
 use crate::errors::ValResult;
 use crate::input::Input;
 use crate::tools::SchemaDict;
 
 use super::ValidationState;
-use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, Validator, SchemaValidator};
+use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, SchemaValidator, Validator};
 
 #[derive(Debug)]
 pub struct PrebuiltValidator {
@@ -38,7 +38,11 @@ impl BuildValidator for PrebuiltValidator {
                 let combined_validator: Arc<CombinedValidator> = schema_validator.validator.clone();
                 let name = class.getattr(intern!(py, "__name__"))?.extract()?;
 
-                return Ok( Self { validator: combined_validator, name}.into())
+                return Ok(Self {
+                    validator: combined_validator,
+                    name,
+                }
+                .into());
             }
         }
         Err(PyValueError::new_err("Prebuilt validator not found."))
