@@ -1,5 +1,4 @@
 use std::borrow::Cow;
-use std::sync::Arc;
 
 use pyo3::exceptions::PyValueError;
 use pyo3::intern;
@@ -15,7 +14,7 @@ use super::shared::{BuildSerializer, CombinedSerializer, TypeSerializer};
 
 #[derive(Debug)]
 pub struct PrebuiltSerializer {
-    serializer: Arc<CombinedSerializer>,
+    serializer: Py<SchemaSerializer>,
 }
 
 impl BuildSerializer for PrebuiltSerializer {
@@ -45,13 +44,9 @@ impl BuildSerializer for PrebuiltSerializer {
 
         // Retrieve the prebuilt validator if available
         let prebuilt_serializer: Bound<'_, PyAny> = class_dict.get_item(intern!(py, "__pydantic_serializer__"))?;
-        let schema_serializer: PyRef<SchemaSerializer> = prebuilt_serializer.extract()?;
-        let combined_serializer: Arc<CombinedSerializer> = schema_serializer.serializer.clone();
+        let serializer: Py<SchemaSerializer> = prebuilt_serializer.extract()?;
 
-        Ok(Self {
-            serializer: combined_serializer,
-        }
-        .into())
+        Ok(Self { serializer }.into())
     }
 }
 
@@ -65,11 +60,14 @@ impl TypeSerializer for PrebuiltSerializer {
         exclude: Option<&Bound<'_, PyAny>>,
         extra: &Extra,
     ) -> PyResult<PyObject> {
-        self.serializer.to_python(value, include, exclude, extra)
+        self.serializer
+            .get()
+            .serializer
+            .to_python(value, include, exclude, extra)
     }
 
     fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
-        self.serializer.json_key(key, extra)
+        self.serializer.get().serializer.json_key(key, extra)
     }
 
     fn serde_serialize<S: serde::ser::Serializer>(
@@ -81,14 +79,16 @@ impl TypeSerializer for PrebuiltSerializer {
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         self.serializer
+            .get()
+            .serializer
             .serde_serialize(value, serializer, include, exclude, extra)
     }
 
     fn get_name(&self) -> &str {
-        self.serializer.get_name()
+        self.serializer.get().serializer.get_name()
     }
 
     fn retry_with_lax_check(&self) -> bool {
-        self.serializer.retry_with_lax_check()
+        self.serializer.get().serializer.retry_with_lax_check()
     }
 }

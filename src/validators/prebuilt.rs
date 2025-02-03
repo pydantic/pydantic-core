@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use pyo3::exceptions::PyValueError;
 use pyo3::intern;
 use pyo3::prelude::*;
@@ -14,7 +12,7 @@ use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, SchemaValidat
 
 #[derive(Debug)]
 pub struct PrebuiltValidator {
-    validator: Arc<CombinedValidator>,
+    schema_validator: Py<SchemaValidator>,
     name: String,
 }
 
@@ -45,19 +43,14 @@ impl BuildValidator for PrebuiltValidator {
 
         // Retrieve the prebuilt validator if available
         let prebuilt_validator = class_dict.get_item(intern!(py, "__pydantic_validator__"))?;
-        let schema_validator: PyRef<SchemaValidator> = prebuilt_validator.extract()?;
-        let combined_validator: Arc<CombinedValidator> = schema_validator.validator.clone();
+        let schema_validator = prebuilt_validator.extract::<Py<SchemaValidator>>()?;
         let name: String = class.getattr(intern!(py, "__name__"))?.extract()?;
 
-        Ok(Self {
-            validator: combined_validator,
-            name,
-        }
-        .into())
+        Ok(Self { schema_validator, name }.into())
     }
 }
 
-impl_py_gc_traverse!(PrebuiltValidator { validator });
+impl_py_gc_traverse!(PrebuiltValidator { schema_validator });
 
 impl Validator for PrebuiltValidator {
     fn validate<'py>(
@@ -66,7 +59,7 @@ impl Validator for PrebuiltValidator {
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
-        self.validator.validate(py, input, state)
+        self.schema_validator.get().validator.validate(py, input, state)
     }
 
     fn get_name(&self) -> &str {

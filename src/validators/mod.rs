@@ -1,5 +1,4 @@
 use std::fmt::Debug;
-use std::sync::Arc;
 
 use enum_dispatch::enum_dispatch;
 use jiter::{PartialMode, StringCacheMode};
@@ -107,7 +106,7 @@ impl PySome {
 #[pyclass(module = "pydantic_core._pydantic_core", frozen)]
 #[derive(Debug)]
 pub struct SchemaValidator {
-    validator: Arc<CombinedValidator>,
+    validator: CombinedValidator,
     definitions: Definitions<CombinedValidator>,
     // References to the Python schema and config objects are saved to enable
     // reconstructing the object for cloudpickle support (see `__reduce__`).
@@ -148,7 +147,7 @@ impl SchemaValidator {
             .get_as(intern!(py, "cache_strings"))?
             .unwrap_or(StringCacheMode::All);
         Ok(Self {
-            validator: Arc::new(validator),
+            validator,
             definitions,
             py_schema,
             py_config,
@@ -457,7 +456,7 @@ impl<'py> SelfValidator<'py> {
         };
         let definitions = definitions_builder.finish()?;
         Ok(SchemaValidator {
-            validator: Arc::new(validator),
+            validator,
             definitions,
             py_schema: py.None(),
             py_config: None,
