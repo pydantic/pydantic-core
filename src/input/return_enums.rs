@@ -194,15 +194,17 @@ impl BuildSet for Bound<'_, PyFrozenSet> {
     }
 }
 
-fn _validate_hashable<'py>(
+fn validate_hashable<'py>(
     py: Python<'py>,
     item: &(impl Input<'py> + ?Sized),
     state: &mut ValidationState<'_, 'py>,
     validator: &CombinedValidator,
 ) -> ValResult<PyObject> {
-    let result = validator.validate(py, item, state)?;
-    // We need to execute the hash function if it exists, to ensure that the item is hashable.
-    match result.call_method0(py, "__hash__") {
+    let result:PyObject = validator.validate(py, item, state)?;
+
+    let bound_result= result.bind(py);
+
+    match bound_result.hash() {
         Ok(_) => Ok(result),
         Err(_) => Err(ValError::new(ErrorTypeDefaults::SetItemNotHashable, item)),
     }
@@ -230,7 +232,7 @@ pub(crate) fn validate_iter_to_set<'py>(
             false => PartialMode::Off,
         };
         let item = item_result.map_err(|e| any_next_error!(py, e, input, index))?;
-        match _validate_hashable(py, item.borrow_input(), state, validator) {
+        match validate_hashable(py, item.borrow_input(), state, validator) {
             Ok(item) => {
                 set.build_add(item)?;
                 if let Some(max_length) = max_length {
