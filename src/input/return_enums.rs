@@ -194,6 +194,15 @@ impl BuildSet for Bound<'_, PyFrozenSet> {
     }
 }
 
+fn _validate_hashable<'py>(py: Python<'py>, item: &(impl Input<'py> + ?Sized), state: &mut ValidationState<'_, 'py>, validator: &CombinedValidator) -> ValResult<PyObject> {
+    let result = validator.validate(py, item, state)?;
+    // We need to execute the hash function if it exists, to ensure that the item is hashable.
+    match result.call_method0(py, "__hash__") {
+        Ok(_) => Ok(result),
+        Err(_) => Err(ValError::new(ErrorTypeDefaults::SetItemNotHashable, item)),
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn validate_iter_to_set<'py>(
     py: Python<'py>,
@@ -216,7 +225,7 @@ pub(crate) fn validate_iter_to_set<'py>(
             false => PartialMode::Off,
         };
         let item = item_result.map_err(|e| any_next_error!(py, e, input, index))?;
-        match validator.validate(py, item.borrow_input(), state) {
+        match _validate_hashable(py, item.borrow_input(), state, validator) {
             Ok(item) => {
                 set.build_add(item)?;
                 if let Some(max_length) = max_length {

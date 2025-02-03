@@ -104,6 +104,23 @@ def test_set_multiple_errors():
     ]
 
 
+def test_list_with_unhashable_items():
+    v = SchemaValidator({'type': 'set'})
+
+    class Unhashable:
+        def __hash__(self):
+            raise TypeError('unhashable type')
+        
+    unhashable = Unhashable()
+
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python([{'a': 'b'}, unhashable])
+    assert exc_info.value.errors(include_url=False) == [
+        {'type': 'set_item_not_hashable', 'loc': (0,), 'msg': 'Set items should be hashable', 'input': {'a': 'b'}},
+        {'type': 'set_item_not_hashable', 'loc': (1,), 'msg': 'Set items should be hashable', 'input': unhashable},
+    ]
+
+
 def generate_repeats():
     for i in 1, 2, 3:
         yield i
