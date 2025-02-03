@@ -200,9 +200,9 @@ fn validate_hashable<'py>(
     state: &mut ValidationState<'_, 'py>,
     validator: &CombinedValidator,
 ) -> ValResult<PyObject> {
-    let result:PyObject = validator.validate(py, item, state)?;
+    let result: PyObject = validator.validate(py, item, state)?;
 
-    let bound_result= result.bind(py);
+    let bound_result: &Bound<'_, PyAny> = result.bind(py);
 
     match bound_result.hash() {
         Ok(_) => Ok(result),
