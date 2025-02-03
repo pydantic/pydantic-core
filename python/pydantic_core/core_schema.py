@@ -4036,6 +4036,7 @@ ErrorType = Literal[
     'mapping_type',
     'list_type',
     'tuple_type',
+    'set_item_not_hashable',
     'set_type',
     'bool_type',
     'bool_parsing',

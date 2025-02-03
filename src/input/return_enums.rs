@@ -194,7 +194,12 @@ impl BuildSet for Bound<'_, PyFrozenSet> {
     }
 }
 
-fn _validate_hashable<'py>(py: Python<'py>, item: &(impl Input<'py> + ?Sized), state: &mut ValidationState<'_, 'py>, validator: &CombinedValidator) -> ValResult<PyObject> {
+fn _validate_hashable<'py>(
+    py: Python<'py>,
+    item: &(impl Input<'py> + ?Sized),
+    state: &mut ValidationState<'_, 'py>,
+    validator: &CombinedValidator,
+) -> ValResult<PyObject> {
     let result = validator.validate(py, item, state)?;
     // We need to execute the hash function if it exists, to ensure that the item is hashable.
     match result.call_method0(py, "__hash__") {
