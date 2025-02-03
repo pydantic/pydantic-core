@@ -110,7 +110,7 @@ def test_list_with_unhashable_items():
     class Unhashable:
         def __hash__(self):
             raise TypeError('unhashable type')
-        
+
     unhashable = Unhashable()
 
     with pytest.raises(ValidationError) as exc_info:
