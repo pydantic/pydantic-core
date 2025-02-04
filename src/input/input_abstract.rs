@@ -240,6 +240,15 @@ pub trait ValidatedDict<'py> {
     type Item<'a>: BorrowInput<'py>
     where
         Self: 'a;
+
+    /// Whether this dict requires consuming the input by `get_item` rather than iterating
+    ///
+    /// (This is true for Python dicts in v2 to preserve semantics in the case of overridden classes,
+    /// maybe in v3 we change this for performance?)
+    fn should_consume_model_input_by_get_item(&self) -> bool {
+        false
+    }
+
     fn get_item<'k>(&self, key: &'k LookupKey) -> ValResult<Option<(&'k LookupPath, Self::Item<'_>)>>;
     // FIXME this is a bit of a leaky abstraction
     fn is_py_get_attr(&self) -> bool {
