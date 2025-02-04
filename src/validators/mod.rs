@@ -516,11 +516,16 @@ pub fn build_validator(
     definitions: &mut DefinitionsBuilder<CombinedValidator>,
 ) -> PyResult<CombinedValidator> {
     let dict = schema.downcast::<PyDict>()?;
-    let type_: Bound<'_, PyString> = dict.get_as_req(intern!(schema.py(), "type"))?;
+    let py = schema.py();
+    let type_: Bound<'_, PyString> = dict.get_as_req(intern!(py, "type"))?;
     let type_ = type_.to_str()?;
 
     // if we have a SchemaValidator on the type already, use it
-    if matches!(type_, "model" | "dataclass" | "typed-dict") {
+    // however, we don't want to use a prebuilt validator for dataclasses if we have a generic_origin
+    // because __pydantic_validator__ is cached on the unparametrized dataclass
+    if matches!(type_, "model" | "typed-dict")
+        || matches!(type_, "dataclass") && !dict.contains(intern!(py, "generic_origin"))?
+    {
         if let Ok(prebuilt_validator) = prebuilt::PrebuiltValidator::build(dict, config, definitions) {
             return Ok(prebuilt_validator);
         }
