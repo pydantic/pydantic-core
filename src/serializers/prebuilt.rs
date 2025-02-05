@@ -1,10 +1,9 @@
 use std::borrow::Cow;
 
-use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyType};
+use pyo3::types::PyDict;
 
-use crate::tools::SchemaDict;
+use crate::common::prebuilt::get_prebuilt;
 use crate::SchemaSerializer;
 
 use super::extra::Extra;
@@ -12,47 +11,20 @@ use super::shared::{CombinedSerializer, TypeSerializer};
 
 #[derive(Debug)]
 pub struct PrebuiltSerializer {
-    serializer: Py<SchemaSerializer>,
+    schema_serializer: Py<SchemaSerializer>,
 }
 
 impl PrebuiltSerializer {
     pub fn try_get_from_schema(type_: &str, schema: &Bound<'_, PyDict>) -> PyResult<Option<CombinedSerializer>> {
-        let py = schema.py();
-
-        // we can only use prebuilt serializeres from models, typed dicts, and dataclasses
-        // however, we don't want to use a prebuilt serializer for dataclasses if we have a generic_origin
-        // because __pydantic_serializer__ is cached on the unparametrized dataclass
-        if !matches!(type_, "model" | "typed-dict")
-            || matches!(type_, "dataclass") && schema.contains(intern!(py, "generic_origin"))?
-        {
-            return Ok(None);
-        }
-
-        let class: Bound<'_, PyType> = schema.get_as_req(intern!(py, "cls"))?;
-
-        // Note: we NEED to use the __dict__ here (and perform get_item calls rather than getattr)
-        // because we don't want to fetch prebuilt validators from parent classes.
-        // We don't downcast here because __dict__ on a class is a readonly mappingproxy,
-        // so we can just leave it as is and do get_item checks.
-        let class_dict = class.getattr(intern!(py, "__dict__"))?;
-
-        let is_complete: bool = class_dict
-            .get_item(intern!(py, "__pydantic_complete__"))
-            .is_ok_and(|b| b.extract().unwrap_or(false));
-
-        if !is_complete {
-            return Ok(None);
-        }
-
-        // Retrieve the prebuilt validator if available
-        let prebuilt_serializer: Bound<'_, PyAny> = class_dict.get_item(intern!(py, "__pydantic_serializer__"))?;
-        let serializer: Py<SchemaSerializer> = prebuilt_serializer.extract()?;
-
-        Ok(Some(Self { serializer }.into()))
+        get_prebuilt(type_, schema, "__pydantic_serializer__", |py_any| {
+            py_any
+                .extract::<Py<SchemaSerializer>>()
+                .map(|schema_serializer| Self { schema_serializer }.into())
+        })
     }
 }
 
-impl_py_gc_traverse!(PrebuiltSerializer { serializer });
+impl_py_gc_traverse!(PrebuiltSerializer { schema_serializer });
 
 impl TypeSerializer for PrebuiltSerializer {
     fn to_python(
@@ -62,14 +34,14 @@ impl TypeSerializer for PrebuiltSerializer {
         exclude: Option<&Bound<'_, PyAny>>,
         extra: &Extra,
     ) -> PyResult<PyObject> {
-        self.serializer
+        self.schema_serializer
             .get()
             .serializer
             .to_python(value, include, exclude, extra)
     }
 
     fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
-        self.serializer.get().serializer.json_key(key, extra)
+        self.schema_serializer.get().serializer.json_key(key, extra)
     }
 
     fn serde_serialize<S: serde::ser::Serializer>(
@@ -80,17 +52,17 @@ impl TypeSerializer for PrebuiltSerializer {
         exclude: Option<&Bound<'_, PyAny>>,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
-        self.serializer
+        self.schema_serializer
             .get()
             .serializer
             .serde_serialize(value, serializer, include, exclude, extra)
     }
 
     fn get_name(&self) -> &str {
-        self.serializer.get().serializer.get_name()
+        self.schema_serializer.get().serializer.get_name()
     }
 
     fn retry_with_lax_check(&self) -> bool {
-        self.serializer.get().serializer.retry_with_lax_check()
+        self.schema_serializer.get().serializer.retry_with_lax_check()
     }
 }
