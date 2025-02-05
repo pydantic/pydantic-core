@@ -13,7 +13,6 @@ use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, SchemaValidat
 #[derive(Debug)]
 pub struct PrebuiltValidator {
     schema_validator: Py<SchemaValidator>,
-    name: String,
 }
 
 impl BuildValidator for PrebuiltValidator {
@@ -44,9 +43,8 @@ impl BuildValidator for PrebuiltValidator {
         // Retrieve the prebuilt validator if available
         let prebuilt_validator = class_dict.get_item(intern!(py, "__pydantic_validator__"))?;
         let schema_validator = prebuilt_validator.extract::<Py<SchemaValidator>>()?;
-        let name: String = class.getattr(intern!(py, "__name__"))?.extract()?;
 
-        Ok(Self { schema_validator, name }.into())
+        Ok(Self { schema_validator }.into())
     }
 }
 
@@ -63,6 +61,6 @@ impl Validator for PrebuiltValidator {
     }
 
     fn get_name(&self) -> &str {
-        &self.name
+        self.schema_validator.get().validator.get_name()
     }
 }
