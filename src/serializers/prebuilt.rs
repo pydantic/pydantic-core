@@ -1,31 +1,33 @@
 use std::borrow::Cow;
 
-use pyo3::exceptions::PyValueError;
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyType};
 
-use crate::definitions::DefinitionsBuilder;
 use crate::tools::SchemaDict;
 use crate::SchemaSerializer;
 
 use super::extra::Extra;
-use super::shared::{BuildSerializer, CombinedSerializer, TypeSerializer};
+use super::shared::{CombinedSerializer, TypeSerializer};
 
 #[derive(Debug)]
 pub struct PrebuiltSerializer {
     serializer: Py<SchemaSerializer>,
 }
 
-impl BuildSerializer for PrebuiltSerializer {
-    const EXPECTED_TYPE: &'static str = "prebuilt";
-
-    fn build(
-        schema: &Bound<'_, PyDict>,
-        _config: Option<&Bound<'_, PyDict>>,
-        _definitions: &mut DefinitionsBuilder<CombinedSerializer>,
-    ) -> PyResult<CombinedSerializer> {
+impl PrebuiltSerializer {
+    pub fn try_get_from_schema(type_: &str, schema: &Bound<'_, PyDict>) -> PyResult<Option<CombinedSerializer>> {
         let py = schema.py();
+
+        // we can only use prebuilt serializeres from models, typed dicts, and dataclasses
+        // however, we don't want to use a prebuilt serializer for dataclasses if we have a generic_origin
+        // because __pydantic_serializer__ is cached on the unparametrized dataclass
+        if !matches!(type_, "model" | "typed-dict")
+            || matches!(type_, "dataclass") && schema.contains(intern!(py, "generic_origin"))?
+        {
+            return Ok(None);
+        }
+
         let class: Bound<'_, PyType> = schema.get_as_req(intern!(py, "cls"))?;
 
         // Note: we NEED to use the __dict__ here (and perform get_item calls rather than getattr)
@@ -39,14 +41,14 @@ impl BuildSerializer for PrebuiltSerializer {
             .is_ok_and(|b| b.extract().unwrap_or(false));
 
         if !is_complete {
-            return Err(PyValueError::new_err("Prebuilt serializer not found."));
+            return Ok(None);
         }
 
         // Retrieve the prebuilt validator if available
         let prebuilt_serializer: Bound<'_, PyAny> = class_dict.get_item(intern!(py, "__pydantic_serializer__"))?;
         let serializer: Py<SchemaSerializer> = prebuilt_serializer.extract()?;
 
-        Ok(Self { serializer }.into())
+        Ok(Some(Self { serializer }.into()))
     }
 }
 

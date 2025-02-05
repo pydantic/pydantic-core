@@ -521,14 +521,8 @@ pub fn build_validator(
     let type_ = type_.to_str()?;
 
     // if we have a SchemaValidator on the type already, use it
-    // however, we don't want to use a prebuilt validator for dataclasses if we have a generic_origin
-    // because __pydantic_validator__ is cached on the unparametrized dataclass
-    if matches!(type_, "model" | "typed-dict")
-        || matches!(type_, "dataclass") && !dict.contains(intern!(py, "generic_origin"))?
-    {
-        if let Ok(prebuilt_validator) = prebuilt::PrebuiltValidator::build(dict, config, definitions) {
-            return Ok(prebuilt_validator);
-        }
+    if let Ok(Some(prebuilt_validator)) = prebuilt::PrebuiltValidator::try_get_from_schema(type_, dict) {
+        return Ok(prebuilt_validator);
     }
 
     validator_match!(

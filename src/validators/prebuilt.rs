@@ -1,4 +1,3 @@
-use pyo3::exceptions::PyValueError;
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyType};
@@ -8,22 +7,26 @@ use crate::input::Input;
 use crate::tools::SchemaDict;
 
 use super::ValidationState;
-use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, SchemaValidator, Validator};
+use super::{CombinedValidator, SchemaValidator, Validator};
 
 #[derive(Debug)]
 pub struct PrebuiltValidator {
     schema_validator: Py<SchemaValidator>,
 }
 
-impl BuildValidator for PrebuiltValidator {
-    const EXPECTED_TYPE: &'static str = "prebuilt";
-
-    fn build(
-        schema: &Bound<'_, PyDict>,
-        _config: Option<&Bound<'_, PyDict>>,
-        _definitions: &mut DefinitionsBuilder<CombinedValidator>,
-    ) -> PyResult<CombinedValidator> {
+impl PrebuiltValidator {
+    pub fn try_get_from_schema(type_: &str, schema: &Bound<'_, PyDict>) -> PyResult<Option<CombinedValidator>> {
         let py = schema.py();
+
+        // we can only use prebuilt validators from models, typed dicts, and dataclasses
+        // however, we don't want to use a prebuilt validator for dataclasses if we have a generic_origin
+        // because __pydantic_validator__ is cached on the unparametrized dataclass
+        if !matches!(type_, "model" | "typed-dict")
+            || matches!(type_, "dataclass") && schema.contains(intern!(py, "generic_origin"))?
+        {
+            return Ok(None);
+        }
+
         let class: Bound<'_, PyType> = schema.get_as_req(intern!(py, "cls"))?;
 
         // Note: we NEED to use the __dict__ here (and perform get_item calls rather than getattr)
@@ -37,14 +40,14 @@ impl BuildValidator for PrebuiltValidator {
             .is_ok_and(|b| b.extract().unwrap_or(false));
 
         if !is_complete {
-            return Err(PyValueError::new_err("Prebuilt validator not found."));
+            return Ok(None);
         }
 
         // Retrieve the prebuilt validator if available
         let prebuilt_validator = class_dict.get_item(intern!(py, "__pydantic_validator__"))?;
         let schema_validator = prebuilt_validator.extract::<Py<SchemaValidator>>()?;
 
-        Ok(Self { schema_validator }.into())
+        Ok(Some(Self { schema_validator }.into()))
     }
 }
 
