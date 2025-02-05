@@ -108,8 +108,7 @@ def test_list_with_unhashable_items():
     v = SchemaValidator({'type': 'set'})
 
     class Unhashable:
-        def __hash__(self):
-            raise TypeError('unhashable type')
+        __hash__ = None
 
     unhashable = Unhashable()
 
