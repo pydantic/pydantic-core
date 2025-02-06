@@ -146,6 +146,7 @@ def generate_repeats():
     ],
     ids=repr,
 )
+@pytest.mark.thread_unsafe  # generators in parameters not compatible with pytest-run-parallel, https://github.com/Quansight-Labs/pytest-run-parallel/issues/14
 def test_set_kwargs(kwargs: dict[str, Any], input_value, expected):
     v = SchemaValidator({'type': 'set', **kwargs})
     if isinstance(expected, Err):

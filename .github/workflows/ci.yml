@@ -68,6 +68,7 @@ jobs:
           - '3.11'
           - '3.12'
           - '3.13'
+          - '3.13t'
           - 'pypy3.9'
           - 'pypy3.10'
 
@@ -96,11 +97,15 @@ jobs:
         env:
           RUST_BACKTRACE: 1
 
+      - if: endsWith(matrix.python-version, 't')
+        run: uv pip install pytest-run-parallel
+
       - run: uv pip freeze
 
       - run: uv run pytest
         env:
           HYPOTHESIS_PROFILE: slow
+          PYTEST_ADDOPTS: ${{ endsWith(matrix.python-version, 't') && '--parallel-threads=2' || '' }}
 
   test-os:
     name: test on ${{ matrix.os }}

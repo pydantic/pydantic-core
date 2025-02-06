@@ -106,7 +106,7 @@ pub fn build_info() -> String {
     )
 }
 
-#[pymodule]
+#[pymodule(gil_used = false)]
 fn _pydantic_core(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("__version__", get_pydantic_core_version())?;
     m.add("build_profile", env!("PROFILE"))?;

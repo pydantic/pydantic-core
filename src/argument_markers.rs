@@ -5,7 +5,11 @@ use pyo3::types::{PyDict, PyTuple};
 
 use crate::tools::safe_repr;
 
-#[pyclass(module = "pydantic_core._pydantic_core", get_all, frozen, freelist = 100)]
+#[cfg_attr(
+    not(Py_GIL_DISABLED),
+    pyclass(module = "pydantic_core._pydantic_core", get_all, frozen, freelist = 100)
+)]
+#[cfg_attr(Py_GIL_DISABLED, pyclass(module = "pydantic_core._pydantic_core", get_all, frozen))]
 #[derive(Debug, Clone)]
 pub struct ArgsKwargs {
     pub(crate) args: Py<PyTuple>,

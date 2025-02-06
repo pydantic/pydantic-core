@@ -601,6 +601,7 @@ dev = [
 ]
 linting = [
     { name = "griffe" },
+    { name = "maturin" },
     { name = "mypy" },
     { name = "pyright" },
     { name = "ruff" },
@@ -663,6 +664,7 @@ codspeed = [{ name = "pytest-codspeed", marker = "python_full_version == '3.13.*
 dev = [{ name = "maturin" }]
 linting = [
     { name = "griffe" },
+    { name = "maturin" },
     { name = "mypy" },
     { name = "pyright" },
     { name = "ruff" },
