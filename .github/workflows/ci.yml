@@ -503,7 +503,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [linux, windows, macos]
-        interpreter: ['3.9', '3.10', '3.11', '3.12', '3.13']
+        interpreter: ['3.9', '3.10', '3.11', '3.12', '3.13', '3.13t']
         include:
           # standard runners with override for macos arm
           - os: linux
