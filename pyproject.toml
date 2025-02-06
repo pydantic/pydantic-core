@@ -108,9 +108,6 @@ filterwarnings = [
     # Python 3.9 and below allowed truncation of float to integers in some
     # cases, by not making this an error we can test for this behaviour
     'ignore:(.+)Implicit conversion to integers using __int__ is deprecated',
-    # free-threading seems to upset Hypothesis
-    'ignore:(.*)The recursion limit will not be reset, since it was changed from another thread or during execution of a test.(.*)',
-    'ignore:(.*)Do not use the `random` module inside strategies(.*)',
 ]
 timeout = 30
 xfail_strict = true
