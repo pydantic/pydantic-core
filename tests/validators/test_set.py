@@ -73,6 +73,7 @@ def test_frozenset_no_validators_both(py_and_json: PyAndJson, input_value, expec
         ('abc', Err('Input should be a valid set')),
     ],
 )
+@pytest.mark.thread_unsafe  # generators in parameters not compatible with pytest-run-parallel, https://github.com/Quansight-Labs/pytest-run-parallel/issues/14
 def test_set_ints_python(input_value, expected):
     v = SchemaValidator({'type': 'set', 'items_schema': {'type': 'int'}})
     if isinstance(expected, Err):

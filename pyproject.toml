@@ -52,6 +52,7 @@ testing = [
     'pytest-speed',
     'pytest-mock',
     'pytest-pretty',
+    'pytest-run-parallel',
     'pytest-timeout',
     'python-dateutil',
     # numpy doesn't offer prebuilt wheels for all versions and platforms we test in CI e.g. aarch64 musllinux
@@ -108,8 +109,8 @@ filterwarnings = [
     # cases, by not making this an error we can test for this behaviour
     'ignore:(.+)Implicit conversion to integers using __int__ is deprecated',
     # free-threading seems to upset Hypothesis
-    'ignore:The recursion limit will not be reset, since it was changed from another thread or during execution of a test.',
-    'ignore:Do not use the `random` module inside strategies; instead consider  `st.randoms()`, `st.sampled_from()`, etc.  from data=datetimes()',
+    'ignore:(.*)The recursion limit will not be reset, since it was changed from another thread or during execution of a test.(.*)',
+    'ignore:(.*)Do not use the `random` module inside strategies(.*)',
 ]
 timeout = 30
 xfail_strict = true

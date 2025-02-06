@@ -5,6 +5,7 @@ use pyo3::types::{PyDict, PyTuple};
 
 use crate::tools::safe_repr;
 
+// see https://github.com/PyO3/pyo3/issues/4894 - freelist is currently unsound with GIL disabled
 #[cfg_attr(
     not(Py_GIL_DISABLED),
     pyclass(module = "pydantic_core._pydantic_core", get_all, frozen, freelist = 100)
