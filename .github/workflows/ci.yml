@@ -105,7 +105,9 @@ jobs:
       - run: uv run pytest
         env:
           HYPOTHESIS_PROFILE: slow
-          PYTEST_ADDOPTS: ${{ endsWith(matrix.python-version, 't') && '--parallel-threads=2' || '' }}
+          # TODO: remove -x when test suite is more stable; we use it so that first error (hopefully) gets
+          # reported without the interpreter crashing
+          PYTEST_ADDOPTS: ${{ endsWith(matrix.python-version, 't') && '--parallel-threads=2 -x' || '' }}
           # TODO: add `gil_used = false` to the PyO3 `#[pymodule]` when test suite is ok
           PYTHON_GIL: ${{ endsWith(matrix.python-version, 't') && '0' || '1' }}
 
