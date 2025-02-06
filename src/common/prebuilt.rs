@@ -16,7 +16,9 @@ pub fn get_prebuilt<T>(
     // However, we don't want to use a prebuilt structure from dataclasses if we have a `generic_origin`
     // as this means the dataclass was parametrized (so a generic alias instance), and `cls` in the
     // core schema is still the (unparametrized) class, meaning we would fetch the wrong validator/serializer.
-    if (type_ != "model") || (type_ == "dataclass" && schema.contains(intern!(py, "generic_origin"))?) {
+    if !matches!(type_, "model" | "dataclass")
+        || (type_ == "dataclass" && schema.contains(intern!(py, "generic_origin"))?)
+    {
         return Ok(None);
     }
 
