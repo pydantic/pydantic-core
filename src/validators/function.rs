@@ -89,7 +89,7 @@ pub struct FunctionBeforeValidator {
     info_arg: bool,
 }
 
-impl_build!(FunctionBeforeValidator, "function-before");
+impl_build!(FunctionBeforeValidator, "validator-function-before");
 
 impl FunctionBeforeValidator {
     fn _validate<'s, 'py>(
@@ -157,7 +157,7 @@ pub struct FunctionAfterValidator {
     info_arg: bool,
 }
 
-impl_build!(FunctionAfterValidator, "function-after");
+impl_build!(FunctionAfterValidator, "validator-function-after");
 
 impl FunctionAfterValidator {
     fn _validate<'py, I: Input<'py> + ?Sized>(
@@ -225,7 +225,7 @@ pub struct FunctionPlainValidator {
 }
 
 impl BuildValidator for FunctionPlainValidator {
-    const EXPECTED_TYPE: &'static str = "function-plain";
+    const EXPECTED_TYPE: &'static str = "validator-function-plain";
 
     fn build(
         schema: &Bound<'_, PyDict>,
@@ -240,7 +240,10 @@ impl BuildValidator for FunctionPlainValidator {
                 Some(c) => c.clone().into(),
                 None => py.None(),
             },
-            name: format!("function-plain[{}()]", function_name(function_info.function.bind(py))?),
+            name: format!(
+                "validator-function-plain[{}()]",
+                function_name(function_info.function.bind(py))?
+            ),
             field_name: function_info.field_name.clone(),
             info_arg: function_info.info_arg,
         }
@@ -284,7 +287,7 @@ pub struct FunctionWrapValidator {
 }
 
 impl BuildValidator for FunctionWrapValidator {
-    const EXPECTED_TYPE: &'static str = "function-wrap";
+    const EXPECTED_TYPE: &'static str = "validator-function-wrap";
 
     fn build(
         schema: &Bound<'_, PyDict>,
@@ -303,7 +306,10 @@ impl BuildValidator for FunctionWrapValidator {
                 Some(c) => c.clone().into(),
                 None => py.None(),
             },
-            name: format!("function-wrap[{}()]", function_name(function_info.function.bind(py))?),
+            name: format!(
+                "validator-function-wrap[{}()]",
+                function_name(function_info.function.bind(py))?
+            ),
             field_name: function_info.field_name.clone(),
             info_arg: function_info.info_arg,
             hide_input_in_errors,

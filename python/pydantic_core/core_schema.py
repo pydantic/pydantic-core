@@ -261,7 +261,7 @@ Values have the following meanings:
 
 
 class PlainSerializerFunctionSerSchema(TypedDict, total=False):
-    type: Required[Literal['function-plain']]
+    type: Required[Literal['serializer-function-plain']]
     function: Required[SerializerFunction]
     is_field_serializer: bool  # default False
     info_arg: bool  # default False
@@ -292,7 +292,7 @@ def plain_serializer_function_ser_schema(
         # just to avoid extra elements in schema, and to use the actual default defined in rust
         when_used = None  # type: ignore
     return _dict_not_none(
-        type='function-plain',
+        type='serializer-function-plain',
         function=function,
         is_field_serializer=is_field_serializer,
         info_arg=info_arg,
@@ -322,7 +322,7 @@ WrapSerializerFunction = Union[
 
 
 class WrapSerializerFunctionSerSchema(TypedDict, total=False):
-    type: Required[Literal['function-wrap']]
+    type: Required[Literal['serializer-function-wrap']]
     function: Required[WrapSerializerFunction]
     is_field_serializer: bool  # default False
     info_arg: bool  # default False
@@ -356,7 +356,7 @@ def wrap_serializer_function_ser_schema(
         # just to avoid extra elements in schema, and to use the actual default defined in rust
         when_used = None  # type: ignore
     return _dict_not_none(
-        type='function-wrap',
+        type='serializer-function-wrap',
         function=function,
         is_field_serializer=is_field_serializer,
         info_arg=info_arg,
@@ -1966,7 +1966,7 @@ class _ValidatorFunctionSchema(TypedDict, total=False):
 
 
 class BeforeValidatorFunctionSchema(_ValidatorFunctionSchema, total=False):
-    type: Required[Literal['function-before']]
+    type: Required[Literal['validator-function-before']]
     json_schema_input_schema: CoreSchema
 
 
@@ -2006,7 +2006,7 @@ def no_info_before_validator_function(
         serialization: Custom serialization schema
     """
     return _dict_not_none(
-        type='function-before',
+        type='validator-function-before',
         function={'type': 'no-info', 'function': function},
         schema=schema,
         ref=ref,
@@ -2057,7 +2057,7 @@ def with_info_before_validator_function(
         serialization: Custom serialization schema
     """
     return _dict_not_none(
-        type='function-before',
+        type='validator-function-before',
         function=_dict_not_none(type='with-info', function=function, field_name=field_name),
         schema=schema,
         ref=ref,
@@ -2068,7 +2068,7 @@ def with_info_before_validator_function(
 
 
 class AfterValidatorFunctionSchema(_ValidatorFunctionSchema, total=False):
-    type: Required[Literal['function-after']]
+    type: Required[Literal['validator-function-after']]
 
 
 def no_info_after_validator_function(
@@ -2105,7 +2105,7 @@ def no_info_after_validator_function(
         serialization: Custom serialization schema
     """
     return _dict_not_none(
-        type='function-after',
+        type='validator-function-after',
         function={'type': 'no-info', 'function': function},
         schema=schema,
         ref=ref,
@@ -2154,7 +2154,7 @@ def with_info_after_validator_function(
         serialization: Custom serialization schema
     """
     return _dict_not_none(
-        type='function-after',
+        type='validator-function-after',
         function=_dict_not_none(type='with-info', function=function, field_name=field_name),
         schema=schema,
         ref=ref,
@@ -2191,7 +2191,7 @@ WrapValidatorFunction = Union[NoInfoWrapValidatorFunctionSchema, WithInfoWrapVal
 
 
 class WrapValidatorFunctionSchema(TypedDict, total=False):
-    type: Required[Literal['function-wrap']]
+    type: Required[Literal['validator-function-wrap']]
     function: Required[WrapValidatorFunction]
     schema: Required[CoreSchema]
     ref: str
@@ -2239,7 +2239,7 @@ def no_info_wrap_validator_function(
         serialization: Custom serialization schema
     """
     return _dict_not_none(
-        type='function-wrap',
+        type='validator-function-wrap',
         function={'type': 'no-info', 'function': function},
         schema=schema,
         json_schema_input_schema=json_schema_input_schema,
@@ -2291,7 +2291,7 @@ def with_info_wrap_validator_function(
         serialization: Custom serialization schema
     """
     return _dict_not_none(
-        type='function-wrap',
+        type='validator-function-wrap',
         function=_dict_not_none(type='with-info', function=function, field_name=field_name),
         schema=schema,
         json_schema_input_schema=json_schema_input_schema,
@@ -2302,7 +2302,7 @@ def with_info_wrap_validator_function(
 
 
 class PlainValidatorFunctionSchema(TypedDict, total=False):
-    type: Required[Literal['function-plain']]
+    type: Required[Literal['validator-function-plain']]
     function: Required[ValidationFunction]
     ref: str
     json_schema_input_schema: CoreSchema
@@ -2341,7 +2341,7 @@ def no_info_plain_validator_function(
         serialization: Custom serialization schema
     """
     return _dict_not_none(
-        type='function-plain',
+        type='validator-function-plain',
         function={'type': 'no-info', 'function': function},
         ref=ref,
         json_schema_input_schema=json_schema_input_schema,
@@ -2383,7 +2383,7 @@ def with_info_plain_validator_function(
         serialization: Custom serialization schema
     """
     return _dict_not_none(
-        type='function-plain',
+        type='validator-function-plain',
         function=_dict_not_none(type='with-info', function=function, field_name=field_name),
         ref=ref,
         json_schema_input_schema=json_schema_input_schema,
@@ -3965,10 +3965,10 @@ CoreSchemaType = Literal[
     'frozenset',
     'generator',
     'dict',
-    'function-after',
-    'function-before',
-    'function-wrap',
-    'function-plain',
+    'validator-function-after',
+    'validator-function-before',
+    'validator-function-wrap',
+    'validator-function-plain',
     'default',
     'nullable',
     'union',

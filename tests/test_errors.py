@@ -93,7 +93,7 @@ def test_pydantic_value_error_invalid_dict():
         v.validate_python(42)
 
     assert str(exc_info.value) == (
-        '1 validation error for function-plain[my_function()]\n'
+        '1 validation error for validator-function-plain[my_function()]\n'
         "  (error rendering message: TypeError: 'tuple' object cannot be converted to 'PyString') "
         '[type=my_error, input_value=42, input_type=int]'
     )

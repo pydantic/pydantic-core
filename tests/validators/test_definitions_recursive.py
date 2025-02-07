@@ -673,7 +673,7 @@ def test_function_name():
     assert exc_info.value.errors(include_url=False) == [
         {
             'type': 'recursion_loop',
-            'loc': ('function-after[f(), ...]',),
+            'loc': ('validator-function-after[f(), ...]',),
             'msg': 'Recursion error - cyclic reference detected',
             'input': 'input value',
         },

@@ -65,7 +65,7 @@ def test_function_before_error():
 
     v = SchemaValidator(
         {
-            'type': 'function-before',
+            'type': 'validator-function-before',
             'function': {'type': 'with-info', 'function': my_function},
             'schema': {'type': 'str', 'max_length': 5},
         }
@@ -83,7 +83,9 @@ def test_function_before_error():
             'ctx': {'max_length': 5},
         }
     ]
-    assert repr(exc_info.value).startswith('1 validation error for function-before[my_function(), constrained-str]\n')
+    assert repr(exc_info.value).startswith(
+        '1 validation error for validator-function-before[my_function(), constrained-str]\n'
+    )
 
 
 @pytest.mark.parametrize(
@@ -100,7 +102,7 @@ def test_function_before_error_hide_input(config, input_str):
 
     v = SchemaValidator(
         {
-            'type': 'function-before',
+            'type': 'validator-function-before',
             'function': {'type': 'with-info', 'function': my_function},
             'schema': {'type': 'str', 'max_length': 5},
         },
@@ -119,7 +121,7 @@ def test_function_before_error_model():
 
     v = SchemaValidator(
         {
-            'type': 'function-before',
+            'type': 'validator-function-before',
             'function': {'type': 'with-info', 'function': f},
             'schema': {
                 'type': 'typed-dict',
@@ -206,11 +208,13 @@ def test_function_wrap_str():
 
 
 def test_function_wrap_not_callable():
-    with pytest.raises(SchemaError, match='function-wrap.function.typed-dict.function\n  Input should be callable'):
+    with pytest.raises(
+        SchemaError, match='validator-function-wrap.function.typed-dict.function\n  Input should be callable'
+    ):
         validate_core_schema(core_schema.with_info_wrap_validator_function([], core_schema.str_schema()))
 
-    with pytest.raises(SchemaError, match='function-wrap.function\n  Field required'):
-        validate_core_schema({'type': 'function-wrap', 'schema': {'type': 'str'}})
+    with pytest.raises(SchemaError, match='validator-function-wrap.function\n  Field required'):
+        validate_core_schema({'type': 'validator-function-wrap', 'schema': {'type': 'str'}})
 
 
 def test_wrap_error():
@@ -375,7 +379,7 @@ def test_function_after_config():
                 'test_field': {
                     'type': 'typed-dict-field',
                     'schema': {
-                        'type': 'function-after',
+                        'type': 'validator-function-after',
                         'function': {'type': 'with-info', 'function': f, 'field_name': 'test_field'},
                         'schema': {'type': 'str'},
                     },
@@ -424,10 +428,10 @@ def test_function_plain_no_info():
 
 
 def test_plain_with_schema():
-    with pytest.raises(SchemaError, match='function-plain.schema\n  Extra inputs are not permitted'):
+    with pytest.raises(SchemaError, match='validator-function-plain.schema\n  Extra inputs are not permitted'):
         validate_core_schema(
             {
-                'type': 'function-plain',
+                'type': 'validator-function-plain',
                 'function': {'type': 'with-info', 'function': lambda x: x},
                 'schema': {'type': 'str'},
             }
@@ -497,7 +501,7 @@ def test_class_with_validator():
 
     v = SchemaValidator(
         {
-            'type': 'function-after',
+            'type': 'validator-function-after',
             'function': {'type': 'with-info', 'function': Foobar.__validate__},
             'schema': {'type': 'str'},
         }

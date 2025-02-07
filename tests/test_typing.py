@@ -110,7 +110,7 @@ def test_schema_typing() -> None:
     }
     SchemaValidator(schema)
     schema: CoreSchema = {
-        'type': 'function-wrap',
+        'type': 'validator-function-wrap',
         'function': {'type': 'with-info', 'function': wrap_validator, 'field_name': 'foobar'},
         'schema': {'type': 'str'},
     }

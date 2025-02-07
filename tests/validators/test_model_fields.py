@@ -280,7 +280,7 @@ def test_validate_assignment_functions():
                 'field_a': {
                     'type': 'model-field',
                     'schema': {
-                        'type': 'function-after',
+                        'type': 'validator-function-after',
                         'function': {'type': 'with-info', 'function': func_a},
                         'schema': {'type': 'str'},
                     },
@@ -288,7 +288,7 @@ def test_validate_assignment_functions():
                 'field_b': {
                     'type': 'model-field',
                     'schema': {
-                        'type': 'function-after',
+                        'type': 'validator-function-after',
                         'function': {'type': 'with-info', 'function': func_b},
                         'schema': {'type': 'int'},
                     },
@@ -1608,7 +1608,7 @@ class TestOnError:
                             'type': 'default',
                             'on_error': 'raise',
                             'schema': {
-                                'type': 'function-wrap',
+                                'type': 'validator-function-wrap',
                                 'function': {'type': 'with-info', 'function': wrap_function},
                                 'schema': {'type': 'str'},
                             },

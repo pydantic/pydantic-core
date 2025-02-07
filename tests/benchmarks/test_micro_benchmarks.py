@@ -966,7 +966,7 @@ def test_chain_list(benchmark):
 def test_chain_function(benchmark):
     validator = SchemaValidator(
         {
-            'type': 'function-after',
+            'type': 'validator-function-after',
             'schema': {'type': 'str'},
             'function': {'type': 'with-info', 'function': lambda v, info: Decimal(v)},
         }
@@ -997,9 +997,9 @@ def test_chain_two_functions(benchmark):
 def test_chain_nested_functions(benchmark):
     validator = SchemaValidator(
         {
-            'type': 'function-after',
+            'type': 'validator-function-after',
             'schema': {
-                'type': 'function-after',
+                'type': 'validator-function-after',
                 'schema': {'type': 'str'},
                 'function': {'type': 'with-info', 'function': lambda v, info: Decimal(v)},
             },

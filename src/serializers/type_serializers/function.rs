@@ -62,7 +62,7 @@ impl BuildSerializer for FunctionAfterSerializerBuilder {
 pub struct FunctionPlainSerializerBuilder;
 
 impl BuildSerializer for FunctionPlainSerializerBuilder {
-    const EXPECTED_TYPE: &'static str = "function-plain";
+    const EXPECTED_TYPE: &'static str = "serializer-function-plain";
     fn build(
         schema: &Bound<'_, PyDict>,
         config: Option<&Bound<'_, PyDict>>,
@@ -95,7 +95,7 @@ fn destructure_function_schema<'py>(schema: &Bound<'py, PyDict>) -> PyResult<(bo
 }
 
 impl BuildSerializer for FunctionPlainSerializer {
-    const EXPECTED_TYPE: &'static str = "function-plain";
+    const EXPECTED_TYPE: &'static str = "serializer-function-plain";
 
     /// NOTE! `schema` here is the actual `CoreSchema`, not `schema.serialization` as in the other builders
     /// (done this way to match `FunctionWrapSerializer` which requires the full schema)
@@ -125,7 +125,7 @@ impl BuildSerializer for FunctionPlainSerializer {
             }
         };
 
-        let name = format!("plain_function[{function_name}]");
+        let name = format!("serializer-function-plain[{function_name}]");
         Ok(Self {
             func: function.unbind(),
             function_name,
@@ -310,7 +310,7 @@ fn copy_outer_schema<'py>(schema: &Bound<'py, PyDict>) -> PyResult<Bound<'py, Py
 pub struct FunctionWrapSerializerBuilder;
 
 impl BuildSerializer for FunctionWrapSerializerBuilder {
-    const EXPECTED_TYPE: &'static str = "function-wrap";
+    const EXPECTED_TYPE: &'static str = "serializer-function-wrap";
     fn build(
         schema: &Bound<'_, PyDict>,
         config: Option<&Bound<'_, PyDict>>,
@@ -339,7 +339,7 @@ pub struct FunctionWrapSerializer {
 }
 
 impl BuildSerializer for FunctionWrapSerializer {
-    const EXPECTED_TYPE: &'static str = "function-wrap";
+    const EXPECTED_TYPE: &'static str = "serializer-function-wrap";
 
     /// NOTE! `schema` here is the actual `CoreSchema`, not `schema.serialization` as in the other builders
     /// (done this way since we need the `CoreSchema`)
@@ -368,7 +368,7 @@ impl BuildSerializer for FunctionWrapSerializer {
             None => AnySerializer::build(schema, config, definitions)?,
         };
 
-        let name = format!("wrap_function[{function_name}, {}]", serializer.get_name());
+        let name = format!("serializer-function-wrap[{function_name}, {}]", serializer.get_name());
         Ok(Self {
             serializer: Arc::new(serializer),
             func: function.into(),
