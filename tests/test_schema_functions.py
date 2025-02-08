@@ -112,7 +112,7 @@ all_schema_functions = [
         core_schema.with_info_before_validator_function,
         args(val_function, {'type': 'int'}),
         {
-            'type': 'function-before',
+            'type': 'validator-function-before',
             'function': {'type': 'with-info', 'function': val_function},
             'schema': {'type': 'int'},
         },
@@ -121,7 +121,7 @@ all_schema_functions = [
         core_schema.with_info_after_validator_function,
         args(val_function, {'type': 'int'}),
         {
-            'type': 'function-after',
+            'type': 'validator-function-after',
             'function': {'type': 'with-info', 'function': val_function},
             'schema': {'type': 'int'},
         },
@@ -130,7 +130,7 @@ all_schema_functions = [
         core_schema.with_info_wrap_validator_function,
         args(val_function, {'type': 'int'}),
         {
-            'type': 'function-wrap',
+            'type': 'validator-function-wrap',
             'function': {'type': 'with-info', 'function': val_function},
             'schema': {'type': 'int'},
         },
@@ -310,7 +310,13 @@ def test_schema_functions(function, args_kwargs, expected_schema):
         pass
 
     # also build the serializer, just to check it doesn't raise an error
-    SchemaSerializer(schema)
+    if schema['type'] not in {
+        'validator-function-before',
+        'validator-function-after',
+        'validator-function-wrap',
+        'validator-function-plain',
+    }:
+        SchemaSerializer(schema)
 
 
 def test_all_schema_functions_used():

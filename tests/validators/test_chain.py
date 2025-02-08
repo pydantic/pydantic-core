@@ -82,11 +82,11 @@ def test_flatten():
                     'type': 'chain',
                     'steps': [
                         {
-                            'type': 'function-plain',
+                            'type': 'validator-function-plain',
                             'function': {'type': 'with-info', 'function': lambda v, info: f'{v}-2'},
                         },
                         {
-                            'type': 'function-plain',
+                            'type': 'validator-function-plain',
                             'function': {'type': 'with-info', 'function': lambda v, info: f'{v}-3'},
                         },
                     ],
@@ -96,7 +96,10 @@ def test_flatten():
     )
 
     assert validator.validate_python('input') == 'input-1-2-3'
-    assert validator.title == 'chain[function-plain[<lambda>()],function-plain[<lambda>()],function-plain[<lambda>()]]'
+    assert (
+        validator.title
+        == 'chain[validator-function-plain[<lambda>()],validator-function-plain[<lambda>()],validator-function-plain[<lambda>()]]'
+    )
 
 
 def test_chain_empty():
@@ -109,4 +112,4 @@ def test_chain_one():
         {'type': 'chain', 'steps': [core_schema.with_info_plain_validator_function(lambda v, info: f'{v}-1')]}
     )
     assert validator.validate_python('input') == 'input-1'
-    assert validator.title == 'function-plain[<lambda>()]'
+    assert validator.title == 'validator-function-plain[<lambda>()]'

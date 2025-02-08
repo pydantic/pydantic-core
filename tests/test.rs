@@ -20,7 +20,7 @@ mod tests {
             //     },
             //     'ref': 'C-ref',
             //     'serialization': {
-            //         'type': 'function-wrap',
+            //         'type': 'serializer-function-wrap',
             //         'function': lambda: None,
             //     },
             let code = c_str!(
@@ -41,7 +41,7 @@ mod tests {
                         },
                         'ref': 'C-ref',
                         'serialization': {
-                            'type': 'function-wrap',
+                            'type': 'serializer-function-wrap',
                             'function': lambda: None,
                         },
                     },

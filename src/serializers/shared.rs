@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::ffi::CString;
 use std::fmt::Debug;
 
 use pyo3::exceptions::PyTypeError;
@@ -148,6 +149,29 @@ combined_serializer! {
     }
 }
 
+fn get_new_type(py: Python, type_: &str) -> PyResult<String> {
+    let maybe_new_type = match type_ {
+        "function-plain" => Some("serializer-function-plain"),
+        "function-wrap" => Some("serializer-function-wrap"),
+        _ => None,
+    };
+
+    match maybe_new_type {
+        Some(new_type) => {
+            let deprecation_message =
+                format!("Serialization core schema type '{type_}' is deprecated, use '{new_type}'");
+            let _ = PyErr::warn(
+                py,
+                &py.get_type::<pyo3::exceptions::PyDeprecationWarning>(),
+                &CString::new(deprecation_message)?,
+                1,
+            );
+            Ok(new_type.to_owned())
+        }
+        None => Ok(type_.to_owned()),
+    }
+}
+
 impl CombinedSerializer {
     fn _build(
         schema: &Bound<'_, PyDict>,
@@ -159,9 +183,12 @@ impl CombinedSerializer {
 
         if let Some(ser_schema) = schema.get_as::<Bound<'_, PyDict>>(intern!(py, "serialization"))? {
             let op_ser_type: Option<Bound<'_, PyString>> = ser_schema.get_as(type_key)?;
-            match op_ser_type.as_ref().map(|py_str| py_str.to_str()).transpose()? {
-                Some("function-plain") => {
-                    // `function-plain` is a special case, not included in `find_serializer` since it means
+            let op_ser_type = op_ser_type.as_ref().map(|py_str| py_str.to_str()).transpose()?;
+            let new_type = op_ser_type.map(|typ| get_new_type(schema.py(), typ).unwrap());
+
+            match new_type.as_deref() {
+                Some("serializer-function-plain") => {
+                    // `serializer-function-plain` is a special case, not included in `find_serializer` since it means
                     // something different in `schema.type`
                     // NOTE! we use the `schema` here, not `ser_schema`
                     return super::type_serializers::function::FunctionPlainSerializer::build(
@@ -169,10 +196,12 @@ impl CombinedSerializer {
                         config,
                         definitions,
                     )
-                    .map_err(|err| py_schema_error_type!("Error building `function-plain` serializer:\n  {}", err));
+                    .map_err(|err| {
+                        py_schema_error_type!("Error building `serializer-function-plain` serializer:\n  {}", err)
+                    });
                 }
-                Some("function-wrap") => {
-                    // `function-wrap` is also a special case, not included in `find_serializer` since it mean
+                Some("serializer-function-wrap") => {
+                    // `serializer-function-wrap` is also a special case, not included in `find_serializer` since it mean
                     // something different in `schema.type`
                     // NOTE! we use the `schema` here, not `ser_schema`
                     return super::type_serializers::function::FunctionWrapSerializer::build(
@@ -180,7 +209,9 @@ impl CombinedSerializer {
                         config,
                         definitions,
                     )
-                    .map_err(|err| py_schema_error_type!("Error building `function-wrap` serializer:\n  {}", err));
+                    .map_err(|err| {
+                        py_schema_error_type!("Error building `serializer-function-wrap` serializer:\n  {}", err)
+                    });
                 }
                 // applies to lists tuples and dicts, does not override the main schema `type`
                 Some("include-exclude-sequence" | "include-exclude-dict") => (),

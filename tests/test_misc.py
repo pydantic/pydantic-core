@@ -8,6 +8,7 @@ from typing_extensions import get_args
 from pydantic_core import CoreSchema, CoreSchemaType, PydanticUndefined, core_schema
 from pydantic_core._pydantic_core import (
     SchemaError,
+    SchemaSerializer,
     SchemaValidator,
     ValidationError,
     __version__,
@@ -214,3 +215,35 @@ def test_core_schema_import_field_validation_info():
 def test_core_schema_import_missing():
     with pytest.raises(AttributeError, match="module 'pydantic_core' has no attribute 'foobar'"):
         core_schema.foobar
+
+
+def test_deprecated_core_schema_types():
+    with pytest.warns(
+        DeprecationWarning, match="Core schema type 'function-plain' is deprecated, use 'validator-function-plain'"
+    ):
+        SchemaValidator(
+            {
+                'type': 'function-plain',
+                'function': {
+                    'type': 'no-info',
+                    'function': lambda v: v,
+                },
+            }
+        )
+
+    with pytest.warns(
+        DeprecationWarning,
+        match="Serialization core schema type 'function-plain' is deprecated, use 'serializer-function-plain'",
+    ):
+        SchemaSerializer(
+            {
+                'type': 'int',
+                'serialization': {
+                    'type': 'function-plain',
+                    'function': {
+                        'type': 'no-info',
+                        'function': lambda v: v,
+                    },
+                },
+            }
+        )

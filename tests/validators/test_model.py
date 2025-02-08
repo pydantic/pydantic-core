@@ -451,7 +451,7 @@ def test_model_class_function_after():
             'type': 'model',
             'cls': MyModel,
             'schema': {
-                'type': 'function-after',
+                'type': 'validator-function-after',
                 'function': {'type': 'with-info', 'function': f},
                 'schema': {
                     'type': 'model-fields',

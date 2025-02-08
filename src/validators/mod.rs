@@ -1,3 +1,4 @@
+use std::ffi::CString;
 use std::fmt::Debug;
 
 use enum_dispatch::enum_dispatch;
@@ -510,6 +511,30 @@ macro_rules! validator_match {
     };
 }
 
+fn get_new_type(py: Python, type_: &str) -> PyResult<String> {
+    let maybe_new_type = match type_ {
+        "function-before" => Some("validator-function-before"),
+        "function-after" => Some("validator-function-after"),
+        "function-plain" => Some("validator-function-plain"),
+        "function-wrap" => Some("validator-function-wrap"),
+        _ => None,
+    };
+
+    match maybe_new_type {
+        Some(new_type) => {
+            let deprecation_message = format!("Core schema type '{type_}' is deprecated, use '{new_type}'");
+            let _ = PyErr::warn(
+                py,
+                &py.get_type::<pyo3::exceptions::PyDeprecationWarning>(),
+                &CString::new(deprecation_message)?,
+                1,
+            );
+            Ok(new_type.to_owned())
+        }
+        None => Ok(type_.to_owned()),
+    }
+}
+
 pub fn build_validator(
     schema: &Bound<'_, PyAny>,
     config: Option<&Bound<'_, PyDict>>,
@@ -525,8 +550,11 @@ pub fn build_validator(
         return Ok(prebuilt_validator);
     }
 
+    let new_type = get_new_type(schema.py(), type_)?;
+    let new_type_str = new_type.as_str();
+
     validator_match!(
-        type_,
+        new_type_str,
         dict,
         config,
         definitions,

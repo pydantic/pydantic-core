@@ -1065,7 +1065,7 @@ class TestOnError:
                             'type': 'default',
                             'on_error': 'raise',
                             'schema': {
-                                'type': 'function-wrap',
+                                'type': 'validator-function-wrap',
                                 'function': {'type': 'with-info', 'function': wrap_function},
                                 'schema': {'type': 'str'},
                             },

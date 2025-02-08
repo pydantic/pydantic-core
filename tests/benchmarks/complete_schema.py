@@ -161,7 +161,7 @@ def schema(*, strict: bool = False) -> dict:
                             'field_before': {
                                 'type': 'typed-dict-field',
                                 'schema': {
-                                    'type': 'function-before',
+                                    'type': 'validator-function-before',
                                     'function': {'type': 'with-info', 'function': append_func},
                                     'schema': {'type': 'str'},
                                 },
@@ -169,7 +169,7 @@ def schema(*, strict: bool = False) -> dict:
                             'field_after': {
                                 'type': 'typed-dict-field',
                                 'schema': {
-                                    'type': 'function-after',
+                                    'type': 'validator-function-after',
                                     'function': {'type': 'with-info', 'function': append_func},
                                     'schema': {'type': 'str'},
                                 },
@@ -177,7 +177,7 @@ def schema(*, strict: bool = False) -> dict:
                             'field_wrap': {
                                 'type': 'typed-dict-field',
                                 'schema': {
-                                    'type': 'function-wrap',
+                                    'type': 'validator-function-wrap',
                                     'function': {'type': 'with-info', 'function': wrap_function},
                                     'schema': {'type': 'str'},
                                 },
@@ -185,7 +185,7 @@ def schema(*, strict: bool = False) -> dict:
                             'field_plain': {
                                 'type': 'typed-dict-field',
                                 'schema': {
-                                    'type': 'function-plain',
+                                    'type': 'validator-function-plain',
                                     'function': {'type': 'with-info', 'function': append_func},
                                 },
                             },
