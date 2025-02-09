@@ -14,21 +14,38 @@ class LineRange:
     start: int
     end: int | None = None
 
+@dataclass
+class CharRange:
+    start: int
+    end: int
 
 @dataclass
 class SchemaValidatorCall:
     schema: dict | ASTClass
     config: dict | ASTClass | None
     lines: LineRange
+    char_range: CharRange
     context: str  # The function/method name where this was found
     assigned_to: str | None  # The variable this was assigned to
 
+@dataclass
+class ParametrizedConfig:
+    config: dict
+    lines: LineRange
+    char_range: CharRange
+
+@dataclass
+class ParametrizedSchema:
+    schema: dict
+    lines: LineRange
+    char_range: CharRange
 
 class SchemaValidatorExtractor(ast.NodeVisitor):
-    def __init__(self):
+    def __init__(self, source):
         self.validators = []
         self.current_function = None
         self.assigned_to = None
+        self.source = source
 
     def visit_FunctionDef(self, node):
         old_function = self.current_function
@@ -76,6 +93,7 @@ class SchemaValidatorExtractor(ast.NodeVisitor):
                         schema=schema_dict,
                         config=config_dict,
                         lines=LineRange(node.lineno, node.end_lineno),
+                        char_range=CharRange(node.col_offset, node.end_col_offset or 0),
                         context=self.current_function or '<module>',
                         assigned_to=self.assigned_to,
                     )
@@ -89,6 +107,9 @@ class SchemaValidatorExtractor(ast.NodeVisitor):
             param_names = self._eval_literal(decorator.args[0])  # Could be string or tuple of strings
             param_values = self._eval_literal(decorator.args[1]) # List of tuples/values
             
+            if not isinstance(param_values, (list, tuple)) or not isinstance(param_names, str):
+                return
+
             if isinstance(param_names, str):
                 param_names = param_names.split(',')
                 
@@ -100,12 +121,34 @@ class SchemaValidatorExtractor(ast.NodeVisitor):
             schema_idx = [idx for idx, name in enumerate(param_names) if 'schema' in name]
             
             # For each test case in param_values, extract config and schema
-            for test_case in param_values:
+            for i, test_case in enumerate(param_values):
+                if not isinstance(test_case, tuple):
+                    continue
                 if config_idx is not None:
                     config = test_case[config_idx]
+                    ast_obj = decorator.args[1].elts[i].elts[config_idx]
+                    if isinstance(config, dict):
+                        self.validators.append(
+                            ParametrizedConfig(
+                                config=config,
+                                lines=LineRange(ast_obj.lineno, ast_obj.end_lineno),
+                                char_range=CharRange(ast_obj.col_offset, ast_obj.end_col_offset)
+                            )
+                        )
                 for idx in schema_idx:
                     schema = test_case[idx]
-                # Create SchemaValidatorCall for each combination
+                    if isinstance(schema, dict):
+                        ast_obj = decorator.args[1].elts[i].elts[idx]
+                        self.validators.append(
+                            ParametrizedSchema(
+                                schema=schema,
+                                lines=LineRange(ast_obj.lineno, ast_obj.end_lineno),
+                                char_range=CharRange(ast_obj.col_offset, ast_obj.end_col_offset)
+                            )
+                        )
+
+
+
 
     def _eval_dict_literal(self, node) -> dict | ASTClass | None:
         """Evaluate a dictionary literal AST node to a Python dict."""
@@ -147,9 +190,10 @@ class SchemaValidatorExtractor(ast.NodeVisitor):
 def extract_validators_from_file(file_path: str) -> List[SchemaValidatorCall]:
     """Extract all SchemaValidator instantiations from a Python file."""
     with open(file_path, 'r') as f:
-        tree = ast.parse(f.read())
+        source = f.read()
+        tree = ast.parse(source)
 
-    extractor = SchemaValidatorExtractor()
+    extractor = SchemaValidatorExtractor(source)
     extractor.visit(tree)
     return extractor.validators
 
