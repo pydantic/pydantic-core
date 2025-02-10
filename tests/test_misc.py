@@ -191,9 +191,7 @@ def test_undefined():
 def test_unicode_error_input_repr() -> None:
     """https://github.com/pydantic/pydantic/issues/6448"""
 
-    schema = core_schema.int_schema()
-
-    validator = SchemaValidator(schema)
+    validator = SchemaValidator(core_schema.int_schema())
 
     danger_str = 'ÿ' * 1000
     expected = "1 validation error for int\n  Input should be a valid integer, unable to parse string as an integer [type=int_parsing, input_value='ÿÿÿÿÿÿÿÿÿÿÿÿ...ÿÿÿÿÿÿÿÿÿÿÿ', input_type=str]"

@@ -150,9 +150,9 @@ def test_uuid_strict(input_value, expected):
     ],
 )
 def test_uuid_version(input_value, version, expected):
-    schema = {'type': 'uuid'}
+    schema = core_schema.uuid_schema()
     if version is not None:
-        schema['version'] = version
+        schema = core_schema.uuid_schema(version=version)
 
     v = SchemaValidator(schema)
 
