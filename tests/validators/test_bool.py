@@ -3,6 +3,7 @@ import re
 import pytest
 
 from pydantic_core import SchemaValidator, ValidationError, core_schema
+from pydantic_core import core_schema as cs
 
 from ..conftest import Err, PyAndJson, plain_repr
 
@@ -54,7 +55,7 @@ def test_bool_strict(py_and_json: PyAndJson):
 
 
 def test_bool_error(pydantic_version):
-    v = SchemaValidator({'type': 'bool'})
+    v = SchemaValidator(schema=cs.bool_schema())
 
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python('wrong')
@@ -76,12 +77,12 @@ def test_bool_error(pydantic_version):
 
 
 def test_bool_repr():
-    v = SchemaValidator({'type': 'bool'})
+    v = SchemaValidator(schema=cs.bool_schema())
     assert (
         plain_repr(v)
         == 'SchemaValidator(title="bool",validator=Bool(BoolValidator{strict:false}),definitions=[],cache_strings=True)'
     )
-    v = SchemaValidator({'type': 'bool', 'strict': True})
+    v = SchemaValidator(schema=cs.bool_schema(strict=True))
     assert (
         plain_repr(v)
         == 'SchemaValidator(title="bool",validator=Bool(BoolValidator{strict:true}),definitions=[],cache_strings=True)'
@@ -104,6 +105,6 @@ def test_validate_assignment_not_supported() -> None:
     same for all validators (it's the default impl on the Validator trait).
     But we need to test this somewhere, so it is going in the bool tests for now.
     """
-    v = SchemaValidator(core_schema.bool_schema())
+    v = SchemaValidator(schema=core_schema.bool_schema())
     with pytest.raises(TypeError, match='validate_assignment is not supported for bool'):
         v.validate_assignment(False, 'foo', True)

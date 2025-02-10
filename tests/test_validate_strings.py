@@ -10,7 +10,7 @@ from .conftest import Err
 
 
 def test_bool():
-    v = SchemaValidator(core_schema.bool_schema())
+    v = SchemaValidator(schema=core_schema.bool_schema())
 
     assert v.validate_strings('true') is True
     assert v.validate_strings('true', strict=True) is True
@@ -39,7 +39,7 @@ def test_bool():
     ids=repr,
 )
 def test_validate_strings(schema, input_value, expected, strict):
-    v = SchemaValidator(schema)
+    v = SchemaValidator(schema=schema)
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_strings(input_value, strict=strict)
@@ -48,7 +48,7 @@ def test_validate_strings(schema, input_value, expected, strict):
 
 
 def test_dict():
-    v = SchemaValidator(core_schema.dict_schema(core_schema.int_schema(), core_schema.date_schema()))
+    v = SchemaValidator(schema=core_schema.dict_schema(core_schema.int_schema(), core_schema.date_schema()))
 
     assert v.validate_strings({'1': '2017-01-01', '2': '2017-01-02'}) == {1: date(2017, 1, 1), 2: date(2017, 1, 2)}
     assert v.validate_strings({'1': '2017-01-01', '2': '2017-01-02'}, strict=True) == {
@@ -65,7 +65,7 @@ def test_model():
         field_b: date
 
     v = SchemaValidator(
-        core_schema.model_schema(
+        schema=core_schema.model_schema(
             MyModel,
             core_schema.model_fields_schema(
                 {
@@ -88,7 +88,7 @@ def test_dataclass():
         field_b: date
 
     v = SchemaValidator(
-        core_schema.dataclass_schema(
+        schema=core_schema.dataclass_schema(
             MyDataClass,
             core_schema.dataclass_args_schema(
                 'MyDataClass',
@@ -108,7 +108,7 @@ def test_dataclass():
 
 def test_typed_dict():
     v = SchemaValidator(
-        core_schema.typed_dict_schema(
+        schema=core_schema.typed_dict_schema(
             {
                 'field_a': core_schema.typed_dict_field(core_schema.int_schema()),
                 'field_b': core_schema.typed_dict_field(core_schema.date_schema()),

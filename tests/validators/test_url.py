@@ -5,7 +5,7 @@ from typing import Optional, Union
 import pytest
 from dirty_equals import HasRepr, IsInstance
 
-from pydantic_core import MultiHostUrl, SchemaError, SchemaValidator, Url, ValidationError, core_schema
+from pydantic_core import CoreConfig, MultiHostUrl, SchemaError, SchemaValidator, Url, ValidationError, core_schema
 
 from ..conftest import Err, PyAndJson
 
@@ -51,7 +51,7 @@ def test_url_from_constructor_ok():
 
 @pytest.fixture(scope='module', name='url_validator')
 def url_validator_fixture():
-    return SchemaValidator(core_schema.url_schema())
+    return SchemaValidator(schema=core_schema.url_schema())
 
 
 SCHEMA_VALIDATOR_MODE = 'SCHEMA_VALIDATOR'
@@ -283,12 +283,12 @@ def test_url_cases(url_validator, url, expected, mode):
     ],
 )
 def test_url_defaults_single_url(validator_kwargs, url, expected):
-    s = SchemaValidator(core_schema.url_schema(**validator_kwargs))
+    s = SchemaValidator(schema=core_schema.url_schema(**validator_kwargs))
     url_test_case_helper(url, expected, SCHEMA_VALIDATOR_MODE, s)
 
 
 def test_url_host_required():
-    s = SchemaValidator(core_schema.url_schema(host_required=True))
+    s = SchemaValidator(schema=core_schema.url_schema(host_required=True))
     url_test_case_helper('test:', Err('empty host'), SCHEMA_VALIDATOR_MODE, s)
     url_test_case_helper('sftp://', Err('empty host'), SCHEMA_VALIDATOR_MODE, s)
 
@@ -328,7 +328,7 @@ def test_url_host_required():
     ],
 )
 def test_url_defaults_multi_host_url(validator_kwargs, url, expected):
-    s = SchemaValidator(core_schema.multi_host_url_schema(**validator_kwargs))
+    s = SchemaValidator(schema=core_schema.multi_host_url_schema(**validator_kwargs))
     url_test_case_helper(url, expected, SCHEMA_VALIDATOR_MODE, s)
 
 
@@ -362,12 +362,12 @@ def test_multi_host_url(url, expected):
 
 def test_multi_host_default_host_no_comma():
     with pytest.raises(SchemaError, match='default_host cannot contain a comma, see pydantic-core#326'):
-        SchemaValidator(core_schema.multi_host_url_schema(default_host='foo,bar'))
+        SchemaValidator(schema=core_schema.multi_host_url_schema(default_host='foo,bar'))
 
 
 @pytest.fixture(scope='module', name='strict_url_validator')
 def strict_url_validator_fixture():
-    return SchemaValidator(core_schema.url_schema(), {'strict': True})
+    return SchemaValidator(schema=core_schema.url_schema(), config=CoreConfig(strict=True))
 
 
 @pytest.mark.parametrize(
@@ -430,7 +430,7 @@ def test_no_host(url_validator):
 
 
 def test_max_length():
-    v = SchemaValidator(core_schema.url_schema(max_length=25))
+    v = SchemaValidator(schema=core_schema.url_schema(max_length=25))
     assert str(v.validate_python('https://example.com')) == 'https://example.com/'
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python('https://example.com/foo/bar')
@@ -447,7 +447,7 @@ def test_max_length():
 
 
 def test_allowed_schemes_ok():
-    v = SchemaValidator(core_schema.url_schema(allowed_schemes=['http', 'https']))
+    v = SchemaValidator(schema=core_schema.url_schema(allowed_schemes=['http', 'https']))
     url = v.validate_python(' https://example.com ')
     assert url.host == 'example.com'
     assert url.scheme == 'https'
@@ -456,7 +456,7 @@ def test_allowed_schemes_ok():
 
 
 def test_allowed_schemes_error():
-    v = SchemaValidator(core_schema.url_schema(allowed_schemes=['http', 'https']))
+    v = SchemaValidator(schema=core_schema.url_schema(allowed_schemes=['http', 'https']))
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python('unix:/run/foo.socket')
     # insert_assert(exc_info.value.errors(include_url=False))
@@ -472,7 +472,7 @@ def test_allowed_schemes_error():
 
 
 def test_allowed_schemes_errors():
-    v = SchemaValidator(core_schema.url_schema(allowed_schemes=['a', 'b', 'c']))
+    v = SchemaValidator(schema=core_schema.url_schema(allowed_schemes=['a', 'b', 'c']))
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python('unix:/run/foo.socket')
     # insert_assert(exc_info.value.errors(include_url=False))
@@ -520,11 +520,11 @@ def test_url_to_url(url_validator, multi_host_url_validator):
 
 
 def test_url_to_constraint():
-    v1 = SchemaValidator(core_schema.url_schema())
+    v1 = SchemaValidator(schema=core_schema.url_schema())
     url: Url = v1.validate_python('http://example.com/foobar/bar')
     assert str(url) == 'http://example.com/foobar/bar'
 
-    v2 = SchemaValidator(core_schema.url_schema(max_length=25))
+    v2 = SchemaValidator(schema=core_schema.url_schema(max_length=25))
 
     with pytest.raises(ValidationError) as exc_info:
         v2.validate_python(url)
@@ -539,7 +539,7 @@ def test_url_to_constraint():
         }
     ]
 
-    v3 = SchemaValidator(core_schema.url_schema(allowed_schemes=['https']))
+    v3 = SchemaValidator(schema=core_schema.url_schema(allowed_schemes=['https']))
 
     with pytest.raises(ValidationError) as exc_info:
         v3.validate_python(url)
@@ -651,7 +651,7 @@ def test_multi_host_url_ok_2(py_and_json: PyAndJson):
 
 @pytest.fixture(scope='module', name='multi_host_url_validator')
 def multi_host_url_validator_fixture():
-    return SchemaValidator(core_schema.multi_host_url_schema())
+    return SchemaValidator(schema=core_schema.multi_host_url_schema())
 
 
 @pytest.mark.parametrize(
@@ -922,7 +922,7 @@ def test_multi_url_cases(multi_host_url_validator, url, expected):
 
 @pytest.fixture(scope='module', name='strict_multi_host_url_validator')
 def strict_multi_host_url_validator_fixture():
-    return SchemaValidator(core_schema.multi_host_url_schema(strict=True))
+    return SchemaValidator(schema=core_schema.multi_host_url_schema(strict=True))
 
 
 @pytest.mark.parametrize(
@@ -998,7 +998,7 @@ def test_multi_wrong_type(multi_host_url_validator):
 
 
 def test_multi_allowed_schemas():
-    v = SchemaValidator(core_schema.multi_host_url_schema(allowed_schemes=['http', 'foo']))
+    v = SchemaValidator(schema=core_schema.multi_host_url_schema(allowed_schemes=['http', 'foo']))
     assert str(v.validate_python('http://example.com')) == 'http://example.com/'
     assert str(v.validate_python('foo://example.com')) == 'foo://example.com'
     with pytest.raises(ValidationError, match=r"URL scheme should be 'http' or 'foo' \[type=url_scheme,"):
@@ -1006,7 +1006,7 @@ def test_multi_allowed_schemas():
 
 
 def test_multi_max_length(url_validator):
-    v = SchemaValidator(core_schema.multi_host_url_schema(max_length=25))
+    v = SchemaValidator(schema=core_schema.multi_host_url_schema(max_length=25))
     assert str(v.validate_python('http://example.com')) == 'http://example.com/'
     with pytest.raises(ValidationError, match=r'URL should have at most 25 characters \[type=url_too_long,'):
         v.validate_python('https://example.com/this-is-too-long')
@@ -1025,7 +1025,7 @@ def test_multi_max_length(url_validator):
 
 def test_zero_schemas():
     with pytest.raises(SchemaError, match='`allowed_schemes` should have length > 0'):
-        SchemaValidator(core_schema.multi_host_url_schema(allowed_schemes=[]))
+        SchemaValidator(schema=core_schema.multi_host_url_schema(allowed_schemes=[]))
 
 
 @pytest.mark.parametrize(

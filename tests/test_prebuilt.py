@@ -12,7 +12,7 @@ def test_prebuilt_val_and_ser_used() -> None:
         ),
     )
 
-    inner_schema_validator = SchemaValidator(inner_schema)
+    inner_schema_validator = SchemaValidator(schema=inner_schema)
     inner_schema_serializer = SchemaSerializer(inner_schema)
     InnerModel.__pydantic_complete__ = True  # pyright: ignore[reportAttributeAccessIssue]
     InnerModel.__pydantic_validator__ = inner_schema_validator  # pyright: ignore[reportAttributeAccessIssue]
@@ -40,7 +40,7 @@ def test_prebuilt_val_and_ser_used() -> None:
         ),
     )
 
-    outer_validator = SchemaValidator(outer_schema)
+    outer_validator = SchemaValidator(schema=outer_schema)
     outer_serializer = SchemaSerializer(outer_schema)
 
     result = outer_validator.validate_python({'inner': {'x': 1}})

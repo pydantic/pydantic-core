@@ -21,16 +21,14 @@ from ..conftest import PyAndJson, assert_gc
 
 def test_typed_dict_default():
     v = SchemaValidator(
-        {
-            'type': 'typed-dict',
-            'fields': {
-                'x': {'type': 'typed-dict-field', 'schema': {'type': 'str'}},
-                'y': {
-                    'type': 'typed-dict-field',
-                    'schema': {'type': 'default', 'schema': {'type': 'str'}, 'default': '[default]'},
-                },
-            },
-        }
+        schema=core_schema.typed_dict_schema(
+            fields={
+                'x': core_schema.typed_dict_field(schema=core_schema.str_schema()),
+                'y': core_schema.typed_dict_field(
+                    schema=core_schema.with_default_schema(schema=core_schema.str_schema(), default='[default]')
+                ),
+            }
+        )
     )
     assert v.validate_python({'x': 'x', 'y': 'y'}) == {'x': 'x', 'y': 'y'}
     assert v.validate_python({'x': 'x'}) == {'x': 'x', 'y': '[default]'}
@@ -38,17 +36,15 @@ def test_typed_dict_default():
 
 def test_typed_dict_omit():
     v = SchemaValidator(
-        {
-            'type': 'typed-dict',
-            'fields': {
-                'x': {'type': 'typed-dict-field', 'schema': {'type': 'str'}},
-                'y': {
-                    'type': 'typed-dict-field',
-                    'schema': {'type': 'default', 'schema': {'type': 'str'}, 'on_error': 'omit'},
-                    'required': False,
-                },
-            },
-        }
+        schema=core_schema.typed_dict_schema(
+            fields={
+                'x': core_schema.typed_dict_field(schema=core_schema.str_schema()),
+                'y': core_schema.typed_dict_field(
+                    schema=core_schema.with_default_schema(schema=core_schema.str_schema(), on_error='omit'),
+                    required=False,
+                ),
+            }
+        )
     )
     assert v.validate_python({'x': 'x', 'y': 'y'}) == {'x': 'x', 'y': 'y'}
     assert v.validate_python({'x': 'x'}) == {'x': 'x'}
@@ -57,16 +53,17 @@ def test_typed_dict_omit():
 
 def test_arguments():
     v = SchemaValidator(
-        {
-            'type': 'arguments',
-            'arguments_schema': [
+        schema=core_schema.arguments_schema(
+            arguments=[
                 {
                     'name': 'a',
                     'mode': 'positional_or_keyword',
-                    'schema': {'type': 'default', 'schema': {'type': 'int'}, 'default_factory': lambda: 1},
+                    'schema': core_schema.with_default_schema(
+                        schema=core_schema.int_schema(), default_factory=lambda: 1
+                    ),
                 }
-            ],
-        }
+            ]
+        )
     )
     assert v.validate_python({'a': 2}) == ((), {'a': 2})
     assert v.validate_python(ArgsKwargs((2,))) == ((2,), {})
@@ -77,16 +74,17 @@ def test_arguments():
 def test_arguments_omit():
     with pytest.raises(SchemaError, match="Parameter 'a': omit_on_error cannot be used with arguments"):
         SchemaValidator(
-            {
-                'type': 'arguments',
-                'arguments_schema': [
+            schema=core_schema.arguments_schema(
+                arguments=[
                     {
                         'name': 'a',
                         'mode': 'positional_or_keyword',
-                        'schema': {'type': 'default', 'schema': {'type': 'int'}, 'default': 1, 'on_error': 'omit'},
+                        'schema': core_schema.with_default_schema(
+                            schema=core_schema.int_schema(), default=1, on_error='omit'
+                        ),
                     }
-                ],
-            }
+                ]
+            )
         )
 
 
@@ -113,7 +111,9 @@ def test_list_json(py_and_json: PyAndJson, input_value, expected):
 )
 def test_list(input_value, expected):
     v = SchemaValidator(
-        {'type': 'list', 'items_schema': {'type': 'default', 'schema': {'type': 'int'}, 'on_error': 'omit'}}
+        schema=core_schema.list_schema(
+            items_schema=core_schema.with_default_schema(schema=core_schema.int_schema(), on_error='omit')
+        )
     )
     assert v.validate_python(input_value) == expected
 
@@ -130,7 +130,9 @@ def test_list(input_value, expected):
 )
 def test_set(input_value, expected):
     v = SchemaValidator(
-        {'type': 'set', 'items_schema': {'type': 'default', 'schema': {'type': 'int'}, 'on_error': 'omit'}}
+        schema=core_schema.set_schema(
+            items_schema=core_schema.with_default_schema(schema=core_schema.int_schema(), on_error='omit')
+        )
     )
     assert v.validate_python(input_value) == expected
 
@@ -150,11 +152,10 @@ def test_dict_values(py_and_json: PyAndJson):
 
 def test_dict_keys():
     v = SchemaValidator(
-        {
-            'type': 'dict',
-            'keys_schema': {'type': 'default', 'schema': {'type': 'int'}, 'on_error': 'omit'},
-            'values_schema': {'type': 'str'},
-        }
+        schema=core_schema.dict_schema(
+            keys_schema=core_schema.with_default_schema(schema=core_schema.int_schema(), on_error='omit'),
+            values_schema=core_schema.str_schema(),
+        )
     )
     assert v.validate_python({1: 'a', '2': 'b'}) == {1: 'a', 2: 'b'}
     assert v.validate_python({1: 'a', 'wrong': 'b'}) == {1: 'a'}
@@ -176,10 +177,12 @@ def test_tuple_variable(py_and_json: PyAndJson):
 
 def test_tuple_positional():
     v = SchemaValidator(
-        {
-            'type': 'tuple',
-            'items_schema': [{'type': 'int'}, {'type': 'default', 'schema': {'type': 'int'}, 'default': 42}],
-        }
+        schema=core_schema.tuple_schema(
+            items_schema=[
+                core_schema.int_schema(),
+                core_schema.with_default_schema(schema=core_schema.int_schema(), default=42),
+            ]
+        )
     )
     assert v.validate_python((1, '2')) == (1, 2)
     assert v.validate_python([1, '2']) == (1, 2)
@@ -189,15 +192,14 @@ def test_tuple_positional():
 
 def test_tuple_positional_omit():
     v = SchemaValidator(
-        {
-            'type': 'tuple',
-            'items_schema': [
-                {'type': 'int'},
-                {'type': 'int'},
-                {'type': 'default', 'schema': {'type': 'int'}, 'on_error': 'omit'},
+        schema=core_schema.tuple_schema(
+            items_schema=[
+                core_schema.int_schema(),
+                core_schema.int_schema(),
+                core_schema.with_default_schema(schema=core_schema.int_schema(), on_error='omit'),
             ],
-            'variadic_item_index': 2,
-        }
+            variadic_item_index=2,
+        )
     )
     assert v.validate_python((1, '2')) == (1, 2)
     assert v.validate_python((1, '2', 3, '4')) == (1, 2, 3, 4)
@@ -207,7 +209,9 @@ def test_tuple_positional_omit():
 
 
 def test_on_error_default():
-    v = SchemaValidator({'type': 'default', 'schema': {'type': 'int'}, 'default': 2, 'on_error': 'default'})
+    v = SchemaValidator(
+        schema=core_schema.with_default_schema(schema=core_schema.int_schema(), default=2, on_error='default')
+    )
     assert v.validate_python(42) == 42
     assert v.validate_python('42') == 42
     assert v.validate_python('wrong') == 2
@@ -218,7 +222,9 @@ def test_factory_runtime_error():
         raise RuntimeError('this is broken')
 
     v = SchemaValidator(
-        {'type': 'default', 'schema': {'type': 'int'}, 'on_error': 'default', 'default_factory': broken}
+        schema=core_schema.with_default_schema(
+            schema=core_schema.int_schema(), on_error='default', default_factory=broken
+        )
     )
     assert v.validate_python(42) == 42
     assert v.validate_python('42') == 42
@@ -231,13 +237,12 @@ def test_factory_missing_arg():
         return 7
 
     v = SchemaValidator(
-        {
-            'type': 'default',
-            'schema': {'type': 'int'},
-            'on_error': 'default',
-            'default_factory': broken,
-            'default_factory_takes_data': False,
-        }
+        schema=core_schema.with_default_schema(
+            schema=core_schema.int_schema(),
+            on_error='default',
+            default_factory=broken,
+            default_factory_takes_data=False,
+        )
     )
     assert v.validate_python(42) == 42
     assert v.validate_python('42') == 42
@@ -247,16 +252,16 @@ def test_factory_missing_arg():
 
 def test_typed_dict_error():
     v = SchemaValidator(
-        {
-            'type': 'typed-dict',
-            'fields': {
-                'x': {'type': 'typed-dict-field', 'schema': {'type': 'str'}},
-                'y': {
-                    'type': 'typed-dict-field',
-                    'schema': {'type': 'default', 'schema': {'type': 'str'}, 'default_factory': lambda y: y * 2},
-                },
-            },
-        }
+        schema=core_schema.typed_dict_schema(
+            fields={
+                'x': core_schema.typed_dict_field(schema=core_schema.str_schema()),
+                'y': core_schema.typed_dict_field(
+                    schema=core_schema.with_default_schema(
+                        schema=core_schema.str_schema(), default_factory=lambda y: y * 2
+                    )
+                ),
+            }
+        )
     )
     assert v.validate_python({'x': 'x', 'y': 'y'}) == {'x': 'x', 'y': 'y'}
     with pytest.raises(TypeError, match=r"<lambda>\(\) missing 1 required positional argument: 'y'"):
@@ -264,7 +269,9 @@ def test_typed_dict_error():
 
 
 def test_on_error_default_not_int():
-    v = SchemaValidator({'type': 'default', 'schema': {'type': 'int'}, 'default': [1, 2, 3], 'on_error': 'default'})
+    v = SchemaValidator(
+        schema=core_schema.with_default_schema(schema=core_schema.int_schema(), default=[1, 2, 3], on_error='default')
+    )
     assert v.validate_python(42) == 42
     assert v.validate_python('42') == 42
     assert v.validate_python('wrong') == [1, 2, 3]
@@ -272,7 +279,9 @@ def test_on_error_default_not_int():
 
 def test_on_error_default_factory():
     v = SchemaValidator(
-        {'type': 'default', 'schema': {'type': 'int'}, 'default_factory': lambda: 17, 'on_error': 'default'}
+        schema=core_schema.with_default_schema(
+            schema=core_schema.int_schema(), default_factory=lambda: 17, on_error='default'
+        )
     )
     assert v.validate_python(42) == 42
     assert v.validate_python('42') == 42
@@ -280,7 +289,7 @@ def test_on_error_default_factory():
 
 
 def test_on_error_omit():
-    v = SchemaValidator({'type': 'default', 'schema': {'type': 'int'}, 'on_error': 'omit'})
+    v = SchemaValidator(schema=core_schema.with_default_schema(schema=core_schema.int_schema(), on_error='omit'))
     assert v.validate_python(42) == 42
     with pytest.raises(SchemaError, match='Uncaught Omit error, please check your usage of `default` validators.'):
         v.validate_python('wrong')
@@ -288,12 +297,16 @@ def test_on_error_omit():
 
 def test_on_error_wrong():
     with pytest.raises(SchemaError, match="'on_error = default' requires a `default` or `default_factory`"):
-        SchemaValidator({'type': 'default', 'schema': {'type': 'int'}, 'on_error': 'default'})
+        SchemaValidator(schema=core_schema.with_default_schema(schema=core_schema.int_schema(), on_error='default'))
 
 
 def test_build_default_and_default_factory():
     with pytest.raises(SchemaError, match="'default' and 'default_factory' cannot be used together"):
-        SchemaValidator({'type': 'default', 'schema': {'type': 'int'}, 'default_factory': lambda: 1, 'default': 2})
+        SchemaValidator(
+            schema=core_schema.with_default_schema(
+                schema=core_schema.int_schema(), default_factory=lambda: 1, default=2
+            )
+        )
 
 
 def test_model_class():
@@ -303,22 +316,19 @@ def test_model_class():
         field_b: int
 
     v = SchemaValidator(
-        {
-            'type': 'model',
-            'cls': MyModel,
-            'schema': {
-                'type': 'default',
-                'schema': {
-                    'type': 'model-fields',
-                    'fields': {
-                        'field_a': {'type': 'model-field', 'schema': {'type': 'str'}},
-                        'field_b': {'type': 'model-field', 'schema': {'type': 'int'}},
-                    },
-                },
-                'default': ({'field_a': '[default-a]', 'field_b': '[default-b]'}, None, set()),
-                'on_error': 'default',
-            },
-        }
+        schema=core_schema.model_schema(
+            cls=MyModel,
+            schema=core_schema.with_default_schema(
+                schema=core_schema.model_fields_schema(
+                    fields={
+                        'field_a': core_schema.model_field(schema=core_schema.str_schema()),
+                        'field_b': core_schema.model_field(schema=core_schema.int_schema()),
+                    }
+                ),
+                default=({'field_a': '[default-a]', 'field_b': '[default-b]'}, None, set()),
+                on_error='default',
+            ),
+        )
     )
     m = v.validate_python({'field_a': 'test', 'field_b': 12})
     assert isinstance(m, MyModel)
@@ -354,7 +364,7 @@ def test_validate_default(
     else:
         config = None
     v = SchemaValidator(
-        core_schema.typed_dict_schema(
+        schema=core_schema.typed_dict_schema(
             {
                 'x': core_schema.typed_dict_field(
                     core_schema.with_default_schema(
@@ -376,7 +386,7 @@ def test_validate_default(
 
 def test_validate_default_factory():
     v = SchemaValidator(
-        core_schema.tuple_positional_schema(
+        schema=core_schema.tuple_positional_schema(
             [core_schema.with_default_schema(core_schema.int_schema(), default_factory=lambda: '42')]
         ),
         config=dict(validate_default=True),
@@ -387,7 +397,7 @@ def test_validate_default_factory():
 
 def test_validate_default_error_tuple():
     v = SchemaValidator(
-        core_schema.tuple_positional_schema(
+        schema=core_schema.tuple_positional_schema(
             [core_schema.with_default_schema(core_schema.int_schema(), default='wrong', validate_default=True)]
         )
     )
@@ -408,7 +418,7 @@ def test_validate_default_error_tuple():
 
 def test_validate_default_error_typed_dict():
     v = SchemaValidator(
-        core_schema.typed_dict_schema(
+        schema=core_schema.typed_dict_schema(
             {
                 'x': core_schema.typed_dict_field(
                     core_schema.with_default_schema(core_schema.int_schema(), default='xx', validate_default=True)
@@ -440,35 +450,27 @@ def test_deepcopy_mutable_defaults():
         str_dict_with_default: dict[str, str] = stored_empty_dict
 
     v = SchemaValidator(
-        {
-            'type': 'model',
-            'cls': Model,
-            'schema': {
-                'type': 'model-fields',
-                'fields': {
-                    'int_list_with_default': {
-                        'type': 'model-field',
-                        'schema': {
-                            'type': 'default',
-                            'schema': {'type': 'list', 'items_schema': {'type': 'int'}},
-                            'default': stored_empty_list,
-                        },
-                    },
-                    'str_dict_with_default': {
-                        'type': 'model-field',
-                        'schema': {
-                            'type': 'default',
-                            'schema': {
-                                'type': 'dict',
-                                'keys_schema': {'type': 'str'},
-                                'values_schema': {'type': 'str'},
-                            },
-                            'default': stored_empty_dict,
-                        },
-                    },
-                },
-            },
-        }
+        schema=core_schema.model_schema(
+            cls=Model,
+            schema=core_schema.model_fields_schema(
+                fields={
+                    'int_list_with_default': core_schema.model_field(
+                        schema=core_schema.with_default_schema(
+                            schema=core_schema.list_schema(items_schema=core_schema.int_schema()),
+                            default=stored_empty_list,
+                        )
+                    ),
+                    'str_dict_with_default': core_schema.model_field(
+                        schema=core_schema.with_default_schema(
+                            schema=core_schema.dict_schema(
+                                keys_schema=core_schema.str_schema(), values_schema=core_schema.str_schema()
+                            ),
+                            default=stored_empty_dict,
+                        )
+                    ),
+                }
+            ),
+        )
     )
 
     m1 = v.validate_python({})
@@ -494,7 +496,7 @@ def test_deepcopy_mutable_defaults():
 def test_default_value() -> None:
     s = core_schema.with_default_schema(core_schema.list_schema(core_schema.int_schema()), default=[1, 2, 3])
 
-    v = SchemaValidator(s)
+    v = SchemaValidator(schema=s)
 
     r = v.get_default_value()
     assert r is not None
@@ -504,7 +506,7 @@ def test_default_value() -> None:
 def test_default_value_validate_default() -> None:
     s = core_schema.with_default_schema(core_schema.list_schema(core_schema.int_schema()), default=['1', '2', '3'])
 
-    v = SchemaValidator(s, core_schema.CoreConfig(validate_default=True))
+    v = SchemaValidator(schema=s, config=core_schema.CoreConfig(validate_default=True))
 
     r = v.get_default_value()
     assert r is not None
@@ -514,7 +516,7 @@ def test_default_value_validate_default() -> None:
 def test_default_value_validate_default_fail() -> None:
     s = core_schema.with_default_schema(core_schema.list_schema(core_schema.int_schema()), default=['a'])
 
-    v = SchemaValidator(s, core_schema.CoreConfig(validate_default=True))
+    v = SchemaValidator(schema=s, config=core_schema.CoreConfig(validate_default=True))
 
     with pytest.raises(ValidationError) as exc_info:
         v.get_default_value()
@@ -531,7 +533,7 @@ def test_default_value_validate_default_fail() -> None:
 def test_default_value_validate_default_strict_pass() -> None:
     s = core_schema.with_default_schema(core_schema.list_schema(core_schema.int_schema()), default=[1, 2, 3])
 
-    v = SchemaValidator(s, core_schema.CoreConfig(validate_default=True))
+    v = SchemaValidator(schema=s, config=core_schema.CoreConfig(validate_default=True))
 
     r = v.get_default_value(strict=True)
     assert r is not None
@@ -541,7 +543,7 @@ def test_default_value_validate_default_strict_pass() -> None:
 def test_default_value_validate_default_strict_fail() -> None:
     s = core_schema.with_default_schema(core_schema.list_schema(core_schema.int_schema()), default=['1'])
 
-    v = SchemaValidator(s, core_schema.CoreConfig(validate_default=True))
+    v = SchemaValidator(schema=s, config=core_schema.CoreConfig(validate_default=True))
 
     with pytest.raises(ValidationError) as exc_info:
         v.get_default_value(strict=True)
@@ -553,7 +555,7 @@ def test_default_value_validate_default_strict_fail() -> None:
 @pytest.mark.parametrize('validate_default', [True, False])
 def test_no_default_value(validate_default: bool) -> None:
     s = core_schema.list_schema(core_schema.int_schema())
-    v = SchemaValidator(s, core_schema.CoreConfig(validate_default=validate_default))
+    v = SchemaValidator(schema=s, config=core_schema.CoreConfig(validate_default=validate_default))
 
     assert v.get_default_value() is None
 
@@ -562,7 +564,7 @@ def test_no_default_value(validate_default: bool) -> None:
 def test_some(validate_default: bool) -> None:
     def get_default() -> Union[Some[int], None]:
         s = core_schema.with_default_schema(core_schema.int_schema(), default=42)
-        return SchemaValidator(s).get_default_value()
+        return SchemaValidator(schema=s).get_default_value()
 
     res = get_default()
     assert res is not None
@@ -591,19 +593,29 @@ def f(v: Union[Some[Any], None]) -> str:
     exec(code, globals(), local_vars)
     f = cast(Callable[[Union[Some[Any], None]], str], local_vars['f'])
 
-    res = f(SchemaValidator(core_schema.with_default_schema(core_schema.int_schema(), default=1)).get_default_value())
+    res = f(
+        SchemaValidator(schema=core_schema.with_default_schema(core_schema.int_schema(), default=1)).get_default_value()
+    )
     assert res == 'case1'
 
-    res = f(SchemaValidator(core_schema.with_default_schema(core_schema.int_schema(), default=2)).get_default_value())
+    res = f(
+        SchemaValidator(schema=core_schema.with_default_schema(core_schema.int_schema(), default=2)).get_default_value()
+    )
     assert res == 'case2'
 
-    res = f(SchemaValidator(core_schema.with_default_schema(core_schema.int_schema(), default=3)).get_default_value())
+    res = f(
+        SchemaValidator(schema=core_schema.with_default_schema(core_schema.int_schema(), default=3)).get_default_value()
+    )
     assert res == 'case3: 3'
 
-    res = f(SchemaValidator(core_schema.with_default_schema(core_schema.int_schema(), default='4')).get_default_value())
+    res = f(
+        SchemaValidator(
+            schema=core_schema.with_default_schema(core_schema.int_schema(), default='4')
+        ).get_default_value()
+    )
     assert res == 'case4: str(4)'
 
-    res = f(SchemaValidator(core_schema.int_schema()).get_default_value())
+    res = f(SchemaValidator(schema=core_schema.int_schema()).get_default_value())
     assert res == 'case5'
 
 
@@ -614,7 +626,7 @@ def test_use_default_error() -> None:
         return handler(v)
 
     validator = SchemaValidator(
-        core_schema.with_default_schema(
+        schema=core_schema.with_default_schema(
             core_schema.no_info_wrap_validator_function(val_func, core_schema.int_schema()), default=10
         )
     )
@@ -625,13 +637,15 @@ def test_use_default_error() -> None:
     # without a default value the error bubbles up
     # the error message is the same as the error message produced by PydanticOmit
     validator = SchemaValidator(
-        core_schema.with_default_schema(core_schema.no_info_wrap_validator_function(val_func, core_schema.int_schema()))
+        schema=core_schema.with_default_schema(
+            core_schema.no_info_wrap_validator_function(val_func, core_schema.int_schema())
+        )
     )
     with pytest.raises(SchemaError, match='Uncaught UseDefault error, please check your usage of `default` validators'):
         validator.validate_python('')
 
     # same if there is no WithDefault validator
-    validator = SchemaValidator(core_schema.no_info_wrap_validator_function(val_func, core_schema.int_schema()))
+    validator = SchemaValidator(schema=core_schema.no_info_wrap_validator_function(val_func, core_schema.int_schema()))
     with pytest.raises(SchemaError, match='Uncaught UseDefault error, please check your usage of `default` validators'):
         validator.validate_python('')
 
@@ -652,7 +666,7 @@ def test_leak_with_default():
         # If any of the Rust validators don't implement traversal properly,
         # there will be an undetectable cycle created by this assignment
         # which will keep Defaulted alive
-        Defaulted.__pydantic_validator__ = SchemaValidator(schema)
+        Defaulted.__pydantic_validator__ = SchemaValidator(schema=schema)
 
         return Defaulted
 
@@ -771,7 +785,7 @@ def test_validate_default_raises(
     )
 
     v = SchemaValidator(
-        core_schema_constructor(
+        schema=core_schema_constructor(
             {
                 'x': field_constructor(
                     core_schema.with_default_schema(inner_schema, default=None, validate_default=True)
@@ -806,7 +820,7 @@ def test_validate_default_raises_dataclass(input_value: dict, expected: Any) -> 
     )
     z = core_schema.dataclass_field(name='z', schema=core_schema.str_schema())
 
-    v = SchemaValidator(core_schema.dataclass_args_schema('XYZ', [x, y, z]))
+    v = SchemaValidator(schema=core_schema.dataclass_args_schema('XYZ', [x, y, z]))
 
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python(input_value)

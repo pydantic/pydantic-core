@@ -67,7 +67,7 @@ def test_pydantic_value_error_usage():
     def f(input_value, info):
         raise PydanticCustomError('my_error', 'this is a custom error {foo} {bar}', {'foo': 'FOOBAR', 'bar': 42})
 
-    v = SchemaValidator(core_schema.with_info_plain_validator_function(f))
+    v = SchemaValidator(schema=core_schema.with_info_plain_validator_function(f))
 
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python(42)
@@ -87,7 +87,7 @@ def test_pydantic_value_error_invalid_dict():
     def my_function(input_value, info):
         raise PydanticCustomError('my_error', 'this is a custom error {foo}', {(): 'foobar'})
 
-    v = SchemaValidator(core_schema.with_info_plain_validator_function(my_function))
+    v = SchemaValidator(schema=core_schema.with_info_plain_validator_function(my_function))
 
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python(42)
@@ -105,7 +105,7 @@ def test_pydantic_value_error_invalid_type():
     def f(input_value, info):
         raise PydanticCustomError('my_error', 'this is a custom error {foo}', [('foo', 123)])
 
-    v = SchemaValidator(core_schema.with_info_plain_validator_function(f))
+    v = SchemaValidator(schema=core_schema.with_info_plain_validator_function(f))
 
     with pytest.raises(TypeError, match="argument 'context': 'list' object cannot be converted to 'PyDict'"):
         v.validate_python(42)
@@ -121,7 +121,7 @@ def test_validator_instance_plain():
             return f'{input_value} {self.foo} {self.bar}'
 
     c = CustomValidator()
-    v = SchemaValidator(core_schema.with_info_plain_validator_function(c.validate, metadata={'instance': c}))
+    v = SchemaValidator(schema=core_schema.with_info_plain_validator_function(c.validate, metadata={'instance': c}))
     c.foo += 1
 
     assert v.validate_python('input value') == 'input value 43 before'
@@ -140,7 +140,9 @@ def test_validator_instance_after():
 
     c = CustomValidator()
     v = SchemaValidator(
-        core_schema.with_info_after_validator_function(c.validate, core_schema.str_schema(), metadata={'instance': c})
+        schema=core_schema.with_info_after_validator_function(
+            c.validate, core_schema.str_schema(), metadata={'instance': c}
+        )
     )
     c.foo += 1
 
@@ -171,7 +173,7 @@ def test_pydantic_error_type_raise_no_ctx():
     def f(input_value, info):
         raise PydanticKnownError('finite_number')
 
-    v = SchemaValidator(core_schema.with_info_before_validator_function(f, core_schema.int_schema()))
+    v = SchemaValidator(schema=core_schema.with_info_before_validator_function(f, core_schema.int_schema()))
 
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python(4)
@@ -190,7 +192,7 @@ def test_pydantic_error_type_raise_ctx(extra: dict):
     def f(input_value, info):
         raise PydanticKnownError('greater_than', ctx)
 
-    v = SchemaValidator(core_schema.with_info_before_validator_function(f, core_schema.int_schema()))
+    v = SchemaValidator(schema=core_schema.with_info_before_validator_function(f, core_schema.int_schema()))
 
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python(4)
@@ -205,7 +207,7 @@ def test_pydantic_error_type_raise_custom_no_ctx(ctx: Optional[dict]):
     def f(input_value, info):
         raise PydanticKnownError('int_type', ctx)
 
-    v = SchemaValidator(core_schema.with_info_before_validator_function(f, core_schema.int_schema()))
+    v = SchemaValidator(schema=core_schema.with_info_before_validator_function(f, core_schema.int_schema()))
 
     expect_ctx = {'ctx': {}} if ctx is not None else {}
 
@@ -226,7 +228,7 @@ def test_pydantic_custom_error_type_raise_custom_ctx(extra: dict):
     def f(input_value, info):
         raise PydanticCustomError('my_error', 'my message with {val}', ctx)
 
-    v = SchemaValidator(core_schema.with_info_before_validator_function(f, core_schema.int_schema()))
+    v = SchemaValidator(schema=core_schema.with_info_before_validator_function(f, core_schema.int_schema()))
 
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python(4)
@@ -241,7 +243,7 @@ def test_pydantic_custom_error_type_raise_custom_no_ctx(ctx: Optional[dict]):
     def f(input_value, info):
         raise PydanticCustomError('my_error', 'my message', ctx)
 
-    v = SchemaValidator(core_schema.with_info_before_validator_function(f, core_schema.int_schema()))
+    v = SchemaValidator(schema=core_schema.with_info_before_validator_function(f, core_schema.int_schema()))
 
     expect_ctx = {'ctx': {}} if ctx is not None else {}
 
@@ -539,7 +541,7 @@ def test_all_errors():
 
 @pytest.mark.skipif(sys.version_info < (3, 11), reason='This is the modern version used post 3.10.')
 def test_validation_error_cause_contents():
-    enabled_config: CoreConfig = {'validation_error_cause': True}
+    enabled_config: CoreConfig = CoreConfig(validation_error_cause=True)
 
     def multi_raise_py_error(v: Any) -> Any:
         try:
@@ -547,7 +549,9 @@ def test_validation_error_cause_contents():
         except AssertionError as e:
             raise ValueError('Oh no!') from e
 
-    s2 = SchemaValidator(core_schema.no_info_plain_validator_function(multi_raise_py_error), config=enabled_config)
+    s2 = SchemaValidator(
+        schema=core_schema.no_info_plain_validator_function(multi_raise_py_error), config=enabled_config
+    )
     with pytest.raises(ValidationError) as exc_info:
         s2.validate_python('anything')
 
@@ -573,7 +577,9 @@ def test_validation_error_cause_contents():
         except ValidationError as e:
             raise ValueError('Sub val failure') from e
 
-    s3 = SchemaValidator(core_schema.no_info_plain_validator_function(outer_raise_py_error), config=enabled_config)
+    s3 = SchemaValidator(
+        schema=core_schema.no_info_plain_validator_function(outer_raise_py_error), config=enabled_config
+    )
     with pytest.raises(ValidationError) as exc_info:
         s3.validate_python('anything')
 
@@ -605,7 +611,7 @@ def test_validation_error_cause_contents():
 def test_validation_error_cause_contents_legacy():
     from exceptiongroup import BaseExceptionGroup
 
-    enabled_config: CoreConfig = {'validation_error_cause': True}
+    enabled_config: CoreConfig = CoreConfig(validation_error_cause=True)
 
     def multi_raise_py_error(v: Any) -> Any:
         try:
@@ -613,7 +619,9 @@ def test_validation_error_cause_contents_legacy():
         except AssertionError as e:
             raise ValueError('Oh no!') from e
 
-    s2 = SchemaValidator(core_schema.no_info_plain_validator_function(multi_raise_py_error), config=enabled_config)
+    s2 = SchemaValidator(
+        schema=core_schema.no_info_plain_validator_function(multi_raise_py_error), config=enabled_config
+    )
     with pytest.raises(ValidationError) as exc_info:
         s2.validate_python('anything')
 
@@ -641,7 +649,9 @@ def test_validation_error_cause_contents_legacy():
         except ValidationError as e:
             raise ValueError('Sub val failure') from e
 
-    s3 = SchemaValidator(core_schema.no_info_plain_validator_function(outer_raise_py_error), config=enabled_config)
+    s3 = SchemaValidator(
+        schema=core_schema.no_info_plain_validator_function(outer_raise_py_error), config=enabled_config
+    )
     with pytest.raises(ValidationError) as exc_info:
         s3.validate_python('anything')
 
@@ -683,10 +693,10 @@ class CauseResult(enum.Enum):
     [  # Without the backport should still work after 3.10 as not needed:
         (
             'Enabled',
-            {'validation_error_cause': True},
+            CoreConfig(validation_error_cause=True),
             CauseResult.CAUSE if sys.version_info >= (3, 11) else CauseResult.IMPORT_ERROR,
         ),
-        ('Disabled specifically', {'validation_error_cause': False}, CauseResult.NO_CAUSE),
+        ('Disabled specifically', CoreConfig(validation_error_cause=False), CauseResult.NO_CAUSE),
         ('Disabled implicitly', {}, CauseResult.NO_CAUSE),
     ],
 )
@@ -697,7 +707,7 @@ def test_validation_error_cause_config_variants(desc: str, config: CoreConfig, e
         def singular_raise_py_error(v: Any) -> Any:
             raise ValueError('Oh no!')
 
-        s = SchemaValidator(core_schema.no_info_plain_validator_function(singular_raise_py_error), config=config)
+        s = SchemaValidator(schema=core_schema.no_info_plain_validator_function(singular_raise_py_error), config=config)
 
         if expected_result is CauseResult.IMPORT_ERROR:
             # Confirm error message contains "requires the exceptiongroup module" in the middle of the string:
@@ -721,12 +731,14 @@ def test_validation_error_cause_config_variants(desc: str, config: CoreConfig, e
 def test_validation_error_cause_traceback_preserved():
     """Makes sure historic bug of traceback being lost is fixed."""
 
-    enabled_config: CoreConfig = {'validation_error_cause': True}
+    enabled_config: CoreConfig = CoreConfig(validation_error_cause=True)
 
     def singular_raise_py_error(v: Any) -> Any:
         raise ValueError('Oh no!')
 
-    s1 = SchemaValidator(core_schema.no_info_plain_validator_function(singular_raise_py_error), config=enabled_config)
+    s1 = SchemaValidator(
+        schema=core_schema.no_info_plain_validator_function(singular_raise_py_error), config=enabled_config
+    )
     with pytest.raises(ValidationError) as exc_info:
         s1.validate_python('anything')
 
@@ -749,7 +761,7 @@ class BadRepr:
 
 
 def test_error_on_repr(pydantic_version):
-    s = SchemaValidator({'type': 'int'})
+    s = SchemaValidator(schema=core_schema.int_schema())
     with pytest.raises(ValidationError) as exc_info:
         s.validate_python(BadRepr())
 
@@ -775,7 +787,7 @@ def test_error_on_repr(pydantic_version):
 
 
 def test_error_json(pydantic_version):
-    s = SchemaValidator({'type': 'str', 'min_length': 3})
+    s = SchemaValidator(schema=core_schema.str_schema(min_length=3))
     with pytest.raises(ValidationError) as exc_info:
         s.validate_python('12')
 
@@ -815,7 +827,7 @@ def test_error_json_python_error(pydantic_version: str):
         except AssertionError as e:
             raise ValueError('Oh no!') from e
 
-    s = SchemaValidator(core_schema.no_info_plain_validator_function(raise_py_error))
+    s = SchemaValidator(schema=core_schema.no_info_plain_validator_function(raise_py_error))
     with pytest.raises(ValidationError) as exc_info:
         s.validate_python('anything')
 
@@ -853,7 +865,7 @@ def test_error_json_python_error(pydantic_version: str):
 
 
 def test_error_json_cycle():
-    s = SchemaValidator({'type': 'str', 'min_length': 3})
+    s = SchemaValidator(schema=core_schema.str_schema(min_length=3))
     cycle = []
     cycle.append(cycle)
     msg = '[type=string_type, input_value=[[...]], input_type=list]'
@@ -875,7 +887,7 @@ class CustomStr:
 
 
 def test_error_json_unknown():
-    s = SchemaValidator({'type': 'str'})
+    s = SchemaValidator(schema=core_schema.str_schema())
     with pytest.raises(ValidationError) as exc_info:
         s.validate_python(Foobar())
 
@@ -909,7 +921,7 @@ def test_error_json_unknown():
 
 def test_error_json_loc():
     s = SchemaValidator(
-        core_schema.dict_schema(core_schema.str_schema(), core_schema.list_schema(core_schema.int_schema()))
+        schema=core_schema.dict_schema(core_schema.str_schema(), core_schema.list_schema(core_schema.int_schema()))
     )
     with pytest.raises(ValidationError) as exc_info:
         s.validate_python({'a': [0, 1, 'x'], 'b': [0, 'y']})
@@ -1057,7 +1069,7 @@ def test_raise_validation_error_custom_class_ctx():
 
 def test_loc_with_dots(pydantic_version):
     v = SchemaValidator(
-        core_schema.typed_dict_schema(
+        schema=core_schema.typed_dict_schema(
             {
                 'a': core_schema.typed_dict_field(
                     core_schema.tuple_positional_schema([core_schema.int_schema(), core_schema.int_schema()]),
@@ -1089,7 +1101,7 @@ def test_loc_with_dots(pydantic_version):
 
 
 def test_hide_input_in_error() -> None:
-    s = SchemaValidator({'type': 'int'})
+    s = SchemaValidator(schema=core_schema.int_schema())
     with pytest.raises(ValidationError) as exc_info:
         s.validate_python('definitely not an int')
 
@@ -1098,7 +1110,7 @@ def test_hide_input_in_error() -> None:
 
 
 def test_hide_input_in_json() -> None:
-    s = SchemaValidator({'type': 'int'})
+    s = SchemaValidator(schema=core_schema.int_schema())
     with pytest.raises(ValidationError) as exc_info:
         s.validate_python('definitely not an int')
 
@@ -1111,7 +1123,7 @@ def test_hide_input_in_json() -> None:
     reason='PyPy before 3.9 cannot pickle this correctly',
 )
 def test_validation_error_pickle() -> None:
-    s = SchemaValidator({'type': 'int'})
+    s = SchemaValidator(schema=core_schema.int_schema())
     with pytest.raises(ValidationError) as exc_info:
         s.validate_python('definitely not an int')
 
@@ -1122,7 +1134,7 @@ def test_validation_error_pickle() -> None:
 
 @pytest.mark.skipif('PYDANTIC_ERRORS_INCLUDE_URL' in os.environ, reason="can't test when envvar is set")
 def test_errors_include_url() -> None:
-    s = SchemaValidator({'type': 'int'})
+    s = SchemaValidator(schema=core_schema.int_schema())
     with pytest.raises(ValidationError) as exc_info:
         s.validate_python('definitely not an int')
     assert 'https://errors.pydantic.dev' in repr(exc_info.value)
@@ -1149,7 +1161,7 @@ def test_errors_include_url_envvar(env_var, env_var_value, expected_to_have_url)
     Since it can only be set before `ValidationError.__repr__()` is first called,
     we need to spawn a subprocess to test it.
     """
-    code = "import pydantic_core; pydantic_core.SchemaValidator({'type': 'int'}).validate_python('ooo')"
+    code = "import pydantic_core; from pydantic_core import core_schema; pydantic_core.SchemaValidator(schema=core_schema.int_schema()).validate_python('ooo')"
     env = os.environ.copy()
     env.pop('PYDANTIC_ERRORS_OMIT_URL', None)  # in case the ambient environment has it set
     if env_var_value is not None:

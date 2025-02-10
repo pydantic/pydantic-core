@@ -10,6 +10,7 @@ import pytest
 from dirty_equals import FunctionCheck, IsStr
 
 from pydantic_core import SchemaValidator, ValidationError, core_schema
+from pydantic_core import core_schema as cs
 
 from ..conftest import Err, PyAndJson, plain_repr
 
@@ -90,7 +91,7 @@ def test_decimal(py_and_json: PyAndJson, input_value, expected):
     ids=repr,
 )
 def test_decimal_strict_py(input_value, expected):
-    v = SchemaValidator({'type': 'decimal', 'strict': True})
+    v = SchemaValidator(schema=cs.decimal_schema(strict=True))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
@@ -120,7 +121,7 @@ def test_decimal_strict_py(input_value, expected):
     ids=repr,
 )
 def test_decimal_strict_json(input_value, expected):
-    v = SchemaValidator({'type': 'decimal', 'strict': True})
+    v = SchemaValidator(schema=cs.decimal_schema(strict=True))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_json(json.dumps(input_value))
@@ -225,7 +226,7 @@ def test_decimal_multiple_of(py_and_json: PyAndJson, multiple_of: float, input_v
 
 def test_union_decimal_py():
     v = SchemaValidator(
-        {'type': 'union', 'choices': [{'type': 'decimal', 'strict': True}, {'type': 'decimal', 'multiple_of': 7}]}
+        schema=cs.union_schema(choices=[cs.decimal_schema(strict=True), cs.decimal_schema(multiple_of=7)])
     )
     assert v.validate_python('14') == 14
     assert v.validate_python(Decimal(5)) == 5
@@ -251,7 +252,7 @@ def test_union_decimal_py():
 
 def test_union_decimal_json():
     v = SchemaValidator(
-        {'type': 'union', 'choices': [{'type': 'decimal', 'strict': True}, {'type': 'decimal', 'multiple_of': 7}]}
+        schema=cs.union_schema(choices=[cs.decimal_schema(strict=True), cs.decimal_schema(multiple_of=7)])
     )
     assert v.validate_json(json.dumps('14')) == 14
     assert v.validate_json(json.dumps('5')) == 5
@@ -275,21 +276,21 @@ def test_union_decimal_simple(py_and_json: PyAndJson):
 
 
 def test_decimal_repr():
-    v = SchemaValidator({'type': 'decimal'})
+    v = SchemaValidator(schema=cs.decimal_schema())
     assert plain_repr(v).startswith(
         'SchemaValidator(title="decimal",validator=Decimal(DecimalValidator{strict:false,allow_inf_nan:false'
     )
-    v = SchemaValidator({'type': 'decimal', 'strict': True})
+    v = SchemaValidator(schema=cs.decimal_schema(strict=True))
     assert plain_repr(v).startswith(
         'SchemaValidator(title="decimal",validator=Decimal(DecimalValidator{strict:true,allow_inf_nan:false'
     )
-    v = SchemaValidator({'type': 'decimal', 'multiple_of': 7})
+    v = SchemaValidator(schema=cs.decimal_schema(multiple_of=7))
     assert plain_repr(v).startswith('SchemaValidator(title="decimal",validator=Decimal(')
 
 
 @pytest.mark.parametrize('input_value,expected', [(Decimal('1.23'), Decimal('1.23')), (Decimal('1'), Decimal('1.0'))])
 def test_decimal_not_json(input_value, expected):
-    v = SchemaValidator({'type': 'decimal'})
+    v = SchemaValidator(schema=cs.decimal_schema())
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
@@ -383,7 +384,7 @@ def test_non_finite_json_values(py_and_json: PyAndJson, input_value, allow_inf_n
     ],
 )
 def test_non_finite_decimal_values(strict, input_value, allow_inf_nan, expected):
-    v = SchemaValidator({'type': 'decimal', 'allow_inf_nan': allow_inf_nan, 'strict': strict})
+    v = SchemaValidator(schema=cs.decimal_schema(allow_inf_nan=allow_inf_nan, strict=strict))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
@@ -419,7 +420,7 @@ def test_non_finite_decimal_values(strict, input_value, allow_inf_nan, expected)
     ],
 )
 def test_non_finite_constrained_decimal_values(input_value, allow_inf_nan, expected):
-    v = SchemaValidator({'type': 'decimal', 'allow_inf_nan': allow_inf_nan, 'gt': 0})
+    v = SchemaValidator(schema=cs.decimal_schema(allow_inf_nan=allow_inf_nan, gt=0))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
@@ -457,12 +458,12 @@ def test_non_finite_constrained_decimal_values(input_value, allow_inf_nan, expec
     ],
 )
 def test_validate_scientific_notation_from_json(input_value, expected):
-    v = SchemaValidator({'type': 'decimal'})
+    v = SchemaValidator(schema=cs.decimal_schema())
     assert v.validate_json(input_value) == expected
 
 
 def test_validate_max_digits_and_decimal_places() -> None:
-    v = SchemaValidator({'type': 'decimal', 'max_digits': 5, 'decimal_places': 2})
+    v = SchemaValidator(schema=cs.decimal_schema(max_digits=5, decimal_places=2))
 
     # valid inputs
     assert v.validate_json('1.23') == Decimal('1.23')
@@ -481,7 +482,7 @@ def test_validate_max_digits_and_decimal_places() -> None:
 
 
 def test_validate_max_digits_and_decimal_places_edge_case() -> None:
-    v = SchemaValidator({'type': 'decimal', 'max_digits': 34, 'decimal_places': 18})
+    v = SchemaValidator(schema=cs.decimal_schema(max_digits=34, decimal_places=18))
 
     # valid inputs
     assert v.validate_python(Decimal('9999999999999999.999999999999999999')) == Decimal(
@@ -490,20 +491,20 @@ def test_validate_max_digits_and_decimal_places_edge_case() -> None:
 
 
 def test_str_validation_w_strict() -> None:
-    s = SchemaValidator(core_schema.decimal_schema(strict=True))
+    s = SchemaValidator(schema=core_schema.decimal_schema(strict=True))
 
     with pytest.raises(ValidationError):
         assert s.validate_python('1.23')
 
 
 def test_str_validation_w_lax() -> None:
-    s = SchemaValidator(core_schema.decimal_schema(strict=False))
+    s = SchemaValidator(schema=core_schema.decimal_schema(strict=False))
 
     assert s.validate_python('1.23') == Decimal('1.23')
 
 
 def test_union_with_str_prefers_str() -> None:
-    s = SchemaValidator(core_schema.union_schema([core_schema.decimal_schema(), core_schema.str_schema()]))
+    s = SchemaValidator(schema=core_schema.union_schema([core_schema.decimal_schema(), core_schema.str_schema()]))
 
     assert s.validate_python('1.23') == '1.23'
     assert s.validate_python(1.23) == Decimal('1.23')

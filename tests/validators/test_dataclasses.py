@@ -207,7 +207,7 @@ def test_dataclass():
         ['a', 'b'],
     )
 
-    v = SchemaValidator(schema)
+    v = SchemaValidator(schema=schema)
     foo = v.validate_python({'a': 'hello', 'b': True})
     assert dataclasses.is_dataclass(foo)
     assert foo.a == 'hello'
@@ -289,7 +289,7 @@ def test_dataclass_subclass(revalidate_instances, input_value, expected):
         ['a', 'b'],
         revalidate_instances=revalidate_instances,
     )
-    v = SchemaValidator(schema)
+    v = SchemaValidator(schema=schema)
 
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=expected.message) as exc_info:
@@ -306,7 +306,7 @@ def test_dataclass_subclass(revalidate_instances, input_value, expected):
 
 def test_dataclass_subclass_strict_never_revalidate():
     v = SchemaValidator(
-        core_schema.dataclass_schema(
+        schema=core_schema.dataclass_schema(
             FooDataclass,
             core_schema.dataclass_args_schema(
                 'FooDataclass',
@@ -333,7 +333,7 @@ def test_dataclass_subclass_strict_never_revalidate():
 
 def test_dataclass_subclass_subclass_revalidate():
     v = SchemaValidator(
-        core_schema.dataclass_schema(
+        schema=core_schema.dataclass_schema(
             FooDataclass,
             core_schema.dataclass_args_schema(
                 'FooDataclass',
@@ -379,7 +379,7 @@ def test_dataclass_post_init():
         post_init=True,
     )
 
-    v = SchemaValidator(schema)
+    v = SchemaValidator(schema=schema)
     foo = v.validate_python({'a': 'hello', 'b': True})
     assert foo.a == 'HELLO'
     assert foo.b is True
@@ -413,7 +413,7 @@ def test_dataclass_post_init_args():
         post_init=True,
     )
 
-    v = SchemaValidator(schema)
+    v = SchemaValidator(schema=schema)
     foo = v.validate_python({'a': b'hello', 'b': 'true', 'c': '42'})
     assert foo.a == 'hello'
     assert foo.b is True
@@ -449,7 +449,7 @@ def test_dataclass_post_init_args_multiple():
         post_init=True,
     )
 
-    v = SchemaValidator(schema)
+    v = SchemaValidator(schema=schema)
     foo = v.validate_python({'a': b'hello', 'b': 'true', 'c': '42'})
     assert dataclasses.asdict(foo) == {'a': 'hello'}
     assert dc_args == (True, 42)
@@ -480,7 +480,7 @@ def test_dataclass_exact_validation(revalidate_instances, input_value, expected)
         revalidate_instances=revalidate_instances,
     )
 
-    v = SchemaValidator(schema)
+    v = SchemaValidator(schema=schema)
     foo = v.validate_python(input_value)
     assert dataclasses.asdict(foo) == expected
 
@@ -515,7 +515,7 @@ def test_dataclass_field_after_validator():
         ['a', 'b'],
     )
 
-    v = SchemaValidator(schema)
+    v = SchemaValidator(schema=schema)
     foo = v.validate_python({'a': 1, 'b': b'hello'})
     assert dataclasses.asdict(foo) == {'a': 1, 'b': 'hello world!'}
 
@@ -547,7 +547,7 @@ def test_dataclass_field_plain_validator():
         ['a', 'b'],
     )
 
-    v = SchemaValidator(schema)
+    v = SchemaValidator(schema=schema)
     foo = v.validate_python({'a': 1, 'b': b'hello'})
     assert dataclasses.asdict(foo) == {'a': 1, 'b': 'hello world!'}
 
@@ -582,7 +582,7 @@ def test_dataclass_field_before_validator():
         ['a', 'b'],
     )
 
-    v = SchemaValidator(schema)
+    v = SchemaValidator(schema=schema)
     foo = v.validate_python({'a': 1, 'b': b'hello'})
     assert dataclasses.asdict(foo) == {'a': 1, 'b': 'hello world!'}
 
@@ -621,7 +621,7 @@ def test_dataclass_field_wrap_validator1():
         ['a', 'b'],
     )
 
-    v = SchemaValidator(schema)
+    v = SchemaValidator(schema=schema)
     foo = v.validate_python({'a': 1, 'b': b'hello'})
     assert dataclasses.asdict(foo) == {'a': 1, 'b': 'hello world!'}
 
@@ -658,7 +658,7 @@ def test_dataclass_field_wrap_validator2():
         ['a', 'b'],
     )
 
-    v = SchemaValidator(schema)
+    v = SchemaValidator(schema=schema)
     foo = v.validate_python({'a': 1, 'b': b'hello'})
     assert dataclasses.asdict(foo) == {'a': 1, 'b': 'hello world!'}
 
@@ -683,7 +683,7 @@ def test_dataclass_self_init():
         ),
         ['a', 'b'],
     )
-    v = SchemaValidator(schema)
+    v = SchemaValidator(schema=schema)
 
     foo = Foo(b'hello', 'True')
     assert dataclasses.is_dataclass(foo)
@@ -707,7 +707,7 @@ def test_dataclass_self_init_alias():
         ),
         ['a', 'b'],
     )
-    v = SchemaValidator(schema)
+    v = SchemaValidator(schema=schema)
 
     def __init__(self, *args, **kwargs):
         v.validate_python(ArgsKwargs(args, kwargs), self_instance=self)
@@ -750,7 +750,7 @@ def test_dataclass_self_init_alias_field_name():
         ['a', 'b'],
         config={'loc_by_alias': False},
     )
-    v = SchemaValidator(schema)
+    v = SchemaValidator(schema=schema)
 
     def __init__(self, *args, **kwargs):
         v.validate_python(ArgsKwargs(args, kwargs), self_instance=self)
@@ -804,7 +804,7 @@ def test_dataclass_self_init_post_init():
         ['a', 'b', 'c'],
         post_init=True,
     )
-    v = SchemaValidator(schema)
+    v = SchemaValidator(schema=schema)
 
     foo = Foo(b'hello', 'True', c='123')
     assert dataclasses.is_dataclass(foo)
@@ -824,7 +824,7 @@ def test_dataclass_validate_assignment():
         ),
         ['a', 'b'],
     )
-    v = SchemaValidator(schema)
+    v = SchemaValidator(schema=schema)
 
     foo = v.validate_python({'a': 'hello', 'b': 'True'})
     assert dataclasses.asdict(foo) == {'a': 'hello', 'b': True}
@@ -870,7 +870,7 @@ def test_validate_assignment_function():
         return x * 2
 
     v = SchemaValidator(
-        core_schema.dataclass_schema(
+        schema=core_schema.dataclass_schema(
             MyDataclass,
             core_schema.dataclass_args_schema(
                 'MyDataclass',
@@ -910,7 +910,7 @@ def test_frozen():
         f: str
 
     v = SchemaValidator(
-        core_schema.dataclass_schema(
+        schema=core_schema.dataclass_schema(
             MyModel,
             core_schema.dataclass_args_schema('MyModel', [core_schema.dataclass_field('f', core_schema.str_schema())]),
             ['f'],
@@ -936,7 +936,7 @@ def test_frozen_field():
         f: str
 
     v = SchemaValidator(
-        core_schema.dataclass_schema(
+        schema=core_schema.dataclass_schema(
             MyModel,
             core_schema.dataclass_args_schema(
                 'MyModel', [core_schema.dataclass_field('f', core_schema.str_schema(), frozen=True)]
@@ -961,7 +961,7 @@ def test_frozen_field():
     'config,schema_extra_behavior_kw',
     [
         (core_schema.CoreConfig(extra_fields_behavior='ignore'), {}),
-        (core_schema.CoreConfig(extra_fields_behavior='ignore'), {'extra_behavior': None}),
+        (core_schema.CoreConfig(extra_fields_behavior='ignore'), {}),
         (core_schema.CoreConfig(), {'extra_behavior': 'ignore'}),
         (None, {'extra_behavior': 'ignore'}),
         (core_schema.CoreConfig(extra_fields_behavior='allow'), {'extra_behavior': 'ignore'}),
@@ -973,7 +973,7 @@ def test_extra_behavior_ignore(config: Union[core_schema.CoreConfig, None], sche
         f: str
 
     v = SchemaValidator(
-        core_schema.dataclass_schema(
+        schema=core_schema.dataclass_schema(
             MyModel,
             core_schema.dataclass_args_schema(
                 'MyModel', [core_schema.dataclass_field('f', core_schema.str_schema())], **schema_extra_behavior_kw
@@ -1009,7 +1009,7 @@ def test_extra_behavior_ignore(config: Union[core_schema.CoreConfig, None], sche
     'config,schema_extra_behavior_kw',
     [
         (core_schema.CoreConfig(extra_fields_behavior='forbid'), {}),
-        (core_schema.CoreConfig(extra_fields_behavior='forbid'), {'extra_behavior': None}),
+        (core_schema.CoreConfig(extra_fields_behavior='forbid'), {}),
         (core_schema.CoreConfig(), {'extra_behavior': 'forbid'}),
         (None, {'extra_behavior': 'forbid'}),
         (core_schema.CoreConfig(extra_fields_behavior='ignore'), {'extra_behavior': 'forbid'}),
@@ -1021,7 +1021,7 @@ def test_extra_behavior_forbid(config: Union[core_schema.CoreConfig, None], sche
         f: str
 
     v = SchemaValidator(
-        core_schema.dataclass_schema(
+        schema=core_schema.dataclass_schema(
             MyModel,
             core_schema.dataclass_args_schema(
                 'MyModel', [core_schema.dataclass_field('f', core_schema.str_schema())], **schema_extra_behavior_kw
@@ -1055,7 +1055,7 @@ def test_extra_behavior_forbid(config: Union[core_schema.CoreConfig, None], sche
     'config,schema_extra_behavior_kw',
     [
         (core_schema.CoreConfig(extra_fields_behavior='allow'), {}),
-        (core_schema.CoreConfig(extra_fields_behavior='allow'), {'extra_behavior': None}),
+        (core_schema.CoreConfig(extra_fields_behavior='allow'), {}),
         (core_schema.CoreConfig(), {'extra_behavior': 'allow'}),
         (None, {'extra_behavior': 'allow'}),
         (core_schema.CoreConfig(extra_fields_behavior='forbid'), {'extra_behavior': 'allow'}),
@@ -1067,7 +1067,7 @@ def test_extra_behavior_allow(config: Union[core_schema.CoreConfig, None], schem
         f: str
 
     v = SchemaValidator(
-        core_schema.dataclass_schema(
+        schema=core_schema.dataclass_schema(
             MyModel,
             core_schema.dataclass_args_schema(
                 'MyModel', [core_schema.dataclass_field('f', core_schema.str_schema())], **schema_extra_behavior_kw
@@ -1110,7 +1110,7 @@ def test_function_validator_wrapping_args_schema_after() -> None:
         ['number'],
     )
 
-    v = SchemaValidator(cs)
+    v = SchemaValidator(schema=cs)
 
     instance: Model = v.validate_python({'number': 1})
     assert instance.number == 1
@@ -1142,7 +1142,7 @@ def test_function_validator_wrapping_args_schema_before() -> None:
         ['number'],
     )
 
-    v = SchemaValidator(cs)
+    v = SchemaValidator(schema=cs)
 
     instance: Model = v.validate_python({'number': 1})
     assert instance.number == 1
@@ -1177,7 +1177,7 @@ def test_function_validator_wrapping_args_schema_wrap() -> None:
         ['number'],
     )
 
-    v = SchemaValidator(cs)
+    v = SchemaValidator(schema=cs)
 
     instance: Model = v.validate_python({'number': 1})
     assert instance.number == 1
@@ -1227,7 +1227,7 @@ def test_custom_dataclass_names():
         ['foo'],
     )
 
-    v = SchemaValidator(schema)
+    v = SchemaValidator(schema=schema)
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python({'foo': 123})
     assert exc_info.value.errors(include_url=False) == [
@@ -1257,7 +1257,7 @@ def test_slots() -> None:
         slots=True,
     )
 
-    val = SchemaValidator(schema)
+    val = SchemaValidator(schema=schema)
     m: Model
 
     m = val.validate_python({'x': 123})
@@ -1305,7 +1305,7 @@ def test_dataclass_slots_field_before_validator():
         slots=True,
     )
 
-    v = SchemaValidator(schema)
+    v = SchemaValidator(schema=schema)
     foo = v.validate_python({'a': 1, 'b': b'hello'})
     assert dataclasses.asdict(foo) == {'a': 1, 'b': 'hello world!'}
 
@@ -1342,7 +1342,7 @@ def test_dataclass_slots_field_after_validator():
         slots=True,
     )
 
-    v = SchemaValidator(schema)
+    v = SchemaValidator(schema=schema)
     foo = v.validate_python({'a': 1, 'b': b'hello'})
     assert dataclasses.asdict(foo) == {'a': 1, 'b': 'hello world!'}
 
@@ -1430,7 +1430,7 @@ def test_slots_dataclass_subclass(revalidate_instances, input_value, expected):
         revalidate_instances=revalidate_instances,
         slots=True,
     )
-    v = SchemaValidator(schema)
+    v = SchemaValidator(schema=schema)
 
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=expected.message) as exc_info:
@@ -1473,7 +1473,7 @@ def test_slots_mixed():
         ['x'],
         slots=True,
     )
-    v = SchemaValidator(schema)
+    v = SchemaValidator(schema=schema)
     dc = v.validate_python({'x': 1, 'y': 'a', 'x2': 2, 'y2': 'b'})
     assert dc.x == 1
     assert dc.x2 == 2
@@ -1492,7 +1492,7 @@ def test_dataclass_json():
         ),
         ['a', 'b'],
     )
-    v = SchemaValidator(schema)
+    v = SchemaValidator(schema=schema)
     assert v.validate_json('{"a": "hello", "b": true}') == FooDataclass(a='hello', b=True)
 
     with pytest.raises(ValidationError) as exc_info:
@@ -1525,7 +1525,7 @@ def test_dataclass_wrap_json():
             ['a', 'b'],
         ),
     )
-    v = SchemaValidator(schema)
+    v = SchemaValidator(schema=schema)
     assert v.validate_json('{"a": "hello", "b": true}') == FooDataclass(a='hello', b=True)
     assert v.validate_json('{"a": "hello", "b": true}', strict=True) == FooDataclass(a='hello', b=True)
 
@@ -1576,7 +1576,7 @@ def test_leak_dataclass(validator):
         # If any of the Rust validators don't implement traversal properly,
         # there will be an undetectable cycle created by this assignment
         # which will keep Dataclass alive
-        Dataclass.__pydantic_validator__ = SchemaValidator(dataclass_schema)
+        Dataclass.__pydantic_validator__ = SchemaValidator(schema=dataclass_schema)
 
         return Dataclass
 
@@ -1652,7 +1652,7 @@ def test_dataclass_args_init(input_value, extra_behavior, expected):
         post_init=True,
     )
 
-    v = SchemaValidator(schema)
+    v = SchemaValidator(schema=schema)
 
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
@@ -1698,7 +1698,7 @@ def test_dataclass_args_init_with_default(input_value, extra_behavior, expected)
         ['a', 'b'],
     )
 
-    v = SchemaValidator(schema)
+    v = SchemaValidator(schema=schema)
 
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:

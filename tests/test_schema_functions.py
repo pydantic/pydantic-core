@@ -303,7 +303,7 @@ def test_schema_functions(function, args_kwargs, expected_schema):
     if schema.get('type') in {None, 'definition-ref', 'typed-dict-field', 'model-field', 'invalid'}:
         return
 
-    v = SchemaValidator(schema)
+    v = SchemaValidator(schema=schema)
     try:
         v.validate_python('foobar')
     except ValidationError:
@@ -330,7 +330,7 @@ def test_all_schema_functions_used():
 def test_invalid_custom_error():
     s = core_schema.union_schema([{'type': 'int'}, {'type': 'str'}], custom_error_type='foobar')
     with pytest.raises(SchemaError, match=r"KeyError: 'custom_error_message'"):
-        SchemaValidator(s)
+        SchemaValidator(schema=s)
 
 
 def test_invalid_custom_error_type():
@@ -339,7 +339,7 @@ def test_invalid_custom_error_type():
     )
     msg = "custom_error.message should not be provided if 'custom_error_type' matches a known error"
     with pytest.raises(SchemaError, match=msg):
-        SchemaValidator(s)
+        SchemaValidator(schema=s)
 
 
 def repr_function(value, _info):
@@ -359,4 +359,4 @@ def test_expected_serialization_types(return_schema):
 
 def test_err_on_invalid() -> None:
     with pytest.raises(SchemaError, match='Cannot construct schema with `InvalidSchema` member.'):
-        SchemaValidator(core_schema.invalid_schema())
+        SchemaValidator(schema=core_schema.invalid_schema())

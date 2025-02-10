@@ -187,7 +187,7 @@ def test_extra_custom_serializer():
         [],
     )
     s = SchemaSerializer(schema)
-    v = SchemaValidator(schema)
+    v = SchemaValidator(schema=schema)
 
     m = v.validate_python({'extra': 'extra'})
 

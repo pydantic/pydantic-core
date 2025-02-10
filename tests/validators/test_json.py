@@ -86,7 +86,7 @@ def test_any(py_and_json: PyAndJson, input_value, expected):
     ],
 )
 def test_any_python(input_value, expected):
-    v = SchemaValidator(core_schema.json_schema())
+    v = SchemaValidator(schema=core_schema.json_schema())
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
@@ -162,7 +162,7 @@ def test_enum() -> None:
         core_schema.is_instance_schema(MyEnum),
     )
     v = core_schema.json_schema(enum_schema)
-    v = SchemaValidator(v)
+    v = SchemaValidator(schema=v)
     assert v.validate_python('"a"') == MyEnum.a
     assert v.validate_python('"b"') == MyEnum.b
     with pytest.raises(ValidationError):
@@ -170,9 +170,9 @@ def test_enum() -> None:
 
 
 def test_any_schema_no_schema():
-    v = SchemaValidator(core_schema.json_schema())
+    v = SchemaValidator(schema=core_schema.json_schema())
     assert 'validator:None' in plain_repr(v)
-    v = SchemaValidator(core_schema.json_schema(core_schema.any_schema()))
+    v = SchemaValidator(schema=core_schema.json_schema(core_schema.any_schema()))
     assert 'validator:None' in plain_repr(v)
-    v = SchemaValidator(core_schema.json_schema(core_schema.int_schema()))
+    v = SchemaValidator(schema=core_schema.json_schema(core_schema.int_schema()))
     assert 'validator:Some(' in plain_repr(v)

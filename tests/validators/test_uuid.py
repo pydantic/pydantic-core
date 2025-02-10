@@ -81,7 +81,7 @@ class MyStr(str): ...
     ],
 )
 def test_uuid(input_value, expected):
-    v = SchemaValidator({'type': 'uuid'})
+    v = SchemaValidator(schema=core_schema.uuid_schema())
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             result = v.validate_python(input_value)
@@ -102,7 +102,7 @@ def test_uuid(input_value, expected):
     ],
 )
 def test_uuid_strict(input_value, expected):
-    v = SchemaValidator({'type': 'uuid', 'strict': True})
+    v = SchemaValidator(schema=core_schema.uuid_schema(strict=True))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
@@ -154,7 +154,7 @@ def test_uuid_version(input_value, version, expected):
     if version is not None:
         schema['version'] = version
 
-    v = SchemaValidator(schema)
+    v = SchemaValidator(schema=schema)
 
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
@@ -193,7 +193,7 @@ def test_uuid_json(py_and_json: PyAndJson, input_value, expected):
 
 
 def test_uuid_deepcopy():
-    output = SchemaValidator({'type': 'uuid'}).validate_python('a6cc5730-2261-11ee-9c43-2eb5a363657c')
+    output = SchemaValidator(schema=core_schema.uuid_schema()).validate_python('a6cc5730-2261-11ee-9c43-2eb5a363657c')
     c = copy.deepcopy(output)
     assert repr(output) == "UUID('a6cc5730-2261-11ee-9c43-2eb5a363657c')"
     assert c == output
@@ -201,7 +201,7 @@ def test_uuid_deepcopy():
 
 
 def test_uuid_copy():
-    output = SchemaValidator({'type': 'uuid'}).validate_python('a6cc5730-2261-11ee-9c43-2eb5a363657c')
+    output = SchemaValidator(schema=core_schema.uuid_schema()).validate_python('a6cc5730-2261-11ee-9c43-2eb5a363657c')
     c = copy.copy(output)
     assert repr(output) == "UUID('a6cc5730-2261-11ee-9c43-2eb5a363657c')"
     assert c == output
@@ -211,7 +211,7 @@ def test_uuid_copy():
 def test_uuid_wrap_json():
     # https://github.com/pydantic/pydantic/issues/8147
     schema = core_schema.no_info_wrap_validator_function(lambda v, handler: handler(v), core_schema.uuid_schema())
-    v = SchemaValidator(schema)
+    v = SchemaValidator(schema=schema)
 
     assert v.validate_python(UUID('a6cc5730-2261-11ee-9c43-2eb5a363657c'), strict=True) == UUID(
         'a6cc5730-2261-11ee-9c43-2eb5a363657c'

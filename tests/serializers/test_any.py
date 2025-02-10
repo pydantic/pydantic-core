@@ -15,7 +15,13 @@ import pytest
 from dirty_equals import HasRepr, IsList
 
 import pydantic_core
-from pydantic_core import PydanticSerializationError, SchemaSerializer, SchemaValidator, core_schema, to_json
+from pydantic_core import (
+    PydanticSerializationError,
+    SchemaSerializer,
+    SchemaValidator,
+    core_schema,
+    to_json,
+)
 
 from ..conftest import plain_repr
 from .test_dataclasses import IsStrictDict, on_pypy
@@ -491,7 +497,7 @@ def test_any_model():
         ),
         ['a'],
     )
-    Foo.__pydantic_validator__ = SchemaValidator(schema)
+    Foo.__pydantic_validator__ = SchemaValidator(schema=schema)
     Foo.__pydantic_serializer__ = SchemaSerializer(schema)
 
     s = SchemaSerializer(core_schema.any_schema())

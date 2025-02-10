@@ -35,7 +35,7 @@ def test_tuple_json(py_and_json: PyAndJson, variadic_item_index, items, input_va
 
 
 def test_any_no_copy():
-    v = SchemaValidator({'type': 'tuple', 'items_schema': [{'type': 'any'}], 'variadic_item_index': 0})
+    v = SchemaValidator(schema=core_schema.tuple_schema(items_schema=[core_schema.any_schema()], variadic_item_index=0))
     input_value = (1, '2', b'3')
     output = v.validate_python(input_value)
     assert output == input_value
@@ -53,14 +53,14 @@ def test_any_no_copy():
 )
 def test_tuple_strict_passes_with_tuple(variadic_item_index, items, input_value, expected):
     v = SchemaValidator(
-        core_schema.tuple_schema(items_schema=items, variadic_item_index=variadic_item_index, strict=True)
+        schema=core_schema.tuple_schema(items_schema=items, variadic_item_index=variadic_item_index, strict=True)
     )
     assert v.validate_python(input_value) == expected
 
 
 @pytest.mark.parametrize('fail_fast', [True, False])
 def test_empty_positional_tuple(fail_fast):
-    v = SchemaValidator({'type': 'tuple', 'items_schema': [], 'fail_fast': fail_fast})
+    v = SchemaValidator(schema=core_schema.tuple_schema(items_schema=[], fail_fast=fail_fast))
     assert v.validate_python(()) == ()
     assert v.validate_python([]) == ()
     with pytest.raises(ValidationError) as exc_info:
@@ -84,7 +84,7 @@ def test_empty_positional_tuple(fail_fast):
 @pytest.mark.parametrize('wrong_coll_type', [list, set, frozenset])
 def test_tuple_strict_fails_without_tuple(wrong_coll_type: type[Any], variadic_item_index, items):
     v = SchemaValidator(
-        core_schema.tuple_schema(variadic_item_index=variadic_item_index, items_schema=items, strict=True)
+        schema=core_schema.tuple_schema(variadic_item_index=variadic_item_index, items_schema=items, strict=True)
     )
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python(wrong_coll_type([1, 2, '33']))
@@ -124,7 +124,9 @@ def test_tuple_strict_fails_without_tuple(wrong_coll_type: type[Any], variadic_i
     ids=repr,
 )
 def test_tuple_var_len_kwargs(kwargs: dict[str, Any], input_value, expected):
-    v = SchemaValidator({'type': 'tuple', 'items_schema': [{'type': 'any'}], 'variadic_item_index': 0, **kwargs})
+    v = SchemaValidator(
+        schema=core_schema.tuple_schema(items_schema=[core_schema.any_schema()], variadic_item_index=0, **kwargs)
+    )
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
@@ -150,7 +152,7 @@ def test_tuple_var_len_kwargs(kwargs: dict[str, Any], input_value, expected):
     ids=repr,
 )
 def test_tuple_validate(input_value, expected, variadic_item_index, items):
-    v = SchemaValidator(core_schema.tuple_schema(items_schema=items, variadic_item_index=variadic_item_index))
+    v = SchemaValidator(schema=core_schema.tuple_schema(items_schema=items, variadic_item_index=variadic_item_index))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
@@ -165,7 +167,7 @@ def test_tuple_validate(input_value, expected, variadic_item_index, items):
     'variadic_item_index,items', [(0, [{'type': 'int'}]), (None, [{'type': 'int'}, {'type': 'int'}, {'type': 'int'}])]
 )
 def test_tuple_validate_iterator(variadic_item_index, items):
-    v = SchemaValidator(core_schema.tuple_schema(items_schema=items, variadic_item_index=variadic_item_index))
+    v = SchemaValidator(schema=core_schema.tuple_schema(items_schema=items, variadic_item_index=variadic_item_index))
     assert v.validate_python(x for x in [1, 2, '3']) == (1, 2, 3)
 
 
@@ -180,7 +182,7 @@ def test_tuple_validate_iterator(variadic_item_index, items):
     ],
 )
 def test_tuple_var_len_errors(input_value, index):
-    v = SchemaValidator({'type': 'tuple', 'items_schema': [{'type': 'int'}], 'variadic_item_index': 0})
+    v = SchemaValidator(schema=core_schema.tuple_schema(items_schema=[core_schema.int_schema()], variadic_item_index=0))
     with pytest.raises(ValidationError) as exc_info:
         assert v.validate_python(input_value)
     assert exc_info.value.errors(include_url=False) == [
@@ -208,7 +210,7 @@ def test_tuple_var_len_errors(input_value, index):
     ],
 )
 def test_tuple_fix_len_errors(input_value, items, index):
-    v = SchemaValidator({'type': 'tuple', 'items_schema': items})
+    v = SchemaValidator(schema=core_schema.tuple_schema(items_schema=items))
     with pytest.raises(ValidationError) as exc_info:
         assert v.validate_python(input_value)
     assert exc_info.value.errors(include_url=False) == [
@@ -276,13 +278,12 @@ def test_positional_empty_extra(py_and_json: PyAndJson):
 @pytest.mark.parametrize('input_value,expected', [((1, 2, 3), (1, 2, 3)), ([1, 2, 3], [1, 2, 3])])
 def test_union_tuple_list(input_value, expected):
     v = SchemaValidator(
-        {
-            'type': 'union',
-            'choices': [
-                {'type': 'tuple', 'items_schema': [{'type': 'any'}], 'variadic_item_index': 0},
-                {'type': 'list'},
-            ],
-        }
+        schema=core_schema.union_schema(
+            choices=[
+                core_schema.tuple_schema(items_schema=[core_schema.any_schema()], variadic_item_index=0),
+                core_schema.list_schema(),
+            ]
+        )
     )
     assert v.validate_python(input_value) == expected
 
@@ -320,13 +321,12 @@ def test_union_tuple_list(input_value, expected):
 )
 def test_union_tuple_var_len(input_value, expected):
     v = SchemaValidator(
-        {
-            'type': 'union',
-            'choices': [
-                {'type': 'tuple', 'items_schema': [{'type': 'int'}], 'variadic_item_index': 0, 'strict': True},
-                {'type': 'tuple', 'items_schema': [{'type': 'str'}], 'variadic_item_index': 0, 'strict': True},
-            ],
-        }
+        schema=core_schema.union_schema(
+            choices=[
+                core_schema.tuple_schema(items_schema=[core_schema.int_schema()], variadic_item_index=0, strict=True),
+                core_schema.tuple_schema(items_schema=[core_schema.str_schema()], variadic_item_index=0, strict=True),
+            ]
+        )
     )
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
@@ -367,13 +367,18 @@ def test_union_tuple_var_len(input_value, expected):
 )
 def test_union_tuple_fix_len(input_value, expected):
     v = SchemaValidator(
-        {
-            'type': 'union',
-            'choices': [
-                {'type': 'tuple', 'items_schema': [{'type': 'int'}, {'type': 'int'}, {'type': 'int'}], 'strict': True},
-                {'type': 'tuple', 'items_schema': [{'type': 'str'}, {'type': 'str'}, {'type': 'str'}], 'strict': True},
-            ],
-        }
+        schema=core_schema.union_schema(
+            choices=[
+                core_schema.tuple_schema(
+                    items_schema=[core_schema.int_schema(), core_schema.int_schema(), core_schema.int_schema()],
+                    strict=True,
+                ),
+                core_schema.tuple_schema(
+                    items_schema=[core_schema.str_schema(), core_schema.str_schema(), core_schema.str_schema()],
+                    strict=True,
+                ),
+            ]
+        )
     )
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
@@ -385,7 +390,9 @@ def test_union_tuple_fix_len(input_value, expected):
 
 
 def test_tuple_fix_error():
-    v = SchemaValidator({'type': 'tuple', 'items_schema': [{'type': 'int'}, {'type': 'str'}]})
+    v = SchemaValidator(
+        schema=core_schema.tuple_schema(items_schema=[core_schema.int_schema(), core_schema.str_schema()])
+    )
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python([1])
 
@@ -407,7 +414,10 @@ def test_tuple_fix_error():
 )
 def test_tuple_fix_extra(input_value, expected):
     v = SchemaValidator(
-        {'type': 'tuple', 'items_schema': [{'type': 'int'}, {'type': 'str'}, {'type': 'str'}], 'variadic_item_index': 2}
+        schema=core_schema.tuple_schema(
+            items_schema=[core_schema.int_schema(), core_schema.str_schema(), core_schema.str_schema()],
+            variadic_item_index=2,
+        )
     )
 
     if isinstance(expected, Err):
@@ -419,7 +429,11 @@ def test_tuple_fix_extra(input_value, expected):
 
 
 def test_tuple_fix_extra_any():
-    v = SchemaValidator({'type': 'tuple', 'items_schema': [{'type': 'str'}, {'type': 'any'}], 'variadic_item_index': 1})
+    v = SchemaValidator(
+        schema=core_schema.tuple_schema(
+            items_schema=[core_schema.str_schema(), core_schema.any_schema()], variadic_item_index=1
+        )
+    )
     assert v.validate_python([b'1']) == ('1',)
     assert v.validate_python([b'1', 2]) == ('1', 2)
     assert v.validate_python((b'1', 2)) == ('1', 2)
@@ -439,7 +453,7 @@ def test_generator_error():
             raise RuntimeError('error')
         yield 3
 
-    v = SchemaValidator({'type': 'tuple', 'items_schema': [{'type': 'int'}], 'variadic_item_index': 0})
+    v = SchemaValidator(schema=core_schema.tuple_schema(items_schema=[core_schema.int_schema()], variadic_item_index=0))
     assert v.validate_python(gen(False)) == (1, 2, 3)
 
     msg = r'Error iterating over object, error: RuntimeError: error \[type=iteration_error,'
@@ -466,7 +480,7 @@ def test_generator_error():
     ],
 )
 def test_frozenset_from_dict_items(input_value, items_schema, expected):
-    v = SchemaValidator({'type': 'tuple', 'items_schema': [items_schema], 'variadic_item_index': 0})
+    v = SchemaValidator(schema=core_schema.tuple_schema(items_schema=[items_schema], variadic_item_index=0))
     output = v.validate_python(input_value)
     assert isinstance(output, tuple)
     assert output == expected
@@ -482,12 +496,11 @@ def test_frozenset_from_dict_items(input_value, items_schema, expected):
 )
 def test_length_constraints_omit(input_value, expected):
     v = SchemaValidator(
-        {
-            'type': 'tuple',
-            'items_schema': [{'type': 'default', 'schema': {'type': 'int'}, 'on_error': 'omit'}],
-            'variadic_item_index': 0,
-            'max_length': 4,
-        }
+        schema=core_schema.tuple_schema(
+            items_schema=[core_schema.with_default_schema(schema=core_schema.int_schema(), on_error='omit')],
+            variadic_item_index=0,
+            max_length=4,
+        )
     )
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
@@ -541,7 +554,7 @@ def test_tuple_fail_fast(fail_fast, expected):
         variadic_item_index=None,
         fail_fast=fail_fast,
     )
-    v = SchemaValidator(s)
+    v = SchemaValidator(schema=s)
 
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python(['str', 'not-num', 'again'])

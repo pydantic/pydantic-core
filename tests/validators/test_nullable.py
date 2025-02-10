@@ -9,7 +9,7 @@ from ..conftest import assert_gc
 
 
 def test_nullable():
-    v = SchemaValidator({'type': 'nullable', 'schema': {'type': 'int'}})
+    v = SchemaValidator(schema=core_schema.nullable_schema(schema=core_schema.int_schema()))
     assert v.validate_python(None) is None
     assert v.validate_python(1) == 1
     assert v.validate_python('123') == 123
@@ -27,13 +27,12 @@ def test_nullable():
 
 def test_union_nullable_bool_int():
     v = SchemaValidator(
-        {
-            'type': 'union',
-            'choices': [
-                {'type': 'nullable', 'schema': {'type': 'bool'}},
-                {'type': 'nullable', 'schema': {'type': 'int'}},
-            ],
-        }
+        schema=core_schema.union_schema(
+            choices=[
+                core_schema.nullable_schema(schema=core_schema.bool_schema()),
+                core_schema.nullable_schema(schema=core_schema.int_schema()),
+            ]
+        )
     )
     assert v.validate_python(None) is None
     assert v.validate_python(True) is True
@@ -54,7 +53,7 @@ def test_leak_nullable():
         # If any of the Rust validators don't implement traversal properly,
         # there will be an undetectable cycle created by this assignment
         # which will keep Defaulted alive
-        validate.__pydantic_validator__ = SchemaValidator(schema)
+        validate.__pydantic_validator__ = SchemaValidator(schema=schema)
 
         return validate
 

@@ -219,7 +219,7 @@ def test_tzinfo_could_be_reused():
         value: datetime
 
     v = SchemaValidator(
-        core_schema.model_schema(
+        schema=core_schema.model_schema(
             Model, core_schema.model_fields_schema({'value': core_schema.model_field(core_schema.datetime_schema())})
         )
     )

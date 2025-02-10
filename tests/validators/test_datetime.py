@@ -9,6 +9,7 @@ from decimal import Decimal
 import pytest
 
 from pydantic_core import SchemaError, SchemaValidator, ValidationError, core_schema, validate_core_schema
+from pydantic_core import core_schema as cs
 
 from ..conftest import Err, PyAndJson
 
@@ -58,7 +59,7 @@ from ..conftest import Err, PyAndJson
     ],
 )
 def test_datetime(input_value, expected):
-    v = SchemaValidator({'type': 'datetime'})
+    v = SchemaValidator(schema=cs.datetime_schema())
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             result = v.validate_python(input_value)
@@ -81,7 +82,7 @@ def test_datetime(input_value, expected):
     ],
 )
 def test_datetime_strict(input_value, expected):
-    v = SchemaValidator({'type': 'datetime', 'strict': True})
+    v = SchemaValidator(schema=cs.datetime_schema(strict=True))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
@@ -93,7 +94,7 @@ def test_datetime_strict(input_value, expected):
 def test_keep_tz():
     tz = zoneinfo.ZoneInfo('Europe/London')
     dt = datetime(2022, 6, 14, 12, 13, 14, tzinfo=tz)
-    v = SchemaValidator({'type': 'datetime'})
+    v = SchemaValidator(schema=cs.datetime_schema())
 
     output = v.validate_python(dt)
     assert output == dt
@@ -106,7 +107,7 @@ def test_keep_tz():
 def test_keep_tz_bound():
     tz = zoneinfo.ZoneInfo('Europe/London')
     dt = datetime(2022, 6, 14, 12, 13, 14, tzinfo=tz)
-    v = SchemaValidator({'type': 'datetime', 'gt': datetime(2022, 1, 1)})
+    v = SchemaValidator(schema=cs.datetime_schema(gt=datetime(2022, 1, 1)))
 
     output = v.validate_python(dt)
     assert output == dt
@@ -166,7 +167,7 @@ def test_datetime_json(py_and_json: PyAndJson, input_value, expected):
     ],
 )
 def test_datetime_strict_json(input_value, expected):
-    v = SchemaValidator({'type': 'datetime', 'strict': True})
+    v = SchemaValidator(schema=cs.datetime_schema(strict=True))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_json(json.dumps(input_value))
@@ -176,7 +177,7 @@ def test_datetime_strict_json(input_value, expected):
 
 
 def test_custom_timezone_repr():
-    output = SchemaValidator({'type': 'datetime'}).validate_python('2022-06-08T12:13:14-12:15')
+    output = SchemaValidator(schema=cs.datetime_schema()).validate_python('2022-06-08T12:13:14-12:15')
     assert output == datetime(2022, 6, 8, 12, 13, 14, tzinfo=timezone(timedelta(hours=-12, minutes=-15)))
     assert output.tzinfo.utcoffset(output) == timedelta(hours=-12, minutes=-15)
     assert output.tzinfo.dst(output) is None
@@ -186,7 +187,7 @@ def test_custom_timezone_repr():
 
 
 def test_custom_timezone_utc_repr():
-    output = SchemaValidator({'type': 'datetime'}).validate_python('2022-06-08T12:13:14Z')
+    output = SchemaValidator(schema=cs.datetime_schema()).validate_python('2022-06-08T12:13:14Z')
     assert output == datetime(2022, 6, 8, 12, 13, 14, tzinfo=timezone(timedelta(0)))
     assert output.tzinfo.utcoffset(output) == timedelta(0)
     assert output.tzinfo.dst(output) is None
@@ -200,19 +201,19 @@ def test_tz_comparison():
     uk_3pm = datetime(2022, 1, 1, 15, 0, 0, tzinfo=tz)
 
     # two times are the same instant, therefore le and ge are both ok
-    v = SchemaValidator({'type': 'datetime', 'le': uk_3pm}).validate_python('2022-01-01T16:00:00+01:00')
+    v = SchemaValidator(schema=cs.datetime_schema(le=uk_3pm)).validate_python('2022-01-01T16:00:00+01:00')
     assert v == datetime(2022, 1, 1, 16, 0, 0, tzinfo=timezone(timedelta(hours=1)))
 
-    v = SchemaValidator({'type': 'datetime', 'ge': uk_3pm}).validate_python('2022-01-01T16:00:00+01:00')
+    v = SchemaValidator(schema=cs.datetime_schema(ge=uk_3pm)).validate_python('2022-01-01T16:00:00+01:00')
     assert v == datetime(2022, 1, 1, 16, 0, 0, tzinfo=timezone(timedelta(hours=1)))
 
     # but not gt
     with pytest.raises(ValidationError, match=r'Input should be greater than 2022-01-01T15:00:00Z \[type=greater_than'):
-        SchemaValidator({'type': 'datetime', 'gt': uk_3pm}).validate_python('2022-01-01T16:00:00+01:00')
+        SchemaValidator(schema=cs.datetime_schema(gt=uk_3pm)).validate_python('2022-01-01T16:00:00+01:00')
 
 
 def test_tz_info_deepcopy():
-    output = SchemaValidator({'type': 'datetime'}).validate_python('2023-02-15T16:23:44.037Z')
+    output = SchemaValidator(schema=cs.datetime_schema()).validate_python('2023-02-15T16:23:44.037Z')
     c = copy.deepcopy(output)
     assert repr(output.tzinfo) == 'TzInfo(UTC)'
     assert repr(c.tzinfo) == 'TzInfo(UTC)'
@@ -220,7 +221,7 @@ def test_tz_info_deepcopy():
 
 
 def test_tz_info_copy():
-    output = SchemaValidator({'type': 'datetime'}).validate_python('2023-02-15T16:23:44.037Z')
+    output = SchemaValidator(schema=cs.datetime_schema()).validate_python('2023-02-15T16:23:44.037Z')
     c = copy.copy(output)
     assert repr(output.tzinfo) == 'TzInfo(UTC)'
     assert repr(c.tzinfo) == 'TzInfo(UTC)'
@@ -238,7 +239,7 @@ def test_custom_tz():
         def tzname(self, _dt):
             return 'CustomTZ'
 
-    schema = SchemaValidator({'type': 'datetime', 'gt': datetime(2022, 1, 1, 15, 0, 0)})
+    schema = SchemaValidator(schema=cs.datetime_schema(gt=datetime(2022, 1, 1, 15, 0, 0)))
 
     dt = datetime(2022, 1, 1, 16, 0, 0, tzinfo=CustomTz())
     outcome = schema.validate_python(dt)
@@ -252,7 +253,7 @@ def test_custom_invalid_tz():
         def tzname(self, _dt):
             return 'CustomTZ'
 
-    schema = SchemaValidator({'type': 'datetime', 'gt': datetime(2022, 1, 1, 15, 0, 0)})
+    schema = SchemaValidator(schema=cs.datetime_schema(gt=datetime(2022, 1, 1, 15, 0, 0)))
 
     dt = datetime(2022, 1, 1, 16, 0, 0, tzinfo=CustomTz())
     # perhaps this should be a ValidationError? but we don't catch other errors
@@ -277,7 +278,7 @@ def test_custom_invalid_tz():
 
 
 def test_dict_py():
-    v = SchemaValidator({'type': 'dict', 'keys_schema': {'type': 'datetime'}, 'values_schema': {'type': 'int'}})
+    v = SchemaValidator(schema=cs.dict_schema(keys_schema=cs.datetime_schema(), values_schema=cs.int_schema()))
     assert v.validate_python({datetime(2000, 1, 1): 2, datetime(2000, 1, 2): 4}) == {
         datetime(2000, 1, 1): 2,
         datetime(2000, 1, 2): 4,
@@ -293,11 +294,11 @@ def test_dict(py_and_json: PyAndJson):
 
 
 def test_union():
-    v = SchemaValidator({'type': 'union', 'choices': [{'type': 'str'}, {'type': 'datetime'}]})
+    v = SchemaValidator(schema=cs.union_schema(choices=[cs.str_schema(), cs.datetime_schema()]))
     assert v.validate_python('2022-01-02T00:00') == '2022-01-02T00:00'
     assert v.validate_python(datetime(2022, 1, 2)) == datetime(2022, 1, 2)
 
-    v = SchemaValidator({'type': 'union', 'choices': [{'type': 'datetime'}, {'type': 'str'}]})
+    v = SchemaValidator(schema=cs.union_schema(choices=[cs.datetime_schema(), cs.str_schema()]))
     assert v.validate_python('2022-01-02T00:00') == '2022-01-02T00:00'
     assert v.validate_python(datetime(2022, 1, 2)) == datetime(2022, 1, 2)
 
@@ -328,7 +329,7 @@ def test_datetime_past(py_and_json: PyAndJson, input_value, expected):
 
 
 def test_datetime_past_timezone():
-    v = SchemaValidator(core_schema.datetime_schema(now_utc_offset=0, now_op='past'))
+    v = SchemaValidator(schema=core_schema.datetime_schema(now_utc_offset=0, now_op='past'))
     now_utc = datetime.now(timezone.utc) - timedelta(seconds=1)
     assert v.isinstance_python(now_utc)
     # "later" in the day
@@ -371,7 +372,7 @@ def test_datetime_future(py_and_json: PyAndJson, input_value, expected):
 
 
 def test_datetime_future_timezone():
-    v = SchemaValidator(core_schema.datetime_schema(now_utc_offset=0, now_op='future'))
+    v = SchemaValidator(schema=core_schema.datetime_schema(now_utc_offset=0, now_op='future'))
     now_utc = datetime.now(timezone.utc)
 
     soon_utc = now_utc + timedelta(minutes=1)
@@ -397,7 +398,7 @@ def test_mock_utc_offset_8_hours(mocker):
     time.localtime() will return `{'tm_gmtoff': 8 * 60 * 60}` for the rest of the session.
     """
     mocker.patch('time.localtime', return_value=type('time.struct_time', (), {'tm_gmtoff': 8 * 60 * 60}))
-    v = SchemaValidator(core_schema.datetime_schema(now_op='future'))
+    v = SchemaValidator(schema=core_schema.datetime_schema(now_op='future'))
     future = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=8, minutes=1)
     assert v.isinstance_python(future)
 
@@ -419,7 +420,7 @@ def test_raises_schema_error_for_unknown_constraint_kind():
 
 
 def test_aware():
-    v = SchemaValidator(core_schema.datetime_schema(tz_constraint='aware'))
+    v = SchemaValidator(schema=core_schema.datetime_schema(tz_constraint='aware'))
     value = datetime.now(tz=timezone.utc)
     assert value is v.validate_python(value)
     assert v.validate_python('2022-06-08T12:13:14Z') == datetime(2022, 6, 8, 12, 13, 14, tzinfo=timezone.utc)
@@ -433,7 +434,7 @@ def test_aware():
 
 
 def test_naive():
-    v = SchemaValidator(core_schema.datetime_schema(tz_constraint='naive'))
+    v = SchemaValidator(schema=core_schema.datetime_schema(tz_constraint='naive'))
     value = datetime.now()
     assert value is v.validate_python(value)
     assert v.validate_python('2022-06-08T12:13:14') == datetime(2022, 6, 8, 12, 13, 14)
@@ -447,7 +448,7 @@ def test_naive():
 
 
 def test_aware_specific():
-    v = SchemaValidator(core_schema.datetime_schema(tz_constraint=0))
+    v = SchemaValidator(schema=core_schema.datetime_schema(tz_constraint=0))
     value = datetime.now(tz=timezone.utc)
     assert value is v.validate_python(value)
     assert v.validate_python('2022-06-08T12:13:14Z') == datetime(2022, 6, 8, 12, 13, 14, tzinfo=timezone.utc)
@@ -475,7 +476,7 @@ def test_aware_specific():
 
 
 def test_neg_7200():
-    v = SchemaValidator(core_schema.datetime_schema(tz_constraint=-7200))
+    v = SchemaValidator(schema=core_schema.datetime_schema(tz_constraint=-7200))
     value = datetime.now(tz=timezone(timedelta(hours=-2)))
     assert value is v.validate_python(value)
 
@@ -492,7 +493,7 @@ def test_neg_7200():
 
 def test_tz_constraint_too_high():
     with pytest.raises(SchemaError, match='OverflowError: Python int too large to convert to C long'):
-        SchemaValidator(core_schema.datetime_schema(tz_constraint=2**64))
+        SchemaValidator(schema=core_schema.datetime_schema(tz_constraint=2**64))
 
 
 def test_tz_constraint_wrong():
@@ -501,7 +502,7 @@ def test_tz_constraint_wrong():
 
 
 def test_tz_hash() -> None:
-    v = SchemaValidator(core_schema.datetime_schema())
+    v = SchemaValidator(schema=core_schema.datetime_schema())
     lookup: dict[datetime, str] = {}
     for day in range(1, 10):
         input_str = f'2022-06-{day:02}T12:13:14-12:15'
@@ -516,7 +517,7 @@ def test_tz_hash() -> None:
 
 
 def test_tz_cmp() -> None:
-    v = SchemaValidator(core_schema.datetime_schema())
+    v = SchemaValidator(schema=core_schema.datetime_schema())
     validated1 = v.validate_python('2022-06-08T12:13:14-12:15')
     validated2 = v.validate_python('2022-06-08T12:13:14-12:14')
 
