@@ -141,18 +141,20 @@ impl UnionValidator {
 
                         let new_exactness = state.exactness.unwrap_or(Exactness::Lax);
                         let new_fields_set_count = state.fields_set_count;
-                        let new_fields_set_percentage = new_fields_set_count.map(|count| {
-                            let total_fields = input.as_dict().map_or(0, |dict| dict.len());
-                            count as f64 / total_fields as f64
-                        });
 
+                        // we use both the exactness and the fields_set_count to determine the best union member match
+                        // if fields_set_count is available for the current best match and the new candidate, we use this
+                        // as the primary metric. If the new fields_set_count is greater, the new candidate is better.
+                        // if the fields_set_count is the same, we use the exactness as a tie breaker to determine the best match.
+                        // if the fields_set_count is not available for either the current best match or the new candidate,
+                        // we use the exactness to determine the best match.
                         let new_success_is_best_match: bool =
                             best_match
                                 .as_ref()
                                 .map_or(true, |(_, cur_exactness, cur_fields_set_count, cur_fields_set_count_value, cur_fields_set_percentage)| {
                                     match (cur_fields_set_count, new_fields_set_count) {
-                                        (Some(cur), Some(new)) if cur != new => cur < new,
-                                        (Some(_), Some(_)) => cur_fields_set_percentage < new_fields_set_percentage,
+                                        (Some(cur), Some(new)) if *cur != new => *cur < new,
+                                        (Some(_), Some(_)) => cur_fields_set_percentage.unwrap_or(0.0) < new_fields_set_percentage.unwrap_or(0.0),
                                         _ => *cur_exactness < new_exactness,
                                     }
                                 });
