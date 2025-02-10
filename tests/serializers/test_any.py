@@ -497,7 +497,7 @@ def test_any_model():
         ),
         ['a'],
     )
-    Foo.__pydantic_validator__ = SchemaValidator(schema=schema)
+    Foo.__pydantic_validator__ = SchemaValidator(schema)
     Foo.__pydantic_serializer__ = SchemaSerializer(schema)
 
     s = SchemaSerializer(core_schema.any_schema())

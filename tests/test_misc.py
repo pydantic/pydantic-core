@@ -42,7 +42,7 @@ def test_schema_error():
 
 
 def test_validation_error(pydantic_version):
-    v = SchemaValidator(schema=core_schema.int_schema())
+    v = SchemaValidator(core_schema.int_schema())
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python(1.5)
 
@@ -73,7 +73,7 @@ def test_validation_error(pydantic_version):
 
 
 def test_validation_error_include_context():
-    v = SchemaValidator(schema=core_schema.list_schema(max_length=2))
+    v = SchemaValidator(core_schema.list_schema(max_length=2))
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python([1, 2, 3])
 
@@ -101,7 +101,7 @@ def test_validation_error_include_context():
 
 
 def test_custom_title():
-    v = SchemaValidator(schema=core_schema.int_schema(), config=CoreConfig(title='MyInt'))
+    v = SchemaValidator(core_schema.int_schema(), config=CoreConfig(title='MyInt'))
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python(1.5)
 
@@ -116,7 +116,7 @@ def test_validation_error_multiple(pydantic_version):
         field_b: int
 
     v = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             cls=MyModel,
             schema=core_schema.model_fields_schema(
                 fields={
@@ -193,7 +193,7 @@ def test_unicode_error_input_repr() -> None:
 
     schema = core_schema.int_schema()
 
-    validator = SchemaValidator(schema=schema)
+    validator = SchemaValidator(schema)
 
     danger_str = 'ÿ' * 1000
     expected = "1 validation error for int\n  Input should be a valid integer, unable to parse string as an integer [type=int_parsing, input_value='ÿÿÿÿÿÿÿÿÿÿÿÿ...ÿÿÿÿÿÿÿÿÿÿÿ', input_type=str]"

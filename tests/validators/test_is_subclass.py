@@ -16,7 +16,7 @@ class Bar:
 
 
 def test_is_subclass_basic():
-    v = SchemaValidator(schema=core_schema.is_subclass_schema(Foo))
+    v = SchemaValidator(core_schema.is_subclass_schema(Foo))
     assert v.validate_python(Foo) == Foo
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python(Bar)
@@ -47,23 +47,23 @@ def test_is_subclass_basic():
     ],
 )
 def test_is_subclass(input_value, valid):
-    v = SchemaValidator(schema=core_schema.is_subclass_schema(Foo))
+    v = SchemaValidator(core_schema.is_subclass_schema(Foo))
     assert v.isinstance_python(input_value) == valid
 
 
 def test_not_parent():
-    v = SchemaValidator(schema=core_schema.is_subclass_schema(Foobar))
+    v = SchemaValidator(core_schema.is_subclass_schema(Foobar))
     assert v.isinstance_python(Foobar)
     assert not v.isinstance_python(Foo)
 
 
 def test_invalid_type():
     with pytest.raises(SchemaError, match="TypeError: 'Foo' object cannot be converted to 'PyType"):
-        SchemaValidator(schema=core_schema.is_subclass_schema(Foo()))
+        SchemaValidator(core_schema.is_subclass_schema(Foo()))
 
 
 def test_custom_repr():
-    v = SchemaValidator(schema=core_schema.is_subclass_schema(Foo, cls_repr='Spam'))
+    v = SchemaValidator(core_schema.is_subclass_schema(Foo, cls_repr='Spam'))
     assert v.validate_python(Foo) == Foo
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python(Bar)
@@ -80,7 +80,7 @@ def test_custom_repr():
 
 
 def test_is_subclass_json() -> None:
-    v = SchemaValidator(schema=core_schema.is_subclass_schema(Foo))
+    v = SchemaValidator(core_schema.is_subclass_schema(Foo))
     with pytest.raises(ValidationError) as exc_info:
         v.validate_json("'Foo'")
         assert exc_info.value.errors()[0]['type'] == 'needs_python_object'

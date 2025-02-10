@@ -13,7 +13,7 @@ def test_plain_enum():
         a = 1
         b = 2
 
-    v = SchemaValidator(schema=core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())))
+    v = SchemaValidator(core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())))
 
     # debug(v)
     assert v.validate_python(MyEnum.a) is MyEnum.a
@@ -43,13 +43,13 @@ def test_plain_enum():
     with pytest.raises(ValidationError, match='type=enum'):
         v.validate_json('"1"', strict=True)
 
-    v_strict = SchemaValidator(schema=core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values()), strict=True))
+    v_strict = SchemaValidator(core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values()), strict=True))
     assert v_strict.validate_python(MyEnum.a) is MyEnum.a
 
     with pytest.raises(ValidationError, match=re.escape(e)):
         v_strict.validate_python(1, strict=True)
 
-    v_strict_f = SchemaValidator(schema=core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values()), strict=True))
+    v_strict_f = SchemaValidator(core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values()), strict=True))
     assert v_strict_f.validate_python(MyEnum.a) is MyEnum.a
 
     with pytest.raises(ValidationError, match=re.escape(e)):
@@ -61,7 +61,7 @@ def test_int_enum():
         a = 1
         b = 2
 
-    v = SchemaValidator(schema=core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values()), sub_type='int'))
+    v = SchemaValidator(core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values()), sub_type='int'))
 
     # debug(v)
     assert v.validate_python(MyEnum.a) is MyEnum.a
@@ -95,7 +95,7 @@ def test_str_enum():
         a = 'x'
         b = 'y'
 
-    v = SchemaValidator(schema=core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values()), sub_type='str'))
+    v = SchemaValidator(core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values()), sub_type='str'))
 
     # debug(v)
     assert v.validate_python('x') is MyEnum.a
@@ -126,7 +126,7 @@ def test_float_enum():
         b = 2.5
         c = 3.0
 
-    v = SchemaValidator(schema=core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values()), sub_type='float'))
+    v = SchemaValidator(core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values()), sub_type='float'))
 
     # debug(v)
     assert v.validate_python(MyEnum.a) is MyEnum.a
@@ -169,9 +169,7 @@ def test_enum_missing():
     assert MyEnum(2) is MyEnum.b
     assert MyEnum(3) is MyEnum.b
 
-    v = SchemaValidator(
-        schema=core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values()), missing=MyEnum._missing_)
-    )
+    v = SchemaValidator(core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values()), missing=MyEnum._missing_))
 
     # debug(v)
     assert v.validate_python(MyEnum.a) is MyEnum.a
@@ -197,9 +195,7 @@ def test_enum_missing_none():
     with pytest.raises(ValueError, match='3 is not a valid'):
         MyEnum(3)
 
-    v = SchemaValidator(
-        schema=core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values()), missing=MyEnum._missing_)
-    )
+    v = SchemaValidator(core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values()), missing=MyEnum._missing_))
 
     # debug(v)
     assert v.validate_python(MyEnum.a) is MyEnum.a
@@ -231,9 +227,7 @@ def test_enum_missing_wrong():
     with pytest.raises(TypeError, match=e):
         MyEnum(3)
 
-    v = SchemaValidator(
-        schema=core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values()), missing=MyEnum._missing_)
-    )
+    v = SchemaValidator(core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values()), missing=MyEnum._missing_))
     with pytest.raises(TypeError, match=e):
         v.validate_python(3)
 
@@ -244,7 +238,7 @@ def test_enum_exactness():
         b = 2
 
     v = SchemaValidator(
-        schema=core_schema.union_schema(
+        core_schema.union_schema(
             [
                 core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values()), missing=MyEnum._missing_),
                 core_schema.int_schema(),
@@ -262,7 +256,7 @@ def test_plain_enum_lists():
         b = [2]
 
     assert MyEnum([1]) is MyEnum.a
-    v = SchemaValidator(schema=core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())))
+    v = SchemaValidator(core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())))
     assert v.validate_python(MyEnum.a) is MyEnum.a
     assert v.validate_python([1]) is MyEnum.a
     assert v.validate_python([2]) is MyEnum.b
@@ -273,7 +267,7 @@ def test_plain_enum_empty():
         pass
 
     with pytest.raises(SchemaError, match='`members` should have length > 0'):
-        SchemaValidator(schema=core_schema.enum_schema(MyEnum, []))
+        SchemaValidator(core_schema.enum_schema(MyEnum, []))
 
 
 def test_enum_with_str_subclass() -> None:
@@ -281,7 +275,7 @@ def test_enum_with_str_subclass() -> None:
         a = 'a'
         b = 'b'
 
-    v = SchemaValidator(schema=core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())))
+    v = SchemaValidator(core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())))
 
     assert v.validate_python(MyEnum.a) is MyEnum.a
     assert v.validate_python('a') is MyEnum.a
@@ -299,7 +293,7 @@ def test_enum_with_int_subclass() -> None:
         a = 1
         b = 2
 
-    v = SchemaValidator(schema=core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())))
+    v = SchemaValidator(core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())))
 
     assert v.validate_python(MyEnum.a) is MyEnum.a
     assert v.validate_python(1) is MyEnum.a
@@ -317,7 +311,7 @@ def test_validate_float_for_int_enum() -> None:
         a = 1
         b = 2
 
-    v = SchemaValidator(schema=core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())))
+    v = SchemaValidator(core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())))
 
     assert v.validate_python(1.0) is MyEnum.a
 
@@ -328,7 +322,7 @@ def test_missing_error_converted_to_val_error() -> None:
         ON = 1
 
     v = SchemaValidator(
-        schema=core_schema.with_default_schema(
+        core_schema.with_default_schema(
             schema=core_schema.enum_schema(MyFlags, list(MyFlags.__members__.values())), default=MyFlags.OFF
         )
     )
@@ -346,9 +340,7 @@ def test_big_int():
         BLUE = 1 << 64
 
     v = SchemaValidator(
-        schema=core_schema.with_default_schema(
-            schema=core_schema.enum_schema(ColorEnum, list(ColorEnum.__members__.values()))
-        )
+        core_schema.with_default_schema(schema=core_schema.enum_schema(ColorEnum, list(ColorEnum.__members__.values())))
     )
 
     assert v.validate_python(ColorEnum.GREEN) is ColorEnum.GREEN
@@ -367,14 +359,14 @@ def test_enum_int_validation_should_succeed_for_decimal(value: int):
         VALUE = value
 
     v = SchemaValidator(
-        schema=core_schema.with_default_schema(
+        core_schema.with_default_schema(
             schema=core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())),
             default=MyEnum.VALUE,
         )
     )
 
     v_int = SchemaValidator(
-        schema=core_schema.with_default_schema(
+        core_schema.with_default_schema(
             schema=core_schema.enum_schema(MyIntEnum, list(MyIntEnum.__members__.values())),
             default=MyIntEnum.VALUE,
         )
@@ -404,7 +396,7 @@ def test_enum_int_validation_should_succeed_for_custom_type():
         THIRD_VALUE = 'Py03'
 
     v = SchemaValidator(
-        schema=core_schema.with_default_schema(
+        core_schema.with_default_schema(
             schema=core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())),
             default=MyEnum.VALUE,
         )
@@ -420,7 +412,7 @@ def test_enum_str_validation_should_fail_for_decimal_when_expecting_str_value():
         VALUE = '1'
 
     v = SchemaValidator(
-        schema=core_schema.with_default_schema(
+        core_schema.with_default_schema(
             schema=core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())),
             default=MyEnum.VALUE,
         )
@@ -435,7 +427,7 @@ def test_enum_int_validation_should_fail_for_incorrect_decimal_value():
         VALUE = 1
 
     v = SchemaValidator(
-        schema=core_schema.with_default_schema(
+        core_schema.with_default_schema(
             schema=core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())),
             default=MyEnum.VALUE,
         )
@@ -460,7 +452,7 @@ def test_enum_int_validation_should_fail_for_plain_type_without_eq_checking():
             self.value = value
 
     v = SchemaValidator(
-        schema=core_schema.with_default_schema(
+        core_schema.with_default_schema(
             schema=core_schema.enum_schema(MyEnum, list(MyEnum.__members__.values())),
             default=MyEnum.VALUE,
         )
@@ -490,7 +482,7 @@ def support_custom_new_method() -> None:
 
             return obj
 
-    v = SchemaValidator(schema=core_schema.enum_schema(Animal, list(Animal.__members__.values())))
+    v = SchemaValidator(core_schema.enum_schema(Animal, list(Animal.__members__.values())))
     assert v.validate_python('cat') is Animal.CAT
     assert v.validate_python('meow') is Animal.CAT
     assert v.validate_python('dog') is Animal.DOG

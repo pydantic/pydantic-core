@@ -84,7 +84,7 @@ def test_gc_validator_iterator() -> None:
         iter: Iterable[int]
 
     v = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             MyModel,
             core_schema.model_fields_schema(
                 {'iter': core_schema.model_field(core_schema.generator_schema(core_schema.int_schema()))}

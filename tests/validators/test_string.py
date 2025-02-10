@@ -56,7 +56,7 @@ def test_str(py_and_json: PyAndJson, input_value, expected):
     ],
 )
 def test_str_not_json(input_value, expected):
-    v = SchemaValidator(schema=core_schema.str_schema())
+    v = SchemaValidator(core_schema.str_schema())
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
@@ -112,7 +112,7 @@ def test_constrained_str(py_and_json: PyAndJson, kwargs: dict[str, Any], input_v
     ],
 )
 def test_constrained_str_py_only(kwargs: dict[str, Any], input_value, expected):
-    v = SchemaValidator(schema=core_schema.str_schema(**kwargs))
+    v = SchemaValidator(core_schema.str_schema(**kwargs))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
@@ -123,7 +123,7 @@ def test_constrained_str_py_only(kwargs: dict[str, Any], input_value, expected):
 def test_unicode_error():
     # `.to_str()` Returns a `UnicodeEncodeError` if the input is not valid unicode (containing unpaired surrogates).
     # https://github.com/PyO3/pyo3/blob/6503128442b8f3e767c663a6a8d96376d7fb603d/src/types/string.rs#L477
-    v = SchemaValidator(schema=core_schema.str_schema(min_length=1))
+    v = SchemaValidator(core_schema.str_schema(min_length=1))
     assert v.validate_python('🐈 Hello') == '🐈 Hello'
 
     with pytest.raises(ValidationError) as exc_info:
@@ -154,7 +154,7 @@ def test_unicode_error():
     ],
 )
 def test_str_constrained(data: str, max_length: int, error: Union[re.Pattern, None]):
-    v = SchemaValidator(schema=core_schema.str_schema(max_length=max_length))
+    v = SchemaValidator(core_schema.str_schema(max_length=max_length))
     if error is None:
         assert v.validate_python(data) == data
     else:
@@ -163,7 +163,7 @@ def test_str_constrained(data: str, max_length: int, error: Union[re.Pattern, No
 
 
 def test_str_constrained_config():
-    v = SchemaValidator(schema=core_schema.str_schema(), config=CoreConfig(str_max_length=5))
+    v = SchemaValidator(core_schema.str_schema(), config=CoreConfig(str_max_length=5))
     assert v.validate_python('test') == 'test'
 
     with pytest.raises(ValidationError, match='String should have at most 5 characters'):
@@ -179,7 +179,7 @@ def test_invalid_regex(engine):
     #     'Error building "str" validator:\n  TypeError: \'int\' object cannot be converted to \'PyString\''
     # )
     with pytest.raises(SchemaError) as exc_info:
-        SchemaValidator(schema=core_schema.str_schema(pattern='(abc', regex_engine=engine))
+        SchemaValidator(core_schema.str_schema(pattern='(abc', regex_engine=engine))
 
     if engine is None or engine == 'rust-regex':
         assert exc_info.value.args[0] == (
@@ -194,7 +194,7 @@ def test_invalid_regex(engine):
 
 @pytest.mark.parametrize('engine', [None, 'rust-regex', 'python-re'])
 def test_regex_error(engine):
-    v = SchemaValidator(schema=core_schema.str_schema(pattern='11', regex_engine=engine))
+    v = SchemaValidator(core_schema.str_schema(pattern='11', regex_engine=engine))
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python('12')
     assert exc_info.value.errors(include_url=False) == [
@@ -210,7 +210,7 @@ def test_regex_error(engine):
 
 def test_default_validator():
     v = SchemaValidator(
-        schema=core_schema.str_schema(strict=True, to_lower=False), config=CoreConfig(str_strip_whitespace=False)
+        core_schema.str_schema(strict=True, to_lower=False), config=CoreConfig(str_strip_whitespace=False)
     )
     assert (
         plain_repr(v)
@@ -231,7 +231,7 @@ def fruit_enum_fixture():
 
 @pytest.mark.parametrize('to_lower', [False, True], ids=repr)
 def test_strict_subclass(to_lower: bool):
-    v = SchemaValidator(schema=core_schema.str_schema(strict=True, to_lower=to_lower))
+    v = SchemaValidator(core_schema.str_schema(strict=True, to_lower=to_lower))
 
     class StrSubclass(str):
         pass
@@ -242,7 +242,7 @@ def test_strict_subclass(to_lower: bool):
 
 @pytest.mark.parametrize('kwargs', [{}, {'to_lower': True}], ids=repr)
 def test_lax_subclass(FruitEnum, kwargs):
-    v = SchemaValidator(schema=core_schema.str_schema(**kwargs))
+    v = SchemaValidator(core_schema.str_schema(**kwargs))
     assert v.validate_python('foobar') == 'foobar'
     assert v.validate_python(b'foobar') == 'foobar'
     p = v.validate_python(FruitEnum.pear)
@@ -253,7 +253,7 @@ def test_lax_subclass(FruitEnum, kwargs):
 
 @pytest.mark.parametrize('kwargs', [{}, {'to_lower': True}], ids=repr)
 def test_lax_subclass_plain_enum(kwargs):
-    v = SchemaValidator(schema=core_schema.str_schema(**kwargs))
+    v = SchemaValidator(core_schema.str_schema(**kwargs))
 
     from enum import Enum
 
@@ -270,7 +270,7 @@ def test_subclass_preserved() -> None:
     class StrSubclass(str):
         pass
 
-    v = SchemaValidator(schema=core_schema.str_schema())
+    v = SchemaValidator(core_schema.str_schema())
 
     assert not isinstance(v.validate_python(StrSubclass('')), StrSubclass)
     assert not isinstance(v.validate_python(StrSubclass(''), strict=True), StrSubclass)
@@ -278,7 +278,7 @@ def test_subclass_preserved() -> None:
     # unions do a first pass in strict mode
     # so verify that they don't match the str schema in strict mode
     # and preserve the type
-    v = SchemaValidator(schema=core_schema.union_schema([core_schema.str_schema(), core_schema.int_schema()]))
+    v = SchemaValidator(core_schema.union_schema([core_schema.str_schema(), core_schema.int_schema()]))
 
     assert not isinstance(v.validate_python(StrSubclass('')), StrSubclass)
     assert not isinstance(v.validate_python(StrSubclass(''), strict=True), StrSubclass)
@@ -288,14 +288,14 @@ def test_subclass_preserved() -> None:
 def test_coerce_numbers_to_str_with_invalid_unicode_character(string) -> None:
     config = core_schema.CoreConfig(coerce_numbers_to_str=True)
 
-    v = SchemaValidator(schema=core_schema.str_schema(strict=string), config=config)
+    v = SchemaValidator(core_schema.str_schema(strict=string), config=config)
     assert v.validate_python('\ud835') == '\ud835'
 
 
 def test_coerce_numbers_to_str_disabled_in_strict_mode() -> None:
     config = core_schema.CoreConfig(coerce_numbers_to_str=True)
 
-    v = SchemaValidator(schema=core_schema.str_schema(strict=True), config=config)
+    v = SchemaValidator(core_schema.str_schema(strict=True), config=config)
     with pytest.raises(ValidationError):
         v.validate_python(42)
     with pytest.raises(ValidationError):
@@ -305,7 +305,7 @@ def test_coerce_numbers_to_str_disabled_in_strict_mode() -> None:
 def test_coerce_numbers_to_str_raises_for_bool() -> None:
     config = core_schema.CoreConfig(coerce_numbers_to_str=True)
 
-    v = SchemaValidator(schema=core_schema.str_schema(), config=config)
+    v = SchemaValidator(core_schema.str_schema(), config=config)
     with pytest.raises(ValidationError):
         v.validate_python(True)
     with pytest.raises(ValidationError):
@@ -323,7 +323,7 @@ def test_coerce_numbers_to_str_raises_for_bool() -> None:
 def test_coerce_numbers_to_str(number: Number, expected_str: str) -> None:
     config = core_schema.CoreConfig(coerce_numbers_to_str=True)
 
-    v = SchemaValidator(schema=core_schema.str_schema(), config=config)
+    v = SchemaValidator(core_schema.str_schema(), config=config)
     assert v.validate_python(number) == expected_str
 
 
@@ -338,7 +338,7 @@ def test_coerce_numbers_to_str(number: Number, expected_str: str) -> None:
 def test_coerce_numbers_to_str_from_json(number: str, expected_str: str) -> None:
     config = core_schema.CoreConfig(coerce_numbers_to_str=True)
 
-    v = SchemaValidator(schema=core_schema.str_schema(), config=config)
+    v = SchemaValidator(core_schema.str_schema(), config=config)
     assert v.validate_json(number) == expected_str
 
 
@@ -349,9 +349,9 @@ def test_backtracking_regex_rust_unsupported(mode) -> None:
     with pytest.raises(SchemaError) as exc_info:
         if mode is None:
             # rust-regex is the default
-            SchemaValidator(schema=core_schema.str_schema(pattern=pattern))
+            SchemaValidator(core_schema.str_schema(pattern=pattern))
         elif mode == 'schema':
-            SchemaValidator(schema=core_schema.str_schema(pattern=pattern, regex_engine='rust-regex'))
+            SchemaValidator(core_schema.str_schema(pattern=pattern, regex_engine='rust-regex'))
         elif mode == 'config':
             SchemaValidator(
                 schema=core_schema.str_schema(pattern=pattern), config=core_schema.CoreConfig(regex_engine='rust-regex')
@@ -371,7 +371,7 @@ def test_backtracking_regex_python(mode) -> None:
     pattern = r'r(#*)".*?"\1'
 
     if mode == 'schema':
-        v = SchemaValidator(schema=core_schema.str_schema(pattern=pattern, regex_engine='python-re'))
+        v = SchemaValidator(core_schema.str_schema(pattern=pattern, regex_engine='python-re'))
     elif mode == 'config':
         v = SchemaValidator(
             schema=core_schema.str_schema(pattern=pattern), config=core_schema.CoreConfig(regex_engine='python-re')
@@ -385,7 +385,7 @@ def test_backtracking_regex_python(mode) -> None:
 
 @pytest.mark.parametrize('number', (42, 443, 10242))
 def test_coerce_numbers_to_str_schema(number: int):
-    v = SchemaValidator(schema=core_schema.str_schema(coerce_numbers_to_str=True))
+    v = SchemaValidator(core_schema.str_schema(coerce_numbers_to_str=True))
     assert v.validate_python(number) == str(number)
     assert v.validate_json(str(number)) == str(number)
 
@@ -393,12 +393,12 @@ def test_coerce_numbers_to_str_schema(number: int):
 @pytest.mark.parametrize('number', (42, 443, 10242))
 def test_coerce_numbers_to_str_schema_precedence(number: int):
     config = core_schema.CoreConfig(coerce_numbers_to_str=False)
-    v = SchemaValidator(schema=core_schema.str_schema(coerce_numbers_to_str=True), config=config)
+    v = SchemaValidator(core_schema.str_schema(coerce_numbers_to_str=True), config=config)
     assert v.validate_python(number) == str(number)
     assert v.validate_json(str(number)) == str(number)
 
     config = core_schema.CoreConfig(coerce_numbers_to_str=True)
-    v = SchemaValidator(schema=core_schema.str_schema(coerce_numbers_to_str=False), config=config)
+    v = SchemaValidator(core_schema.str_schema(coerce_numbers_to_str=False), config=config)
     with pytest.raises(ValidationError):
         v.validate_python(number)
     with pytest.raises(ValidationError):
@@ -407,7 +407,7 @@ def test_coerce_numbers_to_str_schema_precedence(number: int):
 
 @pytest.mark.parametrize('number', (42, 443, 10242))
 def test_coerce_numbers_to_str_schema_with_strict_mode(number: int):
-    v = SchemaValidator(schema=core_schema.str_schema(coerce_numbers_to_str=True, strict=True))
+    v = SchemaValidator(core_schema.str_schema(coerce_numbers_to_str=True, strict=True))
     with pytest.raises(ValidationError):
         v.validate_python(number)
     with pytest.raises(ValidationError):
@@ -416,6 +416,6 @@ def test_coerce_numbers_to_str_schema_with_strict_mode(number: int):
 
 @pytest.mark.parametrize('engine', [None, 'rust-regex', 'python-re'])
 def test_compiled_regex(engine) -> None:
-    v = SchemaValidator(schema=core_schema.str_schema(pattern=re.compile('abc', re.IGNORECASE), regex_engine=engine))
+    v = SchemaValidator(core_schema.str_schema(pattern=re.compile('abc', re.IGNORECASE), regex_engine=engine))
     assert v.validate_python('abc') == 'abc'
     assert v.validate_python('ABC') == 'ABC'

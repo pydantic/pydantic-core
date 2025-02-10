@@ -18,7 +18,7 @@ class MyModel:
 
 def test_model_init():
     v = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             cls=MyModel,
             schema=core_schema.model_fields_schema(
                 fields={
@@ -48,7 +48,7 @@ def test_model_init_nested():
         __slots__ = '__dict__', '__pydantic_fields_set__', '__pydantic_extra__', '__pydantic_private__'
 
     v = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             cls=MyModel,
             schema=core_schema.model_fields_schema(
                 fields={
@@ -92,7 +92,7 @@ def test_function_before():
         return input_value
 
     v = SchemaValidator(
-        schema={
+        {
             'type': 'function-before',
             'function': {'type': 'with-info', 'function': f},
             'schema': core_schema.model_schema(
@@ -126,7 +126,7 @@ def test_function_after():
         return input_value
 
     v = SchemaValidator(
-        schema={
+        {
             'type': 'function-after',
             'function': {'type': 'with-info', 'function': f},
             'schema': core_schema.model_schema(
@@ -162,7 +162,7 @@ def test_function_wrap():
         return v
 
     v = SchemaValidator(
-        schema={
+        {
             'type': 'function-wrap',
             'function': {'type': 'with-info', 'function': f},
             'schema': core_schema.model_schema(
@@ -189,7 +189,7 @@ def test_function_wrap():
 
 
 def test_simple():
-    v = SchemaValidator(schema=core_schema.str_schema())
+    v = SchemaValidator(core_schema.str_schema())
     assert v.validate_python(b'abc') == 'abc'
     assert v.isinstance_python(b'abc') is True
 
@@ -213,7 +213,7 @@ def test_model_custom_init():
             self.c = self.a + 2
 
     v = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             Model,
             core_schema.model_fields_schema(
                 {
@@ -270,7 +270,7 @@ def test_model_custom_init_nested():
         ),
         custom_init=True,
     )
-    ModelInner.__pydantic_validator__ = SchemaValidator(schema=inner_schema)
+    ModelInner.__pydantic_validator__ = SchemaValidator(inner_schema)
 
     class ModelOuter:
         __slots__ = '__dict__', '__pydantic_fields_set__'
@@ -282,7 +282,7 @@ def test_model_custom_init_nested():
             self.__pydantic_validator__.validate_python(data, self_instance=self)
 
     ModelOuter.__pydantic_validator__ = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             ModelOuter,
             core_schema.model_fields_schema(
                 {
@@ -330,7 +330,7 @@ def test_model_custom_init_extra():
         config=CoreConfig(extra_fields_behavior='allow'),
         custom_init=True,
     )
-    ModelInner.__pydantic_validator__ = SchemaValidator(schema=inner_schema)
+    ModelInner.__pydantic_validator__ = SchemaValidator(inner_schema)
 
     class ModelOuter:
         __slots__ = '__dict__', '__pydantic_fields_set__', '__pydantic_extra__', '__pydantic_private__'
@@ -346,7 +346,7 @@ def test_model_custom_init_extra():
             calls.append(('outer', self.__dict__, self.__pydantic_fields_set__, self.__pydantic_extra__))
 
     ModelOuter.__pydantic_validator__ = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             ModelOuter,
             core_schema.model_fields_schema(
                 {
@@ -387,7 +387,7 @@ def test_model_custom_init_revalidate():
             self.__pydantic_extra__ = None
 
     v = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             Model,
             core_schema.model_fields_schema({'a': core_schema.model_field(core_schema.int_schema())}),
             custom_init=True,
@@ -452,7 +452,7 @@ def test_leak_model(validator):
         # If any of the Rust validators don't implement traversal properly,
         # there will be an undetectable cycle created by this assignment
         # which will keep Model alive
-        Model.__pydantic_validator__ = SchemaValidator(schema=model_schema)
+        Model.__pydantic_validator__ = SchemaValidator(model_schema)
 
         return Model
 
@@ -504,7 +504,7 @@ def test_model_custom_init_with_union() -> None:
         ],
     }
 
-    validator = SchemaValidator(schema=schema)
+    validator = SchemaValidator(schema)
 
     assert validator.validate_python({'a': False}).a is False
     assert validator.validate_python({'b': True}).b is True

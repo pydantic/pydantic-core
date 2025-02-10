@@ -33,7 +33,7 @@ from ..conftest import Err, PyAndJson
     ],
 )
 def test_time(input_value, expected):
-    v = SchemaValidator(schema=core_schema.time_schema())
+    v = SchemaValidator(core_schema.time_schema())
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
@@ -114,7 +114,7 @@ def test_time_error_microseconds_overflow(py_and_json: PyAndJson) -> None:
     ],
 )
 def test_time_strict(input_value, expected):
-    v = SchemaValidator(schema=core_schema.time_schema(strict=True))
+    v = SchemaValidator(core_schema.time_schema(strict=True))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
@@ -132,7 +132,7 @@ def test_time_strict(input_value, expected):
     ],
 )
 def test_time_strict_json(input_value, expected):
-    v = SchemaValidator(schema=core_schema.time_schema(strict=True))
+    v = SchemaValidator(core_schema.time_schema(strict=True))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_json(input_value)
@@ -159,7 +159,7 @@ def test_time_strict_json(input_value, expected):
     ],
 )
 def test_time_kwargs(kwargs: dict[str, Any], input_value, expected):
-    v = SchemaValidator(schema=core_schema.time_schema(**kwargs))
+    v = SchemaValidator(core_schema.time_schema(**kwargs))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
             v.validate_python(input_value)
@@ -174,7 +174,7 @@ def test_time_kwargs(kwargs: dict[str, Any], input_value, expected):
 
 
 def test_time_bound_ctx():
-    v = SchemaValidator(schema=core_schema.time_schema(gt=time(12, 13, 14, 123_456)))
+    v = SchemaValidator(core_schema.time_schema(gt=time(12, 13, 14, 123_456)))
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python('12:13')
 
@@ -196,7 +196,7 @@ def test_invalid_constraint():
 
 def test_dict_py():
     v = SchemaValidator(
-        schema=core_schema.dict_schema(keys_schema=core_schema.time_schema(), values_schema=core_schema.int_schema())
+        core_schema.dict_schema(keys_schema=core_schema.time_schema(), values_schema=core_schema.int_schema())
     )
     assert v.validate_python({time(12, 1, 1): 2, time(12, 1, 2): 4}) == {time(12, 1, 1): 2, time(12, 1, 2): 4}
 
@@ -207,17 +207,17 @@ def test_dict(py_and_json: PyAndJson):
 
 
 def test_union():
-    v = SchemaValidator(schema=core_schema.union_schema(choices=[core_schema.str_schema(), core_schema.time_schema()]))
+    v = SchemaValidator(core_schema.union_schema(choices=[core_schema.str_schema(), core_schema.time_schema()]))
     assert v.validate_python('12:01:02') == '12:01:02'
     assert v.validate_python(time(12, 1, 2)) == time(12, 1, 2)
 
-    v = SchemaValidator(schema=core_schema.union_schema(choices=[core_schema.time_schema(), core_schema.str_schema()]))
+    v = SchemaValidator(core_schema.union_schema(choices=[core_schema.time_schema(), core_schema.str_schema()]))
     assert v.validate_python('12:01:02') == '12:01:02'
     assert v.validate_python(time(12, 1, 2)) == time(12, 1, 2)
 
 
 def test_aware():
-    v = SchemaValidator(schema=core_schema.time_schema(tz_constraint='aware'))
+    v = SchemaValidator(core_schema.time_schema(tz_constraint='aware'))
     value = time(12, 13, 15, tzinfo=timezone.utc)
     assert value is v.validate_python(value)
     assert v.validate_python('12:13:14Z') == time(12, 13, 14, tzinfo=timezone.utc)
@@ -231,7 +231,7 @@ def test_aware():
 
 
 def test_naive():
-    v = SchemaValidator(schema=core_schema.time_schema(tz_constraint='naive'))
+    v = SchemaValidator(core_schema.time_schema(tz_constraint='naive'))
     value = time(12, 13, 15)
     assert value is v.validate_python(value)
     assert v.validate_python('12:13:14') == time(12, 13, 14)
@@ -245,7 +245,7 @@ def test_naive():
 
 
 def test_aware_specific():
-    v = SchemaValidator(schema=core_schema.time_schema(tz_constraint=0))
+    v = SchemaValidator(core_schema.time_schema(tz_constraint=0))
     value = time(12, 13, 15, tzinfo=timezone.utc)
     assert value is v.validate_python(value)
     assert v.validate_python('12:13:14Z') == time(12, 13, 14, tzinfo=timezone.utc)
@@ -273,7 +273,7 @@ def test_aware_specific():
 
 
 def test_neg_7200():
-    v = SchemaValidator(schema=core_schema.time_schema(tz_constraint=-7200))
+    v = SchemaValidator(core_schema.time_schema(tz_constraint=-7200))
     value = time(12, 13, 15, tzinfo=timezone(timedelta(hours=-2)))
     assert value is v.validate_python(value)
 
@@ -290,7 +290,7 @@ def test_neg_7200():
 
 def test_tz_constraint_too_high():
     with pytest.raises(SchemaError, match='OverflowError: Python int too large to convert to C long'):
-        SchemaValidator(schema=core_schema.time_schema(tz_constraint=2**64))
+        SchemaValidator(core_schema.time_schema(tz_constraint=2**64))
 
 
 def test_tz_constraint_wrong():

@@ -26,28 +26,28 @@ from .conftest import Err
     [('false', False), ('true', True), ('0', False), ('1', True), ('"yes"', True), ('"no"', False)],
 )
 def test_bool(input_value, output_value):
-    v = SchemaValidator(schema=core_schema.bool_schema())
+    v = SchemaValidator(core_schema.bool_schema())
     assert v.validate_json(input_value) == output_value
 
 
 @pytest.mark.parametrize('input_value', ['[1, 2, 3]', b'[1, 2, 3]', bytearray(b'[1, 2, 3]')])
 def test_input_types(input_value):
-    v = SchemaValidator(schema=core_schema.list_schema(items_schema=core_schema.int_schema()))
+    v = SchemaValidator(core_schema.list_schema(items_schema=core_schema.int_schema()))
     assert v.validate_json(input_value) == [1, 2, 3]
 
 
 def test_input_type_invalid():
-    v = SchemaValidator(schema=core_schema.list_schema(items_schema=core_schema.int_schema()))
+    v = SchemaValidator(core_schema.list_schema(items_schema=core_schema.int_schema()))
     with pytest.raises(ValidationError, match=r'JSON input should be string, bytes or bytearray \[type=json_type,'):
         v.validate_json([])
 
 
 def test_null():
-    assert SchemaValidator(schema=core_schema.none_schema()).validate_json('null') is None
+    assert SchemaValidator(core_schema.none_schema()).validate_json('null') is None
 
 
 def test_str():
-    s = SchemaValidator(schema=core_schema.str_schema())
+    s = SchemaValidator(core_schema.str_schema())
     assert s.validate_json('"foobar"') == 'foobar'
     with pytest.raises(ValidationError, match=r'Input should be a valid string \[type=string_type,'):
         s.validate_json('false')
@@ -56,7 +56,7 @@ def test_str():
 
 
 def test_bytes():
-    s = SchemaValidator(schema=core_schema.bytes_schema())
+    s = SchemaValidator(core_schema.bytes_schema())
     assert s.validate_json('"foobar"') == b'foobar'
     with pytest.raises(ValidationError, match=r'Input should be a valid bytes \[type=bytes_type,'):
         s.validate_json('false')
@@ -82,7 +82,7 @@ _BIG_NUMBER_STR = '1' + ('0' * 40)
     ],
 )
 def test_int(input_value, expected):
-    v = SchemaValidator(schema=core_schema.int_schema())
+    v = SchemaValidator(core_schema.int_schema())
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_json(input_value)
@@ -103,7 +103,7 @@ def test_int(input_value, expected):
     ],
 )
 def test_float(input_value, expected):
-    v = SchemaValidator(schema=core_schema.float_schema())
+    v = SchemaValidator(core_schema.float_schema())
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_json(input_value)
@@ -113,7 +113,7 @@ def test_float(input_value, expected):
 
 def test_typed_dict():
     v = SchemaValidator(
-        schema=core_schema.typed_dict_schema(
+        core_schema.typed_dict_schema(
             fields={
                 'field_a': core_schema.typed_dict_field(schema=core_schema.str_schema()),
                 'field_b': core_schema.typed_dict_field(schema=core_schema.int_schema()),
@@ -131,13 +131,13 @@ def test_typed_dict():
 
 
 def test_float_no_remainder():
-    v = SchemaValidator(schema=core_schema.int_schema())
+    v = SchemaValidator(core_schema.int_schema())
     assert v.validate_json('123.0') == 123
 
 
 def test_error_loc():
     v = SchemaValidator(
-        schema=core_schema.typed_dict_schema(
+        core_schema.typed_dict_schema(
             fields={
                 'field_a': core_schema.typed_dict_field(
                     schema=core_schema.list_schema(items_schema=core_schema.int_schema())
@@ -164,7 +164,7 @@ def test_error_loc():
 
 def test_dict():
     v = SchemaValidator(
-        schema=core_schema.dict_schema(keys_schema=core_schema.int_schema(), values_schema=core_schema.int_schema())
+        core_schema.dict_schema(keys_schema=core_schema.int_schema(), values_schema=core_schema.int_schema())
     )
     assert v.validate_json('{"1": 2, "3": 4}') == {1: 2, 3: 4}
 
@@ -174,12 +174,12 @@ def test_dict():
 
 
 def test_dict_any_value():
-    v = SchemaValidator(schema=core_schema.dict_schema(keys_schema=core_schema.str_schema()))
+    v = SchemaValidator(core_schema.dict_schema(keys_schema=core_schema.str_schema()))
     assert v.validate_json('{"1": 1, "2": "a", "3": null}') == {'1': 1, '2': 'a', '3': None}
 
 
 def test_json_invalid():
-    v = SchemaValidator(schema=core_schema.bool_schema())
+    v = SchemaValidator(core_schema.bool_schema())
 
     with pytest.raises(ValidationError) as exc_info:
         v.validate_json('"foobar')
@@ -275,7 +275,7 @@ def test_to_jsonable_python_schema_serializer():
             )
         ],
     )
-    v = SchemaValidator(schema=c)
+    v = SchemaValidator(c)
     s = SchemaSerializer(c)
 
     Foobar.__pydantic_validator__ = v
@@ -364,7 +364,7 @@ def test_bad_repr():
 
 
 def test_inf_nan_allow():
-    v = SchemaValidator(schema=core_schema.float_schema(allow_inf_nan=True))
+    v = SchemaValidator(core_schema.float_schema(allow_inf_nan=True))
     assert v.validate_json('Infinity') == float('inf')
     assert v.validate_json('-Infinity') == float('-inf')
     assert v.validate_json('NaN') == IsFloatNan()
@@ -386,7 +386,7 @@ def test_json_bytes_base64_round_trip():
     encoded_url = b'"2AfBVHgkkUYl8_NJythADO7Dq_9_083N-cIQ5KGwMWU="'
     assert to_json(data, bytes_mode='base64') == encoded_url
 
-    v = SchemaValidator(schema=core_schema.bytes_schema(), config=CoreConfig(val_json_bytes='base64'))
+    v = SchemaValidator(core_schema.bytes_schema(), config=CoreConfig(val_json_bytes='base64'))
     assert v.validate_json(encoded_url) == data
     assert v.validate_json(encoded_std) == data
 
@@ -397,20 +397,20 @@ def test_json_bytes_base64_round_trip():
 
     assert to_json({'key': data}, bytes_mode='base64') == b'{"key":' + encoded_url + b'}'
     v = SchemaValidator(
-        schema=core_schema.dict_schema(keys_schema=core_schema.str_schema(), values_schema=core_schema.bytes_schema()),
+        core_schema.dict_schema(keys_schema=core_schema.str_schema(), values_schema=core_schema.bytes_schema()),
         config=CoreConfig(val_json_bytes='base64'),
     )
     assert v.validate_json(b'{"key":' + encoded_url + b'}') == {'key': data}
 
 
 def test_json_bytes_base64_no_padding():
-    v = SchemaValidator(schema=core_schema.bytes_schema(), config=CoreConfig(val_json_bytes='base64'))
+    v = SchemaValidator(core_schema.bytes_schema(), config=CoreConfig(val_json_bytes='base64'))
     base_64_without_padding = 'bm8tcGFkZGluZw'
     assert v.validate_json(json.dumps(base_64_without_padding)) == b'no-padding'
 
 
 def test_json_bytes_base64_invalid():
-    v = SchemaValidator(schema=core_schema.bytes_schema(), config=CoreConfig(val_json_bytes='base64'))
+    v = SchemaValidator(core_schema.bytes_schema(), config=CoreConfig(val_json_bytes='base64'))
     wrong_input = 'wrong!'
     with pytest.raises(ValidationError) as exc_info:
         v.validate_json(json.dumps(wrong_input))
@@ -429,19 +429,19 @@ def test_json_bytes_hex_round_trip():
     encoded = b'"68656c6c6f"'
     assert to_json(data, bytes_mode='hex') == encoded
 
-    v = SchemaValidator(schema=core_schema.bytes_schema(), config=CoreConfig(val_json_bytes='hex'))
+    v = SchemaValidator(core_schema.bytes_schema(), config=CoreConfig(val_json_bytes='hex'))
     assert v.validate_json(encoded) == data
 
     assert to_json({'key': data}, bytes_mode='hex') == b'{"key":"68656c6c6f"}'
     v = SchemaValidator(
-        schema=core_schema.dict_schema(keys_schema=core_schema.str_schema(), values_schema=core_schema.bytes_schema()),
+        core_schema.dict_schema(keys_schema=core_schema.str_schema(), values_schema=core_schema.bytes_schema()),
         config=CoreConfig(val_json_bytes='hex'),
     )
     assert v.validate_json('{"key":"68656c6c6f"}') == {'key': data}
 
 
 def test_json_bytes_hex_invalid():
-    v = SchemaValidator(schema=core_schema.bytes_schema(), config=CoreConfig(val_json_bytes='hex'))
+    v = SchemaValidator(core_schema.bytes_schema(), config=CoreConfig(val_json_bytes='hex'))
 
     wrong_input = 'a'
     with pytest.raises(ValidationError) as exc_info:

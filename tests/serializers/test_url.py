@@ -6,7 +6,7 @@ from pydantic_core import MultiHostUrl, SchemaSerializer, SchemaValidator, Url, 
 
 
 def test_url():
-    v = SchemaValidator(schema=core_schema.url_schema())
+    v = SchemaValidator(core_schema.url_schema())
     s = SchemaSerializer(core_schema.url_schema())
 
     url = v.validate_python('https://example.com')
@@ -26,7 +26,7 @@ def test_url():
 
 
 def test_multi_host_url():
-    v = SchemaValidator(schema=core_schema.multi_host_url_schema())
+    v = SchemaValidator(core_schema.multi_host_url_schema())
     s = SchemaSerializer(core_schema.multi_host_url_schema())
 
     url = v.validate_python('https://example.com,example.org/path')
@@ -46,7 +46,7 @@ def test_multi_host_url():
 
 
 def test_url_dict_keys():
-    v = SchemaValidator(schema=core_schema.url_schema())
+    v = SchemaValidator(core_schema.url_schema())
 
     s = SchemaSerializer(core_schema.dict_schema(core_schema.url_schema()))
     url = v.validate_python('https://example.com')
@@ -56,7 +56,7 @@ def test_url_dict_keys():
 
 
 def test_multi_host_url_dict_keys():
-    v = SchemaValidator(schema=core_schema.multi_host_url_schema())
+    v = SchemaValidator(core_schema.multi_host_url_schema())
 
     s = SchemaSerializer(core_schema.dict_schema(core_schema.multi_host_url_schema()))
     url = v.validate_python('https://example.com,example.org/path')

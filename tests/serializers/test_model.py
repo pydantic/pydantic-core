@@ -102,7 +102,7 @@ def test_dataclass():
         ),
     )
     # just check validation works as expected
-    v = SchemaValidator(schema=schema)
+    v = SchemaValidator(schema)
     dc = v.validate_python({'foo': 1, 'bar': 'bar-str', 'spam': 'bite', 'frog': 123})
     assert dc == DataClass(foo=1, bar='bar-str', spam=b'bite', frog=123)
     dc.class_var = 2
@@ -426,7 +426,7 @@ def test_advanced_exclude_nested_lists(exclude, expected):
         BasicModel,
         core_schema.model_fields_schema(dict(subs=core_schema.model_field(core_schema.list_schema(sub_model_schema)))),
     )
-    v = SchemaValidator(schema=model_schema)
+    v = SchemaValidator(model_schema)
 
     data = v.validate_python(
         dict(subs=[dict(k=1, subsubs=[dict(i=1, j=1), dict(i=2, j=2)]), dict(k=2, subsubs=[dict(i=3, j=3)])])
@@ -974,7 +974,7 @@ def test_extra():
         ),
         extra_behavior='allow',
     )
-    v = SchemaValidator(schema=schema)
+    v = SchemaValidator(schema)
     m = v.validate_python({'field_a': b'test', 'field_b': 12, 'field_c': 'extra'})
     assert isinstance(m, MyModel)
     assert m.__dict__ == {'field_a': b'test', 'field_b': 12}

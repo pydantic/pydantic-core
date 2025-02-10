@@ -201,23 +201,23 @@ def test_union_float_simple(py_and_json: PyAndJson):
 
 
 def test_float_repr():
-    v = SchemaValidator(schema=cs.float_schema())
+    v = SchemaValidator(cs.float_schema())
     assert (
         plain_repr(v)
         == 'SchemaValidator(title="float",validator=Float(FloatValidator{strict:false,allow_inf_nan:true}),definitions=[],cache_strings=True)'
     )
-    v = SchemaValidator(schema=cs.float_schema(strict=True))
+    v = SchemaValidator(cs.float_schema(strict=True))
     assert (
         plain_repr(v)
         == 'SchemaValidator(title="float",validator=Float(FloatValidator{strict:true,allow_inf_nan:true}),definitions=[],cache_strings=True)'
     )
-    v = SchemaValidator(schema=cs.float_schema(multiple_of=7))
+    v = SchemaValidator(cs.float_schema(multiple_of=7))
     assert plain_repr(v).startswith('SchemaValidator(title="constrained-float",validator=ConstrainedFloat(')
 
 
 @pytest.mark.parametrize('input_value,expected', [(Decimal('1.23'), 1.23), (Decimal('1'), 1.0)])
 def test_float_not_json(input_value, expected):
-    v = SchemaValidator(schema=cs.float_schema())
+    v = SchemaValidator(cs.float_schema())
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
@@ -316,7 +316,7 @@ def test_non_finite_json_values(py_and_json: PyAndJson, input_value, allow_inf_n
     ],
 )
 def test_non_finite_float_values(strict, input_value, allow_inf_nan, expected):
-    v = SchemaValidator(schema=cs.float_schema(allow_inf_nan=allow_inf_nan, strict=strict))
+    v = SchemaValidator(cs.float_schema(allow_inf_nan=allow_inf_nan, strict=strict))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
@@ -346,7 +346,7 @@ def test_non_finite_float_values(strict, input_value, allow_inf_nan, expected):
     ],
 )
 def test_non_finite_constrained_float_values(input_value, allow_inf_nan, expected):
-    v = SchemaValidator(schema=cs.float_schema(allow_inf_nan=allow_inf_nan, gt=0))
+    v = SchemaValidator(cs.float_schema(allow_inf_nan=allow_inf_nan, gt=0))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
@@ -384,12 +384,12 @@ def test_non_finite_constrained_float_values(input_value, allow_inf_nan, expecte
     ],
 )
 def test_validate_scientific_notation_from_json(input_value, expected):
-    v = SchemaValidator(schema=cs.float_schema())
+    v = SchemaValidator(cs.float_schema())
     assert v.validate_json(input_value) == expected
 
 
 def test_string_with_underscores() -> None:
-    v = SchemaValidator(schema=cs.float_schema())
+    v = SchemaValidator(cs.float_schema())
     assert v.validate_python('1_000_000.0') == 1_000_000.0
     assert v.validate_json('"1_000_000.0"') == 1_000_000.0
 
@@ -401,7 +401,7 @@ def test_string_with_underscores() -> None:
 
 
 def test_allow_inf_nan_true_json() -> None:
-    v = SchemaValidator(schema=core_schema.float_schema())
+    v = SchemaValidator(core_schema.float_schema())
 
     assert v.validate_json('123') == 123
     assert v.validate_json('NaN') == IsFloatNan()
@@ -414,7 +414,7 @@ def test_allow_inf_nan_true_json() -> None:
 
 
 def test_allow_inf_nan_false_json() -> None:
-    v = SchemaValidator(schema=core_schema.float_schema(), config=core_schema.CoreConfig(allow_inf_nan=False))
+    v = SchemaValidator(core_schema.float_schema(), config=core_schema.CoreConfig(allow_inf_nan=False))
 
     assert v.validate_json('123') == 123
     with pytest.raises(ValidationError) as exc_info1:

@@ -7,7 +7,7 @@ from .conftest import PyAndJson
 
 
 def test_isinstance():
-    v = SchemaValidator(schema=cs.int_schema())
+    v = SchemaValidator(cs.int_schema())
     assert v.validate_python(123) == 123
     assert v.isinstance_python(123) is True
     assert v.validate_python('123') == 123
@@ -20,7 +20,7 @@ def test_isinstance():
 
 
 def test_isinstance_strict():
-    v = SchemaValidator(schema=cs.int_schema(strict=True))
+    v = SchemaValidator(cs.int_schema(strict=True))
     assert v.validate_python(123) == 123
     assert v.isinstance_python(123) is True
 
@@ -32,9 +32,7 @@ def test_isinstance_strict():
 
 def test_internal_error():
     v = SchemaValidator(
-        schema=cs.model_schema(
-            cls=int, schema=cs.model_fields_schema(fields={'f': cs.model_field(schema=cs.int_schema())})
-        )
+        cs.model_schema(cls=int, schema=cs.model_fields_schema(fields={'f': cs.model_field(schema=cs.int_schema())}))
     )
     with pytest.raises(AttributeError, match="'int' object has no attribute '__dict__'"):
         v.validate_python({'f': 123})

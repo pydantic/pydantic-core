@@ -20,7 +20,7 @@ def test_serialize_as_any_with_models() -> None:
             }
         ),
     )
-    Parent.__pydantic_validator__ = SchemaValidator(schema=Parent.__pydantic_core_schema__)
+    Parent.__pydantic_validator__ = SchemaValidator(Parent.__pydantic_core_schema__)
     Parent.__pydantic_serializer__ = SchemaSerializer(Parent.__pydantic_core_schema__)
 
     Child.__pydantic_core_schema__ = core_schema.model_schema(
@@ -32,7 +32,7 @@ def test_serialize_as_any_with_models() -> None:
             }
         ),
     )
-    Child.__pydantic_validator__ = SchemaValidator(schema=Child.__pydantic_core_schema__)
+    Child.__pydantic_validator__ = SchemaValidator(Child.__pydantic_core_schema__)
     Child.__pydantic_serializer__ = SchemaSerializer(Child.__pydantic_core_schema__)
 
     child = Child.__pydantic_validator__.validate_python({'x': 1, 'y': 'hopefully not a secret'})
@@ -61,7 +61,7 @@ def test_serialize_as_any_with_dataclass() -> None:
         ),
         ['x'],
     )
-    Parent.__pydantic_validator__ = SchemaValidator(schema=Parent.__pydantic_core_schema__)
+    Parent.__pydantic_validator__ = SchemaValidator(Parent.__pydantic_core_schema__)
     Parent.__pydantic_serializer__ = SchemaSerializer(Parent.__pydantic_core_schema__)
 
     Child.__pydantic_core_schema__ = core_schema.dataclass_schema(
@@ -75,7 +75,7 @@ def test_serialize_as_any_with_dataclass() -> None:
         ),
         ['x', 'y'],
     )
-    Child.__pydantic_validator__ = SchemaValidator(schema=Child.__pydantic_core_schema__)
+    Child.__pydantic_validator__ = SchemaValidator(Child.__pydantic_core_schema__)
     Child.__pydantic_serializer__ = SchemaSerializer(Child.__pydantic_core_schema__)
 
     child = Child.__pydantic_validator__.validate_python({'x': 1, 'y': 'hopefully not a secret'})
@@ -98,7 +98,7 @@ def test_serialize_as_any_with_typeddict() -> None:
             'x': core_schema.typed_dict_field(core_schema.int_schema()),
         }
     )
-    Parent.__pydantic_validator__ = SchemaValidator(schema=Parent.__pydantic_core_schema__)
+    Parent.__pydantic_validator__ = SchemaValidator(Parent.__pydantic_core_schema__)
     Parent.__pydantic_serializer__ = SchemaSerializer(Parent.__pydantic_core_schema__)
 
     Child.__pydantic_core_schema__ = core_schema.typed_dict_schema(
@@ -107,7 +107,7 @@ def test_serialize_as_any_with_typeddict() -> None:
             'y': core_schema.typed_dict_field(core_schema.str_schema()),
         }
     )
-    Child.__pydantic_validator__ = SchemaValidator(schema=Child.__pydantic_core_schema__)
+    Child.__pydantic_validator__ = SchemaValidator(Child.__pydantic_core_schema__)
     Child.__pydantic_serializer__ = SchemaSerializer(Child.__pydantic_core_schema__)
 
     child = Child.__pydantic_validator__.validate_python({'x': 1, 'y': 'hopefully not a secret'})
@@ -133,7 +133,7 @@ def test_serialize_as_any_with_unrelated_models() -> None:
             }
         ),
     )
-    Parent.__pydantic_validator__ = SchemaValidator(schema=Parent.__pydantic_core_schema__)
+    Parent.__pydantic_validator__ = SchemaValidator(Parent.__pydantic_core_schema__)
     Parent.__pydantic_serializer__ = SchemaSerializer(Parent.__pydantic_core_schema__)
 
     Other.__pydantic_core_schema__ = core_schema.model_schema(
@@ -145,7 +145,7 @@ def test_serialize_as_any_with_unrelated_models() -> None:
         ),
         config=core_schema.CoreConfig(extra_fields_behavior='allow'),
     )
-    Other.__pydantic_validator__ = SchemaValidator(schema=Other.__pydantic_core_schema__)
+    Other.__pydantic_validator__ = SchemaValidator(Other.__pydantic_core_schema__)
     Other.__pydantic_serializer__ = SchemaSerializer(Other.__pydantic_core_schema__)
 
     other = Other.__pydantic_validator__.validate_python({'x': 1, 'y': 'hopefully not a secret'})

@@ -74,7 +74,7 @@ from ..conftest import Err, PyAndJson
     ],
 )
 def test_date(input_value, expected):
-    v = SchemaValidator(schema=cs.date_schema())
+    v = SchemaValidator(cs.date_schema())
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             result = v.validate_python(input_value)
@@ -137,7 +137,7 @@ def test_date_json(py_and_json: PyAndJson, input_value, expected):
     ids=repr,
 )
 def test_date_strict(input_value, expected, strict_mode_type):
-    v = SchemaValidator(schema=cs.date_schema(strict=strict_mode_type.schema))
+    v = SchemaValidator(cs.date_schema(strict=strict_mode_type.schema))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value, **strict_mode_type.validator_args)
@@ -158,7 +158,7 @@ def test_date_strict(input_value, expected, strict_mode_type):
     ],
 )
 def test_date_strict_json(input_value, expected, strict_mode_type):
-    v = SchemaValidator(schema=cs.date_schema(strict=strict_mode_type.schema))
+    v = SchemaValidator(cs.date_schema(strict=strict_mode_type.schema))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_json(input_value, **strict_mode_type.validator_args)
@@ -168,7 +168,7 @@ def test_date_strict_json(input_value, expected, strict_mode_type):
 
 
 def test_date_strict_json_ctx():
-    v = SchemaValidator(schema=cs.date_schema(strict=True))
+    v = SchemaValidator(cs.date_schema(strict=True))
     with pytest.raises(ValidationError) as exc_info:
         v.validate_json('"foobar"')
     assert exc_info.value.errors(include_url=False) == [
@@ -205,7 +205,7 @@ def test_date_strict_json_ctx():
     ],
 )
 def test_date_kwargs(kwargs: dict[str, Any], input_value: date, expected: Err | date):
-    v = SchemaValidator(schema=cs.date_schema(**kwargs))  # type: ignore
+    v = SchemaValidator(cs.date_schema(**kwargs))  # type: ignore
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
@@ -220,7 +220,7 @@ def test_invalid_constraint():
 
 
 def test_dict_py():
-    v = SchemaValidator(schema=cs.dict_schema(keys_schema=cs.date_schema(), values_schema=cs.int_schema()))
+    v = SchemaValidator(cs.dict_schema(keys_schema=cs.date_schema(), values_schema=cs.int_schema()))
     assert v.validate_python({date(2000, 1, 1): 2, date(2000, 1, 2): 4}) == {date(2000, 1, 1): 2, date(2000, 1, 2): 4}
 
 
@@ -230,11 +230,11 @@ def test_dict(py_and_json: PyAndJson):
 
 
 def test_union():
-    v = SchemaValidator(schema=cs.union_schema(choices=[cs.str_schema(), cs.date_schema()]))
+    v = SchemaValidator(cs.union_schema(choices=[cs.str_schema(), cs.date_schema()]))
     assert v.validate_python('2022-01-02') == '2022-01-02'
     assert v.validate_python(date(2022, 1, 2)) == date(2022, 1, 2)
 
-    v = SchemaValidator(schema=cs.union_schema(choices=[cs.date_schema(), cs.str_schema()]))
+    v = SchemaValidator(cs.union_schema(choices=[cs.date_schema(), cs.str_schema()]))
     assert v.validate_python('2022-01-02') == '2022-01-02'
     assert v.validate_python(date(2022, 1, 2)) == date(2022, 1, 2)
 
@@ -283,13 +283,13 @@ def test_date_future(py_and_json: PyAndJson, input_value, expected):
 
 
 def test_date_past_future_today():
-    v = SchemaValidator(schema=core_schema.date_schema(now_op='past', now_utc_offset=0))
+    v = SchemaValidator(core_schema.date_schema(now_op='past', now_utc_offset=0))
     today = datetime.now(timezone.utc).date()
     assert v.isinstance_python(today) is False
     assert v.isinstance_python(today - timedelta(days=1)) is True
     assert v.isinstance_python(today + timedelta(days=1)) is False
 
-    v = SchemaValidator(schema=core_schema.date_schema(now_op='future', now_utc_offset=0))
+    v = SchemaValidator(core_schema.date_schema(now_op='future', now_utc_offset=0))
     assert v.isinstance_python(today) is False
     assert v.isinstance_python(today - timedelta(days=1)) is False
     assert v.isinstance_python(today + timedelta(days=1)) is True

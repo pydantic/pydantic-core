@@ -738,7 +738,7 @@ def test_default_factory(py_and_json: PyAndJson, input_value, expected):
 
 def test_repr():
     v = SchemaValidator(
-        schema=cs.arguments_schema(
+        cs.arguments_schema(
             arguments=[
                 {'name': 'b', 'mode': 'positional_or_keyword', 'schema': cs.int_schema()},
                 {
@@ -772,7 +772,7 @@ def test_build_missing_var_kwargs():
     with pytest.raises(
         SchemaError, match="`var_kwargs_schema` must be specified when `var_kwargs_mode` is `'unpacked-typed-dict'`"
     ):
-        SchemaValidator(schema=cs.arguments_schema(arguments=[], var_kwargs_mode='unpacked-typed-dict'))
+        SchemaValidator(cs.arguments_schema(arguments=[], var_kwargs_mode='unpacked-typed-dict'))
 
 
 @pytest.mark.parametrize(
@@ -936,7 +936,7 @@ def validate(config=None):
                 assert p.kind == Parameter.VAR_KEYWORD, p.kind
                 schema['var_kwargs_schema'] = arg_schema
 
-        validator = SchemaValidator(schema=schema, config=config)
+        validator = SchemaValidator(schema, config=config)
 
         @wraps(function)
         def wrapper(*args, **kwargs):
@@ -1111,7 +1111,7 @@ def test_invalid_schema():
 
 def test_error_display(pydantic_version):
     v = SchemaValidator(
-        schema=core_schema.arguments_schema(
+        core_schema.arguments_schema(
             [
                 core_schema.arguments_parameter('a', core_schema.int_schema()),
                 core_schema.arguments_parameter('b', core_schema.int_schema()),

@@ -19,14 +19,14 @@ class Spam:
 
 
 def test_validate_json() -> None:
-    v = SchemaValidator(schema=cs.is_instance_schema(cls=Foo))
+    v = SchemaValidator(cs.is_instance_schema(cls=Foo))
     with pytest.raises(ValidationError) as exc_info:
         v.validate_json('"foo"')
         assert exc_info.value.errors()[0]['type'] == 'needs_python_object'
 
 
 def test_is_instance():
-    v = SchemaValidator(schema=cs.is_instance_schema(cls=Foo))
+    v = SchemaValidator(cs.is_instance_schema(cls=Foo))
     foo = Foo()
     assert v.validate_python(foo) == foo
     assert v.isinstance_python(foo) is True
@@ -66,14 +66,14 @@ def test_is_instance():
     ],
 )
 def test_is_instance_cases(schema_class, input_val, value):
-    v = SchemaValidator(schema=cs.is_instance_schema(cls=schema_class))
+    v = SchemaValidator(cs.is_instance_schema(cls=schema_class))
     assert v.isinstance_python(input_val) == value
 
 
 @pytest.mark.parametrize('input_cls', [123, 'foo', Foo(), [], {1: 2}])
 def test_is_instance_invalid(input_cls):
     with pytest.raises(SchemaError, match="SchemaError: 'cls' must be valid as the first argument to 'isinstance'"):
-        SchemaValidator(schema=cs.is_instance_schema(cls=input_cls))
+        SchemaValidator(cs.is_instance_schema(cls=input_cls))
 
 
 class HasIsInstanceMeta(type):
@@ -89,7 +89,7 @@ class HasIsInstance(metaclass=HasIsInstanceMeta):
 
 
 def test_instancecheck():
-    v = SchemaValidator(schema=cs.is_instance_schema(cls=HasIsInstance))
+    v = SchemaValidator(cs.is_instance_schema(cls=HasIsInstance))
     assert v.validate_python('true') == 'true'
 
     with pytest.raises(ValidationError, match='type=is_instance_of'):
@@ -100,7 +100,7 @@ def test_instancecheck():
 
 
 def test_repr():
-    v = SchemaValidator(schema=cs.union_schema(choices=[cs.int_schema(), cs.is_instance_schema(cls=Foo)]))
+    v = SchemaValidator(cs.union_schema(choices=[cs.int_schema(), cs.is_instance_schema(cls=Foo)]))
     assert v.isinstance_python(4) is True
     assert v.isinstance_python(Bar()) is True
     assert v.isinstance_python('foo') is False
@@ -123,13 +123,13 @@ def test_repr():
     ],
 )
 def test_is_type(input_val, value):
-    v = SchemaValidator(schema=cs.is_instance_schema(cls=type))
+    v = SchemaValidator(cs.is_instance_schema(cls=type))
     assert v.isinstance_python(input_val) == value
 
 
 def test_is_instance_dict():
     v = SchemaValidator(
-        schema=core_schema.dict_schema(
+        core_schema.dict_schema(
             keys_schema=core_schema.is_instance_schema(str), values_schema=core_schema.is_instance_schema(int)
         )
     )
@@ -138,13 +138,13 @@ def test_is_instance_dict():
 
 
 def test_is_instance_dict_not_str():
-    v = SchemaValidator(schema=core_schema.dict_schema(keys_schema=core_schema.is_instance_schema(int)))
+    v = SchemaValidator(core_schema.dict_schema(keys_schema=core_schema.is_instance_schema(int)))
     assert v.isinstance_python({1: 1}) is True
     assert v.isinstance_python({'foo': 1}) is False
 
 
 def test_is_instance_sequence():
-    v = SchemaValidator(schema=core_schema.is_instance_schema(typing.Sequence))
+    v = SchemaValidator(core_schema.is_instance_schema(typing.Sequence))
     assert v.isinstance_python(1) is False
     assert v.isinstance_python([1]) is True
 
@@ -153,7 +153,7 @@ def test_is_instance_sequence():
 
 
 def test_is_instance_tuple():
-    v = SchemaValidator(schema=core_schema.is_instance_schema((int, str)))
+    v = SchemaValidator(core_schema.is_instance_schema((int, str)))
     assert v.isinstance_python(1) is True
     assert v.isinstance_python('foobar') is True
     assert v.isinstance_python([1]) is False
@@ -162,7 +162,7 @@ def test_is_instance_tuple():
 
 
 def test_class_repr():
-    v = SchemaValidator(schema=core_schema.is_instance_schema(int, cls_repr='Foobar'))
+    v = SchemaValidator(core_schema.is_instance_schema(int, cls_repr='Foobar'))
     assert v.validate_python(1) == 1
     with pytest.raises(ValidationError, match=r'Input should be an instance of Foobar \[type=is_instance_of,'):
         v.validate_python('1')
@@ -175,7 +175,7 @@ def test_is_instance_json_type_before_validator():
     # such as type to have a valid input from JSON.
 
     schema = core_schema.is_instance_schema(type)
-    v = SchemaValidator(schema=schema)
+    v = SchemaValidator(schema)
 
     with pytest.raises(ValidationError) as exc_info:
         v.validate_json('null')
@@ -186,6 +186,6 @@ def test_is_instance_json_type_before_validator():
         return int
 
     schema = core_schema.no_info_before_validator_function(set_type_to_int, schema)
-    v = SchemaValidator(schema=schema)
+    v = SchemaValidator(schema)
 
     assert v.validate_json('null') == int

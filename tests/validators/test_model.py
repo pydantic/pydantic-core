@@ -18,7 +18,7 @@ def test_model_class():
         field_b: int
 
     v = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             MyModel,
             core_schema.model_fields_schema(
                 {
@@ -54,7 +54,7 @@ def test_model_class_extra():
         field_b: int
 
     v = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             MyModel,
             core_schema.model_fields_schema(
                 {
@@ -95,7 +95,7 @@ def test_model_class_extra_forbid():
             return getattr(self._inner, key)
 
     v = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             MyModel,
             core_schema.model_fields_schema(
                 {
@@ -142,7 +142,7 @@ def test_model_class_extra_forbid_from_attributes(extra_behavior: str):
             self.__dict__.update(values)
 
     v = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             MyModel,
             core_schema.model_fields_schema(
                 {
@@ -184,7 +184,7 @@ def test_model_class_setattr():
     setattr_calls.clear()
 
     v = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             cls=MyModel,
             schema=core_schema.model_fields_schema(
                 fields={'field_a': core_schema.model_field(schema=core_schema.str_schema())}
@@ -219,7 +219,7 @@ def test_model_class_root_validator_wrap():
         ),
     )
 
-    v = SchemaValidator(schema=schema)
+    v = SchemaValidator(schema)
     m = v.validate_python({'field_a': 123})
     assert m.field_a == 123
 
@@ -253,7 +253,7 @@ def test_model_class_root_validator_before():
         ),
     )
 
-    v = SchemaValidator(schema=schema)
+    v = SchemaValidator(schema)
     m = v.validate_python({'field_a': 123})
     assert m.field_a == 123
 
@@ -288,7 +288,7 @@ def test_model_class_root_validator_after():
         ),
     )
 
-    v = SchemaValidator(schema=schema)
+    v = SchemaValidator(schema)
     m = v.validate_python({'field_a': 123})
     assert m.field_a == 123
 
@@ -315,7 +315,7 @@ def test_function_ask(mode):
         return input_value
 
     SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             cls=MyModel,
             schema={
                 'type': f'function-{mode}',
@@ -335,9 +335,7 @@ def test_function_plain_ask():
     def f(input_value):
         return input_value, {1: 2}, {'field_a'}
 
-    v = SchemaValidator(
-        schema=core_schema.model_schema(cls=MyModel, schema=core_schema.no_info_plain_validator_function(f))
-    )
+    v = SchemaValidator(core_schema.model_schema(cls=MyModel, schema=core_schema.no_info_plain_validator_function(f)))
     m = v.validate_python({'field_a': 'test'})
     assert isinstance(m, MyModel)
     assert m.__dict__ == {'field_a': 'test'}
@@ -350,7 +348,7 @@ def test_union_sub_schema():
         __slots__ = '__dict__', '__pydantic_fields_set__', '__pydantic_extra__', '__pydantic_private__'
 
     v = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             cls=MyModel,
             schema=core_schema.union_schema(
                 choices=[
@@ -379,7 +377,7 @@ def test_tagged_union_sub_schema():
         pass
 
     v = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             cls=MyModel,
             schema=core_schema.tagged_union_schema(
                 discriminator='foo',
@@ -428,7 +426,7 @@ def test_bad_sub_schema():
     class MyModel:
         pass
 
-    v = SchemaValidator(schema=core_schema.model_schema(cls=MyModel, schema=core_schema.int_schema()))
+    v = SchemaValidator(core_schema.model_schema(cls=MyModel, schema=core_schema.int_schema()))
     with pytest.raises(TypeError):
         v.validate_python(123)
 
@@ -442,7 +440,7 @@ def test_model_class_function_after():
         return input_value
 
     v = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             cls=MyModel,
             schema={
                 'type': 'function-after',
@@ -480,7 +478,7 @@ def test_model_class_instance_direct():
             self.field_a = 'init'
 
     v = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             cls=MyModel,
             schema=core_schema.model_fields_schema(
                 fields={'field_a': core_schema.model_field(schema=core_schema.str_schema())}
@@ -519,7 +517,7 @@ def test_model_class_instance_subclass():
             self.field_b = 'init_b'
 
     v = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             cls=MyModel,
             schema=core_schema.model_fields_schema(
                 fields={'field_a': core_schema.model_field(schema=core_schema.str_schema())}
@@ -566,7 +564,7 @@ def test_model_class_instance_subclass_revalidate():
             self.field_b = 'init_b'
 
     v = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             cls=MyModel,
             schema=core_schema.model_fields_schema(
                 fields={'field_a': core_schema.model_field(schema=core_schema.str_schema())}
@@ -604,7 +602,7 @@ def test_model_class_strict():
             self.field_b = 'init_b'
 
     v = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             strict=True,
             cls=MyModel,
             schema=core_schema.model_fields_schema(
@@ -649,7 +647,7 @@ def test_model_class_strict_json():
         field_c: int
 
     v = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             strict=True,
             cls=MyModel,
             schema=core_schema.model_fields_schema(
@@ -673,7 +671,7 @@ def test_model_class_strict_json():
 
 def test_internal_error():
     v = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             cls=int,
             schema=core_schema.model_fields_schema(
                 fields={'f': core_schema.model_field(schema=core_schema.int_schema())}
@@ -696,7 +694,7 @@ def test_revalidate_always():
                 self.__pydantic_fields_set__ = fields_set
 
     v = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             cls=MyModel,
             revalidate_instances='always',
             schema=core_schema.model_fields_schema(
@@ -752,7 +750,7 @@ def test_revalidate_subclass_instances():
             self.field_c = 'init_c'
 
     v = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             cls=MyModel,
             revalidate_instances='subclass-instances',
             schema=core_schema.model_fields_schema(
@@ -793,7 +791,7 @@ def test_revalidate_extra():
             self.__dict__.update(kwargs)
 
     v = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             cls=MyModel,
             schema=core_schema.model_fields_schema(
                 extra_behavior='allow',
@@ -842,7 +840,7 @@ def test_post_init():
             assert self.__pydantic_fields_set__ == {'field_a', 'field_b'}
 
     v = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             cls=MyModel,
             post_init='call_me_maybe',
             schema=core_schema.model_fields_schema(
@@ -870,7 +868,7 @@ def test_revalidate_post_init():
             assert context is None
 
     v = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             cls=MyModel,
             post_init='call_me_maybe',
             schema=core_schema.model_fields_schema(
@@ -914,7 +912,7 @@ def test_post_init_validation_error():
                 raise ValueError(f'this is broken: {self.field_a}')
 
     v = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             cls=MyModel,
             post_init='call_me_maybe',
             schema=core_schema.model_fields_schema(
@@ -948,7 +946,7 @@ def test_post_init_internal_error():
             pass
 
     v = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             cls=MyModel,
             post_init='wrong_signature',
             schema=core_schema.model_fields_schema(
@@ -971,7 +969,7 @@ def test_post_init_mutate():
             self.__pydantic_fields_set__ = {'field_a'}
 
     v = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             cls=MyModel,
             post_init='call_me_maybe',
             schema=core_schema.model_fields_schema(
@@ -1001,7 +999,7 @@ def test_validate_assignment():
             self.__pydantic_extra__ = None
 
     v = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             MyModel,
             core_schema.model_fields_schema(
                 {
@@ -1050,7 +1048,7 @@ def test_validate_assignment_function():
         return x * 2
 
     v = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             MyModel,
             core_schema.model_fields_schema(
                 {
@@ -1090,7 +1088,7 @@ def test_validate_assignment_no_fields_set():
             self.__pydantic_extra__ = None
 
     v = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             cls=MyModel,
             schema=core_schema.model_fields_schema(
                 fields={
@@ -1122,7 +1120,7 @@ def test_frozen():
         __slots__ = {'__dict__', '__pydantic_fields_set__', '__pydantic_extra__', '__pydantic_private__'}
 
     v = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             MyModel,
             core_schema.model_fields_schema({'f': core_schema.model_field(core_schema.str_schema())}),
             frozen=True,
@@ -1191,7 +1189,7 @@ def test_validate_assignment_model_validator_function(function_schema: Any, call
             return values_or_values_and_fields_set
 
     v = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             Model,
             function_schema(
                 f,
@@ -1228,7 +1226,7 @@ def test_model_error():
         field_b: int
 
     v = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             MyModel,
             core_schema.model_fields_schema(
                 {
@@ -1316,7 +1314,7 @@ def test_model_with_enum_int_field_validation_should_succeed_for_any_type_equali
 
     # WHEN
     v = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             MyModel,
             core_schema.model_fields_schema(
                 {

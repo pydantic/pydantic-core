@@ -41,7 +41,7 @@ class Map(Mapping):
 
 def test_simple():
     v = SchemaValidator(
-        schema=core_schema.typed_dict_schema(
+        core_schema.typed_dict_schema(
             fields={
                 'field_a': core_schema.typed_dict_field(schema=core_schema.str_schema()),
                 'field_b': core_schema.typed_dict_field(schema=core_schema.int_schema()),
@@ -76,7 +76,7 @@ def test_strict():
 
 def test_with_default():
     v = SchemaValidator(
-        schema=core_schema.typed_dict_schema(
+        core_schema.typed_dict_schema(
             fields={
                 'field_a': core_schema.typed_dict_field(schema=core_schema.str_schema()),
                 'field_b': core_schema.typed_dict_field(
@@ -92,7 +92,7 @@ def test_with_default():
 
 def test_missing_error(pydantic_version):
     v = SchemaValidator(
-        schema=core_schema.typed_dict_schema(
+        core_schema.typed_dict_schema(
             fields={
                 'field_a': core_schema.typed_dict_field(schema=core_schema.str_schema()),
                 'field_b': core_schema.typed_dict_field(schema=core_schema.int_schema()),
@@ -136,7 +136,7 @@ def test_missing_error(pydantic_version):
 )
 def test_config(config: CoreConfig, input_value, expected):
     v = SchemaValidator(
-        schema=core_schema.typed_dict_schema(
+        core_schema.typed_dict_schema(
             fields={
                 'a': core_schema.typed_dict_field(schema=core_schema.int_schema()),
                 'b': core_schema.typed_dict_field(schema=core_schema.float_schema(), required=False),
@@ -155,7 +155,7 @@ def test_config(config: CoreConfig, input_value, expected):
 
 def test_ignore_extra():
     v = SchemaValidator(
-        schema=core_schema.typed_dict_schema(
+        core_schema.typed_dict_schema(
             fields={
                 'field_a': core_schema.typed_dict_field(schema=core_schema.str_schema()),
                 'field_b': core_schema.typed_dict_field(schema=core_schema.int_schema()),
@@ -168,7 +168,7 @@ def test_ignore_extra():
 
 def test_forbid_extra():
     v = SchemaValidator(
-        schema=core_schema.typed_dict_schema(
+        core_schema.typed_dict_schema(
             fields={'field_a': core_schema.typed_dict_field(schema=core_schema.str_schema())}, extra_behavior='forbid'
         )
     )
@@ -197,7 +197,7 @@ def test_allow_extra_wrong():
 
 def test_str_config():
     v = SchemaValidator(
-        schema=core_schema.typed_dict_schema(
+        core_schema.typed_dict_schema(
             fields={'field_a': core_schema.typed_dict_field(schema=core_schema.str_schema())},
             config=CoreConfig(str_max_length=5),
         )
@@ -210,7 +210,7 @@ def test_str_config():
 
 def test_json_error():
     v = SchemaValidator(
-        schema=core_schema.typed_dict_schema(
+        core_schema.typed_dict_schema(
             fields={
                 'field_a': core_schema.typed_dict_field(
                     schema=core_schema.list_schema(items_schema=core_schema.int_schema())
@@ -239,7 +239,7 @@ def test_missing_schema_key():
 def test_fields_required_by_default():
     """By default all fields should be required"""
     v = SchemaValidator(
-        schema=core_schema.typed_dict_schema(
+        core_schema.typed_dict_schema(
             fields={
                 'x': core_schema.typed_dict_field(schema=core_schema.str_schema()),
                 'y': core_schema.typed_dict_field(schema=core_schema.str_schema()),
@@ -259,7 +259,7 @@ def test_fields_required_by_default():
 
 def test_fields_required_by_default_with_optional():
     v = SchemaValidator(
-        schema=core_schema.typed_dict_schema(
+        core_schema.typed_dict_schema(
             fields={
                 'x': core_schema.typed_dict_field(schema=core_schema.str_schema()),
                 'y': core_schema.typed_dict_field(schema=core_schema.str_schema(), required=False),
@@ -273,7 +273,7 @@ def test_fields_required_by_default_with_optional():
 
 def test_fields_required_by_default_with_default():
     v = SchemaValidator(
-        schema=core_schema.typed_dict_schema(
+        core_schema.typed_dict_schema(
             fields={
                 'x': core_schema.typed_dict_field(schema=core_schema.str_schema()),
                 'y': core_schema.typed_dict_field(
@@ -290,7 +290,7 @@ def test_fields_required_by_default_with_default():
 def test_all_optional_fields():
     """By default all fields should be optional if `total` is set to `False`"""
     v = SchemaValidator(
-        schema=core_schema.typed_dict_schema(
+        core_schema.typed_dict_schema(
             total=False,
             fields={
                 'x': core_schema.typed_dict_field(schema=core_schema.str_schema(strict=True)),
@@ -313,7 +313,7 @@ def test_all_optional_fields():
 
 def test_all_optional_fields_with_required_fields():
     v = SchemaValidator(
-        schema=core_schema.typed_dict_schema(
+        core_schema.typed_dict_schema(
             total=False,
             fields={
                 'x': core_schema.typed_dict_field(schema=core_schema.str_schema(strict=True), required=True),
@@ -491,7 +491,7 @@ def test_aliases_path_multiple(py_and_json: PyAndJson, input_value, expected):
 )
 def test_aliases_path_negative(input_value, expected):
     v = SchemaValidator(
-        schema=core_schema.typed_dict_schema(
+        core_schema.typed_dict_schema(
             fields={
                 'field_a': core_schema.typed_dict_field(validation_alias=['foo', -2], schema=core_schema.int_schema())
             },
@@ -536,7 +536,7 @@ def test_aliases_path_negative_json(py_and_json: PyAndJson, input_value, expecte
 
 def test_aliases_debug():
     v = SchemaValidator(
-        schema=core_schema.typed_dict_schema(
+        core_schema.typed_dict_schema(
             fields={
                 'field_a': core_schema.typed_dict_field(
                     validation_alias=[['foo', 'bar', 'bat'], ['foo', 3]], schema=core_schema.int_schema()
@@ -551,7 +551,7 @@ def test_aliases_debug():
 
 def get_int_key():
     v = SchemaValidator(
-        schema=core_schema.typed_dict_schema(
+        core_schema.typed_dict_schema(
             fields={
                 'field_a': core_schema.typed_dict_field(
                     validation_alias=[['foo', 3], ['spam']], schema=core_schema.int_schema()
@@ -570,7 +570,7 @@ class GetItemThing:
 
 def get_custom_getitem():
     v = SchemaValidator(
-        schema=core_schema.typed_dict_schema(
+        core_schema.typed_dict_schema(
             fields={'field_a': core_schema.typed_dict_field(validation_alias=['foo'], schema=core_schema.int_schema())}
         )
     )
@@ -714,7 +714,7 @@ def test_alias_error_loc_field_names(py_and_json: PyAndJson):
 
 
 def test_empty_model():
-    v = SchemaValidator(schema=core_schema.typed_dict_schema(fields={}))
+    v = SchemaValidator(core_schema.typed_dict_schema(fields={}))
     assert v.validate_python({}) == {}
     with pytest.raises(ValidationError, match=re.escape('Input should be a valid dictionary [type=dict_type,')):
         v.validate_python('x')
@@ -722,7 +722,7 @@ def test_empty_model():
 
 def test_model_deep():
     v = SchemaValidator(
-        schema=core_schema.typed_dict_schema(
+        core_schema.typed_dict_schema(
             fields={
                 'field_a': core_schema.typed_dict_field(schema=core_schema.str_schema()),
                 'field_b': core_schema.typed_dict_field(
@@ -820,7 +820,7 @@ def test_alias_extra_forbid(py_and_json: PyAndJson):
 
 def test_with_default_factory():
     v = SchemaValidator(
-        schema=core_schema.typed_dict_schema(
+        core_schema.typed_dict_schema(
             fields={
                 'x': core_schema.typed_dict_field(
                     schema=core_schema.with_default_schema(
@@ -861,7 +861,7 @@ def test_field_required_and_default_factory():
 )
 def test_bad_default_factory(default_factory, error_message):
     v = SchemaValidator(
-        schema=core_schema.typed_dict_schema(
+        core_schema.typed_dict_schema(
             fields={
                 'x': core_schema.typed_dict_field(
                     schema=core_schema.with_default_schema(
@@ -1075,7 +1075,7 @@ def test_extra_behavior_allow(
     expected_extra_value: Any,
 ):
     v = SchemaValidator(
-        schema=core_schema.typed_dict_schema(
+        core_schema.typed_dict_schema(
             {'f': core_schema.typed_dict_field(core_schema.str_schema())},
             **schema_extra_behavior_kw,
             **extras_schema_kw,
@@ -1099,7 +1099,7 @@ def test_extra_behavior_allow(
 )
 def test_extra_behavior_forbid(config: Union[core_schema.CoreConfig, None], schema_extra_behavior_kw: dict[str, Any]):
     v = SchemaValidator(
-        schema=core_schema.typed_dict_schema(
+        core_schema.typed_dict_schema(
             {'f': core_schema.typed_dict_field(core_schema.str_schema())}, **schema_extra_behavior_kw, config=config
         )
     )
@@ -1128,7 +1128,7 @@ def test_extra_behavior_forbid(config: Union[core_schema.CoreConfig, None], sche
 )
 def test_extra_behavior_ignore(config: Union[core_schema.CoreConfig, None], schema_extra_behavior_kw: dict[str, Any]):
     v = SchemaValidator(
-        schema=core_schema.typed_dict_schema(
+        core_schema.typed_dict_schema(
             {'f': core_schema.typed_dict_field(core_schema.str_schema())}, **schema_extra_behavior_kw
         ),
         config=config,
@@ -1154,7 +1154,7 @@ def test_leak_typed_dict():
         # If any of the Rust validators don't implement traversal properly,
         # there will be an undetectable cycle created by this assignment
         # which will keep Defaulted alive
-        validate.__pydantic_validator__ = SchemaValidator(schema=schema)
+        validate.__pydantic_validator__ = SchemaValidator(schema)
 
         return validate
 

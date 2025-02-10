@@ -76,7 +76,7 @@ def test_frozenset_no_validators_both(py_and_json: PyAndJson, input_value, expec
 )
 @pytest.mark.thread_unsafe  # generators in parameters not compatible with pytest-run-parallel, https://github.com/Quansight-Labs/pytest-run-parallel/issues/14
 def test_set_ints_python(input_value, expected):
-    v = SchemaValidator(schema=cs.set_schema(items_schema=cs.int_schema()))
+    v = SchemaValidator(cs.set_schema(items_schema=cs.int_schema()))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
@@ -86,12 +86,12 @@ def test_set_ints_python(input_value, expected):
 
 @pytest.mark.parametrize('input_value,expected', [([1, 2.5, '3'], {1, 2.5, '3'}), ([(1, 2), (3, 4)], {(1, 2), (3, 4)})])
 def test_set_no_validators_python(input_value, expected):
-    v = SchemaValidator(schema=cs.set_schema())
+    v = SchemaValidator(cs.set_schema())
     assert v.validate_python(input_value) == expected
 
 
 def test_set_multiple_errors():
-    v = SchemaValidator(schema=cs.set_schema(items_schema=cs.int_schema()))
+    v = SchemaValidator(cs.set_schema(items_schema=cs.int_schema()))
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python(['a', (1, 2), []])
     assert exc_info.value.errors(include_url=False) == [
@@ -107,7 +107,7 @@ def test_set_multiple_errors():
 
 
 def test_list_with_unhashable_items():
-    v = SchemaValidator(schema=cs.set_schema())
+    v = SchemaValidator(cs.set_schema())
 
     class Unhashable:
         __hash__ = None
@@ -166,7 +166,7 @@ def generate_repeats():
 )
 @pytest.mark.thread_unsafe  # generators in parameters not compatible with pytest-run-parallel, https://github.com/Quansight-Labs/pytest-run-parallel/issues/14
 def test_set_kwargs(kwargs: dict[str, Any], input_value, expected):
-    v = SchemaValidator(schema=cs.set_schema(**kwargs))
+    v = SchemaValidator(cs.set_schema(**kwargs))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             r = v.validate_python(input_value)
@@ -177,7 +177,7 @@ def test_set_kwargs(kwargs: dict[str, Any], input_value, expected):
 
 @pytest.mark.parametrize('input_value,expected', [({1, 2, 3}, {1, 2, 3}), ([1, 2, 3], [1, 2, 3])])
 def test_union_set_list(input_value, expected):
-    v = SchemaValidator(schema=cs.union_schema(choices=[cs.set_schema(), cs.list_schema()]))
+    v = SchemaValidator(cs.union_schema(choices=[cs.set_schema(), cs.list_schema()]))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
@@ -215,7 +215,7 @@ def test_union_set_list(input_value, expected):
 )
 def test_union_set_int_set_str(input_value, expected):
     v = SchemaValidator(
-        schema=cs.union_schema(
+        cs.union_schema(
             choices=[
                 cs.set_schema(items_schema=cs.int_schema(strict=True)),
                 cs.set_schema(items_schema=cs.str_schema(strict=True)),
@@ -245,7 +245,7 @@ def test_generator_error():
             raise RuntimeError('my error')
         yield 3
 
-    v = SchemaValidator(schema=cs.set_schema(items_schema=cs.int_schema()))
+    v = SchemaValidator(cs.set_schema(items_schema=cs.int_schema()))
     r = v.validate_python(gen(False))
     assert r == {1, 2, 3}
     assert isinstance(r, set)
@@ -274,7 +274,7 @@ def test_generator_error():
     ],
 )
 def test_set_from_dict_items(input_value, items_schema, expected):
-    v = SchemaValidator(schema=cs.set_schema(items_schema=items_schema))
+    v = SchemaValidator(cs.set_schema(items_schema=items_schema))
     output = v.validate_python(input_value)
     assert isinstance(output, set)
     assert output == expected
@@ -291,7 +291,7 @@ def test_set_from_dict_items(input_value, items_schema, expected):
     ],
 )
 def test_set_any(input_value, expected):
-    v = SchemaValidator(schema=cs.set_schema())
+    v = SchemaValidator(cs.set_schema())
     output = v.validate_python(input_value)
     assert output == expected
     assert isinstance(output, set)
@@ -333,7 +333,7 @@ def test_set_any(input_value, expected):
     ],
 )
 def test_set_fail_fast(fail_fast, expected):
-    v = SchemaValidator(schema=cs.set_schema(items_schema=cs.int_schema(), fail_fast=fail_fast))
+    v = SchemaValidator(cs.set_schema(items_schema=cs.int_schema(), fail_fast=fail_fast))
 
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python([1, 'not-num', 'again'])

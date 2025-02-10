@@ -148,7 +148,7 @@ def test_literal_py_and_json(py_and_json: PyAndJson, kwarg_expected, input_value
     ],
 )
 def test_literal_not_json(kwarg_expected, input_value, expected):
-    v = SchemaValidator(schema=cs.literal_schema(expected=kwarg_expected))
+    v = SchemaValidator(cs.literal_schema(expected=kwarg_expected))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
             v.validate_python(input_value)
@@ -161,11 +161,11 @@ def test_literal_not_json(kwarg_expected, input_value, expected):
 
 def test_build_error():
     with pytest.raises(SchemaError, match='SchemaError: `expected` should have length > 0'):
-        SchemaValidator(schema=cs.literal_schema(expected=[]))
+        SchemaValidator(cs.literal_schema(expected=[]))
 
 
 def test_literal_none():
-    v = SchemaValidator(schema=core_schema.literal_schema([None]))
+    v = SchemaValidator(core_schema.literal_schema([None]))
     assert v.isinstance_python(None) is True
     assert v.isinstance_python(0) is False
     expected_repr_start = 'SchemaValidator(title="literal[None]"'
@@ -173,9 +173,7 @@ def test_literal_none():
 
 
 def test_union():
-    v = SchemaValidator(
-        schema=core_schema.union_schema([core_schema.literal_schema(['a', 'b']), core_schema.int_schema()])
-    )
+    v = SchemaValidator(core_schema.union_schema([core_schema.literal_schema(['a', 'b']), core_schema.int_schema()]))
     assert v.validate_python('a') == 'a'
     assert v.validate_python(4) == 4
     with pytest.raises(ValidationError) as exc_info:
@@ -203,7 +201,7 @@ def test_enum_value():
         foo = 'foo_value'
         bar = 'bar_value'
 
-    v = SchemaValidator(schema=core_schema.literal_schema([FooEnum.foo]))
+    v = SchemaValidator(core_schema.literal_schema([FooEnum.foo]))
     assert v.validate_python(FooEnum.foo) == FooEnum.foo
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python('foo_value')
@@ -248,7 +246,7 @@ def test_str_enum_values():
         foo = 'foo_value'
         bar = 'bar_value'
 
-    v = SchemaValidator(schema=core_schema.literal_schema([Foo.foo]))
+    v = SchemaValidator(core_schema.literal_schema([Foo.foo]))
 
     assert v.validate_python(Foo.foo) == Foo.foo
     assert v.validate_python('foo_value') == Foo.foo
@@ -272,7 +270,7 @@ def test_int_enum_values():
         foo = 2
         bar = 3
 
-    v = SchemaValidator(schema=core_schema.literal_schema([Foo.foo]))
+    v = SchemaValidator(core_schema.literal_schema([Foo.foo]))
 
     assert v.validate_python(Foo.foo) == Foo.foo
     assert v.validate_python(2) == Foo.foo
@@ -324,7 +322,7 @@ def test_mix_int_enum_with_int(reverse: Callable[[list[Any]], list[Any]], err: A
     class Foo(int, Enum):
         foo = 1
 
-    v = SchemaValidator(schema=core_schema.literal_schema(reverse([1, Foo.foo])))
+    v = SchemaValidator(core_schema.literal_schema(reverse([1, Foo.foo])))
 
     assert v.validate_python(Foo.foo) is Foo.foo
     val = v.validate_python(1)
@@ -370,7 +368,7 @@ def test_mix_str_enum_with_str(reverse: Callable[[list[Any]], list[Any]], err: A
     class Foo(str, Enum):
         foo = 'foo_val'
 
-    v = SchemaValidator(schema=core_schema.literal_schema(reverse(['foo_val', Foo.foo])))
+    v = SchemaValidator(core_schema.literal_schema(reverse(['foo_val', Foo.foo])))
 
     assert v.validate_python(Foo.foo) is Foo.foo
     val = v.validate_python('foo_val')
@@ -386,7 +384,7 @@ def test_mix_str_enum_with_str(reverse: Callable[[list[Any]], list[Any]], err: A
 def test_big_int():
     big_int = 2**64 + 1
     massive_int = 2**128 + 1
-    v = SchemaValidator(schema=core_schema.literal_schema([big_int, massive_int]))
+    v = SchemaValidator(core_schema.literal_schema([big_int, massive_int]))
     assert v.validate_python(big_int) == big_int
     assert v.validate_python(massive_int) == massive_int
     m = r'Input should be 18446744073709551617 or 340282366920938463463374607431768211457 \[type=literal_error'
@@ -398,8 +396,8 @@ def test_enum_for_str() -> None:
     class S(str, Enum):
         a = 'a'
 
-    val_enum = SchemaValidator(schema=core_schema.literal_schema([S.a]))
-    val_str = SchemaValidator(schema=core_schema.literal_schema(['a']))
+    val_enum = SchemaValidator(core_schema.literal_schema([S.a]))
+    val_str = SchemaValidator(core_schema.literal_schema(['a']))
 
     for val in [val_enum, val_str]:
         assert val.validate_python('a') == 'a'

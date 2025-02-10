@@ -100,7 +100,7 @@ def test_validate_assignment_with_context():
         return input_value + f'| context: {info.context}'
 
     v = SchemaValidator(
-        schema=core_schema.model_fields_schema(
+        core_schema.model_fields_schema(
             {
                 'f1': core_schema.model_field(core_schema.with_info_plain_validator_function(f1)),
                 'f2': core_schema.model_field(core_schema.with_info_plain_validator_function(f2)),

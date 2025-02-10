@@ -16,7 +16,7 @@ from .test_typed_dict import Cls
 
 def test_branch_nullable():
     v = SchemaValidator(
-        schema=core_schema.definitions_schema(
+        core_schema.definitions_schema(
             {'type': 'definition-ref', 'schema_ref': 'Branch'},
             [
                 {
@@ -54,7 +54,7 @@ def test_branch_nullable():
 
 def test_unused_ref():
     v = SchemaValidator(
-        schema=cs.typed_dict_schema(
+        cs.typed_dict_schema(
             fields={
                 'name': cs.typed_dict_field(schema=cs.str_schema()),
                 'other': cs.typed_dict_field(schema=cs.int_schema()),
@@ -67,7 +67,7 @@ def test_unused_ref():
 
 def test_nullable_error():
     v = SchemaValidator(
-        schema=core_schema.definitions_schema(
+        core_schema.definitions_schema(
             core_schema.definition_reference_schema('Branch'),
             [
                 core_schema.typed_dict_schema(
@@ -110,7 +110,7 @@ def test_nullable_error():
 
 def test_list():
     v = SchemaValidator(
-        schema=core_schema.definitions_schema(
+        core_schema.definitions_schema(
             core_schema.definition_reference_schema('BranchList'),
             [
                 core_schema.typed_dict_schema(
@@ -151,7 +151,7 @@ def test_multiple_intertwined():
     """
 
     v = SchemaValidator(
-        schema=core_schema.definitions_schema(
+        core_schema.definitions_schema(
             core_schema.definition_reference_schema('Foo'),
             [
                 core_schema.typed_dict_schema(
@@ -204,7 +204,7 @@ def test_model_class():
         branch: Optional['Branch']
 
     v = SchemaValidator(
-        schema=core_schema.definitions_schema(
+        core_schema.definitions_schema(
             core_schema.definition_reference_schema('Branch'),
             [
                 core_schema.model_schema(
@@ -263,7 +263,7 @@ def test_invalid_schema():
 
 def test_outside_parent():
     v = SchemaValidator(
-        schema=core_schema.definitions_schema(
+        core_schema.definitions_schema(
             core_schema.typed_dict_schema(
                 {
                     'tuple1': core_schema.typed_dict_field(core_schema.definition_reference_schema('tuple-iis')),
@@ -286,7 +286,7 @@ def test_outside_parent():
 
 def test_recursion_branch():
     v = SchemaValidator(
-        schema=core_schema.definitions_schema(
+        core_schema.definitions_schema(
             core_schema.definition_reference_schema('Branch'),
             [
                 core_schema.typed_dict_schema(
@@ -330,7 +330,7 @@ def test_recursion_branch():
 
 def test_recursion_branch_from_attributes():
     v = SchemaValidator(
-        schema=core_schema.definitions_schema(
+        core_schema.definitions_schema(
             core_schema.definition_reference_schema('Branch'),
             [
                 core_schema.model_fields_schema(
@@ -379,7 +379,7 @@ def test_recursion_branch_from_attributes():
 
 def test_definition_list():
     v = SchemaValidator(
-        schema=core_schema.definitions_schema(
+        core_schema.definitions_schema(
             core_schema.definition_reference_schema('the-list'),
             [core_schema.list_schema(core_schema.definition_reference_schema('the-list'), ref='the-list')],
         )
@@ -406,7 +406,7 @@ def test_definition_list():
 @pytest.fixture(scope='module')
 def multiple_tuple_schema() -> SchemaValidator:
     return SchemaValidator(
-        schema=core_schema.definitions_schema(
+        core_schema.definitions_schema(
             core_schema.typed_dict_schema(
                 {
                     'f1': core_schema.typed_dict_field(core_schema.definition_reference_schema('t')),
@@ -509,7 +509,7 @@ def test_definition_wrap():
         return validator(input_value) + (42,)
 
     v = SchemaValidator(
-        schema=core_schema.definitions_schema(
+        core_schema.definitions_schema(
             core_schema.definition_reference_schema('wrapper'),
             [
                 core_schema.with_info_wrap_validator_function(
@@ -543,7 +543,7 @@ def test_definition_wrap():
 
 def test_union_ref_strictness():
     v = SchemaValidator(
-        schema=core_schema.definitions_schema(
+        core_schema.definitions_schema(
             core_schema.typed_dict_schema(
                 {
                     'a': core_schema.typed_dict_field(core_schema.definition_reference_schema('int-type')),
@@ -571,7 +571,7 @@ def test_union_ref_strictness():
 
 def test_union_container_strictness():
     v = SchemaValidator(
-        schema=core_schema.definitions_schema(
+        core_schema.definitions_schema(
             core_schema.typed_dict_schema(
                 {
                     'b': core_schema.typed_dict_field(
@@ -600,7 +600,7 @@ def test_union_container_strictness():
 @pytest.mark.parametrize('strict', [True, False], ids=lambda s: f'strict={s}')
 def test_union_cycle(strict: bool):
     s = SchemaValidator(
-        schema=core_schema.definitions_schema(
+        core_schema.definitions_schema(
             core_schema.definition_reference_schema('root-schema'),
             [
                 core_schema.union_schema(
@@ -641,7 +641,7 @@ def test_function_name():
         return input_value + ' Changed'
 
     v = SchemaValidator(
-        schema=core_schema.definitions_schema(
+        core_schema.definitions_schema(
             core_schema.definition_reference_schema('root-schema'),
             [
                 core_schema.union_schema(
@@ -689,7 +689,7 @@ def test_function_change_id(strict: bool):
         return f'f-{int(count) + 1}'
 
     v = SchemaValidator(
-        schema=core_schema.definitions_schema(
+        core_schema.definitions_schema(
             core_schema.definition_reference_schema('root-schema'),
             [
                 core_schema.union_schema(
@@ -722,7 +722,7 @@ def test_function_change_id(strict: bool):
 def test_many_uses_of_ref():
     # check we can safely exceed RECURSION_GUARD_LIMIT without upsetting the recursion guard
     v = SchemaValidator(
-        schema=core_schema.definitions_schema(
+        core_schema.definitions_schema(
             core_schema.definition_reference_schema('Branch'),
             [
                 core_schema.typed_dict_schema(
@@ -798,7 +798,7 @@ def test_recursive_definitions_schema(pydantic_version) -> None:
         ],
     )
 
-    v = SchemaValidator(schema=s)
+    v = SchemaValidator(s)
 
     assert v.validate_python({'b': [{'a': []}]}) == {'b': [{'a': []}]}
 
@@ -827,7 +827,7 @@ def test_unsorted_definitions_schema() -> None:
         ],
     )
 
-    v = SchemaValidator(schema=s)
+    v = SchemaValidator(s)
 
     assert v.validate_python({'x': 123}) == {'x': 123}
 
@@ -862,7 +862,7 @@ def test_validate_assignment(pydantic_version) -> None:
         ],
     )
 
-    v = SchemaValidator(schema=schema)
+    v = SchemaValidator(schema)
 
     data = [Model(x=[Model(x=[])])]
     instance = Model(x=[])
@@ -910,7 +910,7 @@ def test_cyclic_data() -> None:
         ],
     )
 
-    validator = SchemaValidator(schema=schema)
+    validator = SchemaValidator(schema)
 
     with pytest.raises(ValidationError) as exc_info:
         validator.validate_python(cyclic_data)
@@ -960,7 +960,7 @@ def test_cyclic_data_threeway() -> None:
         ],
     )
 
-    validator = SchemaValidator(schema=schema)
+    validator = SchemaValidator(schema)
 
     with pytest.raises(ValidationError) as exc_info:
         validator.validate_python(cyclic_data)
@@ -998,7 +998,7 @@ def test_complex_recursive_type() -> None:
         ],
     )
 
-    validator = SchemaValidator(schema=schema)
+    validator = SchemaValidator(schema)
 
     with pytest.raises(ValidationError) as exc_info:
         validator.validate_python({'a': datetime.date(year=1992, month=12, day=11)})
@@ -1089,4 +1089,4 @@ def test_no_exponential_blowup():
         ],
     )
 
-    SchemaValidator(schema=schema)
+    SchemaValidator(schema)

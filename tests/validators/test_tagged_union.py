@@ -209,7 +209,7 @@ def test_enum_keys():
         TWO = 'two'
 
     v = SchemaValidator(
-        schema=core_schema.tagged_union_schema(
+        core_schema.tagged_union_schema(
             discriminator='foo',
             choices={
                 BarEnum.ONE: core_schema.typed_dict_schema(
@@ -452,7 +452,7 @@ def test_int_discriminator_function(py_and_json: PyAndJson, input_value, expecte
 
 def test_from_attributes():
     v = SchemaValidator(
-        schema=core_schema.tagged_union_schema(
+        core_schema.tagged_union_schema(
             discriminator='foobar',
             choices={
                 'apple': core_schema.model_fields_schema(
@@ -487,7 +487,7 @@ def test_from_attributes():
 
 def test_use_ref():
     v = SchemaValidator(
-        schema=core_schema.definitions_schema(
+        core_schema.definitions_schema(
             core_schema.tagged_union_schema(
                 discriminator='foobar',
                 choices={
@@ -509,7 +509,7 @@ def test_use_ref():
 
 def test_downcast_error():
     v = SchemaValidator(
-        schema=core_schema.tagged_union_schema(discriminator=lambda x: 123, choices={'str': core_schema.str_schema()})
+        core_schema.tagged_union_schema(discriminator=lambda x: 123, choices={'str': core_schema.str_schema()})
     )
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python('x')
@@ -525,7 +525,7 @@ def test_downcast_error():
 
 def test_custom_error():
     v = SchemaValidator(
-        schema=core_schema.tagged_union_schema(
+        core_schema.tagged_union_schema(
             discriminator='foo',
             custom_error_type='snap',
             custom_error_message='Input should be a foo or bar',
@@ -563,7 +563,7 @@ def test_custom_error():
 
 def test_custom_error_type():
     v = SchemaValidator(
-        schema=core_schema.tagged_union_schema(
+        core_schema.tagged_union_schema(
             discriminator='foo',
             custom_error_type='finite_number',
             choices={

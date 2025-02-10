@@ -9,7 +9,7 @@ from pydantic_core import SchemaValidator, ValidationError, core_schema
 
 def test_list():
     v = SchemaValidator(
-        schema=core_schema.list_schema(
+        core_schema.list_schema(
             core_schema.tuple_positional_schema([core_schema.int_schema(), core_schema.int_schema()]),
         )
     )
@@ -42,7 +42,7 @@ def test_list():
 @pytest.mark.parametrize('collection_type', [core_schema.set_schema, core_schema.frozenset_schema])
 def test_set_frozenset(collection_type):
     v = SchemaValidator(
-        schema=collection_type(
+        collection_type(
             core_schema.tuple_positional_schema([core_schema.int_schema(), core_schema.int_schema()]),
         )
     )
@@ -86,7 +86,7 @@ class MyMapping(Mapping):
 
 
 def test_dict():
-    v = SchemaValidator(schema=core_schema.dict_schema(core_schema.int_schema(), core_schema.int_schema()))
+    v = SchemaValidator(core_schema.dict_schema(core_schema.int_schema(), core_schema.int_schema()))
     assert v.validate_python({'1': 2, 3: '4'}) == snapshot({1: 2, 3: 4})
     assert v.validate_python({'1': 2, 3: '4'}, allow_partial=True) == snapshot({1: 2, 3: 4})
     assert v.validate_python(MyMapping({'1': 2, 3: '4'}), allow_partial=True) == snapshot({1: 2, 3: 4})
@@ -115,7 +115,7 @@ def test_dict():
 
 def test_dict_list():
     v = SchemaValidator(
-        schema=core_schema.dict_schema(core_schema.int_schema(), core_schema.list_schema(core_schema.int_schema(ge=10)))
+        core_schema.dict_schema(core_schema.int_schema(), core_schema.list_schema(core_schema.int_schema(ge=10)))
     )
     assert v.validate_python({'1': [20, 30], 3: [40, '50']}, allow_partial=True) == snapshot({1: [20, 30], 3: [40, 50]})
     assert v.validate_python({'1': [20, 30], 3: [40, 5]}, allow_partial=True) == snapshot({1: [20, 30], 3: [40]})
@@ -126,7 +126,7 @@ def test_dict_list():
 
 def test_partial_typed_dict():
     v = SchemaValidator(
-        schema=core_schema.typed_dict_schema(
+        core_schema.typed_dict_schema(
             {
                 'a': core_schema.typed_dict_field(core_schema.int_schema(gt=10)),
                 'b': core_schema.typed_dict_field(core_schema.int_schema(gt=10)),
@@ -195,7 +195,7 @@ def test_partial_typed_dict():
 
 def test_non_partial_typed_dict():
     v = SchemaValidator(
-        schema=core_schema.typed_dict_schema(
+        core_schema.typed_dict_schema(
             {
                 'a': core_schema.typed_dict_field(core_schema.int_schema(gt=10)),
                 'b': core_schema.typed_dict_field(core_schema.int_schema(gt=10), required=True),
@@ -217,7 +217,7 @@ def test_non_partial_typed_dict():
 
 def test_double_nested():
     v = SchemaValidator(
-        schema=core_schema.typed_dict_schema(
+        core_schema.typed_dict_schema(
             {
                 'a': core_schema.typed_dict_field(core_schema.int_schema(gt=10)),
                 'b': core_schema.typed_dict_field(
@@ -261,7 +261,7 @@ def test_double_nested():
 def test_tuple_list():
     """Tuples don't support partial, so behaviour should be disabled."""
     v = SchemaValidator(
-        schema=core_schema.tuple_positional_schema(
+        core_schema.tuple_positional_schema(
             [core_schema.list_schema(core_schema.int_schema()), core_schema.int_schema()]
         )
     )
@@ -284,7 +284,7 @@ def test_dataclass():
             ),
         ],
     )
-    v = SchemaValidator(schema=schema)
+    v = SchemaValidator(schema)
     assert v.validate_python({'a': 'x', 'b': ['ab', 'cd']}) == snapshot(({'a': 'x', 'b': ['ab', 'cd']}, None))
     assert v.validate_python({'a': 'x', 'b': ['ab', 'cd']}, allow_partial=True) == snapshot(
         ({'a': 'x', 'b': ['ab', 'cd']}, None)
@@ -294,9 +294,7 @@ def test_dataclass():
 
 
 def test_nullable():
-    v = SchemaValidator(
-        schema=core_schema.nullable_schema(core_schema.list_schema(core_schema.str_schema(min_length=2)))
-    )
+    v = SchemaValidator(core_schema.nullable_schema(core_schema.list_schema(core_schema.str_schema(min_length=2))))
 
     assert v.validate_python(None, allow_partial=True) is None
     assert v.validate_python(['ab', 'cd'], allow_partial=True) == ['ab', 'cd']
@@ -312,7 +310,7 @@ def test_nullable():
     'json_nested_type', [None, core_schema.dict_schema(core_schema.str_schema(), core_schema.int_schema())]
 )
 def test_json(json_nested_type):
-    v = SchemaValidator(schema=core_schema.list_schema(core_schema.json_schema(json_nested_type)))
+    v = SchemaValidator(core_schema.list_schema(core_schema.json_schema(json_nested_type)))
 
     assert v.validate_python(['{"a": 1}', '{"b": 2}']) == snapshot([{'a': 1}, {'b': 2}])
     assert v.validate_python(['{"a": 1}', '{"b": 2}'], allow_partial=True) == snapshot([{'a': 1}, {'b': 2}])
@@ -327,7 +325,7 @@ def test_json(json_nested_type):
 
 
 def test_json_trailing_strings():
-    v = SchemaValidator(schema=core_schema.list_schema(core_schema.json_schema()))
+    v = SchemaValidator(core_schema.list_schema(core_schema.json_schema()))
     assert v.validate_python(['{"a": 1}', '{"b": "x'], allow_partial=True) == snapshot([{'a': 1}, {}])
     assert v.validate_python(['{"a": 1}', '{"b": "x'], allow_partial='trailing-strings') == snapshot(
         [{'a': 1}, {'b': 'x'}]

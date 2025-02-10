@@ -11,7 +11,7 @@ from .conftest import Err, plain_repr
 
 
 def test_on_field():
-    v = SchemaValidator(schema=cs.str_schema(min_length=2, max_length=5))
+    v = SchemaValidator(cs.str_schema(min_length=2, max_length=5))
     r = plain_repr(v)
     assert 'min_length:Some(2)' in r
     assert 'max_length:Some(5)' in r
@@ -20,14 +20,14 @@ def test_on_field():
 
 
 def test_on_config():
-    v = SchemaValidator(schema=cs.str_schema(), config=CoreConfig(str_max_length=5))
+    v = SchemaValidator(cs.str_schema(), config=CoreConfig(str_max_length=5))
     assert 'max_length:Some(5)' in plain_repr(v)
     assert v.isinstance_python('test') is True
     assert v.isinstance_python('test long') is False
 
 
 def test_field_priority_arg():
-    v = SchemaValidator(schema=cs.str_schema(max_length=5), config=CoreConfig(str_max_length=10))
+    v = SchemaValidator(cs.str_schema(max_length=5), config=CoreConfig(str_max_length=10))
     assert 'max_length:Some(5)' in plain_repr(v)
     assert v.isinstance_python('test') is True
     assert v.isinstance_python('test long') is False
@@ -40,7 +40,7 @@ class MyModel:
 
 def test_on_model_class():
     v = SchemaValidator(
-        schema=cs.model_schema(
+        cs.model_schema(
             cls=MyModel,
             config=CoreConfig(str_max_length=5),
             schema=cs.model_fields_schema(fields={'f': cs.model_field(schema=cs.str_schema())}),
@@ -53,7 +53,7 @@ def test_on_model_class():
 
 def test_field_priority_model():
     v = SchemaValidator(
-        schema=cs.model_schema(
+        cs.model_schema(
             cls=MyModel,
             config=CoreConfig(str_max_length=10),
             schema=cs.model_fields_schema(fields={'f': cs.model_field(schema=cs.str_schema(max_length=5))}),
@@ -103,7 +103,7 @@ def test_field_priority_model():
 )
 def test_allow_inf_nan(config: CoreConfig, float_field_schema, input_value, expected):
     v = SchemaValidator(
-        schema=cs.model_schema(
+        cs.model_schema(
             cls=MyModel,
             schema=cs.model_fields_schema(fields={'x': cs.model_field(schema=float_field_schema)}),
             config=config,
@@ -127,7 +127,7 @@ def test_allow_inf_nan(config: CoreConfig, float_field_schema, input_value, expe
 )
 def test_hide_input_in_errors(config, input_str):
     v = SchemaValidator(
-        schema=cs.model_schema(
+        cs.model_schema(
             cls=MyModel, schema=cs.model_fields_schema(fields={'f': cs.model_field(schema=cs.str_schema())})
         ),
         config=config,
@@ -138,14 +138,14 @@ def test_hide_input_in_errors(config, input_str):
 
 
 def test_cache_strings():
-    v = SchemaValidator(schema=cs.str_schema())
+    v = SchemaValidator(cs.str_schema())
     assert 'cache_strings=True' in plain_repr(v)
 
-    v = SchemaValidator(schema=cs.str_schema(), config=CoreConfig(cache_strings=True))
+    v = SchemaValidator(cs.str_schema(), config=CoreConfig(cache_strings=True))
     assert 'cache_strings=True' in plain_repr(v)
 
-    v = SchemaValidator(schema=cs.str_schema(), config=CoreConfig(cache_strings=False))
+    v = SchemaValidator(cs.str_schema(), config=CoreConfig(cache_strings=False))
     assert 'cache_strings=False' in plain_repr(v)
 
-    v = SchemaValidator(schema=cs.str_schema(), config=CoreConfig(cache_strings='keys'))
+    v = SchemaValidator(cs.str_schema(), config=CoreConfig(cache_strings='keys'))
     assert "cache_strings='keys'" in plain_repr(v)

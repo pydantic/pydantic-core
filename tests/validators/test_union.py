@@ -29,7 +29,7 @@ from ..conftest import plain_repr
     ],
 )
 def test_union_bool_int(input_value, expected_value):
-    v = SchemaValidator(schema=core_schema.union_schema(choices=[core_schema.bool_schema(), core_schema.int_schema()]))
+    v = SchemaValidator(core_schema.union_schema(choices=[core_schema.bool_schema(), core_schema.int_schema()]))
     assert v.validate_python(input_value) == expected_value
 
 
@@ -49,7 +49,7 @@ def test_union_bool_int(input_value, expected_value):
     ],
 )
 def test_union_int_bool(input_value, expected_value):
-    v = SchemaValidator(schema=core_schema.union_schema(choices=[core_schema.int_schema(), core_schema.bool_schema()]))
+    v = SchemaValidator(core_schema.union_schema(choices=[core_schema.int_schema(), core_schema.bool_schema()]))
     assert v.validate_python(input_value) == expected_value
 
 
@@ -185,7 +185,7 @@ class TestModelClassSimilar:
 
 
 def test_nullable_via_union():
-    v = SchemaValidator(schema=core_schema.union_schema(choices=[core_schema.none_schema(), core_schema.int_schema()]))
+    v = SchemaValidator(core_schema.union_schema(choices=[core_schema.none_schema(), core_schema.int_schema()]))
     assert v.validate_python(None) is None
     assert v.validate_python(1) == 1
     with pytest.raises(ValidationError) as exc_info:
@@ -203,7 +203,7 @@ def test_nullable_via_union():
 
 def test_union_list_bool_int():
     v = SchemaValidator(
-        schema=core_schema.union_schema(
+        core_schema.union_schema(
             choices=[
                 core_schema.list_schema(items_schema=core_schema.bool_schema()),
                 core_schema.list_schema(items_schema=core_schema.int_schema()),
@@ -250,11 +250,11 @@ def test_no_choices(pydantic_version):
 def test_empty_choices():
     msg = r'Error building "union" validator:\s+SchemaError: One or more union choices required'
     with pytest.raises(SchemaError, match=msg):
-        SchemaValidator(schema=core_schema.union_schema(choices=[]))
+        SchemaValidator(core_schema.union_schema(choices=[]))
 
 
 def test_one_choice():
-    v = SchemaValidator(schema=core_schema.union_schema(choices=[core_schema.str_schema()]))
+    v = SchemaValidator(core_schema.union_schema(choices=[core_schema.str_schema()]))
     assert (
         plain_repr(v)
         == 'SchemaValidator(title="str",validator=Str(StrValidator{strict:false,coerce_numbers_to_str:false}),definitions=[],cache_strings=True)'
@@ -264,7 +264,7 @@ def test_one_choice():
 
 def test_strict_union():
     v = SchemaValidator(
-        schema=core_schema.union_schema(strict=True, choices=[core_schema.bool_schema(), core_schema.int_schema()])
+        core_schema.union_schema(strict=True, choices=[core_schema.bool_schema(), core_schema.int_schema()])
     )
     assert v.validate_python(1) == 1
     assert v.validate_python(123) == 123
@@ -280,7 +280,7 @@ def test_strict_union():
 
 def test_custom_error():
     v = SchemaValidator(
-        schema=core_schema.union_schema(
+        core_schema.union_schema(
             choices=[core_schema.str_schema(), core_schema.bytes_schema()],
             custom_error_type='my_error',
             custom_error_message='Input should be a string or bytes',
@@ -298,7 +298,7 @@ def test_custom_error():
 
 def test_custom_error_type():
     v = SchemaValidator(
-        schema=core_schema.union_schema(
+        core_schema.union_schema(
             choices=[core_schema.str_schema(), core_schema.bytes_schema()], custom_error_type='string_type'
         )
     )
@@ -314,7 +314,7 @@ def test_custom_error_type():
 
 def test_custom_error_type_context():
     v = SchemaValidator(
-        schema=core_schema.union_schema(
+        core_schema.union_schema(
             choices=[core_schema.str_schema(), core_schema.bytes_schema()],
             custom_error_type='less_than',
             custom_error_context={'lt': 42},
@@ -342,13 +342,13 @@ def test_dirty_behaviour():
 
 
 def test_int_float():
-    v = SchemaValidator(schema=core_schema.union_schema([core_schema.int_schema(), core_schema.float_schema()]))
+    v = SchemaValidator(core_schema.union_schema([core_schema.int_schema(), core_schema.float_schema()]))
     assert v.validate_python(1) == IsInt(approx=1, delta=0)
     assert v.validate_json('1') == IsInt(approx=1, delta=0)
     assert v.validate_python(1.0) == IsFloat(approx=1, delta=0)
     assert v.validate_json('1.0') == IsFloat(approx=1, delta=0)
 
-    v = SchemaValidator(schema=core_schema.union_schema([core_schema.float_schema(), core_schema.int_schema()]))
+    v = SchemaValidator(core_schema.union_schema([core_schema.float_schema(), core_schema.int_schema()]))
     assert v.validate_python(1) == IsInt(approx=1, delta=0)
     assert v.validate_json('1') == IsInt(approx=1, delta=0)
     assert v.validate_python(1.0) == IsFloat(approx=1, delta=0)
@@ -356,7 +356,7 @@ def test_int_float():
 
 
 def test_str_float():
-    v = SchemaValidator(schema=core_schema.union_schema([core_schema.str_schema(), core_schema.float_schema()]))
+    v = SchemaValidator(core_schema.union_schema([core_schema.str_schema(), core_schema.float_schema()]))
 
     assert v.validate_python(1) == IsFloat(approx=1, delta=0)
     assert v.validate_json('1') == IsFloat(approx=1, delta=0)
@@ -368,7 +368,7 @@ def test_str_float():
     assert v.validate_json('"1.0"') == '1.0'
     assert v.validate_json('"1"') == '1'
 
-    v = SchemaValidator(schema=core_schema.union_schema([core_schema.float_schema(), core_schema.str_schema()]))
+    v = SchemaValidator(core_schema.union_schema([core_schema.float_schema(), core_schema.str_schema()]))
     assert v.validate_python(1) == IsFloat(approx=1, delta=0)
     assert v.validate_json('1') == IsFloat(approx=1, delta=0)
     assert v.validate_python(1.0) == IsFloat(approx=1, delta=0)
@@ -381,16 +381,14 @@ def test_str_float():
 
 
 def test_no_strict_check():
-    v = SchemaValidator(
-        schema=core_schema.union_schema([core_schema.is_instance_schema(int), core_schema.json_schema()])
-    )
+    v = SchemaValidator(core_schema.union_schema([core_schema.is_instance_schema(int), core_schema.json_schema()]))
     assert v.validate_python(123) == 123
     assert v.validate_python('[1, 2, 3]') == [1, 2, 3]
 
 
 def test_strict_reference():
     v = SchemaValidator(
-        schema=core_schema.definitions_schema(
+        core_schema.definitions_schema(
             core_schema.definition_reference_schema(schema_ref='tuple-ref'),
             [
                 core_schema.tuple_positional_schema(
@@ -412,7 +410,7 @@ def test_strict_reference():
 
 def test_case_labels():
     v = SchemaValidator(
-        schema=core_schema.union_schema(
+        core_schema.union_schema(
             choices=[core_schema.none_schema(), ({'type': 'int'}, 'my_label'), core_schema.str_schema()]
         )
     )
@@ -434,7 +432,7 @@ def test_case_labels():
 
 def test_left_to_right_doesnt_care_about_strict_check():
     v = SchemaValidator(
-        schema=core_schema.union_schema([core_schema.int_schema(), core_schema.json_schema()], mode='left_to_right')
+        core_schema.union_schema([core_schema.int_schema(), core_schema.json_schema()], mode='left_to_right')
     )
     assert 'strict_required' not in plain_repr(v)
     assert 'ultra_strict_required' not in plain_repr(v)
@@ -444,13 +442,13 @@ def test_left_to_right_union():
     choices = [core_schema.int_schema(), core_schema.float_schema()]
 
     # smart union prefers float
-    v = SchemaValidator(schema=core_schema.union_schema(choices, mode='smart'))
+    v = SchemaValidator(core_schema.union_schema(choices, mode='smart'))
     out = v.validate_python(1.0)
     assert out == 1.0
     assert isinstance(out, float)
 
     # left_to_right union will select int
-    v = SchemaValidator(schema=core_schema.union_schema(choices, mode='left_to_right'))
+    v = SchemaValidator(core_schema.union_schema(choices, mode='left_to_right'))
     out = v.validate_python(1)
     assert out == 1
     assert isinstance(out, int)
@@ -460,7 +458,7 @@ def test_left_to_right_union():
     assert isinstance(out, int)
 
     # reversing them will select float
-    v = SchemaValidator(schema=core_schema.union_schema(list(reversed(choices)), mode='left_to_right'))
+    v = SchemaValidator(core_schema.union_schema(list(reversed(choices)), mode='left_to_right'))
     out = v.validate_python(1.0)
     assert out == 1.0
     assert isinstance(out, float)
@@ -474,7 +472,7 @@ def test_left_to_right_union_strict():
     choices = [core_schema.int_schema(), core_schema.float_schema()]
 
     # left_to_right union will select not cast if int first (strict int will not accept float)
-    v = SchemaValidator(schema=core_schema.union_schema(choices, mode='left_to_right', strict=True))
+    v = SchemaValidator(core_schema.union_schema(choices, mode='left_to_right', strict=True))
     out = v.validate_python(1)
     assert out == 1
     assert isinstance(out, int)
@@ -484,7 +482,7 @@ def test_left_to_right_union_strict():
     assert isinstance(out, float)
 
     # reversing union will select float always (as strict float will accept int)
-    v = SchemaValidator(schema=core_schema.union_schema(list(reversed(choices)), mode='left_to_right', strict=True))
+    v = SchemaValidator(core_schema.union_schema(list(reversed(choices)), mode='left_to_right', strict=True))
     out = v.validate_python(1.0)
     assert out == 1.0
     assert isinstance(out, float)
@@ -515,7 +513,7 @@ def test_union_function_before_called_once():
 
     prefixed_uuid_schema = core_schema.no_info_before_validator_function(remove_prefix, core_schema.uuid_schema())
 
-    v = SchemaValidator(schema=core_schema.union_schema([special_values_schema, prefixed_uuid_schema]))
+    v = SchemaValidator(core_schema.union_schema([special_values_schema, prefixed_uuid_schema]))
 
     assert v.validate_python('uuid::12345678-1234-5678-1234-567812345678') == UUID(
         '12345678-1234-5678-1234-567812345678'
@@ -544,7 +542,7 @@ def test_smart_union_json_string_types(schema: core_schema.CoreSchema, input_val
     # when parsing in JSON mode these types are preferred
     # TODO: in V3 we will make str win in all these cases.
 
-    validator = SchemaValidator(schema=core_schema.union_schema([schema, core_schema.str_schema()]))
+    validator = SchemaValidator(core_schema.union_schema([schema, core_schema.str_schema()]))
     assert validator.validate_json(f'"{input_value}"') == expected_value
     # in Python mode the string will be preferred
     assert validator.validate_python(input_value) == input_value
@@ -567,7 +565,7 @@ def test_smart_union_json_string_types(schema: core_schema.CoreSchema, input_val
 )
 def test_smart_union_json_string_types_str_first(schema: core_schema.CoreSchema, input_value: str):
     # As above, but reversed order; str should always win
-    validator = SchemaValidator(schema=core_schema.union_schema([core_schema.str_schema(), schema]))
+    validator = SchemaValidator(core_schema.union_schema([core_schema.str_schema(), schema]))
     assert validator.validate_json(f'"{input_value}"') == input_value
     assert validator.validate_python(input_value) == input_value
 
@@ -601,7 +599,7 @@ def test_smart_union_default_fallback():
         ]
     )
 
-    validator = SchemaValidator(schema=schema)
+    validator = SchemaValidator(schema)
 
     result = validator.validate_python({'x': 1})
     assert isinstance(result, ModelA)
@@ -631,7 +629,7 @@ def test_smart_union_model_field():
         ]
     )
 
-    validator = SchemaValidator(schema=schema)
+    validator = SchemaValidator(schema)
 
     result = validator.validate_python({'x': 1})
     assert isinstance(result, ModelA)
@@ -670,7 +668,7 @@ def test_smart_union_dataclass_field():
         ]
     )
 
-    validator = SchemaValidator(schema=schema)
+    validator = SchemaValidator(schema)
 
     result = validator.validate_python({'x': 1})
     assert isinstance(result, ModelA)
@@ -686,12 +684,12 @@ def test_smart_union_with_any():
 
     # str not coerced to int
     schema = core_schema.union_schema([core_schema.int_schema(), core_schema.any_schema()])
-    validator = SchemaValidator(schema=schema)
+    validator = SchemaValidator(schema)
     assert validator.validate_python('1') == '1'
 
     # int *is* coerced to float, this is a strict validation
     schema = core_schema.union_schema([core_schema.float_schema(), core_schema.any_schema()])
-    validator = SchemaValidator(schema=schema)
+    validator = SchemaValidator(schema)
     assert repr(validator.validate_python(1)) == '1.0'
 
 
@@ -700,7 +698,7 @@ def test_smart_union_validator_function():
 
     inner_schema = core_schema.union_schema([core_schema.int_schema(), core_schema.float_schema()])
 
-    validator = SchemaValidator(schema=inner_schema)
+    validator = SchemaValidator(inner_schema)
     assert repr(validator.validate_python(1)) == '1'
     assert repr(validator.validate_python(1.0)) == '1.0'
 
@@ -708,7 +706,7 @@ def test_smart_union_validator_function():
         [core_schema.no_info_after_validator_function(lambda v: v * 2, inner_schema), core_schema.str_schema()]
     )
 
-    validator = SchemaValidator(schema=schema)
+    validator = SchemaValidator(schema)
     assert repr(validator.validate_python(1)) == '2'
     assert repr(validator.validate_python(1.0)) == '2.0'
     assert validator.validate_python('1') == '1'
@@ -720,7 +718,7 @@ def test_smart_union_validator_function():
         ]
     )
 
-    validator = SchemaValidator(schema=schema)
+    validator = SchemaValidator(schema)
     assert repr(validator.validate_python(1)) == '2'
     assert repr(validator.validate_python(1.0)) == '2.0'
     assert validator.validate_python('1') == '1'
@@ -736,7 +734,7 @@ def test_smart_union_validator_function_one_arm():
         ]
     )
 
-    validator = SchemaValidator(schema=schema)
+    validator = SchemaValidator(schema)
     assert repr(validator.validate_python(1)) == '2'
     assert repr(validator.validate_python(1.0)) == '1.0'
 
@@ -747,7 +745,7 @@ def test_smart_union_validator_function_one_arm():
         ]
     )
 
-    validator = SchemaValidator(schema=schema)
+    validator = SchemaValidator(schema)
     assert repr(validator.validate_python(1)) == '2'
     assert repr(validator.validate_python(1.0)) == '1.0'
 
@@ -764,7 +762,7 @@ def test_int_not_coerced_to_enum():
 
     schema = core_schema.union_schema([enum_schema, core_schema.int_schema()])
 
-    validator = SchemaValidator(schema=schema)
+    validator = SchemaValidator(schema)
 
     assert validator.validate_python(0) is not BinaryEnum.ZERO
     assert validator.validate_python(1) is not BinaryEnum.ONE
@@ -778,7 +776,7 @@ def test_model_and_literal_union() -> None:
         pass
 
     validator = SchemaValidator(
-        schema=core_schema.union_schema(
+        core_schema.union_schema(
             choices=[
                 core_schema.model_schema(
                     cls=ModelA,
@@ -825,7 +823,7 @@ class TestSmartUnionWithSubclass:
 
     @pytest.mark.parametrize('choices', permute_choices([model_a_schema, model_b_schema]))
     def test_more_specific_data_matches_subclass(self, choices) -> None:
-        validator = SchemaValidator(schema=core_schema.union_schema(choices))
+        validator = SchemaValidator(core_schema.union_schema(choices))
         assert isinstance(validator.validate_python({'a': 1}), self.ModelA)
         assert isinstance(validator.validate_python({'a': 1, 'b': 2}), self.ModelB)
 
@@ -860,7 +858,7 @@ class TestSmartUnionWithDefaults:
 
     @pytest.mark.parametrize('choices', permute_choices([model_a_schema, model_b_schema]))
     def test_fields_set_ensures_best_match(self, choices) -> None:
-        validator = SchemaValidator(schema=core_schema.union_schema(choices))
+        validator = SchemaValidator(core_schema.union_schema(choices))
         assert isinstance(validator.validate_python({'a': 1}), self.ModelA)
         assert isinstance(validator.validate_python({'b': 1}), self.ModelB)
 
@@ -921,7 +919,7 @@ def test_dc_smart_union_by_fields_set() -> None:
     )
 
     for choices in permute_choices([dc_a_schema, dc_b_schema]):
-        validator = SchemaValidator(schema=core_schema.union_schema(choices=choices))
+        validator = SchemaValidator(core_schema.union_schema(choices=choices))
 
         assert isinstance(validator.validate_python({'x': 1}), ModelA)
         assert isinstance(validator.validate_python({'x': '1'}), ModelA)
@@ -968,7 +966,7 @@ def test_dc_smart_union_with_defaults() -> None:
     )
 
     for choices in permute_choices([dc_a_schema, dc_b_schema]):
-        validator = SchemaValidator(schema=core_schema.union_schema(choices=choices))
+        validator = SchemaValidator(core_schema.union_schema(choices=choices))
 
         assert isinstance(validator.validate_python({'a': 1}), ModelA)
         assert isinstance(validator.validate_python({'b': 1}), ModelB)
@@ -987,7 +985,7 @@ def test_td_smart_union_by_fields_set() -> None:
     )
 
     for choices in permute_choices([td_a_schema, td_b_schema]):
-        validator = SchemaValidator(schema=core_schema.union_schema(choices=choices))
+        validator = SchemaValidator(core_schema.union_schema(choices=choices))
 
         assert set(validator.validate_python({'x': 1}).keys()) == {'x'}
         assert set(validator.validate_python({'x': '1'}).keys()) == {'x'}
@@ -1052,7 +1050,7 @@ def test_smart_union_does_nested_model_field_counting() -> None:
     )
 
     for choices in permute_choices([model_a_schema, model_b_schema]):
-        validator = SchemaValidator(schema=core_schema.union_schema(choices=choices))
+        validator = SchemaValidator(core_schema.union_schema(choices=choices))
 
         assert isinstance(validator.validate_python({'sub': {'x': 1}}), ModelA)
         assert isinstance(validator.validate_python({'sub': {'y': 3}}), ModelB)
@@ -1135,7 +1133,7 @@ def test_smart_union_does_nested_dataclass_field_counting() -> None:
     )
 
     for choices in permute_choices([dc_a_schema, dc_b_schema]):
-        validator = SchemaValidator(schema=core_schema.union_schema(choices=choices))
+        validator = SchemaValidator(core_schema.union_schema(choices=choices))
 
         assert isinstance(validator.validate_python({'sub': {'x': 1}}), ModelA)
         assert isinstance(validator.validate_python({'sub': {'y': 3}}), ModelB)
@@ -1162,7 +1160,7 @@ def test_smart_union_does_nested_typed_dict_field_counting() -> None:
     )
 
     for choices in permute_choices([td_a_schema, td_b_schema]):
-        validator = SchemaValidator(schema=core_schema.union_schema(choices=choices))
+        validator = SchemaValidator(core_schema.union_schema(choices=choices))
 
         assert set(validator.validate_python({'sub': {'x': 1}})['sub'].keys()) == {'x'}
         assert set(validator.validate_python({'sub': {'y': 2}})['sub'].keys()) == {'y'}
@@ -1285,7 +1283,7 @@ def test_smart_union_extra_behavior(extra_behavior) -> None:
         x: Union[Foo, Bar]
 
     validator = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             Model,
             core_schema.model_fields_schema(
                 fields={

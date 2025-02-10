@@ -69,9 +69,7 @@ def test_function_args_any(input_value, expected):
     def my_function(a, b, c):
         return a + b + c
 
-    v = SchemaValidator(
-        schema=cs.call_schema(function=my_function, arguments=cs.any_schema(), return_schema=cs.int_schema())
-    )
+    v = SchemaValidator(cs.call_schema(function=my_function, arguments=cs.any_schema(), return_schema=cs.int_schema()))
 
     if isinstance(expected, Exception):
         with pytest.raises(type(expected), match=re.escape(str(expected))):
@@ -85,7 +83,7 @@ def test_function_return_any(input_value, expected):
     def my_function(a):
         return a
 
-    v = SchemaValidator(schema=cs.call_schema(function=my_function, arguments=cs.any_schema()))
+    v = SchemaValidator(cs.call_schema(function=my_function, arguments=cs.any_schema()))
     assert 'name:"call[my_function]"' in plain_repr(v)
 
     assert v.validate_python(input_value) == expected
@@ -96,7 +94,7 @@ def test_in_union():
         return a
 
     v = SchemaValidator(
-        schema=cs.union_schema(
+        cs.union_schema(
             choices=[
                 cs.call_schema(
                     function=my_function,
@@ -129,7 +127,7 @@ def test_dataclass():
         b: str
 
     v = SchemaValidator(
-        schema=cs.call_schema(
+        cs.call_schema(
             function=my_dataclass,
             arguments=cs.arguments_schema(
                 arguments=[
@@ -154,7 +152,7 @@ def test_named_tuple():
     Point = namedtuple('Point', ['x', 'y'])
 
     v = SchemaValidator(
-        schema=cs.call_schema(
+        cs.call_schema(
             function=Point,
             arguments=cs.arguments_schema(
                 arguments=[
@@ -180,7 +178,7 @@ def test_function_call_partial():
         return a + b + c
 
     v = SchemaValidator(
-        schema=cs.call_schema(
+        cs.call_schema(
             function=partial(my_function, c=3),
             arguments=cs.arguments_schema(
                 arguments=[
@@ -200,7 +198,7 @@ def test_custom_name():
         return a
 
     v = SchemaValidator(
-        schema=cs.call_schema(
+        cs.call_schema(
             function=my_function,
             function_name='foobar',
             arguments=cs.arguments_schema(

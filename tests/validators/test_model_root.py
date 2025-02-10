@@ -9,7 +9,7 @@ def test_model_root():
         root: list[int]
 
     v = SchemaValidator(
-        schema=core_schema.model_schema(RootModel, core_schema.list_schema(core_schema.int_schema()), root_model=True)
+        core_schema.model_schema(RootModel, core_schema.list_schema(core_schema.int_schema()), root_model=True)
     )
     assert repr(v).startswith('SchemaValidator(title="RootModel", validator=Model(\n')
 
@@ -37,7 +37,7 @@ def test_revalidate():
         root: list[int]
 
     v = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             RootModel, core_schema.list_schema(core_schema.int_schema()), root_model=True, revalidate_instances='always'
         )
     )
@@ -60,7 +60,7 @@ def test_revalidate_with_default():
         root: int = 42
 
     v = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             RootModel,
             core_schema.with_default_schema(core_schema.int_schema(), default=42),
             root_model=True,
@@ -86,9 +86,7 @@ def test_init():
         root: str
 
     v = SchemaValidator(
-        schema=core_schema.model_schema(
-            RootModel, core_schema.str_schema(), root_model=True, revalidate_instances='always'
-        )
+        core_schema.model_schema(RootModel, core_schema.str_schema(), root_model=True, revalidate_instances='always')
     )
 
     m = RootModel()
@@ -102,7 +100,7 @@ def test_assignment():
         __slots__ = '__dict__', '__pydantic_fields_set__', '__pydantic_extra__', '__pydantic_private__'
         root: str
 
-    v = SchemaValidator(schema=core_schema.model_schema(RootModel, core_schema.str_schema(), root_model=True))
+    v = SchemaValidator(core_schema.model_schema(RootModel, core_schema.str_schema(), root_model=True))
 
     m = v.validate_python('foobar')
     assert m.root == 'foobar'
@@ -138,7 +136,7 @@ def test_field_function():
         return input_value + ' validated'
 
     v = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             RootModel,
             core_schema.with_info_after_validator_function(f, core_schema.str_schema(), field_name='root'),
             root_model=True,
@@ -163,7 +161,7 @@ def test_extra():
         __slots__ = '__dict__', '__pydantic_fields_set__', '__pydantic_extra__', '__pydantic_private__'
         root: int
 
-    v = SchemaValidator(schema=core_schema.model_schema(RootModel, core_schema.int_schema(), root_model=True))
+    v = SchemaValidator(core_schema.model_schema(RootModel, core_schema.int_schema(), root_model=True))
 
     m = v.validate_python(1)
 
@@ -179,7 +177,7 @@ def test_fields_set():
         root: int = 42
 
     v = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             RootModel, core_schema.with_default_schema(core_schema.int_schema(), default=42), root_model=True
         )
     )
@@ -204,7 +202,7 @@ def test_construct_from_validate_default():
         value: RootModel = 42
 
     v = SchemaValidator(
-        schema=core_schema.model_schema(
+        core_schema.model_schema(
             Model,
             core_schema.model_fields_schema(
                 {

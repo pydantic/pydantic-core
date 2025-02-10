@@ -10,7 +10,7 @@ from pydantic_core._pydantic_core import SchemaValidator, ValidationError
 
 def test_basic_schema_validator():
     v = SchemaValidator(
-        schema=validate_core_schema(
+        validate_core_schema(
             {'type': 'dict', 'strict': True, 'keys_schema': {'type': 'int'}, 'values_schema': {'type': 'int'}}
         )
     )
@@ -26,7 +26,7 @@ def test_schema_validator_containing_config():
     Verify that the config object is not lost during (de)serialization.
     """
     v = SchemaValidator(
-        schema=core_schema.model_fields_schema({'f': core_schema.model_field(core_schema.str_schema())}),
+        core_schema.model_fields_schema({'f': core_schema.model_field(core_schema.str_schema())}),
         config=core_schema.CoreConfig(extra_fields_behavior='allow'),
     )
     v = pickle.loads(pickle.dumps(v))
@@ -46,7 +46,7 @@ def test_schema_validator_tz_pickle() -> None:
     """
     https://github.com/pydantic/pydantic-core/issues/589
     """
-    v = SchemaValidator(schema=core_schema.datetime_schema())
+    v = SchemaValidator(core_schema.datetime_schema())
     original = datetime(2022, 6, 8, 12, 13, 14, tzinfo=timezone(timedelta(hours=-12, minutes=-15)))
     validated = v.validate_python('2022-06-08T12:13:14-12:15')
     assert validated == original

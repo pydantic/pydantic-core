@@ -151,7 +151,7 @@ def gen():
 
 
 def test_generator_too_long():
-    v = SchemaValidator(schema=cs.generator_schema(items_schema=cs.int_schema(), max_length=2))
+    v = SchemaValidator(cs.generator_schema(items_schema=cs.int_schema(), max_length=2))
 
     validating_iterator = v.validate_python(gen())
 
@@ -175,7 +175,7 @@ def test_generator_too_long():
 
 
 def test_generator_too_short():
-    v = SchemaValidator(schema=cs.generator_schema(items_schema=cs.int_schema(), min_length=4))
+    v = SchemaValidator(cs.generator_schema(items_schema=cs.int_schema(), min_length=4))
 
     validating_iterator = v.validate_python(gen())
 
