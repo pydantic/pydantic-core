@@ -961,7 +961,7 @@ def test_frozen_field():
     'config,schema_extra_behavior_kw',
     [
         (core_schema.CoreConfig(extra_fields_behavior='ignore'), {}),
-        (core_schema.CoreConfig(extra_fields_behavior='ignore'), {}),
+        (core_schema.CoreConfig(extra_fields_behavior='ignore'), {'extra_behavior': None}),
         (core_schema.CoreConfig(), {'extra_behavior': 'ignore'}),
         (None, {'extra_behavior': 'ignore'}),
         (core_schema.CoreConfig(extra_fields_behavior='allow'), {'extra_behavior': 'ignore'}),
