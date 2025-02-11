@@ -1693,9 +1693,9 @@ def test_extra_behavior_forbid(config: Union[core_schema.CoreConfig, None], sche
         (core_schema.CoreConfig(), {'extra_behavior': 'ignore'}),
         (None, {'extra_behavior': 'ignore'}),
         (core_schema.CoreConfig(extra_fields_behavior='forbid'), {'extra_behavior': 'ignore'}),
+        (core_schema.CoreConfig(), {}),
         (core_schema.CoreConfig(), {'extra_behavior': None}),
         (None, {'extra_behavior': None}),
-        (None, {}),
     ],
 )
 def test_extra_behavior_ignore(config: Union[core_schema.CoreConfig, None], schema_extra_behavior_kw: dict[str, Any]):

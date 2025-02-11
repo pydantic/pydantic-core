@@ -252,7 +252,8 @@ def test_invalid_schema():
                         'width': cs.typed_dict_field(schema=cs.int_schema()),
                         'branch': cs.typed_dict_field(
                             schema=cs.with_default_schema(
-                                schema=cs.nullable_schema(schema=cs.definition_reference_schema(schema_ref='Branch'))
+                                schema=cs.nullable_schema(schema=cs.definition_reference_schema(schema_ref='Branch')),
+                                default=None
                             )
                         ),
                     }
