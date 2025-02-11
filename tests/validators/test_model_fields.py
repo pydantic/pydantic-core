@@ -1603,7 +1603,7 @@ def test_frozen_field():
     'config,schema_extra_behavior_kw',
     [
         (core_schema.CoreConfig(extra_fields_behavior='allow'), {}),
-        (core_schema.CoreConfig(extra_fields_behavior='allow'), {}),
+        (core_schema.CoreConfig(extra_fields_behavior='allow'), {'extra_behavior': None}),
         (core_schema.CoreConfig(), {'extra_behavior': 'allow'}),
         (None, {'extra_behavior': 'allow'}),
         (core_schema.CoreConfig(extra_fields_behavior='forbid'), {'extra_behavior': 'allow'}),
@@ -1645,7 +1645,7 @@ def test_extra_behavior_allow(
     'config,schema_extra_behavior_kw',
     [
         (core_schema.CoreConfig(extra_fields_behavior='forbid'), {}),
-        (core_schema.CoreConfig(extra_fields_behavior='forbid'), {}),
+        (core_schema.CoreConfig(extra_fields_behavior='forbid'), {'extra_behavior': None}),
         (core_schema.CoreConfig(), {'extra_behavior': 'forbid'}),
         (None, {'extra_behavior': 'forbid'}),
         (core_schema.CoreConfig(extra_fields_behavior='allow'), {'extra_behavior': 'forbid'}),

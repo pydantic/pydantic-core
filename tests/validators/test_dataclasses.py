@@ -1055,7 +1055,7 @@ def test_extra_behavior_forbid(config: Union[core_schema.CoreConfig, None], sche
     'config,schema_extra_behavior_kw',
     [
         (core_schema.CoreConfig(extra_fields_behavior='allow'), {}),
-        (core_schema.CoreConfig(extra_fields_behavior='allow'), {}),
+        (core_schema.CoreConfig(extra_fields_behavior='allow'), {'extra_behavior': None}),
         (core_schema.CoreConfig(), {'extra_behavior': 'allow'}),
         (None, {'extra_behavior': 'allow'}),
         (core_schema.CoreConfig(extra_fields_behavior='forbid'), {'extra_behavior': 'allow'}),
