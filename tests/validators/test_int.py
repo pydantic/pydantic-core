@@ -1,7 +1,7 @@
 import json
 import re
 from decimal import Decimal
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 from dirty_equals import IsStr
@@ -311,10 +311,7 @@ def test_int_strict(py_and_json: PyAndJson, input_value, expected):
         (
             {'ge': 0},
             -1,
-            Err(
-                'Input should be greater than or equal to 0 '
-                '[type=greater_than_equal, input_value=-1, input_type=int]'
-            ),
+            Err('Input should be greater than or equal to 0 [type=greater_than_equal, input_value=-1, input_type=int]'),
         ),
         ({'gt': 0}, 1, 1),
         ({'gt': 0}, 0, Err('Input should be greater than 0 [type=greater_than, input_value=0, input_type=int]')),
@@ -328,7 +325,7 @@ def test_int_strict(py_and_json: PyAndJson, input_value, expected):
     ],
     ids=repr,
 )
-def test_int_kwargs(py_and_json: PyAndJson, kwargs: Dict[str, Any], input_value, expected):
+def test_int_kwargs(py_and_json: PyAndJson, kwargs: dict[str, Any], input_value, expected):
     v = py_and_json({'type': 'int', **kwargs})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:

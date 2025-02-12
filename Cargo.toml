@@ -1,6 +1,6 @@
 [package]
 name = "pydantic-core"
-version = "2.27.1"
+version = "2.28.0"
 edition = "2021"
 license = "MIT"
 homepage = "https://github.com/pydantic/pydantic-core"
@@ -29,13 +29,13 @@ rust-version = "1.75"
 [dependencies]
 # TODO it would be very nice to remove the "py-clone" feature as it can panic,
 # but needs a bit of work to make sure it's not used in the codebase
-pyo3 = { version = "0.23.3", features = ["generate-import-lib", "num-bigint", "py-clone"] }
+pyo3 = { version = "0.23.4", features = ["generate-import-lib", "num-bigint", "py-clone"] }
 regex = "1.11.1"
 strum = { version = "0.26.3", features = ["derive"] }
 strum_macros = "0.26.4"
-serde_json = {version = "1.0.133", features = ["arbitrary_precision", "preserve_order"]}
+serde_json = {version = "1.0.138", features = ["arbitrary_precision", "preserve_order"]}
 enum_dispatch = "0.3.13"
-serde = { version = "1.0.215", features = ["derive"] }
+serde = { version = "1.0.217", features = ["derive"] }
 speedate = "0.15.0"
 smallvec = "1.13.2"
 ahash = "0.8.10"
@@ -44,7 +44,7 @@ url = "2.5.4"
 idna = "1.0.3"
 base64 = "0.22.1"
 num-bigint = "0.4.6"
-uuid = "1.11.0"
+uuid = "1.12.1"
 jiter = { version = "0.8.2", features = ["python"] }
 hex = "0.4.3"
 

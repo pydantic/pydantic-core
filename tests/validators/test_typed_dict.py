@@ -1,16 +1,16 @@
-import gc
 import math
 import platform
 import re
 import weakref
-from typing import Any, Dict, Mapping, Union
+from collections.abc import Mapping
+from typing import Any, Union
 
 import pytest
 from dirty_equals import FunctionCheck
 
 from pydantic_core import CoreConfig, SchemaError, SchemaValidator, ValidationError, core_schema, validate_core_schema
 
-from ..conftest import Err, PyAndJson
+from ..conftest import Err, PyAndJson, assert_gc
 
 
 class Cls:
@@ -1097,8 +1097,8 @@ class TestOnError:
 )
 def test_extra_behavior_allow(
     config: Union[core_schema.CoreConfig, None],
-    schema_extra_behavior_kw: Dict[str, Any],
-    extras_schema_kw: Dict[str, Any],
+    schema_extra_behavior_kw: dict[str, Any],
+    extras_schema_kw: dict[str, Any],
     expected_extra_value: Any,
 ):
     v = SchemaValidator(
@@ -1110,7 +1110,7 @@ def test_extra_behavior_allow(
         )
     )
 
-    m: Dict[str, Any] = v.validate_python({'f': 'x', 'extra_field': '123'})
+    m: dict[str, Any] = v.validate_python({'f': 'x', 'extra_field': '123'})
     assert m == {'f': 'x', 'extra_field': expected_extra_value}
 
 
@@ -1124,14 +1124,14 @@ def test_extra_behavior_allow(
         (core_schema.CoreConfig(extra_fields_behavior='allow'), {'extra_behavior': 'forbid'}),
     ],
 )
-def test_extra_behavior_forbid(config: Union[core_schema.CoreConfig, None], schema_extra_behavior_kw: Dict[str, Any]):
+def test_extra_behavior_forbid(config: Union[core_schema.CoreConfig, None], schema_extra_behavior_kw: dict[str, Any]):
     v = SchemaValidator(
         core_schema.typed_dict_schema(
             {'f': core_schema.typed_dict_field(core_schema.str_schema())}, **schema_extra_behavior_kw, config=config
         )
     )
 
-    m: Dict[str, Any] = v.validate_python({'f': 'x'})
+    m: dict[str, Any] = v.validate_python({'f': 'x'})
     assert m == {'f': 'x'}
 
     with pytest.raises(ValidationError) as exc_info:
@@ -1153,7 +1153,7 @@ def test_extra_behavior_forbid(config: Union[core_schema.CoreConfig, None], sche
         (None, {'extra_behavior': None}),
     ],
 )
-def test_extra_behavior_ignore(config: Union[core_schema.CoreConfig, None], schema_extra_behavior_kw: Dict[str, Any]):
+def test_extra_behavior_ignore(config: Union[core_schema.CoreConfig, None], schema_extra_behavior_kw: dict[str, Any]):
     v = SchemaValidator(
         core_schema.typed_dict_schema(
             {'f': core_schema.typed_dict_field(core_schema.str_schema())}, **schema_extra_behavior_kw
@@ -1161,7 +1161,7 @@ def test_extra_behavior_ignore(config: Union[core_schema.CoreConfig, None], sche
         config=config,
     )
 
-    m: Dict[str, Any] = v.validate_python({'f': 'x', 'extra_field': 123})
+    m: dict[str, Any] = v.validate_python({'f': 'x', 'extra_field': 123})
     assert m == {'f': 'x'}
 
 
@@ -1190,9 +1190,5 @@ def test_leak_typed_dict():
     assert ref() is not None
 
     del cycle
-    gc.collect(0)
-    gc.collect(1)
-    gc.collect(2)
-    gc.collect()
 
-    assert ref() is None
+    assert_gc(lambda: ref() is None)

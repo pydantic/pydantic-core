@@ -32,9 +32,7 @@ jobs:
       - run: rustup component add llvm-tools-preview
 
       - name: install uv
-        uses: astral-sh/setup-uv@v4
-        with:
-          enable-cache: true
+        uses: astral-sh/setup-uv@v5
 
       - name: install deps
         run: uv sync --group testing
@@ -65,16 +63,19 @@ jobs:
       fail-fast: false
       matrix:
         python-version:
-          - '3.8'
           - '3.9'
           - '3.10'
           - '3.11'
           - '3.12'
           - '3.13'
+          - '3.13t'
           - 'pypy3.9'
           - 'pypy3.10'
 
     runs-on: ubuntu-latest
+
+    # TODO: get test suite stable with free-threaded python
+    continue-on-error: ${{ endsWith(matrix.python-version, 't') }}
 
     steps:
       - uses: actions/checkout@v4
@@ -88,9 +89,9 @@ jobs:
           key: test-v3
 
       - name: install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v5
         with:
-          enable-cache: true
+          python-version: ${{ matrix.python-version }}
 
       - name: install deps
         run: uv sync --group testing
@@ -104,9 +105,10 @@ jobs:
       - run: uv run pytest
         env:
           HYPOTHESIS_PROFILE: slow
-
-    env:
-      UV_PYTHON: ${{ matrix.python-version }}
+          # TODO: remove --inline-snapshot=disable after https://github.com/15r10nk/inline-snapshot/issues/192
+          PYTEST_ADDOPTS: ${{ endsWith(matrix.python-version, 't') && '--parallel-threads=2 --inline-snapshot=disable' || '' }}
+          # TODO: add `gil_used = false` to the PyO3 `#[pymodule]` when test suite is ok
+          PYTHON_GIL: ${{ endsWith(matrix.python-version, 't') && '0' || '1' }}
 
   test-os:
     name: test on ${{ matrix.os }}
@@ -127,9 +129,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: install uv
-        uses: astral-sh/setup-uv@v4
-        with:
-          enable-cache: true
+        uses: astral-sh/setup-uv@v5
 
       - name: install deps
         run: uv sync --group testing
@@ -152,9 +152,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: install uv
-        uses: astral-sh/setup-uv@v4
-        with:
-          enable-cache: true
+        uses: astral-sh/setup-uv@v5
 
       - name: install deps
         run: uv sync --group testing
@@ -197,9 +195,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v5
         with:
-          enable-cache: true
+          python-version: ${{ matrix.python-version }}
 
       - name: install rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -214,9 +212,6 @@ jobs:
 
       - run: uv pip freeze
       - run: uv run pytest
-
-    env:
-      UV_PYTHON: ${{ matrix.python-version }}
 
   test-pydantic-integration:
     runs-on: ubuntu-latest
@@ -239,9 +234,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: install uv
-        uses: astral-sh/setup-uv@v4
-        with:
-          enable-cache: true
+        uses: astral-sh/setup-uv@v5
 
       - name: install deps
         run: |
@@ -283,9 +276,7 @@ jobs:
           node-version: '18'
 
       - name: install uv
-        uses: astral-sh/setup-uv@v4
-        with:
-          enable-cache: true
+        uses: astral-sh/setup-uv@v5
 
       - name: install deps
         run: |
@@ -343,9 +334,7 @@ jobs:
           actions-cache-folder: emsdk-cache
 
       - name: install uv
-        uses: astral-sh/setup-uv@v4
-        with:
-          enable-cache: true
+        uses: astral-sh/setup-uv@v5
 
       - name: install deps
         run: uv sync --group wasm
@@ -369,9 +358,6 @@ jobs:
         with:
           name: wasm_wheels
           path: dist
-
-    env:
-      UV_PYTHON: 3.12
 
   # https://github.com/marketplace/actions/alls-green#why used for branch protection checks
   check:
@@ -424,15 +410,15 @@ jobs:
           - os: linux
             manylinux: auto
             target: armv7
-            interpreter: 3.8 3.9 3.10 3.11 3.12 3.13
+            interpreter: 3.9 3.10 3.11 3.12 3.13
           - os: linux
             manylinux: auto
             target: ppc64le
-            interpreter: 3.8 3.9 3.10 3.11 3.12 3.13
+            interpreter: 3.9 3.10 3.11 3.12 3.13
           - os: linux
             manylinux: auto
             target: s390x
-            interpreter: 3.8 3.9 3.10 3.11 3.12 3.13
+            interpreter: 3.9 3.10 3.11 3.12 3.13
           - os: linux
             manylinux: auto
             target: x86_64
@@ -456,7 +442,7 @@ jobs:
             target: x86_64
           - os: macos
             target: aarch64
-            interpreter: 3.8 3.9 pypy3.9 pypy3.10
+            interpreter: 3.9 pypy3.9 pypy3.10
 
           # windows;
           # x86_64 pypy builds are not PGO optimized
@@ -468,7 +454,7 @@ jobs:
           - os: windows
             target: i686
             python-architecture: x86
-            interpreter: 3.8 3.9 3.10 3.11 3.12 3.13
+            interpreter: 3.9 3.10 3.11 3.12 3.13
           - os: windows
             target: aarch64
             interpreter: 3.11 3.12 3.13
@@ -498,10 +484,8 @@ jobs:
         with:
           target: ${{ matrix.target }}
           manylinux: ${{ matrix.manylinux }}
-          args: --release --out dist --interpreter ${{ matrix.interpreter || '3.8 3.9 3.10 3.11 3.12 3.13 pypy3.9 pypy3.10' }}
-          # Limit windows builds to 1.77 to keep Windows 7 support.
-          # FIXME: Unpin when Python 3.8 support is dropped. (3.9 requires Windows 10)
-          rust-toolchain: ${{ (matrix.os == 'windows' && '1.77') || 'stable' }}
+          args: --release --out dist --interpreter ${{ matrix.interpreter || '3.9 3.10 3.11 3.12 3.13 pypy3.9 pypy3.10' }}
+          rust-toolchain: stable
           docker-options: -e CI
 
       - run: ${{ (matrix.os == 'windows' && 'dir') || 'ls -lh' }} dist/
@@ -521,7 +505,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [linux, windows, macos]
-        interpreter: ['3.8', '3.9', '3.10', '3.11', '3.12', '3.13']
+        interpreter: ['3.9', '3.10', '3.11', '3.12', '3.13']
         include:
           # standard runners with override for macos arm
           - os: linux
@@ -530,11 +514,9 @@ jobs:
             ls: dir
             runs-on: windows-latest
           - os: macos
-            runs-on: macos-latest-xlarge
+            runs-on: macos-latest
         exclude:
           # macos arm only supported from 3.10 and up
-          - os: macos
-            interpreter: '3.8'
           - os: macos
             interpreter: '3.9'
 
@@ -543,24 +525,22 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v5
         with:
-          enable-cache: true
+          python-version: ${{ matrix.interpreter }}
 
       - name: install rust stable
         id: rust-toolchain
         uses: dtolnay/rust-toolchain@master
         with:
           components: llvm-tools
-          # Limit windows builds to 1.77 to keep Windows 7 support.
-          # FIXME: Unpin when Python 3.8 support is dropped. (3.9 requires Windows 10)
-          toolchain: ${{ (matrix.os == 'windows' && '1.77') || 'stable' }}
+          toolchain: stable
 
       - name: Build PGO wheel
         id: pgo-wheel
         uses: ./.github/actions/build-pgo-wheel
         with:
-          interpreter: ${{ env.UV_PYTHON }}
+          interpreter: ${{ matrix.interpreter }}
           rust-toolchain: ${{ steps.rust-toolchain.outputs.name }}
 
       - run: ${{ matrix.ls || 'ls -lh' }} dist/
@@ -569,9 +549,6 @@ jobs:
         with:
           name: pypi_files_${{ matrix.os }}_${{ matrix.interpreter }}
           path: dist
-
-    env:
-      UV_PYTHON: ${{ matrix.interpreter }}
 
   inspect-pypi-assets:
     needs: [build, build-sdist, build-pgo]
@@ -668,9 +645,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: install uv
-        uses: astral-sh/setup-uv@v4
-        with:
-          enable-cache: true
+        uses: astral-sh/setup-uv@v5
 
       - name: get dist artifacts
         uses: actions/download-artifact@v4

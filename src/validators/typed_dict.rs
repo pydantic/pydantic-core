@@ -312,10 +312,7 @@ impl Validator for TypedDictValidator {
                             ExtraBehavior::Allow => {
                                 let py_key = either_str.as_py_string(self.py, self.state.cache_str());
                                 if let Some(validator) = self.extras_validator {
-                                    let last_partial = self.partial_last_key.as_ref().map_or(false, |last_key| {
-                                        let key_loc: LocItem = raw_key.clone().into();
-                                        &key_loc == last_key
-                                    });
+                                    let last_partial = self.partial_last_key.as_ref() == Some(&raw_key.clone().into());
                                     self.state.allow_partial = match last_partial {
                                         true => self.allow_partial,
                                         false => false.into(),
@@ -334,7 +331,7 @@ impl Validator for TypedDictValidator {
                                         Err(err) => return Err(err),
                                     }
                                 } else {
-                                    self.output_dict.set_item(py_key, value.to_object(self.py))?;
+                                    self.output_dict.set_item(py_key, value.to_object(self.py)?)?;
                                 };
                             }
                         }
@@ -358,7 +355,7 @@ impl Validator for TypedDictValidator {
         }
 
         if errors.is_empty() {
-            Ok(output_dict.to_object(py))
+            Ok(output_dict.into())
         } else {
             Err(ValError::LineErrors(errors))
         }

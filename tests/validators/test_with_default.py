@@ -1,9 +1,8 @@
-import gc
 import platform
 import sys
 import weakref
 from collections import deque
-from typing import Any, Callable, Dict, List, Union, cast
+from typing import Any, Callable, Union, cast
 
 import pytest
 
@@ -17,7 +16,7 @@ from pydantic_core import (
     core_schema,
 )
 
-from ..conftest import PyAndJson
+from ..conftest import PyAndJson, assert_gc
 
 
 def test_typed_dict_default():
@@ -437,8 +436,8 @@ def test_deepcopy_mutable_defaults():
     stored_empty_dict = {}
 
     class Model:
-        int_list_with_default: List[int] = stored_empty_list
-        str_dict_with_default: Dict[str, str] = stored_empty_dict
+        int_list_with_default: list[int] = stored_empty_list
+        str_dict_with_default: dict[str, str] = stored_empty_dict
 
     v = SchemaValidator(
         {
@@ -662,12 +661,7 @@ def test_leak_with_default():
     assert ref() is not None
 
     del klass
-    gc.collect(0)
-    gc.collect(1)
-    gc.collect(2)
-    gc.collect()
-
-    assert ref() is None
+    assert_gc(lambda: ref() is None)
 
 
 validate_default_raises_examples = [

@@ -1,17 +1,18 @@
 from __future__ import annotations as _annotations
 
 import functools
+import gc
 import importlib.util
 import json
 import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Type
+from time import sleep, time
+from typing import Any, Callable, Literal
 
 import hypothesis
 import pytest
-from typing_extensions import Literal
 
 from pydantic_core import ArgsKwargs, SchemaValidator, ValidationError, validate_core_schema
 from pydantic_core.core_schema import CoreConfig
@@ -83,7 +84,7 @@ class PyAndJsonValidator:
             return self.validator.isinstance_python(py_input, strict=strict, context=context)
 
 
-PyAndJson = Type[PyAndJsonValidator]
+PyAndJson = type[PyAndJsonValidator]
 
 
 @pytest.fixture(params=['python', 'json'])
@@ -128,7 +129,7 @@ def tmp_work_path(tmp_path: Path):
 
 @pytest.fixture
 def import_execute(request, tmp_work_path: Path):
-    def _import_execute(source: str, *, custom_module_name: 'str | None' = None):
+    def _import_execute(source: str, *, custom_module_name: str | None = None):
         module_name = custom_module_name or request.node.name
 
         module_path = tmp_work_path / f'{module_name}.py'
@@ -161,3 +162,20 @@ def infinite_generator():
     while True:
         yield i
         i += 1
+
+
+def assert_gc(test: Callable[[], bool], timeout: float = 10) -> None:
+    """Helper to retry garbage collection until the test passes or timeout is
+    reached.
+
+    This is useful on free-threading where the GC collect call finishes before
+    all cleanup is done.
+    """
+    start = now = time()
+    while now - start < timeout:
+        if test():
+            return
+        gc.collect()
+        sleep(0.1)
+        now = time()
+    raise AssertionError('Timeout waiting for GC')

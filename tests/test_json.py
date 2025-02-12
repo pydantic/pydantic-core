@@ -1,7 +1,6 @@
 import json
 import platform
 import re
-from typing import List
 
 import pytest
 from dirty_equals import IsFloatNan, IsList
@@ -249,7 +248,7 @@ def test_to_jsonable_python_fallback():
 
 def test_to_jsonable_python_schema_serializer():
     class Foobar:
-        def __init__(self, my_foo: int, my_inners: List['Foobar']):
+        def __init__(self, my_foo: int, my_inners: list['Foobar']):
             self.my_foo = my_foo
             self.my_inners = my_inners
 
@@ -416,7 +415,7 @@ def test_json_bytes_base64_invalid():
         {
             'type': 'bytes_invalid_encoding',
             'loc': (),
-            'msg': f'Data should be valid base64: Invalid symbol {ord("!")}, offset {len(wrong_input)-1}.',
+            'msg': f'Data should be valid base64: Invalid symbol {ord("!")}, offset {len(wrong_input) - 1}.',
             'input': wrong_input,
         }
     ]

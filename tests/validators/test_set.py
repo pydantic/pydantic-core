@@ -1,6 +1,6 @@
 import re
 from collections import deque
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 
@@ -73,6 +73,7 @@ def test_frozenset_no_validators_both(py_and_json: PyAndJson, input_value, expec
         ('abc', Err('Input should be a valid set')),
     ],
 )
+@pytest.mark.thread_unsafe  # generators in parameters not compatible with pytest-run-parallel, https://github.com/Quansight-Labs/pytest-run-parallel/issues/14
 def test_set_ints_python(input_value, expected):
     v = SchemaValidator({'type': 'set', 'items_schema': {'type': 'int'}})
     if isinstance(expected, Err):
@@ -101,6 +102,22 @@ def test_set_multiple_errors():
         },
         {'type': 'int_type', 'loc': (1,), 'msg': 'Input should be a valid integer', 'input': (1, 2)},
         {'type': 'int_type', 'loc': (2,), 'msg': 'Input should be a valid integer', 'input': []},
+    ]
+
+
+def test_list_with_unhashable_items():
+    v = SchemaValidator({'type': 'set'})
+
+    class Unhashable:
+        __hash__ = None
+
+    unhashable = Unhashable()
+
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python([{'a': 'b'}, unhashable])
+    assert exc_info.value.errors(include_url=False) == [
+        {'type': 'set_item_not_hashable', 'loc': (0,), 'msg': 'Set items should be hashable', 'input': {'a': 'b'}},
+        {'type': 'set_item_not_hashable', 'loc': (1,), 'msg': 'Set items should be hashable', 'input': unhashable},
     ]
 
 
@@ -146,7 +163,8 @@ def generate_repeats():
     ],
     ids=repr,
 )
-def test_set_kwargs(kwargs: Dict[str, Any], input_value, expected):
+@pytest.mark.thread_unsafe  # generators in parameters not compatible with pytest-run-parallel, https://github.com/Quansight-Labs/pytest-run-parallel/issues/14
+def test_set_kwargs(kwargs: dict[str, Any], input_value, expected):
     v = SchemaValidator({'type': 'set', **kwargs})
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):

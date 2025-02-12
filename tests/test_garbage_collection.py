@@ -1,11 +1,13 @@
-import gc
 import platform
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 from weakref import WeakValueDictionary
 
 import pytest
 
 from pydantic_core import SchemaSerializer, SchemaValidator, core_schema
+
+from .conftest import assert_gc
 
 GC_TEST_SCHEMA_INNER = core_schema.definitions_schema(
     core_schema.definition_reference_schema(schema_ref='model'),
@@ -31,7 +33,7 @@ def test_gc_schema_serializer() -> None:
                 core_schema.model_schema(cls, GC_TEST_SCHEMA_INNER), config={'ser_json_timedelta': 'float'}
             )
 
-    cache: 'WeakValueDictionary[int, Any]' = WeakValueDictionary()
+    cache: WeakValueDictionary[int, Any] = WeakValueDictionary()
 
     for _ in range(10_000):
 
@@ -42,11 +44,7 @@ def test_gc_schema_serializer() -> None:
 
         del MyModel
 
-    gc.collect(0)
-    gc.collect(1)
-    gc.collect(2)
-
-    assert len(cache) == 0
+    assert_gc(lambda: len(cache) == 0)
 
 
 @pytest.mark.xfail(
@@ -63,7 +61,7 @@ def test_gc_schema_validator() -> None:
                 config=core_schema.CoreConfig(extra_fields_behavior='allow'),
             )
 
-    cache: 'WeakValueDictionary[int, Any]' = WeakValueDictionary()
+    cache: WeakValueDictionary[int, Any] = WeakValueDictionary()
 
     for _ in range(10_000):
 
@@ -74,11 +72,7 @@ def test_gc_schema_validator() -> None:
 
         del MyModel
 
-    gc.collect(0)
-    gc.collect(1)
-    gc.collect(2)
-
-    assert len(cache) == 0
+    assert_gc(lambda: len(cache) == 0)
 
 
 @pytest.mark.xfail(
@@ -105,7 +99,7 @@ def test_gc_validator_iterator() -> None:
         def __next__(self):
             raise StopIteration()
 
-    cache: 'WeakValueDictionary[int, Any]' = WeakValueDictionary()
+    cache: WeakValueDictionary[int, Any] = WeakValueDictionary()
 
     for _ in range(10_000):
         iterable = MyIterable()
@@ -113,8 +107,4 @@ def test_gc_validator_iterator() -> None:
         v.validate_python({'iter': iterable})
         del iterable
 
-    gc.collect(0)
-    gc.collect(1)
-    gc.collect(2)
-
-    assert len(cache) == 0
+    assert_gc(lambda: len(cache) == 0)
