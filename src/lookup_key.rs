@@ -262,20 +262,33 @@ impl LookupKey {
         &'s self,
         dict: &'a JsonObject<'data>,
     ) -> ValResult<Option<(&'s LookupPath, &'a JsonValue<'data>)>> {
+        // FIXME: use of find_map in here probably leads to quadratic complexity
         match self {
-            Self::Simple(path) => match dict.get(path.first_key()) {
+            Self::Simple(path) => match dict
+                .iter()
+                .rev()
+                .find_map(|(k, v)| (k == path.first_key()).then_some(v))
+            {
                 Some(value) => {
                     debug_assert!(path.rest.is_empty());
                     Ok(Some((path, value)))
                 }
                 None => Ok(None),
             },
-            Self::Choice { path1, path2 } => match dict.get(path1.first_key()) {
+            Self::Choice { path1, path2 } => match dict
+                .iter()
+                .rev()
+                .find_map(|(k, v)| (k == path1.first_key()).then_some(v))
+            {
                 Some(value) => {
                     debug_assert!(path1.rest.is_empty());
                     Ok(Some((path1, value)))
                 }
-                None => match dict.get(path2.first_key()) {
+                None => match dict
+                    .iter()
+                    .rev()
+                    .find_map(|(k, v)| (k == path2.first_key()).then_some(v))
+                {
                     Some(value) => {
                         debug_assert!(path2.rest.is_empty());
                         Ok(Some((path2, value)))
@@ -287,7 +300,11 @@ impl LookupKey {
                 for path in path_choices {
                     // first step is different from the rest as we already know dict is JsonObject
                     // because of above checks, we know that path should have at least one element, hence unwrap
-                    let v: &JsonValue = match dict.get(path.first_item.key.as_str()) {
+                    let v: &JsonValue = match dict
+                        .iter()
+                        .rev()
+                        .find_map(|(k, v)| (k == path.first_key()).then_some(v))
+                    {
                         Some(v) => v,
                         None => continue,
                     };
@@ -406,6 +423,10 @@ impl LookupPath {
     pub fn first_key(&self) -> &str {
         &self.first_item.key
     }
+
+    pub fn rest(&self) -> &[PathItem] {
+        &self.rest
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -420,8 +441,8 @@ pub(crate) enum PathItem {
 /// we store both the string and pystring to save creating the pystring for python
 #[derive(Debug, Clone)]
 pub(crate) struct PathItemString {
-    key: String,
-    py_key: Py<PyString>,
+    pub key: String,
+    pub py_key: Py<PyString>,
 }
 
 impl fmt::Display for PathItem {
@@ -527,7 +548,7 @@ impl PathItem {
 
     pub fn json_obj_get<'a, 'data>(&self, json_obj: &'a JsonObject<'data>) -> Option<&'a JsonValue<'data>> {
         match self {
-            Self::S(PathItemString { key, .. }) => json_obj.get(key.as_str()),
+            Self::S(PathItemString { key, .. }) => json_obj.iter().rev().find_map(|(k, v)| (k == key).then_some(v)),
             _ => None,
         }
     }
