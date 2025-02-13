@@ -1,3 +1,11 @@
+use std::collections::hash_map::Entry;
+use std::hash::Hash;
+use std::sync::Arc;
+
+use ahash::AHashMap;
+use jiter::JsonArray;
+use jiter::JsonObject;
+use jiter::JsonValue;
 use pyo3::exceptions::PyKeyError;
 use pyo3::intern;
 use pyo3::prelude::*;
@@ -13,6 +21,9 @@ use crate::errors::{ErrorType, ErrorTypeDefaults, ValError, ValLineError, ValRes
 use crate::input::ConsumeIterator;
 use crate::input::{BorrowInput, Input, ValidatedDict, ValidationMatch};
 use crate::lookup_key::LookupKey;
+use crate::lookup_key::LookupPath;
+use crate::lookup_key::PathItem;
+use crate::tools::new_py_string;
 use crate::tools::SchemaDict;
 
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
@@ -37,6 +48,7 @@ pub struct ModelFieldsValidator {
     strict: bool,
     from_attributes: bool,
     loc_by_alias: bool,
+    lookup: LookupMap,
 }
 
 impl BuildValidator for ModelFieldsValidator {
@@ -96,6 +108,265 @@ impl BuildValidator for ModelFieldsValidator {
             });
         }
 
+        let mut map = AHashMap::new();
+
+        fn add_field_to_map<K: Eq + Hash>(map: &mut AHashMap<K, LookupValue>, key: K, field_index: usize) {
+            match map.entry(key) {
+                Entry::Occupied(mut entry) => match entry.get_mut() {
+                    &mut LookupValue::Field(i) => {
+                        entry.insert(LookupValue::Complex {
+                            fields: vec![i, field_index],
+                            lookup_map: LookupMap {
+                                map: AHashMap::new(),
+                                list: AHashMap::new(),
+                            },
+                        });
+                    }
+                    LookupValue::Complex { fields, .. } => {
+                        fields.push(field_index);
+                    }
+                },
+                Entry::Vacant(entry) => {
+                    entry.insert(LookupValue::Field(field_index));
+                }
+            }
+        }
+
+        fn add_path_to_map(map: &mut AHashMap<String, LookupValue>, path: &LookupPath, field_index: usize) {
+            if path.rest().is_empty() {
+                // terminal value
+                add_field_to_map(map, path.first_key().to_owned(), field_index);
+                return;
+            }
+
+            let mut nested_map = match map.entry(path.first_key().to_owned()) {
+                Entry::Occupied(mut entry) => {
+                    let entry = entry.into_mut();
+                    match entry {
+                        &mut LookupValue::Field(i) => {
+                            *entry = LookupValue::Complex {
+                                fields: vec![i],
+                                lookup_map: LookupMap {
+                                    map: AHashMap::new(),
+                                    list: AHashMap::new(),
+                                },
+                            };
+                            match entry {
+                                LookupValue::Complex {
+                                    lookup_map: ref mut nested_map,
+                                    ..
+                                } => nested_map,
+                                _ => unreachable!(),
+                            }
+                        }
+                        LookupValue::Complex {
+                            lookup_map: ref mut nested_map,
+                            ..
+                        } => nested_map,
+                    }
+                }
+                Entry::Vacant(entry) => {
+                    let LookupValue::Complex {
+                        lookup_map: ref mut nested_map,
+                        ..
+                    } = entry.insert(LookupValue::Complex {
+                        fields: Vec::new(),
+                        lookup_map: LookupMap {
+                            map: AHashMap::new(),
+                            list: AHashMap::new(),
+                        },
+                    })
+                    else {
+                        unreachable!()
+                    };
+                    nested_map
+                }
+            };
+
+            let mut nested_map = nested_map;
+            let mut path_iter = path.rest().iter();
+
+            let mut current = path_iter.next().expect("rest is non-empty");
+
+            while let Some(next) = path_iter.next() {
+                nested_map = match current {
+                    PathItem::S(s) => {
+                        let str_key = s.key.to_owned();
+                        match nested_map.map.entry(str_key) {
+                            Entry::Occupied(entry) => {
+                                let entry = entry.into_mut();
+                                match entry {
+                                    &mut LookupValue::Field(i) => {
+                                        *entry = LookupValue::Complex {
+                                            fields: vec![i],
+                                            lookup_map: LookupMap {
+                                                map: AHashMap::new(),
+                                                list: AHashMap::new(),
+                                            },
+                                        };
+                                        let LookupValue::Complex {
+                                            lookup_map: ref mut nested_map,
+                                            ..
+                                        } = entry
+                                        else {
+                                            unreachable!()
+                                        };
+                                        nested_map
+                                    }
+                                    LookupValue::Complex {
+                                        lookup_map: ref mut nested_map,
+                                        ..
+                                    } => nested_map,
+                                }
+                            }
+                            Entry::Vacant(entry) => {
+                                let LookupValue::Complex {
+                                    lookup_map: ref mut nested_map,
+                                    ..
+                                } = entry.insert(LookupValue::Complex {
+                                    fields: vec![],
+                                    lookup_map: LookupMap {
+                                        map: AHashMap::new(),
+                                        list: AHashMap::new(),
+                                    },
+                                })
+                                else {
+                                    unreachable!()
+                                };
+                                nested_map
+                            }
+                        }
+                    }
+                    PathItem::Pos(i) => match nested_map.list.entry(*i as i64) {
+                        Entry::Occupied(entry) => {
+                            let entry = entry.into_mut();
+                            match entry {
+                                &mut LookupValue::Field(i) => {
+                                    *entry = LookupValue::Complex {
+                                        fields: vec![i],
+                                        lookup_map: LookupMap {
+                                            map: AHashMap::new(),
+                                            list: AHashMap::new(),
+                                        },
+                                    };
+                                    let LookupValue::Complex {
+                                        lookup_map: ref mut nested_map,
+                                        ..
+                                    } = entry
+                                    else {
+                                        unreachable!()
+                                    };
+                                    nested_map
+                                }
+                                LookupValue::Complex {
+                                    lookup_map: ref mut nested_map,
+                                    ..
+                                } => nested_map,
+                            }
+                        }
+                        Entry::Vacant(entry) => {
+                            let LookupValue::Complex {
+                                lookup_map: ref mut nested_map,
+                                ..
+                            } = entry.insert(LookupValue::Complex {
+                                fields: vec![],
+                                lookup_map: LookupMap {
+                                    map: AHashMap::new(),
+                                    list: AHashMap::new(),
+                                },
+                            })
+                            else {
+                                unreachable!()
+                            };
+                            nested_map
+                        }
+                    },
+                    // FIXME: handle integer cases
+                    PathItem::Neg(i) => match nested_map.list.entry(-(*i as i64)) {
+                        Entry::Occupied(entry) => {
+                            let entry = entry.into_mut();
+                            match entry {
+                                &mut LookupValue::Field(i) => {
+                                    *entry = LookupValue::Complex {
+                                        fields: vec![i],
+                                        lookup_map: LookupMap {
+                                            map: AHashMap::new(),
+                                            list: AHashMap::new(),
+                                        },
+                                    };
+                                    let LookupValue::Complex {
+                                        lookup_map: ref mut nested_map,
+                                        ..
+                                    } = entry
+                                    else {
+                                        unreachable!()
+                                    };
+                                    nested_map
+                                }
+                                LookupValue::Complex {
+                                    lookup_map: ref mut nested_map,
+                                    ..
+                                } => nested_map,
+                            }
+                        }
+                        Entry::Vacant(entry) => {
+                            let LookupValue::Complex {
+                                lookup_map: ref mut nested_map,
+                                ..
+                            } = entry.insert(LookupValue::Complex {
+                                fields: vec![],
+                                lookup_map: LookupMap {
+                                    map: AHashMap::new(),
+                                    list: AHashMap::new(),
+                                },
+                            })
+                            else {
+                                unreachable!()
+                            };
+                            nested_map
+                        }
+                    },
+                };
+
+                current = next;
+            }
+
+            // now have a terminal value
+            match current {
+                PathItem::S(s) => {
+                    add_field_to_map(&mut nested_map.map, s.key.to_owned(), field_index);
+                }
+                PathItem::Pos(i) => {
+                    add_field_to_map(&mut nested_map.list, *i as i64, field_index);
+                }
+                PathItem::Neg(i) => {
+                    add_field_to_map(&mut nested_map.list, -(*i as i64), field_index);
+                }
+            }
+        }
+
+        for (i, field) in fields.iter().enumerate() {
+            match &field.lookup_key {
+                LookupKey::Simple(path) => {
+                    // should be a single string key
+                    debug_assert!(path.rest().is_empty());
+                    add_field_to_map(&mut map, path.first_key().to_owned(), i);
+                }
+                LookupKey::Choice { path1, path2 } => {
+                    // two choices of single string keys
+                    debug_assert!(path1.rest().is_empty());
+                    debug_assert!(path2.rest().is_empty());
+                    add_field_to_map(&mut map, path1.first_key().to_owned(), i);
+                    add_field_to_map(&mut map, path2.first_key().to_owned(), i);
+                }
+                LookupKey::PathChoices(paths) => {
+                    for path in paths {
+                        add_path_to_map(&mut map, path, i);
+                    }
+                }
+            }
+        }
+
         Ok(Self {
             fields,
             model_name,
@@ -104,6 +375,10 @@ impl BuildValidator for ModelFieldsValidator {
             strict,
             from_attributes,
             loc_by_alias: config.get_as(intern!(py, "loc_by_alias"))?.unwrap_or(true),
+            lookup: LookupMap {
+                map,
+                list: AHashMap::new(),
+            },
         }
         .into())
     }
@@ -127,33 +402,41 @@ impl Validator for ModelFieldsValidator {
         let strict = state.strict_or(self.strict);
         let from_attributes = state.extra().from_attributes.unwrap_or(self.from_attributes);
 
-        // we convert the DictType error to a ModelType error
-        let dict = match input.validate_model_fields(strict, from_attributes) {
-            Ok(d) => d,
-            Err(ValError::LineErrors(errors)) => {
-                let errors: Vec<ValLineError> = errors
-                    .into_iter()
-                    .map(|e| match e.error_type {
-                        ErrorType::DictType { .. } => {
-                            let mut e = e;
-                            e.error_type = ErrorType::ModelType {
-                                class_name: self.model_name.clone(),
-                                context: None,
-                            };
-                            e
-                        }
-                        _ => e,
-                    })
-                    .collect();
-                return Err(ValError::LineErrors(errors));
-            }
-            Err(err) => return Err(err),
-        };
-
-        let (model_dict, mut model_extra_dict_op, fields_set) = if dict.should_consume_model_input_by_get_item() {
-            self.validate_by_get_item(py, input, dict, state)?
+        let (model_dict, mut model_extra_dict_op, fields_set) = if let Some(json_input) = input.as_json() {
+            let JsonValue::Object(json_object) = json_input else {
+                return Err(ValError::new(
+                    ErrorType::ModelType {
+                        context: None,
+                        class_name: self.model_name.clone(),
+                    },
+                    input,
+                ));
+            };
+            self.validate_json_by_iteration(py, json_input, json_object, state)?
         } else {
-            self.validate_by_iteration(py, input, dict, state)?
+            // we convert the DictType error to a ModelType error
+            let dict = match input.validate_model_fields(strict, from_attributes) {
+                Ok(d) => d,
+                Err(ValError::LineErrors(errors)) => {
+                    let errors: Vec<ValLineError> = errors
+                        .into_iter()
+                        .map(|e| match e.error_type {
+                            ErrorType::DictType { .. } => {
+                                let mut e = e;
+                                e.error_type = ErrorType::ModelType {
+                                    class_name: self.model_name.clone(),
+                                    context: None,
+                                };
+                                e
+                            }
+                            _ => e,
+                        })
+                        .collect();
+                    return Err(ValError::LineErrors(errors));
+                }
+                Err(err) => return Err(err),
+            };
+            self.validate_by_get_item(py, input, dict, state)?
         };
         state.add_fields_set(fields_set.len());
 
@@ -464,183 +747,233 @@ impl ModelFieldsValidator {
         Ok((model_dict, model_extra_dict_op, fields_set))
     }
 
-    fn validate_by_iteration<'py>(
+    fn validate_json_by_iteration<'py>(
         &self,
         py: Python<'py>,
-        input: &(impl Input<'py> + ?Sized),
-        dict: impl ValidatedDict<'py>,
+        json_input: &JsonValue<'_>,
+        json_object: &JsonObject<'_>,
         state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<ValidatedModelFields<'py>> {
-        struct ValidateByIterating<'a, 's, 'py, I: Input<'py> + ?Sized> {
+        // expect json_input and json_object to be the same thing, just projected
+        debug_assert!(matches!(&json_input, JsonValue::Object(j) if Arc::ptr_eq(j, json_object)));
+
+        let model_dict = PyDict::new(py);
+        let mut model_extra_dict_op: Option<Bound<PyDict>> = None;
+        let mut field_results: Vec<Option<Result<PyObject, ValError>>> = (0..self.fields.len()).map(|_| None).collect();
+        let mut errors: Vec<ValLineError> = Vec::new();
+        let fields_set = PySet::empty(py)?;
+
+        fn consume_json_array<'py>(
             py: Python<'py>,
-            input: &'a I,
-            state: &'a mut ValidationState<'s, 'py>,
-            this: &'a ModelFieldsValidator,
+            fields: &[Field],
+            field_results: &mut [Option<Result<PyObject, ValError>>],
+            array_lookup: &AHashMap<i64, LookupValue>,
+            json_array: &JsonArray<'_>,
+            state: &mut ValidationState<'_, 'py>,
+        ) -> ValResult<()> {
+            for (list_item, value) in array_lookup {
+                let index = if *list_item < 0 {
+                    list_item + json_array.len() as i64
+                } else {
+                    *list_item
+                };
+                if let Some(json_value) = json_array.get(index as usize) {
+                    match value {
+                        &LookupValue::Field(i) => {
+                            field_results[i] = Some(fields[i].validator.validate(py, json_value, state));
+                        }
+                        LookupValue::Complex {
+                            fields: complex_lookup_fields,
+                            lookup_map,
+                        } => perform_complex_lookup(
+                            py,
+                            fields,
+                            field_results,
+                            complex_lookup_fields,
+                            lookup_map,
+                            json_value,
+                            state,
+                        )?,
+                    }
+                }
+            }
+            Ok(())
         }
 
-        impl<'py, Key, Value, I> ConsumeIterator<ValResult<(Key, Value)>> for ValidateByIterating<'_, '_, 'py, I>
-        where
-            I: Input<'py> + ?Sized,
-            Key: BorrowInput<'py> + Clone + Into<LocItem>,
-            Value: BorrowInput<'py>,
-        {
-            type Output = ValResult<ValidatedModelFields<'py>>;
-            fn consume_iterator(
-                self,
-                iterator: impl Iterator<Item = ValResult<(Key, Value)>>,
-            ) -> ValResult<ValidatedModelFields<'py>> {
-                let this = self.this;
-
-                let model_dict = PyDict::new(self.py);
-                let mut model_extra_dict_op: Option<Bound<PyDict>> = None;
-                let mut field_results: Vec<Option<Result<PyObject, ValError>>> =
-                    (0..this.fields.len()).map(|_| None).collect();
-                let mut errors: Vec<ValLineError> = Vec::new();
-                let fields_set = PySet::empty(self.py)?;
-
-                let model_extra_dict = PyDict::new(self.py);
-                'items: for item_result in iterator {
-                    let (raw_key, value) = item_result?;
-
-                    let either_str = match raw_key
-                        .borrow_input()
-                        .validate_str(true, false)
-                        .map(ValidationMatch::into_inner)
-                    {
-                        Ok(k) => k,
-                        Err(ValError::LineErrors(line_errors)) => {
-                            for err in line_errors {
-                                errors.push(
-                                    err.with_outer_location(raw_key.clone())
-                                        .with_type(ErrorTypeDefaults::InvalidKey),
-                                );
-                            }
-                            continue;
-                        }
-                        Err(err) => return Err(err),
-                    };
-
-                    // TODO: use optimized lookup tree
-                    for (field, field_result) in std::iter::zip(&this.fields, &mut field_results) {
-                        if field.name != either_str.as_cow()? {
-                            continue;
-                        }
-
-                        #[allow(clippy::needless_match)] // seems like a clippy false positive
-                        let validation_result =
-                            match field.validator.validate(self.py, value.borrow_input(), self.state) {
-                                result @ (Ok(_) | Err(ValError::Omit | ValError::LineErrors(_))) => result,
-                                Err(err @ (ValError::UseDefault | ValError::InternalErr(_))) => return Err(err),
-                            };
-
-                        *field_result = Some(validation_result);
-                        continue 'items;
-                    }
-
-                    let value = value.borrow_input();
-                    // Unknown / extra field
-                    match this.extra_behavior {
-                        ExtraBehavior::Forbid => {
-                            errors.push(ValLineError::new_with_loc(
-                                ErrorTypeDefaults::ExtraForbidden,
-                                value,
-                                raw_key.clone(),
-                            ));
-                        }
-                        ExtraBehavior::Ignore => {}
-                        ExtraBehavior::Allow => {
-                            let py_key = either_str.as_py_string(self.py, self.state.cache_str());
-                            if let Some(validator) = &this.extras_validator {
-                                match validator.validate(self.py, value, self.state) {
-                                    Ok(value) => {
-                                        model_extra_dict.set_item(&py_key, value)?;
-                                        fields_set.add(py_key)?;
-                                    }
-                                    Err(ValError::LineErrors(line_errors)) => {
-                                        for err in line_errors {
-                                            errors.push(err.with_outer_location(raw_key.clone()));
-                                        }
-                                    }
-                                    Err(err) => return Err(err),
+        fn perform_complex_lookup<'py>(
+            py: Python<'py>,
+            fields: &[Field],
+            field_results: &mut [Option<Result<PyObject, ValError>>],
+            complex_lookup_fields: &[usize],
+            complex_lookup_map: &LookupMap,
+            json_value: &JsonValue<'_>,
+            state: &mut ValidationState<'_, 'py>,
+        ) -> ValResult<()> {
+            // this is a possibly recursive lookup with some complicated alias logic,
+            // not much we can do except recurse
+            for &i in complex_lookup_fields {
+                field_results[i] = Some(fields[i].validator.validate(py, json_value, state));
+            }
+            if !complex_lookup_map.map.is_empty() {
+                if let JsonValue::Object(nested_object) = json_value {
+                    for (key, value) in &**nested_object {
+                        if let Some(lookup_value) = complex_lookup_map.map.get(key.as_ref()) {
+                            match lookup_value {
+                                &LookupValue::Field(i) => {
+                                    field_results[i] = Some(fields[i].validator.validate(py, value, state));
                                 }
-                            } else {
-                                model_extra_dict.set_item(&py_key, value.to_object(self.py)?)?;
-                                fields_set.add(py_key)?;
-                            };
+                                LookupValue::Complex {
+                                    fields: complex_lookup_fields,
+                                    lookup_map,
+                                } => {
+                                    perform_complex_lookup(
+                                        py,
+                                        fields,
+                                        field_results,
+                                        complex_lookup_fields,
+                                        lookup_map,
+                                        value,
+                                        state,
+                                    )?;
+                                }
+                            }
                         }
                     }
                 }
+            }
+            if !complex_lookup_map.list.is_empty() {
+                if let JsonValue::Array(nested_array) = json_value {
+                    consume_json_array(py, fields, field_results, &complex_lookup_map.list, nested_array, state)?;
+                }
+            }
+            Ok(())
+        }
 
-                // now that we've iterated over all the keys, we can set the values in the model
-                // dict, and try to set defaults for any missing fields
+        let model_extra_dict = PyDict::new(py);
+        for (key, value) in &**json_object {
+            let key = key.as_ref();
+            if let Some(lookup_value) = self.lookup.map.get(key) {
+                match lookup_value {
+                    &LookupValue::Field(i) => {
+                        field_results[i] = Some(self.fields[i].validator.validate(py, value, state));
+                    }
+                    LookupValue::Complex { fields, lookup_map } => {
+                        perform_complex_lookup(py, &self.fields, &mut field_results, fields, lookup_map, value, state)?;
+                    }
+                }
+                continue;
+            }
 
-                for (field, field_result) in std::iter::zip(&this.fields, field_results) {
-                    let field_value = if let Some(validation_result) = field_result {
-                        match validation_result {
+            // Unknown / extra field - we only care about these at the top level
+            match self.extra_behavior {
+                ExtraBehavior::Forbid => {
+                    errors.push(ValLineError::new_with_loc(
+                        ErrorTypeDefaults::ExtraForbidden,
+                        value,
+                        key,
+                    ));
+                }
+                ExtraBehavior::Ignore => {}
+                ExtraBehavior::Allow => {
+                    let py_key: Bound<'_, PyString> = new_py_string(py, key, state.cache_str());
+                    if let Some(validator) = &self.extras_validator {
+                        match validator.validate(py, value, state) {
                             Ok(value) => {
-                                fields_set.add(&field.name_py)?;
-                                value
+                                model_extra_dict.set_item(&py_key, value)?;
+                                fields_set.add(py_key)?;
                             }
-                            Err(ValError::Omit) => continue,
                             Err(ValError::LineErrors(line_errors)) => {
                                 for err in line_errors {
-                                    // FIXME this should use the lookup path
-                                    errors.push(err.with_outer_location(&field.name));
+                                    errors.push(err.with_outer_location(key));
                                 }
-                                continue;
                             }
                             Err(err) => return Err(err),
                         }
                     } else {
-                        match field
-                            .validator
-                            .default_value(self.py, Some(field.name.as_str()), self.state)
-                        {
-                            Ok(Some(default_value)) => default_value,
-                            Ok(None) => {
-                                errors.push(field.lookup_key.error(
-                                    ErrorTypeDefaults::Missing,
-                                    self.input,
-                                    this.loc_by_alias,
-                                    &field.name,
-                                ));
-                                continue;
-                            }
-                            Err(ValError::Omit) => continue,
-                            Err(ValError::LineErrors(line_errors)) => {
-                                for err in line_errors {
-                                    // Note: this will always use the field name even if there is an alias
-                                    // However, we don't mind so much because this error can only happen if the
-                                    // default value fails validation, which is arguably a developer error.
-                                    // We could try to "fix" this in the future if desired.
-                                    errors.push(err);
-                                }
-                                continue;
-                            }
-                            Err(err) => return Err(err),
-                        }
+                        model_extra_dict.set_item(&py_key, value)?;
+                        fields_set.add(py_key)?;
                     };
-
-                    model_dict.set_item(&field.name_py, field_value)?;
                 }
-
-                if matches!(this.extra_behavior, ExtraBehavior::Allow) {
-                    model_extra_dict_op = Some(model_extra_dict);
-                }
-
-                if !errors.is_empty() {
-                    return Err(ValError::LineErrors(errors));
-                }
-
-                Ok((model_dict, model_extra_dict_op, fields_set))
             }
         }
 
-        dict.iterate(ValidateByIterating {
-            py,
-            input,
-            state,
-            this: self,
-        })?
+        // now that we've iterated over all the keys, we can set the values in the model
+        // dict, and try to set defaults for any missing fields
+
+        for (field, field_result) in std::iter::zip(&self.fields, field_results) {
+            let field_value = if let Some(validation_result) = field_result {
+                match validation_result {
+                    Ok(value) => {
+                        fields_set.add(&field.name_py)?;
+                        value
+                    }
+                    Err(ValError::Omit) => continue,
+                    Err(ValError::LineErrors(line_errors)) => {
+                        for err in line_errors {
+                            // FIXME this should use the lookup path which the result was found at
+                            errors.push(err.with_outer_location(&field.name));
+                        }
+                        continue;
+                    }
+                    Err(err) => return Err(err),
+                }
+            } else {
+                match field.validator.default_value(py, Some(field.name.as_str()), state) {
+                    Ok(Some(default_value)) => default_value,
+                    Ok(None) => {
+                        errors.push(field.lookup_key.error(
+                            ErrorTypeDefaults::Missing,
+                            json_input,
+                            self.loc_by_alias,
+                            &field.name,
+                        ));
+                        continue;
+                    }
+                    Err(ValError::Omit) => continue,
+                    Err(ValError::LineErrors(line_errors)) => {
+                        for err in line_errors {
+                            // Note: this will always use the field name even if there is an alias
+                            // However, we don't mind so much because this error can only happen if the
+                            // default value fails validation, which is arguably a developer error.
+                            // We could try to "fix" this in the future if desired.
+                            errors.push(err);
+                        }
+                        continue;
+                    }
+                    Err(err) => return Err(err),
+                }
+            };
+
+            model_dict.set_item(&field.name_py, field_value)?;
+        }
+
+        if matches!(self.extra_behavior, ExtraBehavior::Allow) {
+            model_extra_dict_op = Some(model_extra_dict);
+        }
+
+        if !errors.is_empty() {
+            return Err(ValError::LineErrors(errors));
+        }
+
+        Ok((model_dict, model_extra_dict_op, fields_set))
     }
+}
+
+#[derive(Debug)]
+enum LookupValue {
+    /// This lookup hits an actual field
+    Field(usize),
+    /// This lookup might applicable to multiple fields
+    Complex {
+        /// All fields which wanted _exactly_ this key
+        fields: Vec<usize>,
+        /// Fields which use this key as path prefix
+        lookup_map: LookupMap,
+    },
+}
+
+#[derive(Debug)]
+struct LookupMap {
+    map: AHashMap<String, LookupValue>,
+    list: AHashMap<i64, LookupValue>,
 }

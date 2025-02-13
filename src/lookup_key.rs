@@ -423,6 +423,10 @@ impl LookupPath {
     pub fn first_key(&self) -> &str {
         &self.first_item.key
     }
+
+    pub fn rest(&self) -> &[PathItem] {
+        &self.rest
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -437,8 +441,8 @@ pub(crate) enum PathItem {
 /// we store both the string and pystring to save creating the pystring for python
 #[derive(Debug, Clone)]
 pub(crate) struct PathItemString {
-    key: String,
-    py_key: Py<PyString>,
+    pub key: String,
+    pub py_key: Py<PyString>,
 }
 
 impl fmt::Display for PathItem {
