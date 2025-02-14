@@ -140,8 +140,8 @@ impl Validator for UuidValidator {
             }
             let uuid = self.get_uuid(input)?;
             // This block checks if the UUID version matches the expected version and
-            // if the UUID variant conforms to RFC 4122. When dealing with Python inputs,
-            // UUIDs must adhere to RFC 4122 standards.
+            // if the UUID variant conforms to RFC 9562 (superseding RFC 4122).
+            // When dealing with Python inputs, UUIDs must adhere to RFC 9562 standards.
             if let Some(expected_version) = self.version {
                 if uuid.get_version_num() != expected_version || uuid.get_variant() != Variant::RFC4122 {
                     return Err(ValError::new(
