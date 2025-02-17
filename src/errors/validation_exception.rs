@@ -347,6 +347,7 @@ impl ValidationError {
             true,
             false,
             false,
+            false,
             true,
             None,
             DuckTypingSerMode::SchemaBased,
