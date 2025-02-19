@@ -577,3 +577,22 @@ fn py_get_attrs<'py>(obj: &Bound<'py, PyAny>, attr_name: &Py<PyString>) -> PyRes
         }
     }
 }
+
+pub fn get_lookup_key(
+    py: Python,
+    validation_alias: Option<Bound<'_, PyAny>>,
+    validate_by_name: bool,
+    validate_by_alias: bool,
+    field_name: &str,
+) -> PyResult<LookupKey> {
+    let lookup_key = match (validation_alias, validate_by_name, validate_by_alias) {
+        (Some(va), true, true) => LookupKey::from_py(py, &va, Some(field_name))?,
+        (Some(_va), true, false) => LookupKey::from_string(py, field_name),
+        (Some(va), false, true) => LookupKey::from_py(py, &va, None)?,
+        (Some(_va), false, false) => {
+            return py_schema_err!("`validate_by_name` and `validate_by_alias` cannot both be set to `False`.")
+        }
+        (None, _, _) => LookupKey::from_string(py, field_name),
+    };
+    Ok(lookup_key)
+}

@@ -883,14 +883,14 @@ def test_alias(py_and_json: PyAndJson, input_value, expected):
     ],
     ids=repr,
 )
-def test_alias_populate_by_name(py_and_json: PyAndJson, input_value, expected):
+def test_alias_validate_by_name(py_and_json: PyAndJson, input_value, expected):
     v = py_and_json(
         {
             'type': 'arguments',
             'arguments_schema': [
                 {'name': 'a', 'mode': 'positional_or_keyword', 'schema': {'type': 'int'}, 'alias': 'Foo'}
             ],
-            'populate_by_name': True,
+            'validate_by_name': True,
         }
     )
     if isinstance(expected, Err):
@@ -898,6 +898,47 @@ def test_alias_populate_by_name(py_and_json: PyAndJson, input_value, expected):
             v.validate_test(input_value)
     else:
         assert v.validate_test(input_value) == expected
+
+
+def test_only_validate_by_name(py_and_json) -> None:
+    schema = core_schema.arguments_schema(
+        [
+            core_schema.arguments_parameter(name='a', schema=core_schema.str_schema(), alias='FieldA'),
+        ],
+        validate_by_name=True,
+        validate_by_alias=False,
+    )
+    v = py_and_json(schema)
+    assert v.validate_test(ArgsKwargs((), {'a': 'hello'})) == ((), {'a': 'hello'})
+    with pytest.raises(ValidationError, match=r'a\n +Missing required argument \[type=missing_argument,'):
+        assert v.validate_test(ArgsKwargs((), {'FieldA': 'hello'}))
+
+
+def test_only_allow_alias(py_and_json) -> None:
+    schema = core_schema.arguments_schema(
+        [
+            core_schema.arguments_parameter(name='a', schema=core_schema.str_schema(), alias='FieldA'),
+        ],
+        validate_by_name=False,
+        validate_by_alias=True,
+    )
+    v = py_and_json(schema)
+    assert v.validate_test(ArgsKwargs((), {'FieldA': 'hello'})) == ((), {'a': 'hello'})
+    with pytest.raises(ValidationError, match=r'FieldA\n +Missing required argument \[type=missing_argument,'):
+        assert v.validate_test(ArgsKwargs((), {'a': 'hello'}))
+
+
+def test_invalid_config_raises() -> None:
+    with pytest.raises(SchemaError, match='`validate_by_name` and `validate_by_alias` cannot both be set to `False`.'):
+        SchemaValidator(
+            core_schema.arguments_schema(
+                [
+                    core_schema.arguments_parameter(name='a', schema=core_schema.str_schema(), alias='FieldA'),
+                ],
+                validate_by_name=False,
+                validate_by_alias=False,
+            )
+        )
 
 
 def validate(config=None):

@@ -12,7 +12,7 @@ use crate::errors::{ErrorType, ErrorTypeDefaults, ValError, ValLineError, ValRes
 use crate::input::{
     input_as_python_instance, Arguments, BorrowInput, Input, InputType, KeywordArgs, PositionalArgs, ValidationMatch,
 };
-use crate::lookup_key::LookupKey;
+use crate::lookup_key::{get_lookup_key, LookupKey};
 use crate::tools::SchemaDict;
 use crate::validators::function::convert_err;
 
@@ -54,8 +54,8 @@ impl BuildValidator for DataclassArgsValidator {
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
 
-        let populate_by_name = schema_or_config_same(schema, config, intern!(py, "populate_by_name"))?.unwrap_or(false);
-
+        let validate_by_name = config.get_as(intern!(py, "validate_by_name"))?.unwrap_or(false);
+        let validate_by_alias = config.get_as(intern!(py, "validate_by_alias"))?.unwrap_or(true);
         let extra_behavior = ExtraBehavior::from_schema_or_config(py, schema, config, ExtraBehavior::Ignore)?;
 
         let extras_validator = match (schema.get_item(intern!(py, "extras_schema"))?, &extra_behavior) {
@@ -75,13 +75,8 @@ impl BuildValidator for DataclassArgsValidator {
             let py_name: Bound<'_, PyString> = field.get_as_req(intern!(py, "name"))?;
             let name: String = py_name.extract()?;
 
-            let lookup_key = match field.get_item(intern!(py, "validation_alias"))? {
-                Some(alias) => {
-                    let alt_alias = if populate_by_name { Some(name.as_str()) } else { None };
-                    LookupKey::from_py(py, &alias, alt_alias)?
-                }
-                None => LookupKey::from_string(py, &name),
-            };
+            let validation_alias = field.get_item(intern!(py, "validation_alias"))?;
+            let lookup_key = get_lookup_key(py, validation_alias, validate_by_name, validate_by_alias, name.as_str())?;
 
             let schema = field.get_as_req(intern!(py, "schema"))?;
 

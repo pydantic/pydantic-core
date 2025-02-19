@@ -11,7 +11,7 @@ use crate::build_tools::py_schema_err;
 use crate::build_tools::{schema_or_config_same, ExtraBehavior};
 use crate::errors::{ErrorTypeDefaults, ValError, ValLineError, ValResult};
 use crate::input::{Arguments, BorrowInput, Input, KeywordArgs, PositionalArgs, ValidationMatch};
-use crate::lookup_key::LookupKey;
+use crate::lookup_key::{get_lookup_key, LookupKey};
 use crate::tools::SchemaDict;
 
 use super::validation_state::ValidationState;
@@ -68,14 +68,16 @@ impl BuildValidator for ArgumentsValidator {
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
 
-        let populate_by_name = schema_or_config_same(schema, config, intern!(py, "populate_by_name"))?.unwrap_or(false);
-
         let arguments_schema: Bound<'_, PyList> = schema.get_as_req(intern!(py, "arguments_schema"))?;
         let mut parameters: Vec<Parameter> = Vec::with_capacity(arguments_schema.len());
 
         let mut positional_params_count = 0;
         let mut had_default_arg = false;
         let mut had_keyword_only = false;
+
+        let validate_by_name = schema_or_config_same(schema, config, intern!(py, "validate_by_name"))?.unwrap_or(false);
+        let validate_by_alias =
+            schema_or_config_same(schema, config, intern!(py, "validate_by_alias"))?.unwrap_or(true);
 
         for (arg_index, arg) in arguments_schema.iter().enumerate() {
             let arg = arg.downcast::<PyDict>()?;
@@ -100,13 +102,14 @@ impl BuildValidator for ArgumentsValidator {
             let mut kw_lookup_key = None;
             let mut kwarg_key = None;
             if mode == "keyword_only" || mode == "positional_or_keyword" {
-                kw_lookup_key = match arg.get_item(intern!(py, "alias"))? {
-                    Some(alias) => {
-                        let alt_alias = if populate_by_name { Some(name.as_str()) } else { None };
-                        Some(LookupKey::from_py(py, &alias, alt_alias)?)
-                    }
-                    None => Some(LookupKey::from_string(py, &name)),
-                };
+                let validation_alias = arg.get_item(intern!(py, "alias"))?;
+                kw_lookup_key = Some(get_lookup_key(
+                    py,
+                    validation_alias,
+                    validate_by_name,
+                    validate_by_alias,
+                    name.as_str(),
+                )?);
                 kwarg_key = Some(py_name.unbind());
             }
 

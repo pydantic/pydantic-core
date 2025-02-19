@@ -3,14 +3,14 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString};
 
 use crate::build_tools::py_schema_err;
-use crate::build_tools::{is_strict, schema_or_config, schema_or_config_same, ExtraBehavior};
+use crate::build_tools::{is_strict, schema_or_config, ExtraBehavior};
 use crate::errors::LocItem;
 use crate::errors::{ErrorTypeDefaults, ValError, ValLineError, ValResult};
 use crate::input::BorrowInput;
 use crate::input::ConsumeIterator;
 use crate::input::ValidationMatch;
 use crate::input::{Input, ValidatedDict};
-use crate::lookup_key::LookupKey;
+use crate::lookup_key::{get_lookup_key, LookupKey};
 use crate::tools::SchemaDict;
 use ahash::AHashSet;
 use jiter::PartialMode;
@@ -55,7 +55,9 @@ impl BuildValidator for TypedDictValidator {
 
         let total =
             schema_or_config(schema, config, intern!(py, "total"), intern!(py, "typed_dict_total"))?.unwrap_or(true);
-        let populate_by_name = schema_or_config_same(schema, config, intern!(py, "populate_by_name"))?.unwrap_or(false);
+
+        let validate_by_name = config.get_as(intern!(py, "validate_by_name"))?.unwrap_or(false);
+        let validate_by_alias = config.get_as(intern!(py, "validate_by_alias"))?.unwrap_or(true);
 
         let extra_behavior = ExtraBehavior::from_schema_or_config(py, schema, config, ExtraBehavior::Ignore)?;
 
@@ -108,13 +110,8 @@ impl BuildValidator for TypedDictValidator {
                 }
             }
 
-            let lookup_key = match field_info.get_item(intern!(py, "validation_alias"))? {
-                Some(alias) => {
-                    let alt_alias = if populate_by_name { Some(field_name) } else { None };
-                    LookupKey::from_py(py, &alias, alt_alias)?
-                }
-                None => LookupKey::from_string(py, field_name),
-            };
+            let validation_alias = field_info.get_item(intern!(py, "validation_alias"))?;
+            let lookup_key = get_lookup_key(py, validation_alias, validate_by_name, validate_by_alias, field_name)?;
 
             fields.push(TypedDictField {
                 name: field_name.to_string(),

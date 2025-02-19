@@ -393,17 +393,60 @@ def test_alias_allow_pop(py_and_json: PyAndJson):
     v = py_and_json(
         {
             'type': 'typed-dict',
-            'populate_by_name': True,
             'fields': {
                 'field_a': {'validation_alias': 'FieldA', 'type': 'typed-dict-field', 'schema': {'type': 'int'}}
             },
-        }
+            'config': {'validate_by_name': True, 'validate_by_alias': True},
+        },
     )
     assert v.validate_test({'FieldA': '123'}) == {'field_a': 123}
     assert v.validate_test({'field_a': '123'}) == {'field_a': 123}
     assert v.validate_test({'FieldA': '1', 'field_a': '2'}) == {'field_a': 1}
     with pytest.raises(ValidationError, match=r'FieldA\n +Field required \[type=missing,'):
         assert v.validate_test({'foobar': '123'})
+
+
+def test_only_validate_by_name(py_and_json) -> None:
+    v = py_and_json(
+        {
+            'type': 'typed-dict',
+            'fields': {
+                'field_a': {'validation_alias': 'FieldA', 'type': 'typed-dict-field', 'schema': {'type': 'int'}}
+            },
+            'config': {'validate_by_name': True, 'validate_by_alias': False},
+        }
+    )
+    assert v.validate_test({'field_a': '123'}) == {'field_a': 123}
+    with pytest.raises(ValidationError, match=r'field_a\n +Field required \[type=missing,'):
+        assert v.validate_test({'FieldA': '123'})
+
+
+def test_only_allow_alias(py_and_json) -> None:
+    v = py_and_json(
+        {
+            'type': 'typed-dict',
+            'fields': {
+                'field_a': {'validation_alias': 'FieldA', 'type': 'typed-dict-field', 'schema': {'type': 'int'}}
+            },
+            'config': {'validate_by_name': False, 'validate_by_alias': True},
+        }
+    )
+    assert v.validate_test({'FieldA': '123'}) == {'field_a': 123}
+    with pytest.raises(ValidationError, match=r'FieldA\n +Field required \[type=missing,'):
+        assert v.validate_test({'field_a': '123'})
+
+
+def test_invalid_config_raises() -> None:
+    with pytest.raises(SchemaError, match='`validate_by_name` and `validate_by_alias` cannot both be set to `False`.'):
+        SchemaValidator(
+            {
+                'type': 'typed-dict',
+                'fields': {
+                    'field_a': {'validation_alias': 'FieldA', 'type': 'typed-dict-field', 'schema': {'type': 'int'}}
+                },
+                'config': {'validate_by_name': False, 'validate_by_alias': False},
+            }
+        )
 
 
 @pytest.mark.parametrize(
@@ -590,8 +633,8 @@ def test_paths_allow_by_name(py_and_json: PyAndJson, input_value):
                     'schema': {'type': 'int'},
                 }
             },
-            'populate_by_name': True,
-        }
+            'config': {'validate_by_name': True},
+        },
     )
     assert v.validate_test(input_value) == {'field_a': 42}
 
@@ -795,11 +838,11 @@ def test_alias_extra_by_name(py_and_json: PyAndJson):
         {
             'type': 'typed-dict',
             'extra_behavior': 'allow',
-            'populate_by_name': True,
             'fields': {
                 'field_a': {'validation_alias': 'FieldA', 'type': 'typed-dict-field', 'schema': {'type': 'int'}}
             },
-        }
+            'config': {'validate_by_name': True},
+        },
     )
     assert v.validate_test({'FieldA': 1}) == {'field_a': 1}
     assert v.validate_test({'field_a': 1}) == {'field_a': 1}
