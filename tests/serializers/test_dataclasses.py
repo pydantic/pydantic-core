@@ -84,9 +84,9 @@ def test_serialization_alias():
         ['a', 'b'],
     )
     s = SchemaSerializer(schema)
-    assert s.to_python(Foo(a='hello', b=b'more')) == IsStrictDict(a='hello', BAR=b'more')
-    assert s.to_python(Foo(a='hello', b=b'more'), mode='json') == IsStrictDict(a='hello', BAR='more')
-    j = s.to_json(Foo(a='hello', b=b'more'))
+    assert s.to_python(Foo(a='hello', b=b'more'), by_alias=True) == IsStrictDict(a='hello', BAR=b'more')
+    assert s.to_python(Foo(a='hello', b=b'more'), mode='json', by_alias=True) == IsStrictDict(a='hello', BAR='more')
+    j = s.to_json(Foo(a='hello', b=b'more'), by_alias=True)
 
     if on_pypy:
         assert json.loads(j) == {'a': 'hello', 'BAR': 'more'}
