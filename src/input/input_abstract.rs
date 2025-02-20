@@ -81,6 +81,8 @@ pub trait Input<'py>: fmt::Debug {
 
     fn validate_args(&self) -> ValResult<Self::Arguments<'_>>;
 
+    fn validate_args_v3(&self) -> ValResult<Self::Arguments<'_>>;
+
     fn validate_dataclass_args<'a>(&'a self, dataclass_name: &str) -> ValResult<Self::Arguments<'a>>;
 
     fn validate_str(&self, strict: bool, coerce_numbers_to_str: bool) -> ValMatch<EitherString<'_>>;
