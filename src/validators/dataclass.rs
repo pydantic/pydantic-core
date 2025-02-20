@@ -12,7 +12,7 @@ use crate::errors::{ErrorType, ErrorTypeDefaults, ValError, ValLineError, ValRes
 use crate::input::{
     input_as_python_instance, Arguments, BorrowInput, Input, InputType, KeywordArgs, PositionalArgs, ValidationMatch,
 };
-use crate::lookup_key::{get_lookup_key, LookupKey};
+use crate::lookup_key::get_lookup_key;
 use crate::tools::SchemaDict;
 use crate::validators::function::convert_err;
 
@@ -27,7 +27,7 @@ struct Field {
     py_name: Py<PyString>,
     init: bool,
     init_only: bool,
-    lookup_key: LookupKey,
+    alias: Option<Py<PyAny>>,
     validator: CombinedValidator,
     frozen: bool,
 }
@@ -42,6 +42,8 @@ pub struct DataclassArgsValidator {
     extra_behavior: ExtraBehavior,
     extras_validator: Option<Box<CombinedValidator>>,
     loc_by_alias: bool,
+    validate_by_alias: bool,
+    validate_by_name: bool,
 }
 
 impl BuildValidator for DataclassArgsValidator {
@@ -54,8 +56,6 @@ impl BuildValidator for DataclassArgsValidator {
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
 
-        let validate_by_name = config.get_as(intern!(py, "validate_by_name"))?.unwrap_or(false);
-        let validate_by_alias = config.get_as(intern!(py, "validate_by_alias"))?.unwrap_or(true);
         let extra_behavior = ExtraBehavior::from_schema_or_config(py, schema, config, ExtraBehavior::Ignore)?;
 
         let extras_validator = match (schema.get_item(intern!(py, "extras_schema"))?, &extra_behavior) {
@@ -74,9 +74,6 @@ impl BuildValidator for DataclassArgsValidator {
 
             let py_name: Bound<'_, PyString> = field.get_as_req(intern!(py, "name"))?;
             let name: String = py_name.extract()?;
-
-            let validation_alias = field.get_item(intern!(py, "validation_alias"))?;
-            let lookup_key = get_lookup_key(py, validation_alias, validate_by_name, validate_by_alias, name.as_str())?;
 
             let schema = field.get_as_req(intern!(py, "schema"))?;
 
@@ -100,7 +97,9 @@ impl BuildValidator for DataclassArgsValidator {
                 kw_only,
                 name,
                 py_name: py_name.into(),
-                lookup_key,
+                alias: field
+                    .get_item(intern!(py, "validation_alias"))?
+                    .map(std::convert::Into::into),
                 validator,
                 init: field.get_as(intern!(py, "init"))?.unwrap_or(true),
                 init_only: field.get_as(intern!(py, "init_only"))?.unwrap_or(false),
@@ -125,6 +124,8 @@ impl BuildValidator for DataclassArgsValidator {
             extra_behavior,
             extras_validator,
             loc_by_alias: config.get_as(intern!(py, "loc_by_alias"))?.unwrap_or(true),
+            validate_by_alias: config.get_as(intern!(py, "validate_by_alias"))?.unwrap_or(true),
+            validate_by_name: config.get_as(intern!(py, "validate_by_name"))?.unwrap_or(false),
         }
         .into())
     }
@@ -150,9 +151,13 @@ impl Validator for DataclassArgsValidator {
         let mut init_only_args = self.init_only_count.map(Vec::with_capacity);
 
         let mut errors: Vec<ValLineError> = Vec::new();
-        let mut used_keys: AHashSet<&str> = AHashSet::with_capacity(self.fields.len());
+        let mut used_keys: AHashSet<String> = AHashSet::with_capacity(self.fields.len());
 
         let state = &mut state.rebind_extra(|extra| extra.data = Some(output_dict.clone()));
+
+        let validate_by_alias = state.validate_by_alias_or(self.validate_by_alias);
+        let validate_by_name = state.validate_by_name_or(self.validate_by_name);
+
         let mut fields_set_count: usize = 0;
 
         macro_rules! set_item {
@@ -195,10 +200,17 @@ impl Validator for DataclassArgsValidator {
                 }
             }
 
+            let lookup_key = get_lookup_key(
+                py,
+                field.alias.as_ref(),
+                validate_by_name,
+                validate_by_alias,
+                &field.name,
+            )?;
             let mut kw_value = None;
             if let Some(kwargs) = args.kwargs() {
-                if let Some((lookup_path, value)) = kwargs.get_item(&field.lookup_key)? {
-                    used_keys.insert(lookup_path.first_key());
+                if let Some((lookup_path, value)) = kwargs.get_item(&lookup_key)? {
+                    used_keys.insert(lookup_path.first_key().to_string());
                     kw_value = Some((lookup_path, value));
                 }
             }
@@ -248,7 +260,7 @@ impl Validator for DataclassArgsValidator {
                         }
                         Ok(None) => {
                             // This means there was no default value
-                            errors.push(field.lookup_key.error(
+                            errors.push(lookup_key.error(
                                 ErrorTypeDefaults::Missing,
                                 input,
                                 self.loc_by_alias,

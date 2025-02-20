@@ -10,7 +10,7 @@ use crate::input::BorrowInput;
 use crate::input::ConsumeIterator;
 use crate::input::ValidationMatch;
 use crate::input::{Input, ValidatedDict};
-use crate::lookup_key::{get_lookup_key, LookupKey};
+use crate::lookup_key::get_lookup_key;
 use crate::tools::SchemaDict;
 use ahash::AHashSet;
 use jiter::PartialMode;
@@ -20,7 +20,7 @@ use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuild
 #[derive(Debug)]
 struct TypedDictField {
     name: String,
-    lookup_key: LookupKey,
+    alias: Option<Py<PyAny>>,
     name_py: Py<PyString>,
     required: bool,
     validator: CombinedValidator,
@@ -35,6 +35,8 @@ pub struct TypedDictValidator {
     extras_validator: Option<Box<CombinedValidator>>,
     strict: bool,
     loc_by_alias: bool,
+    validate_by_alias: bool,
+    validate_by_name: bool,
 }
 
 impl BuildValidator for TypedDictValidator {
@@ -55,9 +57,6 @@ impl BuildValidator for TypedDictValidator {
 
         let total =
             schema_or_config(schema, config, intern!(py, "total"), intern!(py, "typed_dict_total"))?.unwrap_or(true);
-
-        let validate_by_name = config.get_as(intern!(py, "validate_by_name"))?.unwrap_or(false);
-        let validate_by_alias = config.get_as(intern!(py, "validate_by_alias"))?.unwrap_or(true);
 
         let extra_behavior = ExtraBehavior::from_schema_or_config(py, schema, config, ExtraBehavior::Ignore)?;
 
@@ -110,12 +109,11 @@ impl BuildValidator for TypedDictValidator {
                 }
             }
 
-            let validation_alias = field_info.get_item(intern!(py, "validation_alias"))?;
-            let lookup_key = get_lookup_key(py, validation_alias, validate_by_name, validate_by_alias, field_name)?;
-
             fields.push(TypedDictField {
                 name: field_name.to_string(),
-                lookup_key,
+                alias: field_info
+                    .get_item(intern!(py, "validation_alias"))?
+                    .map(std::convert::Into::into),
                 name_py: field_name_py.into(),
                 validator,
                 required,
@@ -127,6 +125,8 @@ impl BuildValidator for TypedDictValidator {
             extras_validator,
             strict,
             loc_by_alias: config.get_as(intern!(py, "loc_by_alias"))?.unwrap_or(true),
+            validate_by_alias: config.get_as(intern!(py, "validate_by_alias"))?.unwrap_or(true),
+            validate_by_name: config.get_as(intern!(py, "validate_by_name"))?.unwrap_or(false),
         }
         .into())
     }
@@ -157,9 +157,12 @@ impl Validator for TypedDictValidator {
         };
         let allow_partial = state.allow_partial;
 
+        let validate_by_alias = state.validate_by_alias_or(self.validate_by_alias);
+        let validate_by_name = state.validate_by_name_or(self.validate_by_name);
+
         // we only care about which keys have been used if we're iterating over the object for extra after
         // the first pass
-        let mut used_keys: Option<AHashSet<&str>> =
+        let mut used_keys: Option<AHashSet<String>> =
             if self.extra_behavior == ExtraBehavior::Ignore || dict.is_py_get_attr() {
                 None
             } else {
@@ -168,10 +171,18 @@ impl Validator for TypedDictValidator {
 
         {
             let state = &mut state.rebind_extra(|extra| extra.data = Some(output_dict.clone()));
+
             let mut fields_set_count: usize = 0;
 
             for field in &self.fields {
-                let op_key_value = match dict.get_item(&field.lookup_key) {
+                let lookup_key = get_lookup_key(
+                    py,
+                    field.alias.as_ref(),
+                    validate_by_name,
+                    validate_by_alias,
+                    &field.name,
+                )?;
+                let op_key_value = match dict.get_item(&lookup_key) {
                     Ok(v) => v,
                     Err(ValError::LineErrors(line_errors)) => {
                         let field_loc: LocItem = field.name.clone().into();
@@ -188,7 +199,7 @@ impl Validator for TypedDictValidator {
                     if let Some(ref mut used_keys) = used_keys {
                         // key is "used" whether or not validation passes, since we want to skip this key in
                         // extra logic either way
-                        used_keys.insert(lookup_path.first_key());
+                        used_keys.insert(lookup_path.first_key().to_string());
                     }
                     let is_last_partial = if let Some(ref last_key) = partial_last_key {
                         let first_key_loc: LocItem = lookup_path.first_key().into();
@@ -226,7 +237,7 @@ impl Validator for TypedDictValidator {
                     Ok(None) => {
                         // This means there was no default value
                         if field.required {
-                            errors.push(field.lookup_key.error(
+                            errors.push(lookup_key.error(
                                 ErrorTypeDefaults::Missing,
                                 input,
                                 self.loc_by_alias,
@@ -254,7 +265,7 @@ impl Validator for TypedDictValidator {
         if let Some(used_keys) = used_keys {
             struct ValidateExtras<'a, 's, 'py> {
                 py: Python<'py>,
-                used_keys: AHashSet<&'a str>,
+                used_keys: AHashSet<String>,
                 errors: &'a mut Vec<ValLineError>,
                 extras_validator: Option<&'a CombinedValidator>,
                 output_dict: &'a Bound<'py, PyDict>,
