@@ -1174,3 +1174,42 @@ def test_warn_on_missing_field() -> None:
     with pytest.warns(UserWarning, match='Expected 2 fields but got 1 for type `.*AModel` with value `.*`.+'):
         value = BasicModel(root=AModel(type='a'))
         s.to_python(value)
+
+
+@pytest.mark.parametrize(
+    'config,runtime,expected',
+    [
+        (True, True, {'A': 1}),
+        (True, False, {'a': 1}),
+        (True, None, {'A': 1}),
+        (False, True, {'A': 1}),
+        (False, False, {'a': 1}),
+        (False, None, {'a': 1}),
+        (None, True, {'A': 1}),
+        (None, False, {'a': 1}),
+        (None, None, {'a': 1}),
+    ],
+)
+def test_alias_by_config_via_runtime_setting(config, runtime, expected) -> None:
+    """This test reflects the priority that applies for config vs runtime serialization alias configuration.
+
+    If the runtime value (by_alias) is set, that value is used.
+    If the runtime value is unset, the config value (serialize_by_alias) is used.
+    If neither are set, the default, False, is used.
+    """
+
+    class Model:
+        def __init__(self, a: int) -> None:
+            self.a = a
+
+    schema = core_schema.model_schema(
+        Model,
+        core_schema.model_fields_schema(
+            {
+                'a': core_schema.model_field(core_schema.int_schema(), serialization_alias='A'),
+            }
+        ),
+        config=core_schema.CoreConfig(serialize_by_alias=config) if config is not None else {},
+    )
+    s = SchemaSerializer(schema)
+    assert s.to_python(Model(1), by_alias=runtime) == expected

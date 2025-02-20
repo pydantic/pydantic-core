@@ -235,3 +235,44 @@ def test_dataclass_initvar_not_required_on_union_ser() -> None:
     s = SchemaSerializer(schema)
     assert s.to_python(Foo(x=1), warnings='error') == {'x': 1}
     assert s.to_python(Foo(x=1, init_var=2), warnings='error') == {'x': 1}
+
+
+@pytest.mark.parametrize(
+    'config,runtime,expected',
+    [
+        (True, True, {'A': 'hello'}),
+        (True, False, {'a': 'hello'}),
+        (True, None, {'A': 'hello'}),
+        (False, True, {'A': 'hello'}),
+        (False, False, {'a': 'hello'}),
+        (False, None, {'a': 'hello'}),
+        (None, True, {'A': 'hello'}),
+        (None, False, {'a': 'hello'}),
+        (None, None, {'a': 'hello'}),
+    ],
+)
+def test_alias_by_config_via_runtime_setting(config, runtime, expected) -> None:
+    """This test reflects the priority that applies for config vs runtime serialization alias configuration.
+
+    If the runtime value (by_alias) is set, that value is used.
+    If the runtime value is unset, the config value (serialize_by_alias) is used.
+    If neither are set, the default, False, is used.
+    """
+
+    @dataclasses.dataclass
+    class Foo:
+        a: str
+
+    schema = core_schema.dataclass_schema(
+        Foo,
+        core_schema.dataclass_args_schema(
+            'Foo',
+            [
+                core_schema.dataclass_field(name='a', schema=core_schema.str_schema(), serialization_alias='A'),
+            ],
+        ),
+        ['a'],
+        config=core_schema.CoreConfig(serialize_by_alias=config) if config is not None else {},
+    )
+    s = SchemaSerializer(schema)
+    assert s.to_python(Foo(a='hello'), by_alias=runtime) == expected
