@@ -3494,6 +3494,112 @@ def arguments_schema(
     )
 
 
+class ArgumentsV3Parameter(TypedDict, total=False):
+    name: Required[str]
+    schema: Required[CoreSchema]
+    mode: Literal[
+        'positional_only',
+        'positional_or_keyword',
+        'keyword_only',
+        'var_args',
+        'var_kwargs_uniform',
+        'var_kwargs_unpacked_typed_dict',
+    ]  # default positional_or_keyword
+    alias: Union[str, list[Union[str, int]], list[list[Union[str, int]]]]
+
+
+def arguments_v3_parameter(
+    name: str,
+    schema: CoreSchema,
+    *,
+    mode: Literal[
+        'positional_only',
+        'positional_or_keyword',
+        'keyword_only',
+        'var_args',
+        'var_kwargs_uniform',
+        'var_kwargs_unpacked_typed_dict',
+    ]
+    | None = None,
+    alias: str | list[str | int] | list[list[str | int]] | None = None,
+) -> ArgumentsV3Parameter:
+    """
+    Returns a schema that matches an argument parameter, e.g.:
+
+    ```py
+    from pydantic_core import SchemaValidator, core_schema
+
+    param = core_schema.arguments_v3_parameter(
+        name='a', schema=core_schema.str_schema(), mode='positional_only'
+    )
+    schema = core_schema.arguments_v3_schema([param])
+    v = SchemaValidator(schema)
+    assert v.validate_python({'a': 'hello'}) == (('hello',), {})
+    ```
+
+    Args:
+        name: The name to use for the argument parameter
+        schema: The schema to use for the argument parameter
+        mode: The mode to use for the argument parameter
+        alias: The alias to use for the argument parameter
+    """
+    return _dict_not_none(name=name, schema=schema, mode=mode, alias=alias)
+
+
+class ArgumentsV3Schema(TypedDict, total=False):
+    type: Required[Literal['arguments-v3']]
+    arguments_schema: Required[list[ArgumentsV3Parameter]]
+    populate_by_name: bool
+    var_args_schema: CoreSchema
+    var_kwargs_mode: VarKwargsMode
+    var_kwargs_schema: CoreSchema
+    ref: str
+    metadata: dict[str, Any]
+    serialization: SerSchema
+
+
+def arguments_v3_schema(
+    arguments: list[ArgumentsV3Parameter],
+    *,
+    populate_by_name: bool | None = None,
+    ref: str | None = None,
+    metadata: dict[str, Any] | None = None,
+    serialization: SerSchema | None = None,
+) -> ArgumentsV3Schema:
+    """
+    Returns a schema that matches an arguments schema, e.g.:
+
+    ```py
+    from pydantic_core import SchemaValidator, core_schema
+
+    param_a = core_schema.arguments_v3_parameter(
+        name='a', schema=core_schema.str_schema(), mode='positional_only'
+    )
+    param_b = core_schema.arguments_v3_parameter(
+        name='kwargs', schema=core_schema.bool_schema(), mode='var_kwargs_uniform'
+    )
+    schema = core_schema.arguments_v3_schema([param_a, param_b])
+    v = SchemaValidator(schema)
+    assert v.validate_python({'a': 'hello', 'kwargs': {'extra': True}}) == (('hello',), {'extra': True})
+    ```
+
+    Args:
+        arguments: The arguments to use for the arguments schema
+        populate_by_name: Whether to populate by name
+        ref: optional unique identifier of the schema, used to reference the schema in other places
+        metadata: Any other information you want to include with the schema, not used by pydantic-core
+        serialization: Custom serialization schema
+    """
+    return _dict_not_none(
+        type='arguments-v2',
+        arguments_schema=arguments,
+        populate_by_name=populate_by_name,
+        ref=ref,
+        metadata=metadata,
+        serialization=serialization,
+    )
+
+
 class CallSchema(TypedDict, total=False):
     type: Required[Literal['call']]
     arguments_schema: Required[CoreSchema]

@@ -117,6 +117,16 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
         }
     }
 
+    fn validate_args_v3(&self) -> ValResult<PyArgs<'py>> {
+        if let Ok(args_kwargs) = self.extract::<ArgsKwargs>() {
+            let args = args_kwargs.args.into_bound(self.py());
+            let kwargs = args_kwargs.kwargs.map(|d| d.into_bound(self.py()));
+            Ok(PyArgs::new(Some(args), kwargs))
+        } else {
+            Err(ValError::new(ErrorTypeDefaults::ArgumentsType, self))
+        }
+    }
+
     fn validate_dataclass_args<'a>(&'a self, class_name: &str) -> ValResult<PyArgs<'py>> {
         if let Ok(dict) = self.downcast::<PyDict>() {
             Ok(PyArgs::new(None, Some(dict.clone())))

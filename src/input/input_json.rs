@@ -85,6 +85,11 @@ impl<'py, 'data> Input<'py> for JsonValue<'data> {
         }
     }
 
+    #[cfg_attr(has_coverage_attribute, coverage(off))]
+    fn validate_args_v3(&self) -> ValResult<Self::Arguments<'_>> {
+        Err(ValError::new(ErrorTypeDefaults::ArgumentsType, self))
+    }
+
     fn validate_dataclass_args<'a>(&'a self, class_name: &str) -> ValResult<JsonArgs<'a, 'data>> {
         match self {
             JsonValue::Object(object) => Ok(JsonArgs::new(None, Some(object))),
@@ -380,6 +385,11 @@ impl<'py> Input<'py> for str {
 
     #[cfg_attr(has_coverage_attribute, coverage(off))]
     fn validate_args(&self) -> ValResult<Never> {
+        Err(ValError::new(ErrorTypeDefaults::ArgumentsType, self))
+    }
+
+    #[cfg_attr(has_coverage_attribute, coverage(off))]
+    fn validate_args_v3(&self) -> ValResult<Never> {
         Err(ValError::new(ErrorTypeDefaults::ArgumentsType, self))
     }
 
