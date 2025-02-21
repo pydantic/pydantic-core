@@ -54,8 +54,6 @@ class CoreConfig(TypedDict, total=False):
             `field_names` to construct error `loc`s. Default is `True`.
         revalidate_instances: Whether instances of models and dataclasses should re-validate. Default is 'never'.
         validate_default: Whether to validate default values during validation. Default is `False`.
-        populate_by_name: Whether an aliased field may be populated by its name as given by the model attribute,
-            as well as the alias. (Replaces 'allow_population_by_field_name' in Pydantic v1.) Default is `False`.
         str_max_length: The maximum length for string fields.
         str_min_length: The minimum length for string fields.
         str_strip_whitespace: Whether to strip whitespace from string fields.
@@ -74,6 +72,9 @@ class CoreConfig(TypedDict, total=False):
         regex_engine: The regex engine to use for regex pattern validation. Default is 'rust-regex'. See `StringSchema`.
         cache_strings: Whether to cache strings. Default is `True`, `True` or `'all'` is required to cache strings
             during general validation since validators don't know if they're in a key or a value.
+        validate_by_alias: Whether to validate by alias. Default is `True`.
+        validate_by_name: Whether to validate by attribute name. Default is `False`. Replacement for `populate_by_name`.
+        serialize_by_alias: Whether to serialize by alias. Default is `False`, expected to change to `True` in V3.
     """
 
     title: str
@@ -91,7 +92,6 @@ class CoreConfig(TypedDict, total=False):
     # whether to validate default values during validation, default False
     validate_default: bool
     # used on typed-dicts and arguments
-    populate_by_name: bool  # replaces `allow_population_by_field_name` in pydantic v1
     # fields related to string fields only
     str_max_length: int
     str_min_length: int
@@ -111,6 +111,9 @@ class CoreConfig(TypedDict, total=False):
     coerce_numbers_to_str: bool  # default: False
     regex_engine: Literal['rust-regex', 'python-re']  # default: 'rust-regex'
     cache_strings: Union[bool, Literal['all', 'keys', 'none']]  # default: 'True'
+    validate_by_alias: bool  # default: True
+    validate_by_name: bool  # default: False
+    serialize_by_alias: bool  # default: False
 
 
 IncExCall: TypeAlias = 'set[int | str] | dict[int | str, IncExCall] | None'
@@ -2888,7 +2891,6 @@ class TypedDictSchema(TypedDict, total=False):
     # all these values can be set via config, equivalent fields have `typed_dict_` prefix
     extra_behavior: ExtraBehavior
     total: bool  # default: True
-    populate_by_name: bool  # replaces `allow_population_by_field_name` in pydantic v1
     ref: str
     metadata: dict[str, Any]
     serialization: SerSchema
@@ -2904,7 +2906,6 @@ def typed_dict_schema(
     extras_schema: CoreSchema | None = None,
     extra_behavior: ExtraBehavior | None = None,
     total: bool | None = None,
-    populate_by_name: bool | None = None,
     ref: str | None = None,
     metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
@@ -2938,7 +2939,6 @@ def typed_dict_schema(
         metadata: Any other information you want to include with the schema, not used by pydantic-core
         extra_behavior: The extra behavior to use for the typed dict
         total: Whether the typed dict is total, otherwise uses `typed_dict_total` from config
-        populate_by_name: Whether the typed dict should populate by name
         serialization: Custom serialization schema
     """
     return _dict_not_none(
@@ -2950,7 +2950,6 @@ def typed_dict_schema(
         extras_schema=extras_schema,
         extra_behavior=extra_behavior,
         total=total,
-        populate_by_name=populate_by_name,
         ref=ref,
         metadata=metadata,
         serialization=serialization,
@@ -3012,9 +3011,7 @@ class ModelFieldsSchema(TypedDict, total=False):
     computed_fields: list[ComputedField]
     strict: bool
     extras_schema: CoreSchema
-    # all these values can be set via config, equivalent fields have `typed_dict_` prefix
     extra_behavior: ExtraBehavior
-    populate_by_name: bool  # replaces `allow_population_by_field_name` in pydantic v1
     from_attributes: bool
     ref: str
     metadata: dict[str, Any]
@@ -3029,7 +3026,6 @@ def model_fields_schema(
     strict: bool | None = None,
     extras_schema: CoreSchema | None = None,
     extra_behavior: ExtraBehavior | None = None,
-    populate_by_name: bool | None = None,
     from_attributes: bool | None = None,
     ref: str | None = None,
     metadata: dict[str, Any] | None = None,
@@ -3058,7 +3054,6 @@ def model_fields_schema(
         ref: optional unique identifier of the schema, used to reference the schema in other places
         metadata: Any other information you want to include with the schema, not used by pydantic-core
         extra_behavior: The extra behavior to use for the typed dict
-        populate_by_name: Whether the typed dict should populate by name
         from_attributes: Whether the typed dict should be populated from attributes
         serialization: Custom serialization schema
     """
@@ -3070,7 +3065,6 @@ def model_fields_schema(
         strict=strict,
         extras_schema=extras_schema,
         extra_behavior=extra_behavior,
-        populate_by_name=populate_by_name,
         from_attributes=from_attributes,
         ref=ref,
         metadata=metadata,
@@ -3254,7 +3248,6 @@ class DataclassArgsSchema(TypedDict, total=False):
     dataclass_name: Required[str]
     fields: Required[list[DataclassField]]
     computed_fields: list[ComputedField]
-    populate_by_name: bool  # default: False
     collect_init_only: bool  # default: False
     ref: str
     metadata: dict[str, Any]
@@ -3267,7 +3260,6 @@ def dataclass_args_schema(
     fields: list[DataclassField],
     *,
     computed_fields: list[ComputedField] | None = None,
-    populate_by_name: bool | None = None,
     collect_init_only: bool | None = None,
     ref: str | None = None,
     metadata: dict[str, Any] | None = None,
@@ -3295,7 +3287,6 @@ def dataclass_args_schema(
         dataclass_name: The name of the dataclass being validated
         fields: The fields to use for the dataclass
         computed_fields: Computed fields to use when serializing the dataclass
-        populate_by_name: Whether to populate by name
         collect_init_only: Whether to collect init only fields into a dict to pass to `__post_init__`
         ref: optional unique identifier of the schema, used to reference the schema in other places
         metadata: Any other information you want to include with the schema, not used by pydantic-core
@@ -3307,7 +3298,6 @@ def dataclass_args_schema(
         dataclass_name=dataclass_name,
         fields=fields,
         computed_fields=computed_fields,
-        populate_by_name=populate_by_name,
         collect_init_only=collect_init_only,
         ref=ref,
         metadata=metadata,
@@ -3436,7 +3426,8 @@ VarKwargsMode: TypeAlias = Literal['uniform', 'unpacked-typed-dict']
 class ArgumentsSchema(TypedDict, total=False):
     type: Required[Literal['arguments']]
     arguments_schema: Required[list[ArgumentsParameter]]
-    populate_by_name: bool
+    validate_by_name: bool
+    validate_by_alias: bool
     var_args_schema: CoreSchema
     var_kwargs_mode: VarKwargsMode
     var_kwargs_schema: CoreSchema
@@ -3448,7 +3439,8 @@ class ArgumentsSchema(TypedDict, total=False):
 def arguments_schema(
     arguments: list[ArgumentsParameter],
     *,
-    populate_by_name: bool | None = None,
+    validate_by_name: bool | None = None,
+    validate_by_alias: bool | None = None,
     var_args_schema: CoreSchema | None = None,
     var_kwargs_mode: VarKwargsMode | None = None,
     var_kwargs_schema: CoreSchema | None = None,
@@ -3475,7 +3467,8 @@ def arguments_schema(
 
     Args:
         arguments: The arguments to use for the arguments schema
-        populate_by_name: Whether to populate by name
+        validate_by_name: Whether to populate by argument names, defaults to False.
+        validate_by_alias: Whether to populate by argument aliases, defaults to True.
         var_args_schema: The variable args schema to use for the arguments schema
         var_kwargs_mode: The validation mode to use for variadic keyword arguments. If `'uniform'`, every value of the
             keyword arguments will be validated against the `var_kwargs_schema` schema. If `'unpacked-typed-dict'`,
@@ -3488,7 +3481,8 @@ def arguments_schema(
     return _dict_not_none(
         type='arguments',
         arguments_schema=arguments,
-        populate_by_name=populate_by_name,
+        validate_by_name=validate_by_name,
+        validate_by_alias=validate_by_alias,
         var_args_schema=var_args_schema,
         var_kwargs_mode=var_kwargs_mode,
         var_kwargs_schema=var_kwargs_schema,
