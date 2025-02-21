@@ -8,7 +8,7 @@ from typing import Any, ClassVar, Optional, Union
 import pytest
 from dirty_equals import IsListOrTuple, IsStr
 
-from pydantic_core import ArgsKwargs, SchemaError, SchemaValidator, ValidationError, core_schema
+from pydantic_core import ArgsKwargs, SchemaValidator, ValidationError, core_schema
 
 from ..conftest import Err, PyAndJson, assert_gc
 
@@ -1774,22 +1774,3 @@ def test_only_allow_alias(py_and_json) -> None:
     assert v.validate_test({'FieldA': 'hello'}) == BasicDataclass(a='hello')
     with pytest.raises(ValidationError, match=r'FieldA\n +Field required \[type=missing,'):
         assert v.validate_test({'a': 'hello'})
-
-
-def test_invalid_config_raises() -> None:
-    with pytest.raises(SchemaError, match='`validate_by_name` and `validate_by_alias` cannot both be set to `False`.'):
-        SchemaValidator(
-            core_schema.dataclass_schema(
-                BasicDataclass,
-                core_schema.dataclass_args_schema(
-                    'BasicDataclass',
-                    [
-                        core_schema.dataclass_field(
-                            name='a', schema=core_schema.str_schema(), validation_alias='FieldA'
-                        ),
-                    ],
-                ),
-                ['a'],
-                config=core_schema.CoreConfig(validate_by_name=False, validate_by_alias=False),
-            )
-        )

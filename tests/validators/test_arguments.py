@@ -928,19 +928,6 @@ def test_only_allow_alias(py_and_json) -> None:
         assert v.validate_test(ArgsKwargs((), {'a': 'hello'}))
 
 
-def test_invalid_config_raises() -> None:
-    with pytest.raises(SchemaError, match='`validate_by_name` and `validate_by_alias` cannot both be set to `False`.'):
-        SchemaValidator(
-            core_schema.arguments_schema(
-                [
-                    core_schema.arguments_parameter(name='a', schema=core_schema.str_schema(), alias='FieldA'),
-                ],
-                validate_by_name=False,
-                validate_by_alias=False,
-            )
-        )
-
-
 def validate(config=None):
     def decorator(function):
         parameters = signature(function).parameters

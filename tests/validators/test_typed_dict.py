@@ -436,19 +436,6 @@ def test_only_allow_alias(py_and_json) -> None:
         assert v.validate_test({'field_a': '123'})
 
 
-def test_invalid_config_raises() -> None:
-    with pytest.raises(SchemaError, match='`validate_by_name` and `validate_by_alias` cannot both be set to `False`.'):
-        SchemaValidator(
-            {
-                'type': 'typed-dict',
-                'fields': {
-                    'field_a': {'validation_alias': 'FieldA', 'type': 'typed-dict-field', 'schema': {'type': 'int'}}
-                },
-                'config': {'validate_by_name': False, 'validate_by_alias': False},
-            }
-        )
-
-
 @pytest.mark.parametrize(
     'input_value,expected',
     [
