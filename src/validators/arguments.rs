@@ -11,7 +11,7 @@ use crate::build_tools::py_schema_err;
 use crate::build_tools::{schema_or_config_same, ExtraBehavior};
 use crate::errors::{ErrorTypeDefaults, ValError, ValLineError, ValResult};
 use crate::input::{Arguments, BorrowInput, Input, KeywordArgs, PositionalArgs, ValidationMatch};
-use crate::lookup_key::get_lookup_key;
+use crate::lookup_key::LookupKeyCollection;
 use crate::tools::SchemaDict;
 
 use super::validation_state::ValidationState;
@@ -44,7 +44,7 @@ struct Parameter {
     name: String,
     kwarg_key: Option<Py<PyString>>,
     validator: CombinedValidator,
-    alias: Option<Py<PyAny>>,
+    lookup_key_collection: LookupKeyCollection,
     mode: String,
 }
 
@@ -57,8 +57,8 @@ pub struct ArgumentsValidator {
     var_kwargs_validator: Option<Box<CombinedValidator>>,
     loc_by_alias: bool,
     extra: ExtraBehavior,
-    validate_by_alias: bool,
-    validate_by_name: bool,
+    validate_by_alias: Option<bool>,
+    validate_by_name: Option<bool>,
 }
 
 impl BuildValidator for ArgumentsValidator {
@@ -126,12 +126,16 @@ impl BuildValidator for ArgumentsValidator {
             } else if has_default {
                 had_default_arg = true;
             }
+
+            let validation_alias = arg.get_item(intern!(py, "alias"))?;
+            let lookup_key_collection = LookupKeyCollection::new(py, validation_alias, name.as_str())?;
+
             parameters.push(Parameter {
                 positional,
                 name,
                 kwarg_key,
                 validator,
-                alias: arg.get_item(intern!(py, "alias"))?.map(std::convert::Into::into),
+                lookup_key_collection,
                 mode: mode.to_string(),
             });
         }
@@ -163,8 +167,8 @@ impl BuildValidator for ArgumentsValidator {
             var_kwargs_validator,
             loc_by_alias: config.get_as(intern!(py, "loc_by_alias"))?.unwrap_or(true),
             extra: ExtraBehavior::from_schema_or_config(py, schema, config, ExtraBehavior::Forbid)?,
-            validate_by_alias: schema_or_config_same(schema, config, intern!(py, "validate_by_alias"))?.unwrap_or(true),
-            validate_by_name: schema_or_config_same(schema, config, intern!(py, "validate_by_name"))?.unwrap_or(false),
+            validate_by_alias: schema_or_config_same(schema, config, intern!(py, "validate_by_alias"))?,
+            validate_by_name: schema_or_config_same(schema, config, intern!(py, "validate_by_name"))?,
         }
         .into())
     }
@@ -193,7 +197,7 @@ impl Validator for ArgumentsValidator {
         let mut output_args: Vec<PyObject> = Vec::with_capacity(self.positional_params_count);
         let output_kwargs = PyDict::new(py);
         let mut errors: Vec<ValLineError> = Vec::new();
-        let mut used_kwargs: AHashSet<String> = AHashSet::with_capacity(self.parameters.len());
+        let mut used_kwargs: AHashSet<&str> = AHashSet::with_capacity(self.parameters.len());
 
         let validate_by_alias = state.validate_by_alias_or(self.validate_by_alias);
         let validate_by_name = state.validate_by_name_or(self.validate_by_name);
@@ -209,19 +213,17 @@ impl Validator for ArgumentsValidator {
             let mut kw_value = None;
             let mut kw_lookup_key = None;
             if parameter.mode == "keyword_only" || parameter.mode == "positional_or_keyword" {
-                kw_lookup_key = Some(get_lookup_key(
-                    py,
-                    parameter.alias.as_ref(),
-                    validate_by_name,
-                    validate_by_alias,
-                    &parameter.name,
-                )?);
+                kw_lookup_key = Some(
+                    parameter
+                        .lookup_key_collection
+                        .select(validate_by_alias, validate_by_name)?,
+                );
             }
 
             if let Some(kwargs) = args.kwargs() {
-                if let Some(ref lookup_key) = kw_lookup_key {
+                if let Some(lookup_key) = kw_lookup_key {
                     if let Some((lookup_path, value)) = kwargs.get_item(lookup_key)? {
-                        used_kwargs.insert(lookup_path.first_key().to_string());
+                        used_kwargs.insert(lookup_path.first_key());
                         kw_value = Some((lookup_path, value));
                     }
                 }

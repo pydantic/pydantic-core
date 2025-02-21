@@ -543,17 +543,6 @@ def test_only_allow_alias(py_and_json) -> None:
         assert v.validate_test({'field_a': '123'})
 
 
-def test_invalid_config_raises() -> None:
-    with pytest.raises(SchemaError, match='`validate_by_name` and `validate_by_alias` cannot both be set to `False`.'):
-        SchemaValidator(
-            {
-                'type': 'model-fields',
-                'fields': {'field_a': {'validation_alias': 'FieldA', 'type': 'model-field', 'schema': {'type': 'int'}}},
-            },
-            config=CoreConfig(validate_by_name=False, validate_by_alias=False),
-        )
-
-
 @pytest.mark.parametrize(
     'input_value,expected',
     [
@@ -1767,3 +1756,51 @@ def test_extra_behavior_ignore(config: Union[core_schema.CoreConfig, None], sche
         }
     ]
     assert 'not_f' not in m
+
+
+@pytest.mark.parametrize('config_by_alias', [None, True, False])
+@pytest.mark.parametrize('config_by_name', [None, True, False])
+@pytest.mark.parametrize('runtime_by_alias', [None, True, False])
+@pytest.mark.parametrize('runtime_by_name', [None, True, False])
+def test_by_alias_and_name_config_interaction(
+    config_by_alias: Union[bool, None],
+    config_by_name: Union[bool, None],
+    runtime_by_alias: Union[bool, None],
+    runtime_by_name: Union[bool, None],
+) -> None:
+    """This test reflects the priority that applies for config vs runtime validation alias configuration.
+
+    Runtime values take precedence over config values, when set.
+    By default, by_alias is True and by_name is False.
+    """
+
+    if config_by_alias is False and config_by_name is False and runtime_by_alias is False and runtime_by_name is False:
+        pytest.skip("Can't have both by_alias and by_name as effectively False")
+
+    class Model:
+        def __init__(self, a: int) -> None:
+            self.a = a
+
+    core_config = {
+        **({'validate_by_alias': config_by_alias} if config_by_alias is not None else {}),
+        **({'validate_by_name': config_by_name} if config_by_name is not None else {}),
+    }
+
+    schema = core_schema.model_schema(
+        Model,
+        core_schema.model_fields_schema(
+            {
+                'a': core_schema.model_field(core_schema.int_schema(), validation_alias='A'),
+            }
+        ),
+        config=core_schema.CoreConfig(**core_config),
+    )
+    s = SchemaValidator(schema)
+
+    alias_allowed = next(x for x in (runtime_by_alias, config_by_alias, True) if x is not None)
+    name_allowed = next(x for x in (runtime_by_name, config_by_name, False) if x is not None)
+
+    if alias_allowed:
+        assert s.validate_python({'A': 1}, by_alias=runtime_by_alias, by_name=runtime_by_name).a == 1
+    if name_allowed:
+        assert s.validate_python({'a': 1}, by_alias=runtime_by_alias, by_name=runtime_by_name).a == 1

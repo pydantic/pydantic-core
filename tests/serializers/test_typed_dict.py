@@ -349,7 +349,7 @@ def test_extra_custom_serializer():
         (None, None, {'a': 1}),
     ],
 )
-def test_alias_by_config_via_runtime_setting(config, runtime, expected) -> None:
+def test_by_alias_and_name_config_interaction(config, runtime, expected) -> None:
     """This test reflects the priority that applies for config vs runtime serialization alias configuration.
 
     If the runtime value (by_alias) is set, that value is used.
@@ -365,5 +365,5 @@ def test_alias_by_config_via_runtime_setting(config, runtime, expected) -> None:
             'a': core_schema.typed_dict_field(core_schema.int_schema(), serialization_alias='A'),
         },
     )
-    s = SchemaSerializer(schema, config=core_schema.CoreConfig(serialize_by_alias=config) if config is not None else {})
+    s = SchemaSerializer(schema, config=core_schema.CoreConfig(serialize_by_alias=config or False))
     assert s.to_python(Model(a=1), by_alias=runtime) == expected

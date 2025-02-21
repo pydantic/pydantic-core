@@ -12,7 +12,7 @@ use crate::errors::{ErrorType, ErrorTypeDefaults, ValError, ValLineError, ValRes
 use crate::input::{
     input_as_python_instance, Arguments, BorrowInput, Input, InputType, KeywordArgs, PositionalArgs, ValidationMatch,
 };
-use crate::lookup_key::get_lookup_key;
+use crate::lookup_key::LookupKeyCollection;
 use crate::tools::SchemaDict;
 use crate::validators::function::convert_err;
 
@@ -27,7 +27,7 @@ struct Field {
     py_name: Py<PyString>,
     init: bool,
     init_only: bool,
-    alias: Option<Py<PyAny>>,
+    lookup_key_collection: LookupKeyCollection,
     validator: CombinedValidator,
     frozen: bool,
 }
@@ -42,8 +42,8 @@ pub struct DataclassArgsValidator {
     extra_behavior: ExtraBehavior,
     extras_validator: Option<Box<CombinedValidator>>,
     loc_by_alias: bool,
-    validate_by_alias: bool,
-    validate_by_name: bool,
+    validate_by_alias: Option<bool>,
+    validate_by_name: Option<bool>,
 }
 
 impl BuildValidator for DataclassArgsValidator {
@@ -93,13 +93,14 @@ impl BuildValidator for DataclassArgsValidator {
                 positional_count += 1;
             }
 
+            let validation_alias = field.get_item(intern!(py, "validation_alias"))?;
+            let lookup_key_collection = LookupKeyCollection::new(py, validation_alias, name.as_str())?;
+
             fields.push(Field {
                 kw_only,
                 name,
                 py_name: py_name.into(),
-                alias: field
-                    .get_item(intern!(py, "validation_alias"))?
-                    .map(std::convert::Into::into),
+                lookup_key_collection,
                 validator,
                 init: field.get_as(intern!(py, "init"))?.unwrap_or(true),
                 init_only: field.get_as(intern!(py, "init_only"))?.unwrap_or(false),
@@ -124,8 +125,8 @@ impl BuildValidator for DataclassArgsValidator {
             extra_behavior,
             extras_validator,
             loc_by_alias: config.get_as(intern!(py, "loc_by_alias"))?.unwrap_or(true),
-            validate_by_alias: config.get_as(intern!(py, "validate_by_alias"))?.unwrap_or(true),
-            validate_by_name: config.get_as(intern!(py, "validate_by_name"))?.unwrap_or(false),
+            validate_by_alias: config.get_as(intern!(py, "validate_by_alias"))?,
+            validate_by_name: config.get_as(intern!(py, "validate_by_name"))?,
         }
         .into())
     }
@@ -151,7 +152,7 @@ impl Validator for DataclassArgsValidator {
         let mut init_only_args = self.init_only_count.map(Vec::with_capacity);
 
         let mut errors: Vec<ValLineError> = Vec::new();
-        let mut used_keys: AHashSet<String> = AHashSet::with_capacity(self.fields.len());
+        let mut used_keys: AHashSet<&str> = AHashSet::with_capacity(self.fields.len());
 
         let state = &mut state.rebind_extra(|extra| extra.data = Some(output_dict.clone()));
 
@@ -200,17 +201,14 @@ impl Validator for DataclassArgsValidator {
                 }
             }
 
-            let lookup_key = get_lookup_key(
-                py,
-                field.alias.as_ref(),
-                validate_by_name,
-                validate_by_alias,
-                &field.name,
-            )?;
+            let lookup_key = field
+                .lookup_key_collection
+                .select(validate_by_alias, validate_by_name)?;
+
             let mut kw_value = None;
             if let Some(kwargs) = args.kwargs() {
-                if let Some((lookup_path, value)) = kwargs.get_item(&lookup_key)? {
-                    used_keys.insert(lookup_path.first_key().to_string());
+                if let Some((lookup_path, value)) = kwargs.get_item(lookup_key)? {
+                    used_keys.insert(lookup_path.first_key());
                     kw_value = Some((lookup_path, value));
                 }
             }

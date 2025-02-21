@@ -8,7 +8,7 @@ from typing import Any, ClassVar, Optional, Union
 import pytest
 from dirty_equals import IsListOrTuple, IsStr
 
-from pydantic_core import ArgsKwargs, SchemaError, SchemaValidator, ValidationError, core_schema
+from pydantic_core import ArgsKwargs, SchemaValidator, ValidationError, core_schema
 
 from ..conftest import Err, PyAndJson, assert_gc
 
@@ -1776,20 +1776,55 @@ def test_only_allow_alias(py_and_json) -> None:
         assert v.validate_test({'a': 'hello'})
 
 
-def test_invalid_config_raises() -> None:
-    with pytest.raises(SchemaError, match='`validate_by_name` and `validate_by_alias` cannot both be set to `False`.'):
-        SchemaValidator(
-            core_schema.dataclass_schema(
-                BasicDataclass,
-                core_schema.dataclass_args_schema(
-                    'BasicDataclass',
-                    [
-                        core_schema.dataclass_field(
-                            name='a', schema=core_schema.str_schema(), validation_alias='FieldA'
-                        ),
-                    ],
-                ),
-                ['a'],
-                config=core_schema.CoreConfig(validate_by_name=False, validate_by_alias=False),
-            )
-        )
+@pytest.mark.parametrize('config_by_alias', [None, True, False])
+@pytest.mark.parametrize('config_by_name', [None, True, False])
+@pytest.mark.parametrize('runtime_by_alias', [None, True, False])
+@pytest.mark.parametrize('runtime_by_name', [None, True, False])
+def test_by_alias_and_name_config_interaction(
+    config_by_alias: Union[bool, None],
+    config_by_name: Union[bool, None],
+    runtime_by_alias: Union[bool, None],
+    runtime_by_name: Union[bool, None],
+) -> None:
+    """This test reflects the priority that applies for config vs runtime validation alias configuration.
+
+    Runtime values take precedence over config values, when set.
+    By default, by_alias is True and by_name is False.
+    """
+
+    if config_by_alias is False and config_by_name is False and runtime_by_alias is False and runtime_by_name is False:
+        pytest.skip("Can't have both by_alias and by_name as effectively False")
+
+    core_config = {
+        **({'validate_by_alias': config_by_alias} if config_by_alias is not None else {}),
+        **({'validate_by_name': config_by_name} if config_by_name is not None else {}),
+    }
+
+    @dataclasses.dataclass
+    class MyDataclass:
+        a: int
+
+    schema = core_schema.dataclass_schema(
+        MyDataclass,
+        core_schema.dataclass_args_schema(
+            'MyDataclass',
+            [
+                core_schema.dataclass_field(name='a', schema=core_schema.int_schema(), validation_alias='A'),
+            ],
+        ),
+        ['a'],
+        config=core_schema.CoreConfig(**core_config),
+    )
+    s = SchemaValidator(schema)
+
+    alias_allowed = next(x for x in (runtime_by_alias, config_by_alias, True) if x is not None)
+    name_allowed = next(x for x in (runtime_by_name, config_by_name, False) if x is not None)
+
+    if alias_allowed:
+        assert dataclasses.asdict(s.validate_python({'A': 1}, by_alias=runtime_by_alias, by_name=runtime_by_name)) == {
+            'a': 1
+        }
+    if name_allowed:
+        assert dataclasses.asdict(s.validate_python({'a': 1}, by_alias=runtime_by_alias, by_name=runtime_by_name)) == {
+            'a': 1
+        }
