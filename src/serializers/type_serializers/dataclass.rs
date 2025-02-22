@@ -37,7 +37,7 @@ impl BuildSerializer for DataclassArgsBuilder {
             _ => FieldsMode::SimpleDict,
         };
 
-        let serialize_by_alias = config.get_as(intern!(py, "serialize_by_alias"))?.unwrap_or(false);
+        let serialize_by_alias = config.get_as(intern!(py, "serialize_by_alias"))?;
 
         for (index, item) in fields_list.iter().enumerate() {
             let field_info = item.downcast::<PyDict>()?;

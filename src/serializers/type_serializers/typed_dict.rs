@@ -32,7 +32,7 @@ impl BuildSerializer for TypedDictBuilder {
             _ => FieldsMode::SimpleDict,
         };
 
-        let serialize_by_alias = config.get_as(intern!(py, "serialize_by_alias"))?.unwrap_or(false);
+        let serialize_by_alias = config.get_as(intern!(py, "serialize_by_alias"))?;
 
         let fields_dict: Bound<'_, PyDict> = schema.get_as_req(intern!(py, "fields"))?;
         let mut fields: AHashMap<String, SerField> = AHashMap::with_capacity(fields_dict.len());

@@ -47,7 +47,7 @@ impl BuildSerializer for ModelFieldsBuilder {
             (_, _) => None,
         };
 
-        let serialize_by_alias = config.get_as(intern!(py, "serialize_by_alias"))?.unwrap_or(false);
+        let serialize_by_alias = config.get_as(intern!(py, "serialize_by_alias"))?;
 
         for (key, value) in fields_dict {
             let key_py = key.downcast_into::<PyString>()?;

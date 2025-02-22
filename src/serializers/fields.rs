@@ -29,7 +29,7 @@ pub(super) struct SerField {
     // None serializer means exclude
     pub serializer: Option<CombinedSerializer>,
     pub required: bool,
-    pub serialize_by_alias: bool,
+    pub serialize_by_alias: Option<bool>,
 }
 
 impl_py_gc_traverse!(SerField { serializer });
@@ -41,7 +41,7 @@ impl SerField {
         alias: Option<String>,
         serializer: Option<CombinedSerializer>,
         required: bool,
-        serialize_by_alias: bool,
+        serialize_by_alias: Option<bool>,
     ) -> Self {
         let alias_py = alias.as_ref().map(|alias| PyString::new(py, alias.as_str()).into());
         Self {
