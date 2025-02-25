@@ -72,8 +72,8 @@ class CoreConfig(TypedDict, total=False):
         regex_engine: The regex engine to use for regex pattern validation. Default is 'rust-regex'. See `StringSchema`.
         cache_strings: Whether to cache strings. Default is `True`, `True` or `'all'` is required to cache strings
             during general validation since validators don't know if they're in a key or a value.
-        validate_by_alias: Whether to validate by alias. Default is `True`.
-        validate_by_name: Whether to validate by attribute name. Default is `False`. Replacement for `populate_by_name`.
+        validate_by_alias: Whether to use the field's alias when validating against the provided input data. Default is `True`.
+        validate_by_name: Whether to use the field's name when validating against the provided input data. Default is `False`. Replacement for `populate_by_name`.
         serialize_by_alias: Whether to serialize by alias. Default is `False`, expected to change to `True` in V3.
     """
 
