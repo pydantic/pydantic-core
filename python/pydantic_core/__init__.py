@@ -89,11 +89,16 @@ class ErrorDetails(_TypedDict):
     Values which are required to render the error message, and could hence be useful in rendering custom error messages.
     Also useful for passing custom error data forward.
     """
+    url: _NotRequired[str]
+    """
+    The documentation URL giving information about the error. No URL is available if
+    a [`PydanticCustomError`][pydantic_core.PydanticCustomError] is used.
+    """
 
 
 class InitErrorDetails(_TypedDict):
     type: str | PydanticCustomError
-    """The type of error that occurred, this should a "slug" identifier that changes rarely or never."""
+    """The type of error that occurred, this should be a "slug" identifier that changes rarely or never."""
     loc: _NotRequired[tuple[int | str, ...]]
     """Tuple of strings and ints identifying where in the schema the error occurred."""
     input: _Any
