@@ -1,5 +1,4 @@
 import json
-import platform
 import re
 import sys
 from collections import deque
