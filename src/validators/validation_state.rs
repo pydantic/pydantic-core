@@ -65,11 +65,11 @@ impl<'a, 'py> ValidationState<'a, 'py> {
     }
 
     pub fn validate_by_alias_or(&self, default: Option<bool>) -> bool {
-        self.extra.by_alias.unwrap_or(default.unwrap_or(true))
+        self.extra.by_alias.or(default).unwrap_or(true)
     }
 
     pub fn validate_by_name_or(&self, default: Option<bool>) -> bool {
-        self.extra.by_name.unwrap_or(default.unwrap_or(false))
+        self.extra.by_name.or(default).unwrap_or(false)
     }
 
     /// Sets the exactness to the lower of the current exactness

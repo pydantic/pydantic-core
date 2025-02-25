@@ -206,7 +206,7 @@ impl<'a> Extra<'a> {
     }
 
     pub fn serialize_by_alias_or(&self, serialize_by_alias: Option<bool>) -> bool {
-        self.by_alias.unwrap_or(serialize_by_alias.unwrap_or(false))
+        self.by_alias.or(serialize_by_alias).unwrap_or(false)
     }
 }
 
