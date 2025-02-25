@@ -3467,8 +3467,8 @@ def arguments_schema(
 
     Args:
         arguments: The arguments to use for the arguments schema
-        validate_by_name: Whether to populate by argument names, defaults to False.
-        validate_by_alias: Whether to populate by argument aliases, defaults to True.
+        validate_by_name: Whether to populate by the parameter names, defaults to False.
+        validate_by_alias: Whether to populate by parameter aliases, defaults to True.
         var_args_schema: The variable args schema to use for the arguments schema
         var_kwargs_mode: The validation mode to use for variadic keyword arguments. If `'uniform'`, every value of the
             keyword arguments will be validated against the `var_kwargs_schema` schema. If `'unpacked-typed-dict'`,
