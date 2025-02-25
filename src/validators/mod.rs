@@ -21,6 +21,7 @@ pub(crate) use config::ValBytesMode;
 
 mod any;
 mod arguments;
+mod arguments_v2;
 mod bool;
 mod bytes;
 mod call;
@@ -636,6 +637,7 @@ pub fn build_validator(
         callable::CallableValidator,
         // arguments
         arguments::ArgumentsValidator,
+        arguments_v2::ArgumentsV2Validator,
         // default value
         with_default::WithDefaultValidator,
         // chain validators
@@ -802,6 +804,7 @@ pub enum CombinedValidator {
     Callable(callable::CallableValidator),
     // arguments
     Arguments(arguments::ArgumentsValidator),
+    ArgumentsV2(arguments_v2::ArgumentsV2Validator),
     // default value
     WithDefault(with_default::WithDefaultValidator),
     // chain validators
