@@ -823,6 +823,12 @@ impl<'py> ValidatedDict<'py> for GenericPyMapping<'_, 'py> {
     where
         Self: 'a;
 
+    fn should_consume_model_input_by_get_item(&self) -> bool {
+        // Backwards compatibility; in v2 we used get_item rather than iteration and changing this
+        // might have implications for dict / mapping behaviour
+        true
+    }
+
     fn get_item<'k>(
         &self,
         key: &'k crate::lookup_key::LookupKey,

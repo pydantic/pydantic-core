@@ -305,6 +305,11 @@ impl<'py> ValidatedDict<'py> for StringMappingDict<'py> {
         = StringMapping<'py>
     where
         Self: 'a;
+
+    fn should_consume_model_input_by_get_item(&self) -> bool {
+        true
+    }
+
     fn get_item<'k>(&self, key: &'k LookupKey) -> ValResult<Option<(&'k LookupPath, Self::Item<'_>)>> {
         key.py_get_string_mapping_item(&self.0)
     }
