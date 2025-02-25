@@ -240,15 +240,15 @@ def test_dataclass_initvar_not_required_on_union_ser() -> None:
 @pytest.mark.parametrize(
     'config,runtime,expected',
     [
-        (True, True, {'A': 'hello'}),
-        (True, False, {'a': 'hello'}),
-        (True, None, {'A': 'hello'}),
-        (False, True, {'A': 'hello'}),
-        (False, False, {'a': 'hello'}),
-        (False, None, {'a': 'hello'}),
-        (None, True, {'A': 'hello'}),
-        (None, False, {'a': 'hello'}),
-        (None, None, {'a': 'hello'}),
+        (True, True, {'my_alias': 'hello'}),
+        (True, False, {'my_field': 'hello'}),
+        (True, None, {'my_alias': 'hello'}),
+        (False, True, {'my_alias': 'hello'}),
+        (False, False, {'my_field': 'hello'}),
+        (False, None, {'my_field': 'hello'}),
+        (None, True, {'my_alias': 'hello'}),
+        (None, False, {'my_field': 'hello'}),
+        (None, None, {'my_field': 'hello'}),
     ],
 )
 def test_by_alias_and_name_config_interaction(config, runtime, expected) -> None:
@@ -261,18 +261,18 @@ def test_by_alias_and_name_config_interaction(config, runtime, expected) -> None
 
     @dataclasses.dataclass
     class Foo:
-        a: str
+        my_field: str
 
     schema = core_schema.dataclass_schema(
         Foo,
         core_schema.dataclass_args_schema(
             'Foo',
             [
-                core_schema.dataclass_field(name='a', schema=core_schema.str_schema(), serialization_alias='A'),
+                core_schema.dataclass_field(name='my_field', schema=core_schema.str_schema(), serialization_alias='my_alias'),
             ],
         ),
-        ['a'],
+        ['my_field'],
         config=core_schema.CoreConfig(serialize_by_alias=config or False),
     )
     s = SchemaSerializer(schema)
-    assert s.to_python(Foo(a='hello'), by_alias=runtime) == expected
+    assert s.to_python(Foo(my_field='hello'), by_alias=runtime) == expected

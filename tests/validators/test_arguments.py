@@ -1196,7 +1196,7 @@ def test_by_alias_and_name_config_interaction(
 
     schema = core_schema.arguments_schema(
         arguments=[
-            core_schema.arguments_parameter(name='a', schema=core_schema.int_schema(), alias='A'),
+            core_schema.arguments_parameter(name='my_field', schema=core_schema.int_schema(), alias='my_alias'),
         ],
         **({'validate_by_alias': config_by_alias} if config_by_alias is not None else {}),
         **({'validate_by_name': config_by_name} if config_by_name is not None else {}),
@@ -1207,12 +1207,12 @@ def test_by_alias_and_name_config_interaction(
     name_allowed = next(x for x in (runtime_by_name, config_by_name, False) if x is not None)
 
     if alias_allowed:
-        assert s.validate_python(ArgsKwargs((), {'A': 1}), by_alias=runtime_by_alias, by_name=runtime_by_name) == (
+        assert s.validate_python(ArgsKwargs((), {'my_alias': 1}), by_alias=runtime_by_alias, by_name=runtime_by_name) == (
             (),
-            {'a': 1},
+            {'my_field': 1},
         )
     if name_allowed:
-        assert s.validate_python(ArgsKwargs((), {'a': 1}), by_alias=runtime_by_alias, by_name=runtime_by_name) == (
+        assert s.validate_python(ArgsKwargs((), {'my_field': 1}), by_alias=runtime_by_alias, by_name=runtime_by_name) == (
             (),
-            {'a': 1},
+            {'my_field': 1},
         )

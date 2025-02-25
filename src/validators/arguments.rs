@@ -212,7 +212,7 @@ impl Validator for ArgumentsValidator {
             }
             let mut kw_value = None;
             let mut kw_lookup_key = None;
-            if matches!(parameter.mode, "keyword_only" | "positional_or_keyword") {
+            if matches!(parameter.mode.as_str(), "keyword_only" | "positional_or_keyword") {
                 kw_lookup_key = Some(
                     parameter
                         .lookup_key_collection

@@ -338,15 +338,15 @@ def test_extra_custom_serializer():
 @pytest.mark.parametrize(
     'config,runtime,expected',
     [
-        (True, True, {'A': 1}),
-        (True, False, {'a': 1}),
-        (True, None, {'A': 1}),
-        (False, True, {'A': 1}),
-        (False, False, {'a': 1}),
-        (False, None, {'a': 1}),
-        (None, True, {'A': 1}),
-        (None, False, {'a': 1}),
-        (None, None, {'a': 1}),
+        (True, True, {'my_alias': 1}),
+        (True, False, {'my_field': 1}),
+        (True, None, {'my_alias': 1}),
+        (False, True, {'my_alias': 1}),
+        (False, False, {'my_field': 1}),
+        (False, None, {'my_field': 1}),
+        (None, True, {'my_alias': 1}),
+        (None, False, {'my_field': 1}),
+        (None, None, {'my_field': 1}),
     ],
 )
 def test_by_alias_and_name_config_interaction(config, runtime, expected) -> None:
@@ -358,12 +358,12 @@ def test_by_alias_and_name_config_interaction(config, runtime, expected) -> None
     """
 
     class Model(TypedDict):
-        a: int
+        my_field: int
 
     schema = core_schema.typed_dict_schema(
         {
-            'a': core_schema.typed_dict_field(core_schema.int_schema(), serialization_alias='A'),
+            'my_field': core_schema.typed_dict_field(core_schema.int_schema(), serialization_alias='my_alias'),
         },
     )
     s = SchemaSerializer(schema, config=core_schema.CoreConfig(serialize_by_alias=config or False))
-    assert s.to_python(Model(a=1), by_alias=runtime) == expected
+    assert s.to_python(Model(my_field=1), by_alias=runtime) == expected

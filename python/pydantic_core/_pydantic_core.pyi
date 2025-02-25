@@ -211,8 +211,8 @@ class SchemaValidator:
             allow_partial: Whether to allow partial validation; if `True` errors in the last element of sequences
                 and mappings are ignored.
                 `'trailing-strings'` means any final unfinished JSON string is included in the result.
-            by_alias: Whether to use the field's alias to match the input data to an attribute.
-            by_name: Whether to use the field's name to match the input data to an attribute.
+            by_alias: Whether to use the field's alias when validating against the provided input data.
+            by_name: Whether to use the field's name when validating against the provided input data.
 
         Raises:
             ValidationError: If validation fails or if the JSON data is invalid.
@@ -246,8 +246,8 @@ class SchemaValidator:
                 If `None`, the value of [`CoreConfig.from_attributes`][pydantic_core.core_schema.CoreConfig] is used.
             context: The context to use for validation, this is passed to functional validators as
                 [`info.context`][pydantic_core.core_schema.ValidationInfo.context].
-            by_alias: Whether to use the field's alias to match the input data to an attribute.
-            by_name: Whether to use the field's name to match the input data to an attribute.
+            by_alias: Whether to use the field's alias when validating against the provided input data.
+            by_name: Whether to use the field's name when validating against the provided input data.
 
         Raises:
             ValidationError: If validation fails.

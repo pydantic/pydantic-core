@@ -1778,8 +1778,8 @@ def test_by_alias_and_name_config_interaction(
         pytest.skip("Can't have both by_alias and by_name as effectively False")
 
     class Model:
-        def __init__(self, a: int) -> None:
-            self.a = a
+        def __init__(self, my_field: int) -> None:
+            self.my_field = my_field
 
     core_config = {
         **({'validate_by_alias': config_by_alias} if config_by_alias is not None else {}),
@@ -1790,7 +1790,7 @@ def test_by_alias_and_name_config_interaction(
         Model,
         core_schema.model_fields_schema(
             {
-                'a': core_schema.model_field(core_schema.int_schema(), validation_alias='A'),
+                'my_field': core_schema.model_field(core_schema.int_schema(), validation_alias='my_alias'),
             }
         ),
         config=core_schema.CoreConfig(**core_config),
@@ -1801,6 +1801,6 @@ def test_by_alias_and_name_config_interaction(
     name_allowed = next(x for x in (runtime_by_name, config_by_name, False) if x is not None)
 
     if alias_allowed:
-        assert s.validate_python({'A': 1}, by_alias=runtime_by_alias, by_name=runtime_by_name).a == 1
+        assert s.validate_python({'my_alias': 1}, by_alias=runtime_by_alias, by_name=runtime_by_name).my_field == 1
     if name_allowed:
-        assert s.validate_python({'a': 1}, by_alias=runtime_by_alias, by_name=runtime_by_name).a == 1
+        assert s.validate_python({'my_field': 1}, by_alias=runtime_by_alias, by_name=runtime_by_name).my_field == 1

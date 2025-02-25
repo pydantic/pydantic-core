@@ -1179,15 +1179,15 @@ def test_warn_on_missing_field() -> None:
 @pytest.mark.parametrize(
     'config,runtime,expected',
     [
-        (True, True, {'A': 1}),
-        (True, False, {'a': 1}),
-        (True, None, {'A': 1}),
-        (False, True, {'A': 1}),
-        (False, False, {'a': 1}),
-        (False, None, {'a': 1}),
-        (None, True, {'A': 1}),
-        (None, False, {'a': 1}),
-        (None, None, {'a': 1}),
+        (True, True, {'my_alias': 1}),
+        (True, False, {'my_field': 1}),
+        (True, None, {'my_alias': 1}),
+        (False, True, {'my_alias': 1}),
+        (False, False, {'my_field': 1}),
+        (False, None, {'my_field': 1}),
+        (None, True, {'my_alias': 1}),
+        (None, False, {'my_field': 1}),
+        (None, None, {'my_field': 1}),
     ],
 )
 def test_by_alias_and_name_config_interaction(config, runtime, expected) -> None:
@@ -1199,14 +1199,14 @@ def test_by_alias_and_name_config_interaction(config, runtime, expected) -> None
     """
 
     class Model:
-        def __init__(self, a: int) -> None:
-            self.a = a
+        def __init__(self, my_field: int) -> None:
+            self.my_field = my_field
 
     schema = core_schema.model_schema(
         Model,
         core_schema.model_fields_schema(
             {
-                'a': core_schema.model_field(core_schema.int_schema(), serialization_alias='A'),
+                'my_field': core_schema.model_field(core_schema.int_schema(), serialization_alias='my_alias'),
             }
         ),
         config=core_schema.CoreConfig(serialize_by_alias=config or False),

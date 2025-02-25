@@ -1223,7 +1223,7 @@ def test_by_alias_and_name_config_interaction(
 
     schema = core_schema.typed_dict_schema(
         fields={
-            'a': core_schema.typed_dict_field(schema=core_schema.int_schema(), validation_alias='A'),
+            'my_field': core_schema.typed_dict_field(schema=core_schema.int_schema(), validation_alias='my_alias'),
         },
         config=core_schema.CoreConfig(**core_config),
     )
@@ -1233,6 +1233,6 @@ def test_by_alias_and_name_config_interaction(
     name_allowed = next(x for x in (runtime_by_name, config_by_name, False) if x is not None)
 
     if alias_allowed:
-        assert s.validate_python({'A': 1}, by_alias=runtime_by_alias, by_name=runtime_by_name) == {'a': 1}
+        assert s.validate_python({'my_alias': 1}, by_alias=runtime_by_alias, by_name=runtime_by_name) == {'my_field': 1}
     if name_allowed:
-        assert s.validate_python({'a': 1}, by_alias=runtime_by_alias, by_name=runtime_by_name) == {'a': 1}
+        assert s.validate_python({'my_field': 1}, by_alias=runtime_by_alias, by_name=runtime_by_name) == {'my_field': 1}
