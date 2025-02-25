@@ -1809,7 +1809,9 @@ def test_by_alias_and_name_config_interaction(
         core_schema.dataclass_args_schema(
             'MyDataclass',
             [
-                core_schema.dataclass_field(name='my_field', schema=core_schema.int_schema(), validation_alias='my_alias'),
+                core_schema.dataclass_field(
+                    name='my_field', schema=core_schema.int_schema(), validation_alias='my_alias'
+                ),
             ],
         ),
         ['my_field'],
@@ -1821,10 +1823,10 @@ def test_by_alias_and_name_config_interaction(
     name_allowed = next(x for x in (runtime_by_name, config_by_name, False) if x is not None)
 
     if alias_allowed:
-        assert dataclasses.asdict(s.validate_python({'my_alias': 1}, by_alias=runtime_by_alias, by_name=runtime_by_name)) == {
-            'my_field': 1
-        }
+        assert dataclasses.asdict(
+            s.validate_python({'my_alias': 1}, by_alias=runtime_by_alias, by_name=runtime_by_name)
+        ) == {'my_field': 1}
     if name_allowed:
-        assert dataclasses.asdict(s.validate_python({'my_field': 1}, by_alias=runtime_by_alias, by_name=runtime_by_name)) == {
-            'my_field': 1
-        }
+        assert dataclasses.asdict(
+            s.validate_python({'my_field': 1}, by_alias=runtime_by_alias, by_name=runtime_by_name)
+        ) == {'my_field': 1}

@@ -268,7 +268,9 @@ def test_by_alias_and_name_config_interaction(config, runtime, expected) -> None
         core_schema.dataclass_args_schema(
             'Foo',
             [
-                core_schema.dataclass_field(name='my_field', schema=core_schema.str_schema(), serialization_alias='my_alias'),
+                core_schema.dataclass_field(
+                    name='my_field', schema=core_schema.str_schema(), serialization_alias='my_alias'
+                ),
             ],
         ),
         ['my_field'],

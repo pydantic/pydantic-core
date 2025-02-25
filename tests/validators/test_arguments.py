@@ -1207,12 +1207,16 @@ def test_by_alias_and_name_config_interaction(
     name_allowed = next(x for x in (runtime_by_name, config_by_name, False) if x is not None)
 
     if alias_allowed:
-        assert s.validate_python(ArgsKwargs((), {'my_alias': 1}), by_alias=runtime_by_alias, by_name=runtime_by_name) == (
+        assert s.validate_python(
+            ArgsKwargs((), {'my_alias': 1}), by_alias=runtime_by_alias, by_name=runtime_by_name
+        ) == (
             (),
             {'my_field': 1},
         )
     if name_allowed:
-        assert s.validate_python(ArgsKwargs((), {'my_field': 1}), by_alias=runtime_by_alias, by_name=runtime_by_name) == (
+        assert s.validate_python(
+            ArgsKwargs((), {'my_field': 1}), by_alias=runtime_by_alias, by_name=runtime_by_name
+        ) == (
             (),
             {'my_field': 1},
         )
