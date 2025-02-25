@@ -265,6 +265,7 @@ pub trait ValidatedList<'py> {
 pub trait ValidatedTuple<'py> {
     type Item: BorrowInput<'py>;
     fn len(&self) -> Option<usize>;
+    fn try_for_each(self, f: impl FnMut(PyResult<Self::Item>) -> ValResult<()>) -> ValResult<()>;
     fn iterate<R>(self, consumer: impl ConsumeIterator<PyResult<Self::Item>, Output = R>) -> ValResult<R>;
 }
 
@@ -311,6 +312,9 @@ impl<'py> ValidatedList<'py> for Never {
 impl<'py> ValidatedTuple<'py> for Never {
     type Item = Bound<'py, PyAny>;
     fn len(&self) -> Option<usize> {
+        unreachable!()
+    }
+    fn try_for_each(self, _f: impl FnMut(PyResult<Self::Item>) -> ValResult<()>) -> ValResult<()> {
         unreachable!()
     }
     fn iterate<R>(self, _consumer: impl ConsumeIterator<PyResult<Self::Item>, Output = R>) -> ValResult<R> {
