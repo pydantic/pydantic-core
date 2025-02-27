@@ -2,6 +2,9 @@ use std::fmt;
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use pyo3::types::PyString;
+
+use crate::tools::truncate_safe_repr;
 
 use serde::ser;
 
@@ -44,9 +47,9 @@ pub(super) fn se_err_py_err(error: PythonSerializerError) -> PyErr {
     let s = error.to_string();
     if let Some(msg) = s.strip_prefix(UNEXPECTED_TYPE_SER_MARKER) {
         if msg.is_empty() {
-            PydanticSerializationUnexpectedValue::new_err(None)
+            PydanticSerializationUnexpectedValue::new_from_msg(None)
         } else {
-            PydanticSerializationUnexpectedValue::new_err(Some(msg.to_string()))
+            PydanticSerializationUnexpectedValue::new_from_msg(Some(msg.to_string()))
         }
     } else if let Some(msg) = s.strip_prefix(SERIALIZATION_ERR_MARKER) {
         PydanticSerializationError::new_err(msg.to_string())
@@ -94,30 +97,57 @@ impl PydanticSerializationError {
 #[derive(Debug, Clone)]
 pub struct PydanticSerializationUnexpectedValue {
     message: Option<String>,
+    field_type: Option<String>,
+    input_value: Option<PyObject>,
 }
 
 impl PydanticSerializationUnexpectedValue {
-    pub(crate) fn new_err(msg: Option<String>) -> PyErr {
-        PyErr::new::<Self, Option<String>>(msg)
+    pub fn new_from_msg(message: Option<String>) -> PyErr {
+        PyErr::new::<Self, (Option<String>, Option<String>, Option<PyObject>)>((message, None, None))
+    }
+
+    pub fn new_from_parts(field_type: String, input_value: PyObject) -> PyErr {
+        PyErr::new::<Self, (Option<String>, Option<String>, Option<PyObject>)>((
+            None,
+            Some(field_type),
+            Some(input_value),
+        ))
     }
 }
 
 #[pymethods]
 impl PydanticSerializationUnexpectedValue {
     #[new]
-    #[pyo3(signature = (message=None))]
-    fn py_new(message: Option<String>) -> Self {
-        Self { message }
-    }
-
-    fn __str__(&self) -> &str {
-        match self.message {
-            Some(ref s) => s,
-            None => "Unexpected Value",
+    #[pyo3(signature = (message=None, field_type=None, input_value=None))]
+    fn py_new(message: Option<String>, field_type: Option<String>, input_value: Option<PyObject>) -> Self {
+        Self {
+            message,
+            field_type,
+            input_value,
         }
     }
 
-    pub(crate) fn __repr__(&self) -> String {
-        format!("PydanticSerializationUnexpectedValue({})", self.__str__())
+    fn __str__(&self, py: Python) -> String {
+        match &self.message {
+            Some(s) => s.to_string(),
+            None => match (&self.field_type, &self.input_value) {
+                (Some(ref field_type), Some(ref input_value)) => {
+                    let bound_input = input_value.bind(py);
+
+                    let type_name = bound_input
+                        .get_type()
+                        .qualname()
+                        .unwrap_or_else(|_| PyString::new(py, "<unknown python object>"));
+
+                    let value_str = truncate_safe_repr(bound_input, None);
+                    format!("Expected `{field_type}` but got `{type_name}` with value `{value_str}` - serialized value may not be as expected")
+                }
+                _ => "Unexpected value - serialized value may not be as expected".to_string(),
+            },
+        }
+    }
+
+    pub(crate) fn __repr__(&self, py: Python) -> String {
+        format!("PydanticSerializationUnexpectedValue({})", self.__str__(py))
     }
 }

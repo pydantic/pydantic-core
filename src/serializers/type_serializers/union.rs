@@ -111,7 +111,7 @@ fn union_serialize<S>(
     // care of the formatting for us
     else if !errors.is_empty() {
         let message = errors.iter().map(ToString::to_string).collect::<Vec<_>>().join("\n");
-        return Err(PydanticSerializationUnexpectedValue::new_err(Some(message)));
+        return Err(PydanticSerializationUnexpectedValue::new_from_msg(Some(message)));
     }
 
     Ok(None)

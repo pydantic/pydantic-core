@@ -202,7 +202,7 @@ impl GeneralFieldsSerializer {
                     output_dict.set_item(key, value)?;
                 } else if field_extra.check == SerCheck::Strict {
                     let type_name = field_extra.model_type_name();
-                    return Err(PydanticSerializationUnexpectedValue::new_err(Some(format!(
+                    return Err(PydanticSerializationUnexpectedValue::new_from_msg(Some(format!(
                         "Unexpected field `{key}`{for_type_name}",
                         for_type_name = if let Some(type_name) = type_name {
                             format!(" for type `{type_name}`")
@@ -227,7 +227,7 @@ impl GeneralFieldsSerializer {
                 None => "<unknown python object>".to_string(),
             };
 
-            Err(PydanticSerializationUnexpectedValue::new_err(Some(format!(
+            Err(PydanticSerializationUnexpectedValue::new_from_msg(Some(format!(
                 "Expected {required_fields} fields but got {used_req_fields}{for_type_name} with value `{field_value}` - serialized value may not be as expected.",
                 for_type_name = if let Some(type_name) = type_name { format!(" for type `{type_name}`") } else { String::new() },
             ))))

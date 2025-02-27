@@ -34,7 +34,7 @@ fn downcast_date_reject_datetime<'a, 'py>(py_date: &'a Bound<'py, PyAny>) -> PyR
         }
     }
 
-    Err(PydanticSerializationUnexpectedValue::new_err(None))
+    Err(PydanticSerializationUnexpectedValue::new_from_msg(None))
 }
 
 macro_rules! build_serializer {

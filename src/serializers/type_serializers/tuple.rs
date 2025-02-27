@@ -214,7 +214,7 @@ impl TupleSerializer {
                 .chain(self.serializers[variadic_item_index + 1..].iter());
             use_serializers!(serializers_iter);
         } else if extra.check == SerCheck::Strict && n_items != self.serializers.len() {
-            return Err(PydanticSerializationUnexpectedValue::new_err(Some(format!(
+            return Err(PydanticSerializationUnexpectedValue::new_from_msg(Some(format!(
                 "Expected {} items, but got {}",
                 self.serializers.len(),
                 n_items

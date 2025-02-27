@@ -3,6 +3,7 @@ use std::ffi::CString;
 use std::fmt;
 use std::sync::Mutex;
 
+use crate::tools::truncate_safe_repr;
 use pyo3::exceptions::{PyTypeError, PyUserWarning, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyString};
@@ -17,7 +18,6 @@ use crate::recursion_guard::ContainsRecursionState;
 use crate::recursion_guard::RecursionError;
 use crate::recursion_guard::RecursionGuard;
 use crate::recursion_guard::RecursionState;
-use crate::tools::truncate_safe_repr;
 use crate::PydanticSerializationError;
 
 /// this is ugly, would be much better if extra could be stored in `SerializationState`
@@ -415,15 +415,10 @@ impl CollectWarnings {
         if value.is_none() {
             Ok(())
         } else if extra.check.enabled() {
-            let type_name = value
-                .get_type()
-                .qualname()
-                .unwrap_or_else(|_| PyString::new(value.py(), "<unknown python object>"));
-
-            let value_str = truncate_safe_repr(value, None);
-            Err(PydanticSerializationUnexpectedValue::new_err(Some(format!(
-                "Expected `{field_type}` but got `{type_name}` with value `{value_str}` - serialized value may not be as expected"
-            ))))
+            Err(PydanticSerializationUnexpectedValue::new_from_parts(
+                field_type.to_string(),
+                value.clone().unbind(),
+            ))
         } else {
             self.fallback_warning(field_type, value);
             Ok(())
