@@ -1171,7 +1171,9 @@ def test_warn_on_missing_field() -> None:
         )
     )
 
-    with pytest.warns(UserWarning, match='Expected 2 fields but got 1 for type `.*AModel` with value `.*`.+'):
+    with pytest.warns(
+        UserWarning, match='Expected 2 fields but got 1. Expected `AModel` but got `AModel` with value `.*`.+'
+    ):
         value = BasicModel(root=AModel(type='a'))
         s.to_python(value)
 
