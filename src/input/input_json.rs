@@ -589,6 +589,12 @@ impl<'a, 'data> ValidatedTuple<'_> for &'a JsonArray<'data> {
     fn len(&self) -> Option<usize> {
         Some(Vec::len(self))
     }
+    fn try_for_each(self, mut f: impl FnMut(PyResult<Self::Item>) -> ValResult<()>) -> ValResult<()> {
+        for item in self.iter() {
+            f(Ok(item))?;
+        }
+        Ok(())
+    }
     fn iterate<R>(self, consumer: impl ConsumeIterator<PyResult<Self::Item>, Output = R>) -> ValResult<R> {
         Ok(consumer.consume_iterator(self.iter().map(Ok)))
     }

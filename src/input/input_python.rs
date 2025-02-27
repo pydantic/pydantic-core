@@ -925,7 +925,15 @@ impl<'py> PySequenceIterable<'_, 'py> {
             PySequenceIterable::Iterator(iter) => iter.len().ok(),
         }
     }
-
+    fn generic_try_for_each(self, f: impl FnMut(PyResult<Bound<'py, PyAny>>) -> ValResult<()>) -> ValResult<()> {
+        match self {
+            PySequenceIterable::List(iter) => iter.iter().map(Ok).try_for_each(f),
+            PySequenceIterable::Tuple(iter) => iter.iter().map(Ok).try_for_each(f),
+            PySequenceIterable::Set(iter) => iter.iter().map(Ok).try_for_each(f),
+            PySequenceIterable::FrozenSet(iter) => iter.iter().map(Ok).try_for_each(f),
+            PySequenceIterable::Iterator(mut iter) => iter.try_for_each(f),
+        }
+    }
     fn generic_iterate<R>(
         self,
         consumer: impl ConsumeIterator<PyResult<Bound<'py, PyAny>>, Output = R>,
@@ -960,6 +968,9 @@ impl<'py> ValidatedTuple<'py> for PySequenceIterable<'_, 'py> {
     type Item = Bound<'py, PyAny>;
     fn len(&self) -> Option<usize> {
         self.generic_len()
+    }
+    fn try_for_each(self, f: impl FnMut(PyResult<Self::Item>) -> ValResult<()>) -> ValResult<()> {
+        self.generic_try_for_each(f)
     }
     fn iterate<R>(self, consumer: impl ConsumeIterator<PyResult<Self::Item>, Output = R>) -> ValResult<R> {
         self.generic_iterate(consumer)

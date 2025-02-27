@@ -10,7 +10,9 @@ use pyo3::IntoPyObjectExt;
 use crate::build_tools::py_schema_err;
 use crate::build_tools::{schema_or_config_same, ExtraBehavior};
 use crate::errors::{ErrorTypeDefaults, ValError, ValLineError, ValResult};
-use crate::input::{Arguments, BorrowInput, Input, KeywordArgs, PositionalArgs, ValidatedDict, ValidationMatch};
+use crate::input::{
+    Arguments, BorrowInput, Input, KeywordArgs, PositionalArgs, ValidatedDict, ValidatedTuple, ValidationMatch,
+};
 use crate::lookup_key::LookupKey;
 use crate::tools::SchemaDict;
 
@@ -209,11 +211,29 @@ impl ArgumentsV3Validator {
                             Err(err) => return Err(err),
                         }
                     }
-                    // ParameterMode::VarArgs => match dict_value.validate_tuple() {
-                    //     Ok(iterable) => for value in iterable,
-                    //     Err(err) => return Err(err),
-                    // },
-                    ParameterMode::VarArgs => todo!(),
+                    ParameterMode::VarArgs => match dict_value.borrow_input().validate_tuple(false) {
+                        Ok(tuple) => {
+                            tuple.unpack(state).try_for_each(|v| {
+                                match parameter.validator.validate(py, v.unwrap().borrow_input(), state) {
+                                    Ok(tuple_value) => {
+                                        output_args.push(tuple_value);
+                                        return Ok(());
+                                    }
+                                    Err(ValError::LineErrors(line_errors)) => {
+                                        errors.extend(line_errors.into_iter().map(|err| {
+                                            lookup_path.apply_error_loc(err, self.loc_by_alias, &parameter.name)
+                                        }));
+                                        return Ok(());
+                                    }
+                                    Err(err) => return Err(err),
+                                }
+                            })?;
+                        }
+                        Err(_) => {
+                            let val_error = ValLineError::new(ErrorTypeDefaults::TupleType, dict_value.borrow_input());
+                            errors.push(lookup_path.apply_error_loc(val_error, self.loc_by_alias, &parameter.name));
+                        }
+                    },
                     ParameterMode::KeywordOnly => {
                         match parameter.validator.validate(py, dict_value.borrow_input(), state) {
                             Ok(value) => {
@@ -240,6 +260,7 @@ impl ArgumentsV3Validator {
                                         for err in line_errors {
                                             errors.push(
                                                 err.with_outer_location(dict_key.clone())
+                                                    .with_outer_location(&parameter.name)
                                                     .with_type(ErrorTypeDefaults::InvalidKey),
                                             );
                                         }
@@ -252,14 +273,21 @@ impl ArgumentsV3Validator {
                                     Ok(value) => output_kwargs.set_item(dict_key, value)?,
                                     Err(ValError::LineErrors(line_errors)) => {
                                         errors.extend(line_errors.into_iter().map(|err| {
-                                            lookup_path.apply_error_loc(err, self.loc_by_alias, &parameter.name)
+                                            lookup_path.apply_error_loc(
+                                                err.with_outer_location(dict_key.clone()),
+                                                self.loc_by_alias,
+                                                &parameter.name,
+                                            )
                                         }));
                                     }
                                     Err(err) => return Err(err),
                                 }
                             }
                         }
-                        None => todo!(),
+                        None => {
+                            let val_error = ValLineError::new(ErrorTypeDefaults::DictType, dict_value);
+                            errors.push(lookup_path.apply_error_loc(val_error, self.loc_by_alias, &parameter.name));
+                        }
                     },
                     ParameterMode::VarKwargsUnpackedTypedDict => {
                         let kwargs_dict = dict_value
