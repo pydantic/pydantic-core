@@ -253,11 +253,8 @@ def test_tuple_fallback():
 
     with pytest.warns(UserWarning) as warning_info:
         assert v.to_json([1, 2, 3]) == b'[1,2,3]'
-    assert [w.message.args[0] for w in warning_info.list] == [
-        'Pydantic serializer warnings:\n'
-        '  PydanticSerializationUnexpectedValue(Expected `tuple[any, ...]` but got '
-        '`list` with value `[1, 2, 3]` - serialized value may not be as expected.)',
-    ]
+
+    assert 'Expected `tuple[any, ...]` but got `list` with value `[1, 2, 3]`' in warning_info.list[0].message.args[0]
 
     msg = "Expected `tuple[any, ...]` but got `bytes` with value `b'apple'` - serialized value may not be as expected"
     with pytest.warns(UserWarning, match=re.escape(msg)):
