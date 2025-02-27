@@ -55,12 +55,10 @@ struct Parameter {
 
 impl Parameter {
     fn is_variadic(&self) -> bool {
-        match self.mode {
-            ParameterMode::VarArgs | ParameterMode::VarKwargsUniform | ParameterMode::VarKwargsUnpackedTypedDict => {
-                true
-            }
-            _ => false,
-        }
+        matches!(
+            self.mode,
+            ParameterMode::VarArgs | ParameterMode::VarKwargsUniform | ParameterMode::VarKwargsUnpackedTypedDict
+        )
     }
 }
 
@@ -75,7 +73,7 @@ pub struct ArgumentsV3Validator {
 }
 
 impl BuildValidator for ArgumentsV3Validator {
-    const EXPECTED_TYPE: &'static str = "arguments-v2";
+    const EXPECTED_TYPE: &'static str = "arguments-v3";
 
     fn build(
         schema: &Bound<'_, PyDict>,
@@ -195,12 +193,12 @@ impl ArgumentsV3Validator {
         let validate_by_alias = state.validate_by_alias_or(self.validate_by_alias);
         let validate_by_name = state.validate_by_name_or(self.validate_by_name);
 
-        for parameter in self.parameters.iter() {
+        for parameter in &self.parameters {
             let lookup_key = parameter
                 .lookup_key_collection
                 .select(validate_by_alias, validate_by_name)?;
             // A value is present in the mapping:
-            if let Some((lookup_path, dict_value)) = mapping.get_item(&lookup_key)? {
+            if let Some((lookup_path, dict_value)) = mapping.get_item(lookup_key)? {
                 match parameter.mode {
                     ParameterMode::PositionalOnly | ParameterMode::PositionalOrKeyword => {
                         match parameter.validator.validate(py, dict_value.borrow_input(), state) {
@@ -221,15 +219,15 @@ impl ArgumentsV3Validator {
                                 match parameter.validator.validate(py, v.unwrap().borrow_input(), state) {
                                     Ok(tuple_value) => {
                                         output_args.push(tuple_value);
-                                        return Ok(());
+                                        Ok(())
                                     }
                                     Err(ValError::LineErrors(line_errors)) => {
                                         errors.extend(line_errors.into_iter().map(|err| {
                                             lookup_path.apply_error_loc(err, self.loc_by_alias, &parameter.name)
                                         }));
-                                        return Ok(());
+                                        Ok(())
                                     }
-                                    Err(err) => return Err(err),
+                                    Err(err) => Err(err),
                                 }
                             })?;
                         }
@@ -241,7 +239,7 @@ impl ArgumentsV3Validator {
                     ParameterMode::KeywordOnly => {
                         match parameter.validator.validate(py, dict_value.borrow_input(), state) {
                             Ok(value) => {
-                                output_kwargs.set_item(PyString::new(py, parameter.name.as_str()).unbind(), value)?
+                                output_kwargs.set_item(PyString::new(py, parameter.name.as_str()).unbind(), value)?;
                             }
                             Err(ValError::LineErrors(line_errors)) => {
                                 errors.extend(
@@ -256,7 +254,7 @@ impl ArgumentsV3Validator {
                     ParameterMode::VarKwargsUniform => match dict_value.borrow_input().as_kwargs(py) {
                         // We will validate that keys are strings, and values match the validator:
                         Some(value) => {
-                            for (dict_key, dict_value) in value.into_iter() {
+                            for (dict_key, dict_value) in value {
                                 // Validate keys are strings:
                                 match dict_key.validate_str(true, false).map(ValidationMatch::into_inner) {
                                     Ok(_) => (),
@@ -346,9 +344,9 @@ impl ArgumentsV3Validator {
         }
 
         if !errors.is_empty() {
-            return Err(ValError::LineErrors(errors));
+            Err(ValError::LineErrors(errors))
         } else {
-            return Ok((PyTuple::new(py, output_args)?, output_kwargs).into_py_any(py)?);
+            Ok((PyTuple::new(py, output_args)?, output_kwargs).into_py_any(py)?)
         }
     }
 
@@ -396,7 +394,7 @@ impl ArgumentsV3Validator {
                     parameter.mode,
                     ParameterMode::PositionalOrKeyword | ParameterMode::KeywordOnly
                 ) {
-                    if let Some((lookup_path, value)) = kwargs.get_item(&lookup_key)? {
+                    if let Some((lookup_path, value)) = kwargs.get_item(lookup_key)? {
                         used_kwargs.insert(lookup_path.first_key());
                         kw_value = Some((lookup_path, value));
                     }
@@ -421,7 +419,7 @@ impl ArgumentsV3Validator {
                 (None, Some((lookup_path, kw_value))) => {
                     match parameter.validator.validate(py, kw_value.borrow_input(), state) {
                         Ok(value) => {
-                            output_kwargs.set_item(PyString::new(py, parameter.name.as_str()).unbind(), value)?
+                            output_kwargs.set_item(PyString::new(py, parameter.name.as_str()).unbind(), value)?;
                         }
                         Err(ValError::LineErrors(line_errors)) => {
                             errors.extend(
@@ -442,7 +440,7 @@ impl ArgumentsV3Validator {
                             parameter.mode,
                             ParameterMode::PositionalOnly | ParameterMode::PositionalOrKeyword
                         ) {
-                            output_kwargs.set_item(PyString::new(py, parameter.name.as_str()).unbind(), value)?
+                            output_kwargs.set_item(PyString::new(py, parameter.name.as_str()).unbind(), value)?;
                         } else {
                             output_args.push(value);
                         }
@@ -601,9 +599,9 @@ impl ArgumentsV3Validator {
         }
 
         if !errors.is_empty() {
-            return Err(ValError::LineErrors(errors));
+            Err(ValError::LineErrors(errors))
         } else {
-            return Ok((PyTuple::new(py, output_args)?, output_kwargs).into_py_any(py)?);
+            Ok((PyTuple::new(py, output_args)?, output_kwargs).into_py_any(py)?)
         }
     }
 }
@@ -622,10 +620,10 @@ impl Validator for ArgumentsV3Validator {
 
         // Validation from a dictionary, mapping parameter names to the values:
         if let Ok(dict) = args_dict {
-            return self.validate_from_mapping(py, input, dict, state);
+            self.validate_from_mapping(py, input, dict, state)
         } else {
             let args = input.validate_args_v3()?;
-            return self.validate_from_argskwargs(py, input, args, state);
+            self.validate_from_argskwargs(py, input, args, state)
         }
     }
 
