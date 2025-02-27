@@ -13,7 +13,7 @@ use crate::errors::{ErrorTypeDefaults, ValError, ValLineError, ValResult};
 use crate::input::{
     Arguments, BorrowInput, Input, KeywordArgs, PositionalArgs, ValidatedDict, ValidatedTuple, ValidationMatch,
 };
-use crate::lookup_key::LookupKey;
+use crate::lookup_key::LookupKeyCollection;
 use crate::tools::SchemaDict;
 
 use super::validation_state::ValidationState;
@@ -49,7 +49,7 @@ impl FromStr for ParameterMode {
 struct Parameter {
     name: String,
     mode: ParameterMode,
-    lookup_key: LookupKey,
+    lookup_key_collection: LookupKeyCollection,
     validator: CombinedValidator,
 }
 
@@ -70,6 +70,8 @@ pub struct ArgumentsV3Validator {
     positional_params_count: usize,
     loc_by_alias: bool,
     extra: ExtraBehavior,
+    validate_by_alias: Option<bool>,
+    validate_by_name: Option<bool>,
 }
 
 impl BuildValidator for ArgumentsV3Validator {
@@ -81,8 +83,6 @@ impl BuildValidator for ArgumentsV3Validator {
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
-
-        let populate_by_name = schema_or_config_same(schema, config, intern!(py, "populate_by_name"))?.unwrap_or(false);
 
         let arguments_schema: Bound<'_, PyList> = schema.get_as_req(intern!(py, "arguments_schema"))?;
         let mut parameters: Vec<Parameter> = Vec::with_capacity(arguments_schema.len());
@@ -113,14 +113,6 @@ impl BuildValidator for ArgumentsV3Validator {
                 had_keyword_only = true;
             }
 
-            let lookup_key = match arg.get_item(intern!(py, "alias"))? {
-                Some(alias) => {
-                    let alt_alias = if populate_by_name { Some(name.as_str()) } else { None };
-                    LookupKey::from_py(py, &alias, alt_alias)?
-                }
-                None => LookupKey::from_string(py, &name),
-            };
-
             let schema = arg.get_as_req(intern!(py, "schema"))?;
 
             let validator = match build_validator(&schema, config, definitions) {
@@ -143,10 +135,14 @@ impl BuildValidator for ArgumentsV3Validator {
             } else if has_default {
                 had_default_arg = true;
             }
+
+            let validation_alias = arg.get_item(intern!(py, "alias"))?;
+            let lookup_key_collection = LookupKeyCollection::new(py, validation_alias, name.as_str())?;
+
             parameters.push(Parameter {
                 name,
                 mode,
-                lookup_key,
+                lookup_key_collection,
                 validator,
             });
         }
@@ -166,6 +162,8 @@ impl BuildValidator for ArgumentsV3Validator {
             positional_params_count,
             loc_by_alias: config.get_as(intern!(py, "loc_by_alias"))?.unwrap_or(true),
             extra: ExtraBehavior::from_schema_or_config(py, schema, config, ExtraBehavior::Forbid)?,
+            validate_by_alias: schema_or_config_same(schema, config, intern!(py, "validate_by_alias"))?,
+            validate_by_name: schema_or_config_same(schema, config, intern!(py, "validate_by_name"))?,
         }
         .into())
     }
@@ -194,9 +192,15 @@ impl ArgumentsV3Validator {
         let output_kwargs = PyDict::new(py);
         let mut errors: Vec<ValLineError> = Vec::new();
 
+        let validate_by_alias = state.validate_by_alias_or(self.validate_by_alias);
+        let validate_by_name = state.validate_by_name_or(self.validate_by_name);
+
         for parameter in self.parameters.iter() {
+            let lookup_key = parameter
+                .lookup_key_collection
+                .select(validate_by_alias, validate_by_name)?;
             // A value is present in the mapping:
-            if let Some((lookup_path, dict_value)) = mapping.get_item(&parameter.lookup_key)? {
+            if let Some((lookup_path, dict_value)) = mapping.get_item(&lookup_key)? {
                 match parameter.mode {
                     ParameterMode::PositionalOnly | ParameterMode::PositionalOrKeyword => {
                         match parameter.validator.validate(py, dict_value.borrow_input(), state) {
@@ -327,7 +331,7 @@ impl ArgumentsV3Validator {
                                 _ => unreachable!(),
                             };
 
-                            errors.push(parameter.lookup_key.error(
+                            errors.push(lookup_key.error(
                                 error_type,
                                 original_input,
                                 self.loc_by_alias,
@@ -367,8 +371,15 @@ impl ArgumentsV3Validator {
         let mut errors: Vec<ValLineError> = Vec::new();
         let mut used_kwargs: AHashSet<&str> = AHashSet::with_capacity(self.parameters.len());
 
+        let validate_by_alias = state.validate_by_alias_or(self.validate_by_alias);
+        let validate_by_name = state.validate_by_name_or(self.validate_by_name);
+
         // go through non variadic arguments, getting the value from args or kwargs and validating it
         for (index, parameter) in self.parameters.iter().filter(|p| !p.is_variadic()).enumerate() {
+            let lookup_key = parameter
+                .lookup_key_collection
+                .select(validate_by_alias, validate_by_name)?;
+
             let mut pos_value = None;
             if let Some(args) = args_kwargs.args() {
                 if matches!(
@@ -385,7 +396,7 @@ impl ArgumentsV3Validator {
                     parameter.mode,
                     ParameterMode::PositionalOrKeyword | ParameterMode::KeywordOnly
                 ) {
-                    if let Some((lookup_path, value)) = kwargs.get_item(&parameter.lookup_key)? {
+                    if let Some((lookup_path, value)) = kwargs.get_item(&lookup_key)? {
                         used_kwargs.insert(lookup_path.first_key());
                         kw_value = Some((lookup_path, value));
                     }
@@ -446,7 +457,7 @@ impl ArgumentsV3Validator {
                                 ));
                             }
                             ParameterMode::PositionalOrKeyword => {
-                                errors.push(parameter.lookup_key.error(
+                                errors.push(lookup_key.error(
                                     ErrorTypeDefaults::MissingArgument,
                                     original_input,
                                     self.loc_by_alias,
@@ -454,7 +465,7 @@ impl ArgumentsV3Validator {
                                 ));
                             }
                             ParameterMode::KeywordOnly => {
-                                errors.push(parameter.lookup_key.error(
+                                errors.push(lookup_key.error(
                                     ErrorTypeDefaults::MissingKeywordOnlyArgument,
                                     original_input,
                                     self.loc_by_alias,
