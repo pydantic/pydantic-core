@@ -3594,7 +3594,7 @@ def arguments_v3_schema(
         serialization: Custom serialization schema.
     """
     return _dict_not_none(
-        type='arguments-v2',
+        type='arguments-v3',
         arguments_schema=arguments,
         validate_by_name=validate_by_name,
         validate_by_alias=validate_by_alias,
@@ -4031,6 +4031,7 @@ if not MYPY:
         DataclassArgsSchema,
         DataclassSchema,
         ArgumentsSchema,
+        ArgumentsV3Schema,
         CallSchema,
         CustomErrorSchema,
         JsonSchema,
