@@ -148,15 +148,21 @@ impl PydanticSerializationUnexpectedValue {
     }
 
     pub(crate) fn __str__(&self, py: Python) -> String {
-        let mut message = self.message.as_deref().unwrap_or("Unexpected Value").to_string();
+        let mut message = self.message.as_deref().unwrap_or("").to_string();
 
         if let Some(field_type) = &self.field_type {
+            if !message.is_empty() {
+                message.push_str(": ");
+            }
             message.push_str(&format!("Expected `{field_type}`"));
+            if self.input_value.is_some() {
+                message.push_str(" - serialized value may not be as expected");
+            }
         }
 
         if let Some(input_value) = &self.input_value {
             let bound_input = input_value.bind(py);
-            let type_name = bound_input
+            let input_type = bound_input
                 .get_type()
                 .name()
                 .unwrap_or_else(|_| PyString::new(py, "<unknown python object>"))
@@ -164,11 +170,11 @@ impl PydanticSerializationUnexpectedValue {
 
             let value_str = truncate_safe_repr(bound_input, None);
 
-            message.push_str(&format!(" but got `{type_name}` with value `{value_str}`"));
+            message.push_str(&format!(" [input_value={value_str}, input_type={input_type}]"));
         }
 
-        if self.input_value.is_some() || self.field_type.is_some() {
-            message.push_str(" - serialized value may not be as expected.");
+        if message.is_empty() {
+            message = "Unexpected Value".to_string();
         }
 
         message

@@ -164,7 +164,7 @@ def test_any_with_date_serializer():
         assert s.to_python(b'bang', mode='json') == 'bang'
 
     assert (
-        "Expected `date` but got `bytes` with value `b'bang'` - serialized value may not be as expected"
+        "Expected `date` - serialized value may not be as expected [input_value=b'bang', input_type=bytes]"
         in warning_info.list[0].message.args[0]
     )
 
@@ -179,7 +179,7 @@ def test_any_with_timedelta_serializer():
         assert s.to_python(b'bang', mode='json') == 'bang'
 
     assert (
-        "Expected `timedelta` but got `bytes` with value `b'bang'` - serialized value may not be as expected"
+        "Expected `timedelta` - serialized value may not be as expected [input_value=b'bang', input_type=bytes]"
         in warning_info.list[0].message.args[0]
     )
 

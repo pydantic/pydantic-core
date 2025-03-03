@@ -219,7 +219,7 @@ impl GeneralFieldsSerializer {
             let required_fields = self.required_fields;
 
             Err(PydanticSerializationUnexpectedValue::new(
-                Some(format!("Expected {required_fields} fields but got {used_req_fields}. ").to_string()),
+                Some(format!("Expected {required_fields} fields but got {used_req_fields}").to_string()),
                 extra.model_type_name().map(|bound| bound.to_string()),
                 extra.model.map(|bound| bound.clone().unbind()),
             )
