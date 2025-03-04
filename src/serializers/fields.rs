@@ -156,9 +156,12 @@ impl GeneralFieldsSerializer {
         let output_dict = PyDict::new(py);
         let mut used_req_fields: usize = 0;
 
-        // NOTE! we maintain the order of the input dict assuming that's right
-        for result in main_iter {
-            let (key, value) = result?;
+        let mut items = main_iter.collect::<PyResult<Vec<_>>>()?;
+        if extra.sort_keys {
+            items.sort_by_cached_key(|(key, _)| key_str(key).unwrap_or_default().to_string());
+        }
+
+        for (key, value) in items {
             let key_str = key_str(&key)?;
             let op_field = self.fields.get(key_str);
             if extra.exclude_none && value.is_none() {
@@ -242,8 +245,11 @@ impl GeneralFieldsSerializer {
         // we don't both with `used_fields` here because on unions, `to_python(..., mode='json')` is used
         let mut map = serializer.serialize_map(Some(expected_len))?;
 
-        for result in main_iter {
-            let (key, value) = result.map_err(py_err_se_err)?;
+        let mut items = main_iter.collect::<PyResult<Vec<_>>>().map_err(py_err_se_err)?;
+        if extra.sort_keys {
+            items.sort_by_cached_key(|(key, _)| key_str(key).unwrap_or_default().to_string());
+        }
+        for (key, value) in items {
             if extra.exclude_none && value.is_none() {
                 continue;
             }
