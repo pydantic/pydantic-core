@@ -102,11 +102,6 @@ impl BuildValidator for ArgumentsV3Validator {
 
             let mode = ParameterMode::from_str(py_mode)?;
 
-            // let positional = mode == "positional_only" || mode == "positional_or_keyword";
-            // if positional {
-            //     positional_params_count = arg_index + 1;
-            // }
-
             if mode == ParameterMode::KeywordOnly {
                 had_keyword_only = true;
             }
@@ -129,7 +124,7 @@ impl BuildValidator for ArgumentsV3Validator {
             };
 
             if had_default_arg && !has_default && !had_keyword_only {
-                return py_schema_err!("Non-default argument '{}' follows default argument", name);
+                return py_schema_err!("Required parameter '{}' follows parameter with default", name);
             } else if has_default {
                 had_default_arg = true;
             }
@@ -215,19 +210,29 @@ impl ArgumentsV3Validator {
                     }
                     ParameterMode::VarArgs => match dict_value.borrow_input().validate_tuple(false) {
                         Ok(tuple) => {
+                            let mut i: i64 = 0;
                             tuple.unpack(state).try_for_each(|v| {
                                 match parameter.validator.validate(py, v.unwrap().borrow_input(), state) {
                                     Ok(tuple_value) => {
                                         output_args.push(tuple_value);
+                                        i += 1;
                                         Ok(())
                                     }
                                     Err(ValError::LineErrors(line_errors)) => {
                                         errors.extend(line_errors.into_iter().map(|err| {
-                                            lookup_path.apply_error_loc(err, self.loc_by_alias, &parameter.name)
+                                            lookup_path.apply_error_loc(
+                                                err.with_outer_location(i),
+                                                self.loc_by_alias,
+                                                &parameter.name,
+                                            )
                                         }));
+                                        i += 1;
                                         Ok(())
                                     }
-                                    Err(err) => Err(err),
+                                    Err(err) => {
+                                        i += 1;
+                                        Err(err)
+                                    }
                                 }
                             })?;
                         }
@@ -292,31 +297,35 @@ impl ArgumentsV3Validator {
                         }
                     },
                     ParameterMode::VarKwargsUnpackedTypedDict => {
-                        let kwargs_dict = dict_value
-                            .borrow_input()
-                            .as_kwargs(py)
-                            .unwrap_or_else(|| PyDict::new(py));
-                        match parameter.validator.validate(py, kwargs_dict.as_any(), state) {
+                        match parameter.validator.validate(py, dict_value.borrow_input(), state) {
                             Ok(value) => {
                                 output_kwargs.update(value.downcast_bound::<PyDict>(py).unwrap().as_mapping())?;
                             }
                             Err(ValError::LineErrors(line_errors)) => {
-                                errors.extend(line_errors);
+                                errors.extend(
+                                    line_errors.into_iter().map(|err| {
+                                        lookup_path.apply_error_loc(err, self.loc_by_alias, &parameter.name)
+                                    }),
+                                );
                             }
                             Err(err) => return Err(err),
                         }
                     }
                 }
-            // No value is present in the mapping, fallback to the default value (and error if no default):
+            // No value is present in the mapping...
             } else {
                 match parameter.mode {
+                    // ... fallback to the default value (and error if no default):
                     ParameterMode::PositionalOnly | ParameterMode::PositionalOrKeyword | ParameterMode::KeywordOnly => {
                         if let Some(value) =
                             parameter
                                 .validator
                                 .default_value(py, Some(parameter.name.as_str()), state)?
                         {
-                            if parameter.mode == ParameterMode::PositionalOnly {
+                            if matches!(
+                                parameter.mode,
+                                ParameterMode::PositionalOnly | ParameterMode::PositionalOrKeyword
+                            ) {
                                 output_args.push(value);
                             } else {
                                 output_kwargs.set_item(PyString::new(py, parameter.name.as_str()).unbind(), value)?;
@@ -337,7 +346,23 @@ impl ArgumentsV3Validator {
                             ));
                         }
                     }
-                    // Variadic args/kwargs can be empty by definition:
+                    // ... validate the unpacked kwargs against an empty dict:
+                    ParameterMode::VarKwargsUnpackedTypedDict => {
+                        match parameter.validator.validate(py, PyDict::new(py).borrow_input(), state) {
+                            Ok(value) => {
+                                output_kwargs.update(value.downcast_bound::<PyDict>(py).unwrap().as_mapping())?;
+                            }
+                            Err(ValError::LineErrors(line_errors)) => {
+                                errors.extend(
+                                    line_errors
+                                        .into_iter()
+                                        .map(|err| err.with_outer_location(&parameter.name)),
+                                );
+                            }
+                            Err(err) => return Err(err),
+                        }
+                    }
+                    // Variadic args/uniform kwargs can be empty by definition:
                     _ => (),
                 }
             }
@@ -436,13 +461,10 @@ impl ArgumentsV3Validator {
                         .validator
                         .default_value(py, Some(parameter.name.as_str()), state)?
                     {
-                        if matches!(
-                            parameter.mode,
-                            ParameterMode::PositionalOnly | ParameterMode::PositionalOrKeyword
-                        ) {
-                            output_kwargs.set_item(PyString::new(py, parameter.name.as_str()).unbind(), value)?;
-                        } else {
+                        if parameter.mode == ParameterMode::PositionalOnly {
                             output_args.push(value);
+                        } else {
+                            output_kwargs.set_item(PyString::new(py, parameter.name.as_str()).unbind(), value)?;
                         }
                     } else {
                         // Required and no default, error:
@@ -577,13 +599,12 @@ impl ArgumentsV3Validator {
             }
         }
 
-        if !remaining_kwargs.is_empty() {
-            // In this case, the unpacked typeddict var kwargs parameter is guaranteed to exist:
-            let var_kwargs_parameter = self
-                .parameters
-                .iter()
-                .find(|p| p.mode == ParameterMode::VarKwargsUnpackedTypedDict)
-                .unwrap();
+        let maybe_var_kwargs_parameter = self
+            .parameters
+            .iter()
+            .find(|p| p.mode == ParameterMode::VarKwargsUnpackedTypedDict);
+
+        if let Some(var_kwargs_parameter) = maybe_var_kwargs_parameter {
             match var_kwargs_parameter
                 .validator
                 .validate(py, remaining_kwargs.as_any(), state)

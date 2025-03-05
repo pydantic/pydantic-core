@@ -3582,7 +3582,7 @@ def arguments_v3_schema(
     )
     schema = core_schema.arguments_v3_schema([param_a, param_b])
     v = SchemaValidator(schema)
-    assert v.validate_python({'a': 'hello', 'kwargs': {'extra': True}}) == (('hello',), {'extra': True})
+    assert v.validate_python({'a': 'hi', 'kwargs': {'b': True}}) == (('hi',), {'b': True})
     ```
 
     Args:
@@ -4089,6 +4089,7 @@ CoreSchemaType = Literal[
     'dataclass-args',
     'dataclass',
     'arguments',
+    'arguments-v3',
     'call',
     'custom-error',
     'json',
