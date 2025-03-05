@@ -992,22 +992,22 @@ def test_extra():
     class MyModel:
         # this is not required, but it avoids `__pydantic_fields_set__` being included in `__dict__`
         __slots__ = '__dict__', '__pydantic_fields_set__', '__pydantic_extra__', '__pydantic_private__'
-        field_b: int
         field_a: str
+        field_b: int
 
     schema = core_schema.model_schema(
         MyModel,
         core_schema.model_fields_schema(
             {
-                'field_b': core_schema.model_field(core_schema.int_schema()),
                 'field_a': core_schema.model_field(core_schema.bytes_schema()),
+                'field_b': core_schema.model_field(core_schema.int_schema()),
             },
             extra_behavior='allow',
         ),
         extra_behavior='allow',
     )
     v = SchemaValidator(schema)
-    m = v.validate_python({'field_b': 12, 'field_a': b'test', 'field_c': 'extra'})
+    m = v.validate_python({'field_a': b'test', 'field_b': 12, 'field_c': 'extra'})
     assert isinstance(m, MyModel)
     assert m.__dict__ == {'field_a': b'test', 'field_b': 12}
     assert m.__pydantic_extra__ == {'field_c': 'extra'}
@@ -1016,11 +1016,11 @@ def test_extra():
     s = SchemaSerializer(schema)
     assert 'mode:ModelExtra' in plain_repr(s)
     assert 'has_extra:true' in plain_repr(s)
-    assert s.to_python(m, sort_keys=False) == snapshot({'field_a': b'test', 'field_b': 12, 'field_c': 'extra'})
-    assert s.to_json(m, sort_keys=True) == b'{"field_a":"test","field_b":12,"field_c":"extra"}'
+    assert s.to_python(m) == {'field_a': b'test', 'field_b': 12, 'field_c': 'extra'}
     assert s.to_python(m, mode='json') == {'field_a': 'test', 'field_b': 12, 'field_c': 'extra'}
+    assert s.to_json(m) == b'{"field_a":"test","field_b":12,"field_c":"extra"}'
 
-    # # test filtering
+    # test filtering
     m = v.validate_python({'field_a': b'test', 'field_b': 12, 'field_c': None, 'field_d': [1, 2, 3]})
     assert isinstance(m, MyModel)
     assert m.__dict__ == {'field_a': b'test', 'field_b': 12}
@@ -1028,13 +1028,13 @@ def test_extra():
     assert m.__pydantic_fields_set__ == {'field_a', 'field_b', 'field_c', 'field_d'}
 
     assert s.to_python(m) == {'field_a': b'test', 'field_b': 12, 'field_c': None, 'field_d': [1, 2, 3]}
-    assert s.to_json(m) == b'{"field_b":12,"field_a":"test","field_c":null,"field_d":[1,2,3]}'
+    assert s.to_json(m) == b'{"field_a":"test","field_b":12,"field_c":null,"field_d":[1,2,3]}'
 
     assert s.to_python(m, exclude_none=True) == {'field_a': b'test', 'field_b': 12, 'field_d': [1, 2, 3]}
-    assert s.to_json(m, exclude_none=True) == b'{"field_b":12,"field_a":"test","field_d":[1,2,3]}'
+    assert s.to_json(m, exclude_none=True) == b'{"field_a":"test","field_b":12,"field_d":[1,2,3]}'
 
     assert s.to_python(m, exclude={'field_c'}) == {'field_a': b'test', 'field_b': 12, 'field_d': [1, 2, 3]}
-    assert s.to_json(m, exclude={'field_c'}) == b'{"field_b":12,"field_a":"test","field_d":[1,2,3]}'
+    assert s.to_json(m, exclude={'field_c'}) == b'{"field_a":"test","field_b":12,"field_d":[1,2,3]}'
 
     assert s.to_python(m, exclude={'field_d': [0]}) == {
         'field_a': b'test',
@@ -1042,10 +1042,78 @@ def test_extra():
         'field_c': None,
         'field_d': [2, 3],
     }
-    assert s.to_json(m, exclude={'field_d': [0]}) == b'{"field_b":12,"field_a":"test","field_c":null,"field_d":[2,3]}'
-    assert (
-        s.to_json(m, exclude={'field_d': [0]}, sort_keys=True)
-        == b'{"field_a":"test","field_b":12,"field_c":null,"field_d":[2,3]}'
+    assert s.to_json(m, exclude={'field_d': [0]}) == b'{"field_a":"test","field_b":12,"field_c":null,"field_d":[2,3]}'
+
+
+def test_extra_sort_keys():
+    class MyModel:
+        field_123: str
+        field_b: int
+        field_a: str
+
+    schema = core_schema.model_schema(
+        MyModel,
+        core_schema.model_fields_schema(
+            {
+                'field_123': core_schema.model_field(core_schema.bytes_schema()),
+                'field_b': core_schema.model_field(core_schema.int_schema()),
+                'field_a': core_schema.model_field(core_schema.bytes_schema()),
+            },
+            extra_behavior='allow',
+        ),
+        extra_behavior='allow',
+    )
+    v = SchemaValidator(schema)
+    m = v.validate_python({'field_123': b'test_123', 'field_b': 12, 'field_a': b'test', 'field_c': 'extra'})
+    s = SchemaSerializer(schema)
+    assert 'mode:ModelExtra' in plain_repr(s)
+    assert 'has_extra:true' in plain_repr(s)
+    assert s.to_json(m, sort_keys=True) == snapshot(
+        b'{"field_123":"test_123","field_a":"test","field_b":12,"field_c":"extra"}'
+    )
+    assert s.to_python(m, mode='json', sort_keys=True) == snapshot(
+        {'field_123': 'test_123', 'field_a': 'test', 'field_b': 12, 'field_c': 'extra'}
+    )
+
+    # test filtering
+    m = v.validate_python(
+        {'field_123': b'test_123', 'field_b': 12, 'field_a': b'test', 'field_c': None, 'field_d': [1, 2, 3]}
+    )
+    assert s.to_python(m, exclude_none=True) == snapshot(
+        {'field_123': b'test_123', 'field_a': b'test', 'field_b': 12, 'field_d': [1, 2, 3]}
+    )
+    assert s.to_python(m, exclude_none=True, sort_keys=True) == snapshot(
+        {'field_123': b'test_123', 'field_a': b'test', 'field_b': 12, 'field_d': [1, 2, 3]}
+    )
+    assert s.to_json(m, exclude_none=True) == snapshot(
+        b'{"field_123":"test_123","field_b":12,"field_a":"test","field_d":[1,2,3]}'
+    )
+    assert s.to_json(m, exclude_none=True, sort_keys=True) == snapshot(
+        b'{"field_123":"test_123","field_a":"test","field_b":12,"field_d":[1,2,3]}'
+    )
+    assert s.to_python(m, exclude={'field_c'}) == snapshot(
+        {'field_123': b'test_123', 'field_a': b'test', 'field_b': 12, 'field_d': [1, 2, 3]}
+    )
+    assert s.to_python(m, exclude={'field_c'}, sort_keys=True) == snapshot(
+        {'field_123': b'test_123', 'field_a': b'test', 'field_b': 12, 'field_d': [1, 2, 3]}
+    )
+    assert s.to_json(m, exclude={'field_c'}) == snapshot(
+        b'{"field_123":"test_123","field_b":12,"field_a":"test","field_d":[1,2,3]}'
+    )
+    assert s.to_json(m, exclude={'field_c'}, sort_keys=True) == snapshot(
+        b'{"field_123":"test_123","field_a":"test","field_b":12,"field_d":[1,2,3]}'
+    )
+    assert s.to_python(m, exclude={'field_d': [0]}) == snapshot(
+        {'field_123': b'test_123', 'field_a': b'test', 'field_b': 12, 'field_c': None, 'field_d': [2, 3]}
+    )
+    assert s.to_python(m, exclude={'field_d': [0]}, sort_keys=True) == snapshot(
+        {'field_123': b'test_123', 'field_a': b'test', 'field_b': 12, 'field_c': None, 'field_d': [2, 3]}
+    )
+    assert s.to_json(m, exclude={'field_d': [0]}) == snapshot(
+        b'{"field_123":"test_123","field_b":12,"field_a":"test","field_c":null,"field_d":[2,3]}'
+    )
+    assert s.to_json(m, exclude={'field_d': [0]}, sort_keys=True) == snapshot(
+        b'{"field_123":"test_123","field_a":"test","field_b":12,"field_c":null,"field_d":[2,3]}'
     )
 
 
