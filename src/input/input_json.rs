@@ -84,6 +84,11 @@ impl<'py, 'data> Input<'py> for JsonValue<'data> {
         }
     }
 
+    #[cfg_attr(has_coverage_attribute, coverage(off))]
+    fn validate_args_v3(&self) -> ValResult<Self::Arguments<'_>> {
+        Err(ValError::new(ErrorTypeDefaults::ArgumentsType, self))
+    }
+
     fn validate_dataclass_args<'a>(&'a self, class_name: &str) -> ValResult<JsonArgs<'a, 'data>> {
         match self {
             JsonValue::Object(object) => Ok(JsonArgs::new(None, Some(object))),
@@ -376,6 +381,11 @@ impl<'py> Input<'py> for str {
     }
 
     #[cfg_attr(has_coverage_attribute, coverage(off))]
+    fn validate_args_v3(&self) -> ValResult<Never> {
+        Err(ValError::new(ErrorTypeDefaults::ArgumentsType, self))
+    }
+
+    #[cfg_attr(has_coverage_attribute, coverage(off))]
     fn validate_dataclass_args(&self, class_name: &str) -> ValResult<Never> {
         let class_name = class_name.to_string();
         Err(ValError::new(
@@ -570,6 +580,12 @@ impl<'a, 'data> ValidatedTuple<'_> for &'a JsonArray<'data> {
 
     fn len(&self) -> Option<usize> {
         Some(SmallVec::len(self))
+    }
+    fn try_for_each(self, mut f: impl FnMut(PyResult<Self::Item>) -> ValResult<()>) -> ValResult<()> {
+        for item in self.iter() {
+            f(Ok(item))?;
+        }
+        Ok(())
     }
     fn iterate<R>(self, consumer: impl ConsumeIterator<PyResult<Self::Item>, Output = R>) -> ValResult<R> {
         Ok(consumer.consume_iterator(self.iter().map(Ok)))
