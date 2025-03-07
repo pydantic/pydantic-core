@@ -1,4 +1,5 @@
 version = 1
+revision = 1
 requires-python = ">=3.9"
 resolution-markers = [
     "python_full_version == '3.13.*' and implementation_name == 'cpython'",
@@ -282,7 +283,7 @@ wheels = [
 
 [[package]]
 name = "inline-snapshot"
-version = "0.19.3"
+version = "0.20.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "asttokens" },
@@ -290,9 +291,9 @@ dependencies = [
     { name = "rich" },
     { name = "tomli", marker = "python_full_version < '3.11'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/42/bc/bbba2efb2ab0c8cf3d43fb0a7a1d3dfd8533d3bf18df9662ee4c09af7cac/inline_snapshot-0.19.3.tar.gz", hash = "sha256:1e40f34da64fe2406c6bba3f473905e22386da43e16c85060610692325aa94d7", size = 88636 }
+sdist = { url = "https://files.pythonhosted.org/packages/3b/95/9b85a63031c168dd1c479f8cfd5cae42d42d6ac41c18dd760a104bc87ddc/inline_snapshot-0.20.5.tar.gz", hash = "sha256:d8b67c6d533c0a3f566e72608144b54da65dc3da5d0dba4169b2c56b75530fb5", size = 92215 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/fd/fc/d99b8983af46c0adbe10ad369ab929eb35cb32635526a9de4fe06ffd612f/inline_snapshot-0.19.3-py3-none-any.whl", hash = "sha256:81ed10eedb593aee630d2fc0cfe5d10a843c4bd507c2d96ea058c28413985452", size = 43627 },
+    { url = "https://files.pythonhosted.org/packages/d4/71/34e775bbf0bcf81d588d80a1df93437f937b0df9a841f246606a03fc5eff/inline_snapshot-0.20.5-py3-none-any.whl", hash = "sha256:3aa56acf5985d89f17ebd4df4aef00faacc49f10cdf4e6b42be701ffc9702b5a", size = 48071 },
 ]
 
 [[package]]
