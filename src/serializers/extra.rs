@@ -87,9 +87,10 @@ impl SerializationState {
         exclude_none: bool,
         round_trip: bool,
         serialize_unknown: bool,
-        fallback: Option<&'py Bound<'_, PyAny>>,
+        fallback: Option<&'py Bound<'py, PyAny>>,
         duck_typing_ser_mode: DuckTypingSerMode,
-        context: Option<&'py Bound<'_, PyAny>>,
+        context: Option<&'py Bound<'py, PyAny>>,
+        sort_keys: bool,
     ) -> Extra<'py> {
         Extra::new(
             py,
@@ -106,6 +107,7 @@ impl SerializationState {
             fallback,
             duck_typing_ser_mode,
             context,
+            sort_keys,
         )
     }
 
@@ -139,6 +141,7 @@ pub(crate) struct Extra<'a> {
     pub fallback: Option<&'a Bound<'a, PyAny>>,
     pub duck_typing_ser_mode: DuckTypingSerMode,
     pub context: Option<&'a Bound<'a, PyAny>>,
+    pub sort_keys: bool,
 }
 
 impl<'a> Extra<'a> {
@@ -158,6 +161,7 @@ impl<'a> Extra<'a> {
         fallback: Option<&'a Bound<'a, PyAny>>,
         duck_typing_ser_mode: DuckTypingSerMode,
         context: Option<&'a Bound<'a, PyAny>>,
+        sort_keys: bool,
     ) -> Self {
         Self {
             mode,
@@ -177,6 +181,7 @@ impl<'a> Extra<'a> {
             fallback,
             duck_typing_ser_mode,
             context,
+            sort_keys,
         }
     }
 
@@ -288,11 +293,12 @@ impl ExtraOwned {
             fallback: self.fallback.as_ref().map(|m| m.bind(py)),
             duck_typing_ser_mode: self.duck_typing_ser_mode,
             context: self.context.as_ref().map(|m| m.bind(py)),
+            sort_keys: false,
         }
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub(crate) enum SerMode {
     Python,

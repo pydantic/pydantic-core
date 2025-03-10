@@ -108,6 +108,7 @@ pub(crate) fn infer_to_python_known(
             extra.fallback,
             extra.duck_typing_ser_mode,
             extra.context,
+            extra.sort_keys,
         );
         serializer.serializer.to_python(value, include, exclude, &extra)
     };
@@ -265,10 +266,16 @@ pub(crate) fn infer_to_python_known(
             }
             ObType::Dict => {
                 let dict = value.downcast::<PyDict>()?;
-                serialize_pairs_python(py, dict.iter().map(Ok), include, exclude, extra, Ok)?
+                serialize_pairs_python(py, dict.iter().map(Ok), include, exclude, extra, |k| {
+                    Ok(PyString::new(py, &infer_json_key(&k, extra)?).into_any())
+                })?
             }
             ObType::PydanticSerializable => serialize_with_serializer()?,
-            ObType::Dataclass => serialize_pairs_python(py, any_dataclass_iter(value)?.0, include, exclude, extra, Ok)?,
+            ObType::Dataclass => {
+                serialize_pairs_python(py, any_dataclass_iter(value)?.0, include, exclude, extra, |k| {
+                    Ok(PyString::new(py, &infer_json_key(&k, extra)?).into_any())
+                })?
+            }
             ObType::Generator => {
                 let iter = super::type_serializers::generator::SerializationIterator::new(
                     value.downcast()?,
@@ -497,6 +504,7 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
                 extra.fallback,
                 extra.duck_typing_ser_mode,
                 extra.context,
+                extra.sort_keys,
             );
             let pydantic_serializer =
                 PydanticSerializer::new(value, &extracted_serializer.serializer, include, exclude, &extra);
@@ -708,14 +716,35 @@ fn serialize_pairs_python<'py>(
     let new_dict = PyDict::new(py);
     let filter = AnyFilter::new();
 
+    // Collect pairs if we need to sort
+    let mut pairs = Vec::new();
     for result in pairs_iter {
         let (k, v) = result?;
         let op_next = filter.key_filter(&k, include, exclude)?;
         if let Some((next_include, next_exclude)) = op_next {
-            let k = key_transform(k)?;
+            let k = if *extra.mode == SerMode::Json {
+                key_transform(k)?
+            } else {
+                k
+            };
             let v = infer_to_python(&v, next_include.as_ref(), next_exclude.as_ref(), extra)?;
-            new_dict.set_item(k, v)?;
+            pairs.push((k, v));
         }
+    }
+
+    // Sort if requested and in JSON mode
+    if extra.sort_keys && *extra.mode == SerMode::Json {
+        pairs.sort_by(|(a, _), (b, _)| {
+            a.str()
+                .ok()
+                .and_then(|s| s.to_str().ok().map(ToString::to_string))
+                .cmp(&b.str().ok().and_then(|s| s.to_str().ok().map(ToString::to_string)))
+        });
+    }
+
+    // Add to dictionary
+    for (k, v) in pairs {
+        new_dict.set_item(k, v)?;
     }
     Ok(new_dict.into())
 }
@@ -731,15 +760,26 @@ fn serialize_pairs_json<'py, S: Serializer>(
     let mut map = serializer.serialize_map(Some(iter_size))?;
     let filter = AnyFilter::new();
 
+    // If sort_keys is true, collect and sort the pairs first
+    let mut pairs: Vec<_> = Vec::new();
     for result in pairs_iter {
         let (key, value) = result.map_err(py_err_se_err)?;
-
         let op_next = filter.key_filter(&key, include, exclude).map_err(py_err_se_err)?;
         if let Some((next_include, next_exclude)) = op_next {
-            let key = infer_json_key(&key, extra).map_err(py_err_se_err)?;
-            let value_serializer = SerializeInfer::new(&value, next_include.as_ref(), next_exclude.as_ref(), extra);
-            map.serialize_entry(&key, &value_serializer)?;
+            let key_str = infer_json_key(&key, extra).map_err(py_err_se_err)?.into_owned();
+            pairs.push((key_str, (value, next_include, next_exclude)));
         }
     }
+
+    if extra.sort_keys {
+        pairs.sort_by(|(a, _), (b, _)| a.cmp(b));
+    }
+
+    // Serialize the pairs in order
+    for (key, (value, next_include, next_exclude)) in pairs {
+        let value_serializer = SerializeInfer::new(&value, next_include.as_ref(), next_exclude.as_ref(), extra);
+        map.serialize_entry(&key, &value_serializer)?;
+    }
+
     map.end()
 }
