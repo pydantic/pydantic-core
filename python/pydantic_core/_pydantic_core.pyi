@@ -402,6 +402,7 @@ def to_json(
     fallback: Callable[[Any], Any] | None = None,
     serialize_as_any: bool = False,
     context: Any | None = None,
+    sort_keys: bool = False,
 ) -> bytes:
     """
     Serialize a Python object to JSON including transforming and filtering data.

@@ -233,6 +233,31 @@ def test_to_json_fallback():
     assert to_json(Foobar(), fallback=fallback_func) == b'"fallback:Foobar"'
 
 
+@pytest.mark.parametrize(
+    'input_value,unsorted_output_value,sorted_output_value',
+    [
+        (
+            {'b': 2, 'a': 1},
+            b'{"b":2,"a":1}',
+            b'{"a":1,"b":2}',
+        ),
+        (
+            {'b': {'d': 4, 'c': 3}},
+            b'{"b":{"d":4,"c":3}}',
+            b'{"b":{"c":3,"d":4}}',
+        ),
+        (
+            {'b': {'d': 4, 'c': 3}, 'a': 1},
+            b'{"b":{"d":4,"c":3},"a":1}',
+            b'{"a":1,"b":{"c":3,"d":4}}',
+        ),
+    ],
+)
+def test_to_json_sort_keys(input_value, unsorted_output_value, sorted_output_value):
+    assert to_json(input_value) == unsorted_output_value
+    assert to_json(input_value, sort_keys=True) == sorted_output_value
+
+
 def test_to_jsonable_python():
     assert to_jsonable_python([1, 2]) == [1, 2]
     assert to_jsonable_python({1, 2}) == IsList(1, 2, check_order=False)

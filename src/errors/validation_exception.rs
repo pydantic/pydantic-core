@@ -351,6 +351,7 @@ impl ValidationError {
             None,
             DuckTypingSerMode::SchemaBased,
             None,
+            false,
         );
         let serializer = ValidationErrorSerializer {
             py,
