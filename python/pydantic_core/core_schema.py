@@ -3551,9 +3551,7 @@ class ArgumentsV3Schema(TypedDict, total=False):
     arguments_schema: Required[list[ArgumentsV3Parameter]]
     validate_by_name: bool
     validate_by_alias: bool
-    var_args_schema: CoreSchema
-    var_kwargs_mode: VarKwargsMode
-    var_kwargs_schema: CoreSchema
+    extra_behavior: Literal['forbid', 'ignore']  # 'allow' doesn't make sense here.
     ref: str
     metadata: dict[str, Any]
     serialization: SerSchema
@@ -3564,6 +3562,7 @@ def arguments_v3_schema(
     *,
     validate_by_name: bool | None = None,
     validate_by_alias: bool | None = None,
+    extra_behavior: Literal['forbid', 'ignore'] | None = None,
     ref: str | None = None,
     metadata: dict[str, Any] | None = None,
     serialization: SerSchema | None = None,
@@ -3585,10 +3584,14 @@ def arguments_v3_schema(
     assert v.validate_python({'a': 'hi', 'kwargs': {'b': True}}) == (('hi',), {'b': True})
     ```
 
+    This schema is currently not used by other Pydantic components. In V3, it will most likely
+    become the default arguments schema for the `'call'` schema.
+
     Args:
         arguments: The arguments to use for the arguments schema.
         validate_by_name: Whether to populate by the parameter names, defaults to `False`.
         validate_by_alias: Whether to populate by the parameter aliases, defaults to `True`.
+        extra_behavior: The extra behavior to use.
         ref: optional unique identifier of the schema, used to reference the schema in other places.
         metadata: Any other information you want to include with the schema, not used by pydantic-core.
         serialization: Custom serialization schema.
@@ -3598,6 +3601,7 @@ def arguments_v3_schema(
         arguments_schema=arguments,
         validate_by_name=validate_by_name,
         validate_by_alias=validate_by_alias,
+        extra_behavior=extra_behavior,
         ref=ref,
         metadata=metadata,
         serialization=serialization,

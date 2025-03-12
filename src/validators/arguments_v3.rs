@@ -9,7 +9,9 @@ use pyo3::IntoPyObjectExt;
 
 use crate::build_tools::py_schema_err;
 use crate::build_tools::{schema_or_config_same, ExtraBehavior};
+use crate::errors::LocItem;
 use crate::errors::{ErrorTypeDefaults, ValError, ValLineError, ValResult};
+use crate::input::ConsumeIterator;
 use crate::input::{
     Arguments, BorrowInput, Input, KeywordArgs, PositionalArgs, ValidatedDict, ValidatedTuple, ValidationMatch,
 };
@@ -86,13 +88,22 @@ impl BuildValidator for ArgumentsV3Validator {
         let mut parameters: Vec<Parameter> = Vec::with_capacity(arguments_schema.len());
 
         let mut had_default_arg = false;
+        let mut had_positional_or_keyword = false;
+        let mut had_var_args = false;
         let mut had_keyword_only = false;
+        let mut had_var_kwargs = false;
+
+        let mut names: AHashSet<String> = AHashSet::with_capacity(arguments_schema.len());
 
         for arg in arguments_schema.iter() {
             let arg = arg.downcast::<PyDict>()?;
 
             let py_name: Bound<PyString> = arg.get_as_req(intern!(py, "name"))?;
             let name = py_name.to_string();
+            if !names.insert(name.clone()) {
+                return py_schema_err!("Duplicate parameter '{}'", name);
+            }
+
             let py_mode = arg.get_as::<Bound<'_, PyString>>(intern!(py, "mode"))?;
             let py_mode = py_mode
                 .as_ref()
@@ -102,8 +113,51 @@ impl BuildValidator for ArgumentsV3Validator {
 
             let mode = ParameterMode::from_str(py_mode)?;
 
-            if mode == ParameterMode::KeywordOnly {
-                had_keyword_only = true;
+            match mode {
+                ParameterMode::PositionalOnly => {
+                    if had_positional_or_keyword || had_var_args || had_keyword_only || had_var_kwargs {
+                        return py_schema_err!(
+                            "Positional only parameter '{}' cannot follow other parameter kinds",
+                            name
+                        );
+                    }
+                }
+                ParameterMode::PositionalOrKeyword => {
+                    if had_var_args || had_keyword_only || had_var_kwargs {
+                        return py_schema_err!(
+                            "Positional or keyword parameter '{}' cannot follow variadic or keyword only parameters",
+                            name
+                        );
+                    }
+                    had_positional_or_keyword = true;
+                }
+                ParameterMode::VarArgs => {
+                    if had_var_args {
+                        return py_schema_err!("Duplicate variadic positional parameter '{}'", name);
+                    }
+                    if had_keyword_only || had_var_kwargs {
+                        return py_schema_err!(
+                            "Variadic positional parameter '{}' cannot follow variadic or keyword only parameters",
+                            name
+                        );
+                    }
+                    had_var_args = true;
+                }
+                ParameterMode::KeywordOnly => {
+                    if had_var_kwargs {
+                        return py_schema_err!(
+                            "Keyword only parameter '{}' cannot follow variadic keyword only parameter",
+                            name
+                        );
+                    }
+                    had_keyword_only = true;
+                }
+                ParameterMode::VarKwargsUniform | ParameterMode::VarKwargsUnpackedTypedDict => {
+                    if had_var_kwargs {
+                        return py_schema_err!("Duplicate variadic keyword parameter '{}'", name);
+                    }
+                    had_var_kwargs = true;
+                }
             }
 
             let schema = arg.get_as_req(intern!(py, "schema"))?;
@@ -188,12 +242,26 @@ impl ArgumentsV3Validator {
         let validate_by_alias = state.validate_by_alias_or(self.validate_by_alias);
         let validate_by_name = state.validate_by_name_or(self.validate_by_name);
 
+        // Keep track of used keys for extra behavior:
+        let mut used_keys: Option<AHashSet<&str>> = if self.extra == ExtraBehavior::Ignore || mapping.is_py_get_attr() {
+            None
+        } else {
+            Some(AHashSet::with_capacity(self.parameters.len()))
+        };
+
         for parameter in &self.parameters {
             let lookup_key = parameter
                 .lookup_key_collection
                 .select(validate_by_alias, validate_by_name)?;
+
             // A value is present in the mapping:
             if let Some((lookup_path, dict_value)) = mapping.get_item(lookup_key)? {
+                if let Some(ref mut used_keys) = used_keys {
+                    // key is "used" whether or not validation passes, since we want to skip this key in
+                    // extra logic either way
+                    used_keys.insert(lookup_path.first_key());
+                }
+
                 match parameter.mode {
                     ParameterMode::PositionalOnly | ParameterMode::PositionalOrKeyword => {
                         match parameter.validator.validate(py, dict_value.borrow_input(), state) {
@@ -368,6 +436,66 @@ impl ArgumentsV3Validator {
             }
         }
 
+        if let Some(used_keys) = used_keys {
+            struct ValidateExtra<'a> {
+                used_keys: AHashSet<&'a str>,
+                errors: &'a mut Vec<ValLineError>,
+                extra_behavior: ExtraBehavior,
+            }
+
+            impl<'py, Key, Value> ConsumeIterator<ValResult<(Key, Value)>> for ValidateExtra<'_>
+            where
+                Key: BorrowInput<'py> + Clone + Into<LocItem>,
+                Value: BorrowInput<'py>,
+            {
+                type Output = ValResult<()>;
+                fn consume_iterator(self, iterator: impl Iterator<Item = ValResult<(Key, Value)>>) -> Self::Output {
+                    for item_result in iterator {
+                        let (raw_key, value) = item_result?;
+                        let either_str = match raw_key
+                            .borrow_input()
+                            .validate_str(true, false)
+                            .map(ValidationMatch::into_inner)
+                        {
+                            Ok(k) => k,
+                            Err(ValError::LineErrors(line_errors)) => {
+                                for err in line_errors {
+                                    self.errors.push(
+                                        err.with_outer_location(raw_key.clone())
+                                            .with_type(ErrorTypeDefaults::InvalidKey),
+                                    );
+                                }
+                                continue;
+                            }
+                            Err(err) => return Err(err),
+                        };
+                        let cow = either_str.as_cow()?;
+                        if self.used_keys.contains(cow.as_ref()) {
+                            continue;
+                        }
+
+                        let value = value.borrow_input();
+
+                        if self.extra_behavior == ExtraBehavior::Forbid {
+                            self.errors.push(ValLineError::new_with_loc(
+                                ErrorTypeDefaults::ExtraForbidden,
+                                value,
+                                raw_key.clone(),
+                            ));
+                        }
+                    }
+
+                    Ok(())
+                }
+            }
+
+            mapping.iterate(ValidateExtra {
+                used_keys,
+                errors: &mut errors,
+                extra_behavior: self.extra,
+            })??;
+        }
+
         if !errors.is_empty() {
             Err(ValError::LineErrors(errors))
         } else {
@@ -397,7 +525,7 @@ impl ArgumentsV3Validator {
         let validate_by_alias = state.validate_by_alias_or(self.validate_by_alias);
         let validate_by_name = state.validate_by_name_or(self.validate_by_name);
 
-        // go through non variadic arguments, getting the value from args or kwargs and validating it
+        // go through non variadic parameters, getting the value from args or kwargs and validating it
         for (index, parameter) in self.parameters.iter().filter(|p| !p.is_variadic()).enumerate() {
             let lookup_key = parameter
                 .lookup_key_collection

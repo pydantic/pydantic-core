@@ -1,6 +1,6 @@
 import pytest
 
-from pydantic_core import ArgsKwargs, SchemaError, SchemaValidator, ValidationError
+from pydantic_core import ArgsKwargs, SchemaValidator, ValidationError
 from pydantic_core import core_schema as cs
 
 from ...conftest import Err, PyAndJson, plain_repr
@@ -13,8 +13,6 @@ from ...conftest import Err, PyAndJson, plain_repr
         [{}, ((), {})],
         [ArgsKwargs((1,)), Err('', [{'type': 'unexpected_positional_argument'}])],
         [ArgsKwargs((), {'a': 1}), Err('', [{'type': 'unexpected_keyword_argument'}])],
-        # TODO?
-        # [{'a': 1}, Err('', [{'type': 'unexpected_argument'}])],
     ),
 )
 def test_no_args(py_and_json: PyAndJson, input_value, expected) -> None:
@@ -72,7 +70,7 @@ def test_internal_error(py_and_json: PyAndJson) -> None:
             [
                 cs.arguments_v3_parameter(name='a', schema=cs.int_schema(), mode='positional_only'),
                 cs.arguments_v3_parameter(
-                    name='a', schema=cs.no_info_plain_validator_function(double_or_bust), mode='positional_only'
+                    name='b', schema=cs.no_info_plain_validator_function(double_or_bust), mode='positional_only'
                 ),
             ]
         )
@@ -83,27 +81,11 @@ def test_internal_error(py_and_json: PyAndJson) -> None:
         v.validate_test(ArgsKwargs((1, 1)))
 
 
-def test_build_non_default_follows_default() -> None:
-    with pytest.raises(SchemaError, match="Required parameter 'b' follows parameter with default"):
-        SchemaValidator(
-            schema=cs.arguments_v3_schema(
-                [
-                    cs.arguments_v3_parameter(
-                        name='a',
-                        schema=cs.with_default_schema(schema=cs.int_schema(), default_factory=lambda: 42),
-                        mode='positional_or_keyword',
-                    ),
-                    cs.arguments_v3_parameter(name='b', schema=cs.int_schema(), mode='positional_or_keyword'),
-                ]
-            )
-        )
-
-
 def test_repr() -> None:
     v = SchemaValidator(
         cs.arguments_v3_schema(
             [
-                cs.arguments_v3_parameter(name='b', schema=cs.int_schema(), mode='positional_or_keyword'),
+                cs.arguments_v3_parameter(name='a', schema=cs.int_schema(), mode='positional_or_keyword'),
                 cs.arguments_v3_parameter(
                     name='b',
                     schema=cs.with_default_schema(schema=cs.int_schema(), default_factory=lambda: 42),
