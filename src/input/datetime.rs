@@ -548,7 +548,6 @@ pub struct TzInfo {
 #[pymethods]
 impl TzInfo {
     #[new]
-    #[pyo3(signature = (seconds))]
     fn py_new(seconds: f32) -> PyResult<Self> {
         Self::try_from(seconds.trunc() as i32)
     }
