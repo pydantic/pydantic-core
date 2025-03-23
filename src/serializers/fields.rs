@@ -13,7 +13,7 @@ use crate::PydanticSerializationUnexpectedValue;
 
 use super::computed_fields::ComputedFields;
 use super::errors::py_err_se_err;
-use super::extra::Extra;
+use super::extra::{Extra, SortKeysMode};
 use super::filter::SchemaFilter;
 use super::infer::{infer_json_key, infer_serialize, infer_to_python, SerializeInfer};
 use super::shared::PydanticSerializer;
@@ -156,7 +156,7 @@ impl GeneralFieldsSerializer {
         let output_dict = PyDict::new(py);
         let mut used_req_fields: usize = 0;
 
-        if !extra.sort_keys {
+        if matches!(extra.sort_keys, SortKeysMode::Unsorted) {
             for result in main_iter {
                 let (key, value) = result?;
                 if let Some(is_required) =
@@ -201,6 +201,23 @@ impl GeneralFieldsSerializer {
         }
     }
 
+    fn sort_dict_recursive<'py>(py: Python<'py>, value: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyDict>> {
+        let dict = value.downcast::<PyDict>()?;
+        let mut items = dict_items(dict).collect::<PyResult<Vec<_>>>()?;
+        items.sort_by_cached_key(|(key, _)| key_str(key).unwrap_or_default().to_string());
+
+        let sorted_dict = PyDict::new(py);
+        for (k, v) in items {
+            if v.downcast::<PyDict>().is_ok() {
+                let sorted_v = Self::sort_dict_recursive(py, &v)?;
+                sorted_dict.set_item(k, sorted_v)?;
+            } else {
+                sorted_dict.set_item(k, v)?;
+            }
+        }
+        Ok(sorted_dict)
+    }
+
     fn process_field_entry_python<'py>(
         &self,
         key: &Bound<'py, PyAny>,
@@ -235,10 +252,21 @@ impl GeneralFieldsSerializer {
             if let Some(field) = op_field {
                 if let Some(ref serializer) = field.serializer {
                     if !exclude_default(value, &field_extra, serializer)? {
-                        let value =
-                            serializer.to_python(value, next_include.as_ref(), next_exclude.as_ref(), &field_extra)?;
+                        let processed_value = if matches!(extra.sort_keys, SortKeysMode::Recursive)
+                            && value.downcast::<PyDict>().is_ok()
+                        {
+                            let sorted_dict = Self::sort_dict_recursive(value.py(), value)?;
+                            serializer.to_python(
+                                sorted_dict.as_ref(),
+                                next_include.as_ref(),
+                                next_exclude.as_ref(),
+                                &field_extra,
+                            )?
+                        } else {
+                            serializer.to_python(value, next_include.as_ref(), next_exclude.as_ref(), &field_extra)?
+                        };
                         let output_key = field.get_key_py(output_dict.py(), &field_extra);
-                        output_dict.set_item(output_key, value)?;
+                        output_dict.set_item(output_key, processed_value)?;
                     }
                 }
 
@@ -247,13 +275,33 @@ impl GeneralFieldsSerializer {
                 }
                 return Ok(Some(false));
             } else if self.mode == FieldsMode::TypedDictAllow {
-                let value = match &self.extra_serializer {
-                    Some(serializer) => {
-                        serializer.to_python(value, next_include.as_ref(), next_exclude.as_ref(), &field_extra)?
+                let processed_value = if matches!(extra.sort_keys, SortKeysMode::Recursive)
+                    && value.downcast::<PyDict>().is_ok()
+                {
+                    let sorted_dict = Self::sort_dict_recursive(value.py(), value)?;
+                    match &self.extra_serializer {
+                        Some(serializer) => serializer.to_python(
+                            sorted_dict.as_ref(),
+                            next_include.as_ref(),
+                            next_exclude.as_ref(),
+                            &field_extra,
+                        )?,
+                        None => infer_to_python(
+                            sorted_dict.as_ref(),
+                            next_include.as_ref(),
+                            next_exclude.as_ref(),
+                            &field_extra,
+                        )?,
                     }
-                    None => infer_to_python(value, next_include.as_ref(), next_exclude.as_ref(), &field_extra)?,
+                } else {
+                    match &self.extra_serializer {
+                        Some(serializer) => {
+                            serializer.to_python(value, next_include.as_ref(), next_exclude.as_ref(), &field_extra)?
+                        }
+                        None => infer_to_python(value, next_include.as_ref(), next_exclude.as_ref(), &field_extra)?,
+                    }
                 };
-                output_dict.set_item(key, value)?;
+                output_dict.set_item(key, processed_value)?;
                 return Ok(None);
             } else if field_extra.check == SerCheck::Strict {
                 return Err(PydanticSerializationUnexpectedValue::new(
@@ -281,7 +329,7 @@ impl GeneralFieldsSerializer {
         // we don't both with `used_fields` here because on unions, `to_python(..., mode='json')` is used
         let mut map = serializer.serialize_map(Some(expected_len))?;
 
-        if !extra.sort_keys {
+        if matches!(extra.sort_keys, SortKeysMode::Unsorted) {
             for result in main_iter {
                 let (key, value) = result.map_err(py_err_se_err)?;
                 self.process_field_entry::<S>(&key, &value, &mut map, include, exclude, &extra)?;
@@ -308,32 +356,56 @@ impl GeneralFieldsSerializer {
         if extra.exclude_none && value.is_none() {
             return Ok(());
         }
-        let key_str = key_str(key).map_err(py_err_se_err)?;
+        let field_key_str = key_str(key).map_err(py_err_se_err)?;
         let field_extra = Extra {
-            field_name: Some(key_str),
+            field_name: Some(field_key_str),
             ..*extra
         };
 
         let filter = self.filter.key_filter(key, include, exclude).map_err(py_err_se_err)?;
         if let Some((next_include, next_exclude)) = filter {
-            if let Some(field) = self.fields.get(key_str) {
+            if let Some(field) = self.fields.get(field_key_str) {
                 if let Some(ref serializer) = field.serializer {
                     if !exclude_default(value, &field_extra, serializer).map_err(py_err_se_err)? {
-                        let s = PydanticSerializer::new(
-                            value,
-                            serializer,
-                            next_include.as_ref(),
-                            next_exclude.as_ref(),
-                            &field_extra,
-                        );
-                        let output_key = field.get_key_json(key_str, &field_extra);
-                        map.serialize_entry(&output_key, &s)?;
+                        if matches!(extra.sort_keys, SortKeysMode::Recursive) && value.downcast::<PyDict>().is_ok() {
+                            let sorted_dict = Self::sort_dict_recursive(value.py(), value).map_err(py_err_se_err)?;
+                            let s = PydanticSerializer::new(
+                                sorted_dict.as_ref(),
+                                serializer,
+                                next_include.as_ref(),
+                                next_exclude.as_ref(),
+                                &field_extra,
+                            );
+                            let output_key = field.get_key_json(field_key_str, &field_extra);
+                            map.serialize_entry(&output_key, &s)?;
+                        } else {
+                            let s = PydanticSerializer::new(
+                                value,
+                                serializer,
+                                next_include.as_ref(),
+                                next_exclude.as_ref(),
+                                &field_extra,
+                            );
+                            let output_key = field.get_key_json(field_key_str, &field_extra);
+                            map.serialize_entry(&output_key, &s)?;
+                        }
                     }
                 }
             } else if self.mode == FieldsMode::TypedDictAllow {
                 let output_key = infer_json_key(key, &field_extra).map_err(py_err_se_err)?;
-                let s = SerializeInfer::new(value, next_include.as_ref(), next_exclude.as_ref(), &field_extra);
-                map.serialize_entry(&output_key, &s)?;
+                if matches!(extra.sort_keys, SortKeysMode::Recursive) && value.downcast::<PyDict>().is_ok() {
+                    let sorted_dict = Self::sort_dict_recursive(value.py(), value).map_err(py_err_se_err)?;
+                    let s = SerializeInfer::new(
+                        sorted_dict.as_ref(),
+                        next_include.as_ref(),
+                        next_exclude.as_ref(),
+                        &field_extra,
+                    );
+                    map.serialize_entry(&output_key, &s)?;
+                } else {
+                    let s = SerializeInfer::new(value, next_include.as_ref(), next_exclude.as_ref(), &field_extra);
+                    map.serialize_entry(&output_key, &s)?;
+                }
             }
             // no error case here since unions (which need the error case) use `to_python(..., mode='json')`
         }
