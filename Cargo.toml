@@ -110,3 +110,7 @@ too_many_lines = "allow"
 unnecessary_wraps = "allow"
 unused_self = "allow"
 used_underscore_binding = "allow"
+
+[patch.crates-io]
+pyo3 = { git = "https://github.com/davidhewitt/pyo3", branch = "no-err-normalization" }
+pyo3-build-config = { git = "https://github.com/davidhewitt/pyo3", branch = "no-err-normalization" }
