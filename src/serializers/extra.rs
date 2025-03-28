@@ -86,6 +86,7 @@ impl SerializationState {
         by_alias: Option<bool>,
         exclude_none: bool,
         round_trip: bool,
+        sort_keys: &'py SortKeysMode,
         serialize_unknown: bool,
         fallback: Option<&'py Bound<'_, PyAny>>,
         duck_typing_ser_mode: DuckTypingSerMode,
@@ -100,6 +101,7 @@ impl SerializationState {
             false,
             exclude_none,
             round_trip,
+            sort_keys,
             &self.config,
             &self.rec_guard,
             serialize_unknown,
@@ -126,6 +128,7 @@ pub(crate) struct Extra<'a> {
     pub exclude_defaults: bool,
     pub exclude_none: bool,
     pub round_trip: bool,
+    pub sort_keys: &'a SortKeysMode,
     pub config: &'a SerializationConfig,
     pub rec_guard: &'a SerRecursionState,
     // the next two are used for union logic
@@ -152,6 +155,7 @@ impl<'a> Extra<'a> {
         exclude_defaults: bool,
         exclude_none: bool,
         round_trip: bool,
+        sort_keys: &'a SortKeysMode,
         config: &'a SerializationConfig,
         rec_guard: &'a SerRecursionState,
         serialize_unknown: bool,
@@ -168,6 +172,7 @@ impl<'a> Extra<'a> {
             exclude_defaults,
             exclude_none,
             round_trip,
+            sort_keys,
             config,
             rec_guard,
             check: SerCheck::None,
@@ -236,6 +241,7 @@ pub(crate) struct ExtraOwned {
     exclude_defaults: bool,
     exclude_none: bool,
     round_trip: bool,
+    sort_keys: SortKeysMode,
     config: SerializationConfig,
     rec_guard: SerRecursionState,
     check: SerCheck,
@@ -257,6 +263,7 @@ impl ExtraOwned {
             exclude_defaults: extra.exclude_defaults,
             exclude_none: extra.exclude_none,
             round_trip: extra.round_trip,
+            sort_keys: *extra.sort_keys,
             config: extra.config.clone(),
             rec_guard: extra.rec_guard.clone(),
             check: extra.check,
@@ -279,6 +286,7 @@ impl ExtraOwned {
             exclude_defaults: self.exclude_defaults,
             exclude_none: self.exclude_none,
             round_trip: self.round_trip,
+            sort_keys: &self.sort_keys,
             config: &self.config,
             rec_guard: &self.rec_guard,
             check: self.check,
@@ -375,6 +383,58 @@ impl From<bool> for WarningsMode {
             Self::Warn
         } else {
             Self::None
+        }
+    }
+}
+
+// #[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy)]
+pub enum SortKeysMode {
+    Recursive,
+    TopLevel,
+    Unsorted,
+}
+
+impl<'py> FromPyObject<'py> for SortKeysMode {
+    fn extract_bound(ob: &Bound<'py, PyAny>) -> PyResult<SortKeysMode> {
+        if let Ok(str_mode) = ob.extract::<&str>() {
+            match str_mode {
+                "recursive" => Ok(Self::Recursive),
+                "top-level" => Ok(Self::TopLevel),
+                "unsorted" => Ok(Self::Unsorted),
+                _ => Err(PyValueError::new_err(
+                    "Invalid sort_keys parameter, should be `'recursive'`, `'top-level'`, `'unsorted'`",
+                )),
+            }
+        } else {
+            Err(PyTypeError::new_err(
+                "Invalid warnings parameter, should be `'none'`, `'warn'`, `'error'` or a `bool`",
+            ))
+        }
+    }
+}
+
+impl From<&str> for SortKeysMode {
+    fn from(s: &str) -> Self {
+        match s {
+            "recursive" => SortKeysMode::Recursive,
+            "top-level" => SortKeysMode::TopLevel,
+            "unsorted" => SortKeysMode::Unsorted,
+            _ => SortKeysMode::Unsorted,
+        }
+    }
+}
+
+impl<'py> IntoPyObject<'py> for &'_ SortKeysMode {
+    type Target = PyString;
+    type Output = Bound<'py, PyString>;
+    type Error = Infallible;
+
+    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
+        match self {
+            SortKeysMode::Recursive => Ok(intern!(py, "recursive").clone()),
+            SortKeysMode::TopLevel => Ok(intern!(py, "top-level").clone()),
+            SortKeysMode::Unsorted => Ok(intern!(py, "unsorted").clone()),
         }
     }
 }

@@ -18,7 +18,7 @@ use crate::build_tools::py_schema_error_type;
 use crate::errors::LocItem;
 use crate::get_pydantic_version;
 use crate::input::InputType;
-use crate::serializers::{DuckTypingSerMode, Extra, SerMode, SerializationState};
+use crate::serializers::{DuckTypingSerMode, Extra, SerMode, SerializationState, SortKeysMode};
 use crate::tools::{safe_repr, write_truncated_to_limited_bytes, SchemaDict};
 
 use super::line_error::ValLineError;
@@ -347,6 +347,7 @@ impl ValidationError {
             None,
             false,
             false,
+            &SortKeysMode::Unsorted,
             true,
             None,
             DuckTypingSerMode::SchemaBased,
