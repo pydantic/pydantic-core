@@ -159,8 +159,9 @@ impl GeneralFieldsSerializer {
         if matches!(extra.sort_keys, SortKeysMode::Unsorted) {
             for result in main_iter {
                 let (key, value) = result?;
+                let key_str = key_str(&key)?;
                 if let Some(is_required) =
-                    self.process_field_entry_python(&key, &value, &output_dict, include, exclude, &extra)?
+                    self.process_field_entry_python(key_str, &key, &value, &output_dict, include, exclude, &extra)?
                 {
                     if is_required {
                         used_req_fields += 1;
@@ -168,12 +169,18 @@ impl GeneralFieldsSerializer {
                 }
             }
         } else {
-            let mut items = main_iter.collect::<PyResult<Vec<_>>>()?;
-            items.sort_by_cached_key(|(key, _)| key_str(key).unwrap_or_default().to_string());
+            let mut items = main_iter
+                .map(|r| -> PyResult<_> {
+                    let (k, v) = r?;
+                    let k_str = key_str(&k)?.to_owned();
+                    Ok((k_str, k, v))
+                })
+                .collect::<PyResult<Vec<_>>>()?;
+            items.sort_by(|(a, _, _), (b, _, _)| a.cmp(b));
 
-            for (key, value) in items {
+            for (key_str, key, value) in items {
                 if let Some(is_required) =
-                    self.process_field_entry_python(&key, &value, &output_dict, include, exclude, &extra)?
+                    self.process_field_entry_python(&key_str, &key, &value, &output_dict, include, exclude, &extra)?
                 {
                     if is_required {
                         used_req_fields += 1;
@@ -218,8 +225,10 @@ impl GeneralFieldsSerializer {
         Ok(sorted_dict)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn process_field_entry_python<'py>(
         &self,
+        key_str: &str,
         key: &Bound<'py, PyAny>,
         value: &Bound<'py, PyAny>,
         output_dict: &Bound<'py, PyDict>,
@@ -231,7 +240,6 @@ impl GeneralFieldsSerializer {
         //   - Some(true)  -> Field was required and processed
         //   - Some(false) -> Field was processed but not required
         //   - None        -> Field was filtered out or skipped
-        let key_str = key_str(key)?;
         let op_field = self.fields.get(key_str);
 
         if extra.exclude_none && value.is_none() {
@@ -301,11 +309,11 @@ impl GeneralFieldsSerializer {
                         None => infer_to_python(value, next_include.as_ref(), next_exclude.as_ref(), &field_extra)?,
                     }
                 };
-                output_dict.set_item(key, processed_value)?;
+                output_dict.set_item(key_str, processed_value)?;
                 return Ok(None);
             } else if field_extra.check == SerCheck::Strict {
                 return Err(PydanticSerializationUnexpectedValue::new(
-                    Some(format!("Unexpected field `{key}`")),
+                    Some(format!("Unexpected field `{key_str}`")),
                     field_extra.model_type_name().map(|bound| bound.to_string()),
                     None,
                 )
@@ -332,20 +340,30 @@ impl GeneralFieldsSerializer {
         if matches!(extra.sort_keys, SortKeysMode::Unsorted) {
             for result in main_iter {
                 let (key, value) = result.map_err(py_err_se_err)?;
-                self.process_field_entry::<S>(&key, &value, &mut map, include, exclude, &extra)?;
+                let key_str = key_str(&key).map_err(py_err_se_err)?;
+                self.process_field_entry::<S>(key_str, &key, &value, &mut map, include, exclude, &extra)?;
             }
         } else {
-            let mut items = main_iter.collect::<PyResult<Vec<_>>>().map_err(py_err_se_err)?;
-            items.sort_by_cached_key(|(key, _)| key_str(key).unwrap_or_default().to_string());
-            for (key, value) in items {
-                self.process_field_entry::<S>(&key, &value, &mut map, include, exclude, &extra)?;
+            let mut items = main_iter
+                .map(|r| -> PyResult<_> {
+                    let (k, v) = r?;
+                    let k_str = key_str(&k)?.to_owned();
+                    Ok((k_str, k, v))
+                })
+                .collect::<PyResult<Vec<_>>>()
+                .map_err(py_err_se_err)?;
+            items.sort_by(|(a, _, _), (b, _, _)| a.cmp(b));
+            for (key_str, key, value) in items {
+                self.process_field_entry::<S>(&key_str, &key, &value, &mut map, include, exclude, &extra)?;
             }
         }
         Ok(map)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn process_field_entry<'py, S: serde::ser::Serializer>(
         &self,
+        key_str: &str,
         key: &Bound<'py, PyAny>,
         value: &Bound<'py, PyAny>,
         map: &mut S::SerializeMap,
@@ -356,15 +374,14 @@ impl GeneralFieldsSerializer {
         if extra.exclude_none && value.is_none() {
             return Ok(());
         }
-        let field_key_str = key_str(key).map_err(py_err_se_err)?;
         let field_extra = Extra {
-            field_name: Some(field_key_str),
+            field_name: Some(key_str),
             ..*extra
         };
 
         let filter = self.filter.key_filter(key, include, exclude).map_err(py_err_se_err)?;
         if let Some((next_include, next_exclude)) = filter {
-            if let Some(field) = self.fields.get(field_key_str) {
+            if let Some(field) = self.fields.get(key_str) {
                 if let Some(ref serializer) = field.serializer {
                     if !exclude_default(value, &field_extra, serializer).map_err(py_err_se_err)? {
                         if matches!(extra.sort_keys, SortKeysMode::Recursive) && value.downcast::<PyDict>().is_ok() {
@@ -376,7 +393,7 @@ impl GeneralFieldsSerializer {
                                 next_exclude.as_ref(),
                                 &field_extra,
                             );
-                            let output_key = field.get_key_json(field_key_str, &field_extra);
+                            let output_key = field.get_key_json(key_str, &field_extra);
                             map.serialize_entry(&output_key, &s)?;
                         } else {
                             let s = PydanticSerializer::new(
@@ -386,7 +403,7 @@ impl GeneralFieldsSerializer {
                                 next_exclude.as_ref(),
                                 &field_extra,
                             );
-                            let output_key = field.get_key_json(field_key_str, &field_extra);
+                            let output_key = field.get_key_json(key_str, &field_extra);
                             map.serialize_entry(&output_key, &s)?;
                         }
                     }
