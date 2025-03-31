@@ -1,7 +1,7 @@
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::intern;
 use pyo3::sync::GILOnceCell;
-use pyo3::types::{IntoPyDict, PyDict, PyString, PyTuple, PyType};
+use pyo3::types::{IntoPyDict, PyDict, PyTuple, PyType};
 use pyo3::{prelude::*, PyTypeInfo};
 
 use crate::build_tools::{is_strict, schema_or_config_same};
@@ -29,7 +29,7 @@ pub fn get_decimal_type(py: Python) -> &Bound<'_, PyType> {
 }
 
 fn validate_as_decimal(py: Python, schema: &Bound<'_, PyDict>, key: &str) -> PyResult<Option<Py<PyAny>>> {
-    match schema.get_as::<Bound<'_, PyAny>>(&PyString::new(py, key))? {
+    match schema.get_item(key)? {
         Some(value) => match value.validate_decimal(false, py) {
             Ok(v) => Ok(Some(v.into_inner().unbind())),
             Err(_) => Err(PyValueError::new_err(format!(

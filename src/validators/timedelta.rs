@@ -1,10 +1,11 @@
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDelta, PyDeltaAccess, PyDict};
-use speedate::Duration;
+use speedate::{Duration, MicrosecondsPrecisionOverflowBehavior};
 
 use crate::build_tools::is_strict;
 use crate::errors::{ErrorType, ValError, ValResult};
-use crate::input::{duration_as_pytimedelta, EitherTimedelta, Input};
+use crate::input::{duration_as_pytimedelta, Input};
 
 use super::datetime::extract_microseconds_precision;
 use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
@@ -26,10 +27,12 @@ struct TimedeltaConstraints {
 
 fn get_constraint(schema: &Bound<'_, PyDict>, key: &str) -> PyResult<Option<Duration>> {
     match schema.get_item(key)? {
-        Some(value) => {
-            let either_timedelta = EitherTimedelta::try_from(&value)?;
-            Ok(Some(either_timedelta.to_duration()?))
-        }
+        Some(value) => match value.validate_timedelta(false, MicrosecondsPrecisionOverflowBehavior::default()) {
+            Ok(v) => Ok(Some(v.into_inner().to_duration()?)),
+            Err(_) => Err(PyValueError::new_err(format!(
+                "'{key}' must be coercible to a timedelta instance"
+            ))),
+        },
         None => Ok(None),
     }
 }
