@@ -1,7 +1,7 @@
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::intern;
 use pyo3::sync::GILOnceCell;
-use pyo3::types::{IntoPyDict, PyDict, PyTuple, PyType};
+use pyo3::types::{IntoPyDict, PyDict, PyString, PyTuple, PyType};
 use pyo3::{prelude::*, PyTypeInfo};
 
 use crate::build_tools::{is_strict, schema_or_config_same};
@@ -28,7 +28,11 @@ pub fn get_decimal_type(py: Python) -> &Bound<'_, PyType> {
         .bind(py)
 }
 
-fn validate_as_decimal(py: Python, schema: &Bound<'_, PyDict>, key: &str) -> PyResult<Option<Py<PyAny>>> {
+fn validate_as_decimal(
+    py: Python,
+    schema: &Bound<'_, PyDict>,
+    key: &Bound<'_, PyString>,
+) -> PyResult<Option<Py<PyAny>>> {
     match schema.get_item(key)? {
         Some(value) => match value.validate_decimal(false, py) {
             Ok(v) => Ok(Some(v.into_inner().unbind())),
@@ -77,11 +81,11 @@ impl BuildValidator for DecimalValidator {
             allow_inf_nan,
             check_digits: decimal_places.is_some() || max_digits.is_some(),
             decimal_places,
-            multiple_of: validate_as_decimal(py, schema, "multiple_of")?,
-            le: validate_as_decimal(py, schema, "le")?,
-            lt: validate_as_decimal(py, schema, "lt")?,
-            ge: validate_as_decimal(py, schema, "ge")?,
-            gt: validate_as_decimal(py, schema, "gt")?,
+            multiple_of: validate_as_decimal(py, schema, intern!(py, "multiple_of"))?,
+            le: validate_as_decimal(py, schema, intern!(py, "le"))?,
+            lt: validate_as_decimal(py, schema, intern!(py, "lt"))?,
+            ge: validate_as_decimal(py, schema, intern!(py, "ge"))?,
+            gt: validate_as_decimal(py, schema, intern!(py, "gt"))?,
             max_digits,
         }
         .into())

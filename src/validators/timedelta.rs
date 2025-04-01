@@ -1,6 +1,7 @@
 use pyo3::exceptions::PyValueError;
+use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::{PyDelta, PyDeltaAccess, PyDict};
+use pyo3::types::{PyDelta, PyDeltaAccess, PyDict, PyString};
 use speedate::{Duration, MicrosecondsPrecisionOverflowBehavior};
 
 use crate::build_tools::is_strict;
@@ -25,7 +26,7 @@ struct TimedeltaConstraints {
     gt: Option<Duration>,
 }
 
-fn get_constraint(schema: &Bound<'_, PyDict>, key: &str) -> PyResult<Option<Duration>> {
+fn get_constraint(schema: &Bound<'_, PyDict>, key: &Bound<'_, PyString>) -> PyResult<Option<Duration>> {
     match schema.get_item(key)? {
         Some(value) => match value.validate_timedelta(false, MicrosecondsPrecisionOverflowBehavior::default()) {
             Ok(v) => Ok(Some(v.into_inner().to_duration()?)),
@@ -45,11 +46,12 @@ impl BuildValidator for TimeDeltaValidator {
         config: Option<&Bound<'_, PyDict>>,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
+        let py = schema.py();
         let constraints = TimedeltaConstraints {
-            le: get_constraint(schema, "le")?,
-            lt: get_constraint(schema, "lt")?,
-            ge: get_constraint(schema, "ge")?,
-            gt: get_constraint(schema, "gt")?,
+            le: get_constraint(schema, intern!(py, "le"))?,
+            lt: get_constraint(schema, intern!(py, "lt"))?,
+            ge: get_constraint(schema, intern!(py, "ge"))?,
+            gt: get_constraint(schema, intern!(py, "gt"))?,
         };
 
         Ok(Self {
