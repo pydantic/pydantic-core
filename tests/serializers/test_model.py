@@ -1124,20 +1124,20 @@ def test_extra_sort_keys():
             'field_none': None,
         }
     )
-    assert s.to_python(m) == snapshot(
+    assert s.to_python(m, sort_keys=True) == snapshot(
         {
             'field_123': b'test_123',
             'field_a': b'test',
             'field_b': 12,
-            'field_c': {'mango': 2, 'banana': 3, 'apple': 1},
+            'field_c': {'apple': 1, 'banana': 3, 'mango': 2},
             'field_n': [
-                {'mango': 3, 'banana': 2, 'apple': 1},
-                [{'mango': 3, 'banana': 2, 'apple': 1}, {'d': 3, 'b': 2, 'a': 1}],
+                {'apple': 1, 'banana': 2, 'mango': 3},
+                [{'apple': 1, 'banana': 2, 'mango': 3}, {'a': 1, 'b': 2, 'd': 3}],
                 3,
             ],
             'field_d': [
-                {'d': 3, 'b': 2, 'a': {'nested3': 3, 'nested1': 1, 'nested2': 2}},
-                [[{'mango': 3, 'banana': 2, 'apple': 1}], {'d': 3, 'b': 2, 'a': 1}],
+                {'a': {'nested1': 1, 'nested2': 2, 'nested3': 3}, 'b': 2, 'd': 3},
+                [[{'apple': 1, 'banana': 2, 'mango': 3}], {'a': 1, 'b': 2, 'd': 3}],
                 3,
             ],
             'field_none': None,
