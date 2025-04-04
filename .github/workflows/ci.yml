@@ -46,7 +46,7 @@ jobs:
 
       - run: uv pip freeze
 
-      - run: uv run coverage run -m pytest
+      - run: uv run coverage run -m pytest --junitxml=junit.xml -o junit_family=legacy
 
       - run: ls -lha
       - run: uv run coverage xml
