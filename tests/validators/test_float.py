@@ -11,6 +11,7 @@ from pydantic_core import core_schema as cs
 
 from ..conftest import Err, PyAndJson, plain_repr
 
+i64_max = 9_223_372_036_854_775_807
 f64_max = 1.7976931348623157e308
 
 
@@ -20,6 +21,7 @@ f64_max = 1.7976931348623157e308
         (0, 0),
         (1, 1),
         (42, 42),
+        (i64_max + 1, i64_max + 1),
         ('42', 42),
         ('  42.1  ', 42.1),
         ('42.123', 42.123),
