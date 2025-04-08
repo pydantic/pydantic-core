@@ -13,7 +13,7 @@ from decimal import Decimal
 from re import Pattern
 from typing import TYPE_CHECKING, Any, Callable, Literal, Union
 
-from typing_extensions import deprecated
+from typing_extensions import TypeVar, deprecated
 
 if sys.version_info < (3, 12):
     from typing_extensions import TypedDict
@@ -163,13 +163,16 @@ class FieldSerializationInfo(SerializationInfo, Protocol):
     def field_name(self) -> str: ...
 
 
-class ValidationInfo(Protocol):
+ContextT = TypeVar('ContextT', covariant=True, default='Any | None')
+
+
+class ValidationInfo(Protocol[ContextT]):
     """
     Argument passed to validation functions.
     """
 
     @property
-    def context(self) -> Any | None:
+    def context(self) -> ContextT:
         """Current validation context."""
         ...
 
