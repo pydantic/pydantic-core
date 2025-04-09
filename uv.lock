@@ -1,4 +1,5 @@
 version = 1
+revision = 1
 requires-python = ">=3.9"
 resolution-markers = [
     "python_full_version == '3.13.*' and implementation_name == 'cpython'",
@@ -635,7 +636,7 @@ wasm = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "typing-extensions", specifier = ">=4.6.0,!=4.7.0" }]
+requires-dist = [{ name = "typing-extensions", specifier = ">=4.12.0" }]
 
 [package.metadata.requires-dev]
 all = [
