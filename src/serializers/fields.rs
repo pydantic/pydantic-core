@@ -214,7 +214,7 @@ impl GeneralFieldsSerializer {
         }
         if let Ok(list) = value.downcast::<PyList>() {
             for item in list.iter() {
-                if item.downcast::<PyDict>().is_ok() {
+                if Self::contains_dict(&item) {
                     return true;
                 }
             }

@@ -1117,10 +1117,10 @@ def test_extra_sort_keys():
                 3,
             ],
             'field_d': [
-                {'d': 3, 'b': 2, 'a': {'nested3': 3, 'nested1': 1, 'nested2': 2}},
                 [[{'mango': 3, 'banana': 2, 'apple': 1}], {'d': 3, 'b': 2, 'a': 1}],
                 3,
             ],
+            'field_e': {'c': 1, 'b': {'c': 2, 'd': {'mango': 3, 'banana': 2, 'apple': 1}}, 'a': 3},
             'field_none': None,
         }
     )
@@ -1136,10 +1136,10 @@ def test_extra_sort_keys():
                 3,
             ],
             'field_d': [
-                {'a': {'nested1': 1, 'nested2': 2, 'nested3': 3}, 'b': 2, 'd': 3},
                 [[{'apple': 1, 'banana': 2, 'mango': 3}], {'a': 1, 'b': 2, 'd': 3}],
                 3,
             ],
+            'field_e': {'a': 3, 'b': {'c': 2, 'd': {'apple': 1, 'banana': 2, 'mango': 3}}, 'c': 1},
             'field_none': None,
         }
     )
@@ -1155,10 +1155,10 @@ def test_extra_sort_keys():
                 3,
             ],
             'field_d': [
-                {'d': 3, 'b': 2, 'a': {'nested3': 3, 'nested1': 1, 'nested2': 2}},
                 [[{'mango': 3, 'banana': 2, 'apple': 1}], {'d': 3, 'b': 2, 'a': 1}],
                 3,
             ],
+            'field_e': {'c': 1, 'b': {'c': 2, 'd': {'mango': 3, 'banana': 2, 'apple': 1}}, 'a': 3},
         }
     )
     assert s.to_python(m, exclude_none=True, sort_keys=True) == snapshot(
@@ -1173,17 +1173,17 @@ def test_extra_sort_keys():
                 3,
             ],
             'field_d': [
-                {'a': {'nested1': 1, 'nested2': 2, 'nested3': 3}, 'b': 2, 'd': 3},
                 [[{'apple': 1, 'banana': 2, 'mango': 3}], {'a': 1, 'b': 2, 'd': 3}],
                 3,
             ],
+            'field_e': {'a': 3, 'b': {'c': 2, 'd': {'apple': 1, 'banana': 2, 'mango': 3}}, 'c': 1},
         }
     )
     assert s.to_json(m, exclude_none=True) == snapshot(
-        b'{"field_123":"test_123","field_b":12,"field_a":"test","field_c":{"mango":2,"banana":3,"apple":1},"field_n":[{"mango":3,"banana":2,"apple":1},[{"mango":3,"banana":2,"apple":1},{"d":3,"b":2,"a":1}],3],"field_d":[{"d":3,"b":2,"a":{"nested3":3,"nested1":1,"nested2":2}},[[{"mango":3,"banana":2,"apple":1}],{"d":3,"b":2,"a":1}],3]}'
+        b'{"field_123":"test_123","field_b":12,"field_a":"test","field_c":{"mango":2,"banana":3,"apple":1},"field_n":[{"mango":3,"banana":2,"apple":1},[{"mango":3,"banana":2,"apple":1},{"d":3,"b":2,"a":1}],3],"field_d":[[[{"mango":3,"banana":2,"apple":1}],{"d":3,"b":2,"a":1}],3],"field_e":{"c":1,"b":{"c":2,"d":{"mango":3,"banana":2,"apple":1}},"a":3}}'
     )
     assert s.to_json(m, exclude_none=True, sort_keys=True) == snapshot(
-        b'{"field_123":"test_123","field_a":"test","field_b":12,"field_c":{"apple":1,"banana":3,"mango":2},"field_n":[{"apple":1,"banana":2,"mango":3},[{"apple":1,"banana":2,"mango":3},{"a":1,"b":2,"d":3}],3],"field_d":[{"a":{"nested1":1,"nested2":2,"nested3":3},"b":2,"d":3},[[{"apple":1,"banana":2,"mango":3}],{"a":1,"b":2,"d":3}],3]}'
+        b'{"field_123":"test_123","field_a":"test","field_b":12,"field_c":{"apple":1,"banana":3,"mango":2},"field_n":[{"apple":1,"banana":2,"mango":3},[{"apple":1,"banana":2,"mango":3},{"a":1,"b":2,"d":3}],3],"field_d":[[[{"apple":1,"banana":2,"mango":3}],{"a":1,"b":2,"d":3}],3],"field_e":{"a":3,"b":{"c":2,"d":{"apple":1,"banana":2,"mango":3}},"c":1}}'
     )
     assert s.to_python(m, exclude={'field_c'}) == snapshot(
         {
@@ -1196,10 +1196,10 @@ def test_extra_sort_keys():
                 3,
             ],
             'field_d': [
-                {'d': 3, 'b': 2, 'a': {'nested3': 3, 'nested1': 1, 'nested2': 2}},
                 [[{'mango': 3, 'banana': 2, 'apple': 1}], {'d': 3, 'b': 2, 'a': 1}],
                 3,
             ],
+            'field_e': {'c': 1, 'b': {'c': 2, 'd': {'mango': 3, 'banana': 2, 'apple': 1}}, 'a': 3},
             'field_none': None,
         }
     )
@@ -1214,18 +1214,18 @@ def test_extra_sort_keys():
                 3,
             ],
             'field_d': [
-                {'a': {'nested1': 1, 'nested2': 2, 'nested3': 3}, 'b': 2, 'd': 3},
                 [[{'apple': 1, 'banana': 2, 'mango': 3}], {'a': 1, 'b': 2, 'd': 3}],
                 3,
             ],
+            'field_e': {'a': 3, 'b': {'c': 2, 'd': {'apple': 1, 'banana': 2, 'mango': 3}}, 'c': 1},
             'field_none': None,
         }
     )
     assert s.to_json(m, exclude={'field_c'}) == snapshot(
-        b'{"field_123":"test_123","field_b":12,"field_a":"test","field_n":[{"mango":3,"banana":2,"apple":1},[{"mango":3,"banana":2,"apple":1},{"d":3,"b":2,"a":1}],3],"field_d":[{"d":3,"b":2,"a":{"nested3":3,"nested1":1,"nested2":2}},[[{"mango":3,"banana":2,"apple":1}],{"d":3,"b":2,"a":1}],3],"field_none":null}'
+        b'{"field_123":"test_123","field_b":12,"field_a":"test","field_n":[{"mango":3,"banana":2,"apple":1},[{"mango":3,"banana":2,"apple":1},{"d":3,"b":2,"a":1}],3],"field_d":[[[{"mango":3,"banana":2,"apple":1}],{"d":3,"b":2,"a":1}],3],"field_e":{"c":1,"b":{"c":2,"d":{"mango":3,"banana":2,"apple":1}},"a":3},"field_none":null}'
     )
     assert s.to_json(m, exclude={'field_c'}, sort_keys=True) == snapshot(
-        b'{"field_123":"test_123","field_a":"test","field_b":12,"field_n":[{"apple":1,"banana":2,"mango":3},[{"apple":1,"banana":2,"mango":3},{"a":1,"b":2,"d":3}],3],"field_d":[{"a":{"nested1":1,"nested2":2,"nested3":3},"b":2,"d":3},[[{"apple":1,"banana":2,"mango":3}],{"a":1,"b":2,"d":3}],3],"field_none":null}'
+        b'{"field_123":"test_123","field_a":"test","field_b":12,"field_n":[{"apple":1,"banana":2,"mango":3},[{"apple":1,"banana":2,"mango":3},{"a":1,"b":2,"d":3}],3],"field_d":[[[{"apple":1,"banana":2,"mango":3}],{"a":1,"b":2,"d":3}],3],"field_e":{"a":3,"b":{"c":2,"d":{"apple":1,"banana":2,"mango":3}},"c":1},"field_none":null}'
     )
     assert s.to_python(m, exclude={'field_d': [0]}) == snapshot(
         {
@@ -1238,7 +1238,8 @@ def test_extra_sort_keys():
                 [{'mango': 3, 'banana': 2, 'apple': 1}, {'d': 3, 'b': 2, 'a': 1}],
                 3,
             ],
-            'field_d': [[[{'mango': 3, 'banana': 2, 'apple': 1}], {'d': 3, 'b': 2, 'a': 1}], 3],
+            'field_d': [3],
+            'field_e': {'c': 1, 'b': {'c': 2, 'd': {'mango': 3, 'banana': 2, 'apple': 1}}, 'a': 3},
             'field_none': None,
         }
     )
@@ -1253,7 +1254,8 @@ def test_extra_sort_keys():
                 [{'apple': 1, 'banana': 2, 'mango': 3}, {'a': 1, 'b': 2, 'd': 3}],
                 3,
             ],
-            'field_d': [[[{'apple': 1, 'banana': 2, 'mango': 3}], {'a': 1, 'b': 2, 'd': 3}], 3],
+            'field_d': [3],
+            'field_e': {'a': 3, 'b': {'c': 2, 'd': {'apple': 1, 'banana': 2, 'mango': 3}}, 'c': 1},
             'field_none': None,
         }
     )
@@ -1268,15 +1270,16 @@ def test_extra_sort_keys():
                 [{'apple': 1, 'banana': 2, 'mango': 3}, {'a': 1, 'b': 2, 'd': 3}],
                 3,
             ],
-            'field_d': [[[{'apple': 1, 'banana': 2, 'mango': 3}], {'a': 1, 'b': 2, 'd': 3}], 3],
+            'field_d': [3],
+            'field_e': {'a': 3, 'b': {'c': 2, 'd': {'apple': 1, 'banana': 2, 'mango': 3}}, 'c': 1},
             'field_none': None,
         }
     )
     assert s.to_json(m, exclude={'field_d': [0]}) == snapshot(
-        b'{"field_123":"test_123","field_b":12,"field_a":"test","field_c":{"mango":2,"banana":3,"apple":1},"field_n":[{"mango":3,"banana":2,"apple":1},[{"mango":3,"banana":2,"apple":1},{"d":3,"b":2,"a":1}],3],"field_d":[[[{"mango":3,"banana":2,"apple":1}],{"d":3,"b":2,"a":1}],3],"field_none":null}'
+        b'{"field_123":"test_123","field_b":12,"field_a":"test","field_c":{"mango":2,"banana":3,"apple":1},"field_n":[{"mango":3,"banana":2,"apple":1},[{"mango":3,"banana":2,"apple":1},{"d":3,"b":2,"a":1}],3],"field_d":[3],"field_e":{"c":1,"b":{"c":2,"d":{"mango":3,"banana":2,"apple":1}},"a":3},"field_none":null}'
     )
     assert s.to_json(m, exclude={'field_d': [0]}, sort_keys=True) == snapshot(
-        b'{"field_123":"test_123","field_a":"test","field_b":12,"field_c":{"apple":1,"banana":3,"mango":2},"field_n":[{"apple":1,"banana":2,"mango":3},[{"apple":1,"banana":2,"mango":3},{"a":1,"b":2,"d":3}],3],"field_d":[[[{"apple":1,"banana":2,"mango":3}],{"a":1,"b":2,"d":3}],3],"field_none":null}'
+        b'{"field_123":"test_123","field_a":"test","field_b":12,"field_c":{"apple":1,"banana":3,"mango":2},"field_n":[{"apple":1,"banana":2,"mango":3},[{"apple":1,"banana":2,"mango":3},{"a":1,"b":2,"d":3}],3],"field_d":[3],"field_e":{"a":3,"b":{"c":2,"d":{"apple":1,"banana":2,"mango":3}},"c":1},"field_none":null}'
     )
 
 
