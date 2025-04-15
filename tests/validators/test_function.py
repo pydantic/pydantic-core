@@ -2,6 +2,7 @@ import datetime
 import platform
 import re
 from copy import deepcopy
+from dataclasses import dataclass
 from typing import Any
 
 import pytest
@@ -662,6 +663,36 @@ def test_model_field_plain_validator() -> None:
     assert v.validate_python({'x': b'foo'}).x == 'input: foo'
 
 
+def test_model_field_validator_reuse() -> None:
+    class Model:
+        x: str
+        y: str
+
+    def f(input_value: Any, info: core_schema.ValidationInfo) -> Any:
+        return f'{info.field_name}: {input_value}'
+
+    # When a type alias with a validator function is used on multiple fields,
+    # its core schema is only generated once (with the first field_name) and reused.
+    # See https://github.com/pydantic/pydantic/issues/11737
+    validator = core_schema.with_info_plain_validator_function(f, field_name='x')
+
+    v = SchemaValidator(
+        core_schema.model_schema(
+            Model,
+            core_schema.model_fields_schema(
+                {
+                    'x': core_schema.model_field(validator),
+                    'y': core_schema.model_field(validator),
+                }
+            ),
+        )
+    )
+
+    m = v.validate_python({'x': 'foo', 'y': 'bar'})
+    assert m.x == 'x: foo'
+    assert m.y == 'y: bar'
+
+
 def test_model_field_wrap_validator() -> None:
     class Model:
         x: str
@@ -819,6 +850,62 @@ def test_typed_dict_data() -> None:
         v.validate_python({'a': 1, 'b': 'wrong', 'c': b'foo'})
 
     assert info_stuff == {'field_name': 'c', 'data': {'a': 1}}
+
+
+def test_typed_dict_validator_reuse() -> None:
+    def f(input_value: Any, info: core_schema.ValidationInfo) -> Any:
+        return f'{info.field_name}: {input_value}'
+
+    # When a type alias with a validator function is used on multiple fields,
+    # its core schema is only generated once (with the first field_name) and reused.
+    # See https://github.com/pydantic/pydantic/issues/11737
+    validator = core_schema.with_info_plain_validator_function(f, field_name='x')
+
+    v = SchemaValidator(
+        core_schema.typed_dict_schema(
+            {
+                'x': core_schema.model_field(validator),
+                'y': core_schema.model_field(validator),
+            }
+        )
+    )
+
+    data = v.validate_python({'x': 'foo', 'y': 'bar'})
+    assert data['x'] == 'x: foo'
+    assert data['y'] == 'y: bar'
+
+
+def test_dataclass_validator_reuse() -> None:
+    @dataclass
+    class Model:
+        x: str
+        y: str
+
+    def f(input_value: Any, info: core_schema.ValidationInfo) -> Any:
+        return f'{info.field_name}: {input_value}'
+
+    # When a type alias with a validator function is used on multiple fields,
+    # its core schema is only generated once (with the first field_name) and reused.
+    # See https://github.com/pydantic/pydantic/issues/11737
+    validator = core_schema.with_info_plain_validator_function(f, field_name='x')
+
+    v = SchemaValidator(
+        core_schema.dataclass_schema(
+            Model,
+            core_schema.dataclass_args_schema(
+                'Model',
+                [
+                    core_schema.dataclass_field(name='x', schema=validator),
+                    core_schema.dataclass_field(name='y', schema=validator),
+                ],
+            ),
+            ['x', 'y'],
+        )
+    )
+
+    m = v.validate_python({'x': 'foo', 'y': 'bar'})
+    assert m.x == 'x: foo'
+    assert m.y == 'y: bar'
 
 
 @pytest.mark.parametrize(
