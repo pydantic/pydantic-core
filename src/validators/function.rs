@@ -105,7 +105,7 @@ impl FunctionBeforeValidator {
                 .field_name
                 .clone()
                 .map(Bound::unbind)
-                .or(self.field_name.clone());
+                .or_else(|| self.field_name.clone());
             let info = ValidationInfo::new(py, state.extra(), &self.config, field_name);
             self.func.call1(py, (input.to_object(py)?, info))
         } else {
@@ -180,7 +180,7 @@ impl FunctionAfterValidator {
                 .field_name
                 .clone()
                 .map(Bound::unbind)
-                .or(self.field_name.clone());
+                .or_else(|| self.field_name.clone());
             let info = ValidationInfo::new(py, state.extra(), &self.config, field_name);
             self.func.call1(py, (v, info))
         } else {
@@ -275,7 +275,7 @@ impl Validator for FunctionPlainValidator {
                 .field_name
                 .clone()
                 .map(Bound::unbind)
-                .or(self.field_name.clone());
+                .or_else(|| self.field_name.clone());
             let info = ValidationInfo::new(py, state.extra(), &self.config, field_name);
             self.func.call1(py, (input.to_object(py)?, info))
         } else {
@@ -345,7 +345,7 @@ impl FunctionWrapValidator {
                 .field_name
                 .clone()
                 .map(Bound::unbind)
-                .or(self.field_name.clone());
+                .or_else(|| self.field_name.clone());
             let info = ValidationInfo::new(py, state.extra(), &self.config, field_name);
             self.func.call1(py, (input.to_object(py)?, handler, info))
         } else {
