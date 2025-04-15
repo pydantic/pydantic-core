@@ -1145,17 +1145,17 @@ def test_frozen():
         (
             core_schema.with_info_after_validator_function,
             (({'a': 1, 'b': 2}, None, {'b'}), 'ValidationInfo(config=None, context=None, data=None, field_name=None)'),
-            (({'a': 10, 'b': 2}, None, {'a'}), 'ValidationInfo(config=None, context=None, data=None, field_name=None)'),
+            (({'a': 10, 'b': 2}, None, {'a'}), "ValidationInfo(config=None, context=None, data=None, field_name='a')"),
         ),
         (
             core_schema.with_info_before_validator_function,
             ({'b': 2}, 'ValidationInfo(config=None, context=None, data=None, field_name=None)'),
-            ({'a': 10, 'b': 2}, 'ValidationInfo(config=None, context=None, data=None, field_name=None)'),
+            ({'a': 10, 'b': 2}, "ValidationInfo(config=None, context=None, data=None, field_name='a')"),
         ),
         (
             core_schema.with_info_wrap_validator_function,
             ({'b': 2}, 'ValidationInfo(config=None, context=None, data=None, field_name=None)'),
-            ({'a': 10, 'b': 2}, 'ValidationInfo(config=None, context=None, data=None, field_name=None)'),
+            ({'a': 10, 'b': 2}, "ValidationInfo(config=None, context=None, data=None, field_name='a')"),
         ),
     ],
 )
