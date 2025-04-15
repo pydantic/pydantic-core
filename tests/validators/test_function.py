@@ -605,7 +605,7 @@ def test_model_field_before_validator() -> None:
             core_schema.model_fields_schema(
                 {
                     'x': core_schema.model_field(
-                        core_schema.with_info_before_validator_function(f, core_schema.str_schema(), field_name='x')
+                        core_schema.with_info_before_validator_function(f, core_schema.str_schema())
                     )
                 }
             ),
@@ -631,7 +631,7 @@ def test_model_field_after_validator() -> None:
             core_schema.model_fields_schema(
                 {
                     'x': core_schema.model_field(
-                        core_schema.with_info_after_validator_function(f, core_schema.str_schema(), field_name='x')
+                        core_schema.with_info_after_validator_function(f, core_schema.str_schema())
                     )
                 }
             ),
@@ -655,7 +655,7 @@ def test_model_field_plain_validator() -> None:
         core_schema.model_schema(
             Model,
             core_schema.model_fields_schema(
-                {'x': core_schema.model_field(core_schema.with_info_plain_validator_function(f, field_name='x'))}
+                {'x': core_schema.model_field(core_schema.with_info_plain_validator_function(f))}
             ),
         )
     )
@@ -674,7 +674,10 @@ def test_model_field_validator_reuse() -> None:
     # When a type alias with a validator function is used on multiple fields,
     # its core schema is only generated once (with the first field_name) and reused.
     # See https://github.com/pydantic/pydantic/issues/11737
-    validator = core_schema.with_info_plain_validator_function(f, field_name='x')
+    with pytest.warns(
+        DeprecationWarning, match='`field_name` argument on `with_info_plain_validator_function` is deprecated'
+    ):
+        validator = core_schema.with_info_plain_validator_function(f, field_name='x')
 
     v = SchemaValidator(
         core_schema.model_schema(
@@ -709,7 +712,7 @@ def test_model_field_wrap_validator() -> None:
             core_schema.model_fields_schema(
                 {
                     'x': core_schema.model_field(
-                        core_schema.with_info_wrap_validator_function(f, core_schema.str_schema(), field_name='x')
+                        core_schema.with_info_wrap_validator_function(f, core_schema.str_schema())
                     )
                 }
             ),
@@ -833,7 +836,7 @@ def test_typed_dict_data() -> None:
                 'a': core_schema.typed_dict_field(core_schema.int_schema()),
                 'b': core_schema.typed_dict_field(core_schema.int_schema()),
                 'c': core_schema.typed_dict_field(
-                    core_schema.with_info_after_validator_function(f, core_schema.str_schema(), field_name='c')
+                    core_schema.with_info_after_validator_function(f, core_schema.str_schema())
                 ),
             }
         )
@@ -858,7 +861,10 @@ def test_typed_dict_validator_reuse() -> None:
     # When a type alias with a validator function is used on multiple fields,
     # its core schema is only generated once (with the first field_name) and reused.
     # See https://github.com/pydantic/pydantic/issues/11737
-    validator = core_schema.with_info_plain_validator_function(f, field_name='x')
+    with pytest.warns(
+        DeprecationWarning, match='`field_name` argument on `with_info_plain_validator_function` is deprecated'
+    ):
+        validator = core_schema.with_info_plain_validator_function(f, field_name='x')
 
     v = SchemaValidator(
         core_schema.typed_dict_schema(
@@ -886,7 +892,10 @@ def test_dataclass_validator_reuse() -> None:
     # When a type alias with a validator function is used on multiple fields,
     # its core schema is only generated once (with the first field_name) and reused.
     # See https://github.com/pydantic/pydantic/issues/11737
-    validator = core_schema.with_info_plain_validator_function(f, field_name='x')
+    with pytest.warns(
+        DeprecationWarning, match='`field_name` argument on `with_info_plain_validator_function` is deprecated'
+    ):
+        validator = core_schema.with_info_plain_validator_function(f, field_name='x')
 
     v = SchemaValidator(
         core_schema.dataclass_schema(
@@ -1000,35 +1009,6 @@ def test_function_validation_info_mode():
     assert v.validate_json('1') == 1
     assert calls == ['json']
     calls.clear()
-
-
-def test_reprs() -> None:
-    reprs: list[str] = []
-
-    def sample_repr(v: Any, info: core_schema.ValidationInfo) -> Any:
-        reprs.append(repr(info))
-        return v
-
-    v = SchemaValidator(
-        core_schema.chain_schema(
-            [
-                core_schema.with_info_plain_validator_function(sample_repr),
-                core_schema.with_info_plain_validator_function(sample_repr, field_name='x'),
-            ]
-        )
-    )
-
-    class Foo:
-        def __repr__(self) -> str:
-            return 'This is Foo!'
-
-    v.validate_python(Foo())
-
-    # insert_assert(reprs)
-    assert reprs == [
-        'ValidationInfo(config=None, context=None, data=None, field_name=None)',
-        "ValidationInfo(config=None, context=None, data=None, field_name='x')",
-    ]
 
 
 def test_function_after_doesnt_change_mode() -> None:

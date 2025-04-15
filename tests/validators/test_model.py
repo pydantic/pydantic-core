@@ -1054,9 +1054,7 @@ def test_validate_assignment_function():
                 {
                     'field_a': core_schema.model_field(core_schema.str_schema()),
                     'field_b': core_schema.model_field(
-                        core_schema.with_info_after_validator_function(
-                            func, core_schema.int_schema(), field_name='field_b'
-                        )
+                        core_schema.with_info_after_validator_function(func, core_schema.int_schema())
                     ),
                     'field_c': core_schema.model_field(core_schema.int_schema()),
                 }
