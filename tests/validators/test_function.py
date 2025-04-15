@@ -719,17 +719,13 @@ def test_model_field_wrap_validator() -> None:
     assert v.validate_python({'x': b'foo'}).x == 'input: foo'
 
 
-def check_info_field_name_none(info: core_schema.ValidationInfo) -> None:
-    assert info.field_name is None
-    assert info.data == {}
-
-
-def test_non_model_field_before_validator_tries_to_access_field_info() -> None:
+def test_non_model_field_before_validator_field_info() -> None:
     class Model:
         x: str
 
     def f(input_value: Any, info: core_schema.ValidationInfo) -> Any:
-        check_info_field_name_none(info)
+        assert info.field_name == 'x'
+        assert info.data == {}
         assert isinstance(input_value, bytes)
         return f'input: {input_value.decode()}'
 
@@ -749,12 +745,13 @@ def test_non_model_field_before_validator_tries_to_access_field_info() -> None:
     assert v.validate_python({'x': b'foo'}).x == 'input: foo'
 
 
-def test_non_model_field_after_validator_tries_to_access_field_info() -> None:
+def test_non_model_field_after_validator_field_info() -> None:
     class Model:
         x: str
 
     def f(input_value: Any, info: core_schema.ValidationInfo) -> Any:
-        check_info_field_name_none(info)
+        assert info.field_name == 'x'
+        assert info.data == {}
         return f'input: {input_value}'
 
     v = SchemaValidator(
@@ -773,12 +770,13 @@ def test_non_model_field_after_validator_tries_to_access_field_info() -> None:
     assert v.validate_python({'x': b'foo'}).x == 'input: foo'
 
 
-def test_non_model_field_plain_validator_tries_to_access_field_info() -> None:
+def test_non_model_field_plain_validator_field_info() -> None:
     class Model:
         x: str
 
     def f(input_value: Any, info: core_schema.ValidationInfo) -> Any:
-        check_info_field_name_none(info)
+        assert info.field_name == 'x'
+        assert info.data == {}
         assert isinstance(input_value, bytes)
         return f'input: {input_value.decode()}'
 
@@ -794,13 +792,14 @@ def test_non_model_field_plain_validator_tries_to_access_field_info() -> None:
     assert v.validate_python({'x': b'foo'}).x == 'input: foo'
 
 
-def test_non_model_field_wrap_validator_tries_to_access_field_info() -> None:
+def test_non_model_field_wrap_validator_field_info() -> None:
     class Model:
         __slots__ = '__dict__', '__pydantic_fields_set__', '__pydantic_extra__', '__pydantic_private__'
         x: str
 
     def f(input_value: Any, val: core_schema.ValidatorFunctionWrapHandler, info: core_schema.ValidationInfo) -> Any:
-        check_info_field_name_none(info)
+        assert info.field_name == 'x'
+        assert info.data == {}
         return f'input: {val(input_value)}'
 
     v = SchemaValidator(
