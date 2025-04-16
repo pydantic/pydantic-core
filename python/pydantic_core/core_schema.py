@@ -2063,6 +2063,7 @@ def with_info_before_validator_function(
         warnings.warn(
             'The `field_name` argument on `with_info_before_validator_function` is deprecated, it will be passed to the function through `ValidationState` instead.',
             DeprecationWarning,
+            stacklevel=2,
         )
 
     return _dict_not_none(
@@ -2166,6 +2167,7 @@ def with_info_after_validator_function(
         warnings.warn(
             'The `field_name` argument on `with_info_after_validator_function` is deprecated, it will be passed to the function through `ValidationState` instead.',
             DeprecationWarning,
+            stacklevel=2,
         )
 
     return _dict_not_none(
@@ -2309,6 +2311,7 @@ def with_info_wrap_validator_function(
         warnings.warn(
             'The `field_name` argument on `with_info_wrap_validator_function` is deprecated, it will be passed to the function through `ValidationState` instead.',
             DeprecationWarning,
+            stacklevel=2,
         )
 
     return _dict_not_none(
@@ -2407,6 +2410,7 @@ def with_info_plain_validator_function(
         warnings.warn(
             'The `field_name` argument on `with_info_plain_validator_function` is deprecated, it will be passed to the function through `ValidationState` instead.',
             DeprecationWarning,
+            stacklevel=2,
         )
 
     return _dict_not_none(
