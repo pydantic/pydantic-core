@@ -2201,7 +2201,7 @@ WithInfoWrapValidatorFunction = Callable[[Any, ValidatorFunctionWrapHandler, Val
 class WithInfoWrapValidatorFunctionSchema(TypedDict, total=False):
     type: Required[Literal['with-info']]
     function: Required[WithInfoWrapValidatorFunction]
-    field_name: str
+    field_name: str  # deprecated
 
 
 WrapValidatorFunction = Union[NoInfoWrapValidatorFunctionSchema, WithInfoWrapValidatorFunctionSchema]
