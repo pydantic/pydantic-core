@@ -560,7 +560,7 @@ pub fn build_validator_base(
     config: Option<&Bound<'_, PyDict>>,
     definitions: &mut DefinitionsBuilder<CombinedValidator>,
 ) -> PyResult<CombinedValidator> {
-    _build_validator(schema, config, definitions, false)
+    build_validator_inner(schema, config, definitions, false)
 }
 
 pub fn build_validator(
@@ -568,10 +568,10 @@ pub fn build_validator(
     config: Option<&Bound<'_, PyDict>>,
     definitions: &mut DefinitionsBuilder<CombinedValidator>,
 ) -> PyResult<CombinedValidator> {
-    _build_validator(schema, config, definitions, true)
+    build_validator_inner(schema, config, definitions, true)
 }
 
-fn _build_validator(
+fn build_validator_inner(
     schema: &Bound<'_, PyAny>,
     config: Option<&Bound<'_, PyDict>>,
     definitions: &mut DefinitionsBuilder<CombinedValidator>,
