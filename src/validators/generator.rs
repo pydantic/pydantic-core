@@ -286,8 +286,7 @@ impl InternalValidator {
             by_name: None,
         };
         let mut state = ValidationState::new(extra, &mut self.recursion_guard, false.into());
-        // state.exactness = self.exactness;
-        // state.fields_set_count = self.fields_set_count;
+        state.exactness = self.exactness;
         let result = self
             .validator
             .validate_assignment(py, model, field_name, field_value, &mut state)
@@ -302,8 +301,7 @@ impl InternalValidator {
                     self.validation_error_cause,
                 )
             });
-        // self.exactness = state.exactness;
-        // self.fields_set_count = state.fields_set_count;
+        self.exactness = state.exactness;
         result
     }
 
