@@ -17,7 +17,8 @@ use super::extra::Extra;
 use super::filter::SchemaFilter;
 use super::infer::{infer_json_key, infer_serialize, infer_to_python, SerializeInfer};
 use super::shared::PydanticSerializer;
-use super::shared::{sort_dict_recursive, CombinedSerializer, TypeSerializer};
+use super::shared::{CombinedSerializer, TypeSerializer};
+use super::type_serializers::dict::sort_dict_recursive;
 
 /// representation of a field for serialization
 #[derive(Debug)]
@@ -167,118 +168,31 @@ impl GeneralFieldsSerializer {
             items.sort_by(|(a, _, _), (b, _, _)| a.cmp(b));
 
             for (key_str, key, value) in items {
-                let op_field = self.fields.get(&key_str);
-                if extra.exclude_none && value.is_none() {
-                    if let Some(field) = op_field {
-                        if field.required {
-                            used_req_fields += 1;
-                        }
-                    }
-                    continue;
-                }
-                let field_extra = Extra {
-                    field_name: Some(&key_str),
-                    ..extra
-                };
-                if let Some((next_include, next_exclude)) = self.filter.key_filter(&key, include, exclude)? {
-                    if let Some(field) = op_field {
-                        if let Some(ref serializer) = field.serializer {
-                            if !exclude_default(&value, &field_extra, serializer)? {
-                                let value = serializer.to_python(
-                                    &value,
-                                    next_include.as_ref(),
-                                    next_exclude.as_ref(),
-                                    &field_extra,
-                                )?;
-                                let output_key = field.get_key_py(output_dict.py(), &field_extra);
-                                output_dict.set_item(output_key, value)?;
-                            }
-                        }
-
-                        if field.required {
-                            used_req_fields += 1;
-                        }
-                    } else if self.mode == FieldsMode::TypedDictAllow {
-                        let value = match &self.extra_serializer {
-                            Some(serializer) => serializer.to_python(
-                                &value,
-                                next_include.as_ref(),
-                                next_exclude.as_ref(),
-                                &field_extra,
-                            )?,
-                            None => {
-                                infer_to_python(&value, next_include.as_ref(), next_exclude.as_ref(), &field_extra)?
-                            }
-                        };
-                        output_dict.set_item(key, value)?;
-                    } else if field_extra.check == SerCheck::Strict {
-                        return Err(PydanticSerializationUnexpectedValue::new(
-                            Some(format!("Unexpected field `{key}`")),
-                            field_extra.model_type_name().map(|bound| bound.to_string()),
-                            None,
-                        )
-                        .to_py_err());
-                    }
-                }
+                self.process_field(
+                    &key_str,
+                    &key,
+                    value,
+                    &output_dict,
+                    include,
+                    exclude,
+                    &extra,
+                    &mut used_req_fields,
+                )?;
             }
         } else {
-            // NOTE! we maintain the order of the input dict assuming that's right
             for result in main_iter {
                 let (key, value) = result?;
                 let key_str = key_str(&key)?;
-                let op_field = self.fields.get(key_str);
-                if extra.exclude_none && value.is_none() {
-                    if let Some(field) = op_field {
-                        if field.required {
-                            used_req_fields += 1;
-                        }
-                    }
-                    continue;
-                }
-                let field_extra = Extra {
-                    field_name: Some(key_str),
-                    ..extra
-                };
-                if let Some((next_include, next_exclude)) = self.filter.key_filter(&key, include, exclude)? {
-                    if let Some(field) = op_field {
-                        if let Some(ref serializer) = field.serializer {
-                            if !exclude_default(&value, &field_extra, serializer)? {
-                                let value = serializer.to_python(
-                                    &value,
-                                    next_include.as_ref(),
-                                    next_exclude.as_ref(),
-                                    &field_extra,
-                                )?;
-                                let output_key = field.get_key_py(output_dict.py(), &field_extra);
-                                output_dict.set_item(output_key, value)?;
-                            }
-                        }
-
-                        if field.required {
-                            used_req_fields += 1;
-                        }
-                    } else if self.mode == FieldsMode::TypedDictAllow {
-                        let value = match &self.extra_serializer {
-                            Some(serializer) => serializer.to_python(
-                                &value,
-                                next_include.as_ref(),
-                                next_exclude.as_ref(),
-                                &field_extra,
-                            )?,
-                            None => {
-                                infer_to_python(&value, next_include.as_ref(), next_exclude.as_ref(), &field_extra)?
-                            }
-                        };
-                        output_dict.set_item(key, value)?;
-                    } else if field_extra.check == SerCheck::Strict {
-                        return Err(PydanticSerializationUnexpectedValue::new(
-                            Some(format!("Unexpected field `{key}`")),
-                            field_extra.model_type_name().map(|bound| bound.to_string()),
-                            None,
-                        )
-                        .to_py_err());
-                    }
-                }
+                self.process_field(
+                    key_str,
+                    &key,
+                    value,
+                    &output_dict,
+                    include,
+                    exclude,
+                    &extra,
+                    &mut used_req_fields,
+                )?;
             }
         }
 
@@ -299,6 +213,65 @@ impl GeneralFieldsSerializer {
         } else {
             Ok(output_dict)
         }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn process_field<'py>(
+        &self,
+        key_str: &str,
+        key: &Bound<'py, PyAny>,
+        value: Bound<'py, PyAny>,
+        output_dict: &Bound<'py, PyDict>,
+        include: Option<&Bound<'py, PyAny>>,
+        exclude: Option<&Bound<'py, PyAny>>,
+        extra: &Extra,
+        used_req_fields: &mut usize,
+    ) -> PyResult<()> {
+        let op_field = self.fields.get(key_str);
+        if extra.exclude_none && value.is_none() {
+            if let Some(field) = op_field {
+                if field.required {
+                    *used_req_fields += 1;
+                }
+            }
+            return Ok(());
+        }
+        let field_extra = Extra {
+            field_name: Some(key_str),
+            ..*extra
+        };
+        if let Some((next_include, next_exclude)) = self.filter.key_filter(key, include, exclude)? {
+            if let Some(field) = op_field {
+                if let Some(ref serializer) = field.serializer {
+                    if !exclude_default(&value, &field_extra, serializer)? {
+                        let value =
+                            serializer.to_python(&value, next_include.as_ref(), next_exclude.as_ref(), &field_extra)?;
+                        let output_key = field.get_key_py(output_dict.py(), &field_extra);
+                        output_dict.set_item(output_key, value)?;
+                    }
+                }
+
+                if field.required {
+                    *used_req_fields += 1;
+                }
+            } else if self.mode == FieldsMode::TypedDictAllow {
+                let value = match &self.extra_serializer {
+                    Some(serializer) => {
+                        serializer.to_python(&value, next_include.as_ref(), next_exclude.as_ref(), &field_extra)?
+                    }
+                    None => infer_to_python(&value, next_include.as_ref(), next_exclude.as_ref(), &field_extra)?,
+                };
+                output_dict.set_item(key, value)?;
+            } else if field_extra.check == SerCheck::Strict {
+                return Err(PydanticSerializationUnexpectedValue::new(
+                    Some(format!("Unexpected field `{key}`")),
+                    field_extra.model_type_name().map(|bound| bound.to_string()),
+                    None,
+                )
+                .to_py_err());
+            }
+        }
+        Ok(())
     }
 
     pub(crate) fn main_serde_serialize<'py, S: serde::ser::Serializer>(
@@ -324,58 +297,7 @@ impl GeneralFieldsSerializer {
                 .map_err(py_err_se_err)?;
             items.sort_by(|(a, _, _), (b, _, _)| a.cmp(b));
             for (key_str, key, value) in items {
-                let field_extra = Extra {
-                    field_name: Some(&key_str),
-                    ..extra
-                };
-
-                let filter = self.filter.key_filter(&key, include, exclude).map_err(py_err_se_err)?;
-                if let Some((next_include, next_exclude)) = filter {
-                    if let Some(field) = self.fields.get(&key_str) {
-                        if let Some(ref serializer) = field.serializer {
-                            if !exclude_default(&value, &field_extra, serializer).map_err(py_err_se_err)? {
-                                if extra.sort_keys {
-                                    let sorted_dict = sort_dict_recursive(value.py(), &value).map_err(py_err_se_err)?;
-                                    let s = PydanticSerializer::new(
-                                        sorted_dict.as_ref(),
-                                        serializer,
-                                        next_include.as_ref(),
-                                        next_exclude.as_ref(),
-                                        &field_extra,
-                                    );
-                                    let output_key = field.get_key_json(&key_str, &field_extra);
-                                    map.serialize_entry(&output_key, &s)?;
-                                } else {
-                                    let s = PydanticSerializer::new(
-                                        &value,
-                                        serializer,
-                                        next_include.as_ref(),
-                                        next_exclude.as_ref(),
-                                        &field_extra,
-                                    );
-                                    let output_key = field.get_key_json(&key_str, &field_extra);
-                                    map.serialize_entry(&output_key, &s)?;
-                                }
-                            }
-                        }
-                    } else if self.mode == FieldsMode::TypedDictAllow {
-                        let output_key = infer_json_key(&key, &field_extra).map_err(py_err_se_err)?;
-                        if extra.sort_keys {
-                            let sorted_dict = sort_dict_recursive(value.py(), &value).map_err(py_err_se_err)?;
-                            let s = SerializeInfer::new(
-                                sorted_dict.as_ref(),
-                                next_include.as_ref(),
-                                next_exclude.as_ref(),
-                                &field_extra,
-                            );
-                            map.serialize_entry(&output_key, &s)?;
-                        } else {
-                            let s =
-                                SerializeInfer::new(&value, next_include.as_ref(), next_exclude.as_ref(), &field_extra);
-                            map.serialize_entry(&output_key, &s)?;
-                        }
-                    }
-                }
+                self.process_serde_field::<S>(&key_str, &key, &value, &mut map, include, exclude, &extra)?;
             }
         } else {
             for result in main_iter {
@@ -384,37 +306,81 @@ impl GeneralFieldsSerializer {
                     continue;
                 }
                 let key_str = key_str(&key).map_err(py_err_se_err)?;
-                let field_extra = Extra {
-                    field_name: Some(key_str),
-                    ..extra
-                };
-
-                let filter = self.filter.key_filter(&key, include, exclude).map_err(py_err_se_err)?;
-                if let Some((next_include, next_exclude)) = filter {
-                    if let Some(field) = self.fields.get(key_str) {
-                        if let Some(ref serializer) = field.serializer {
-                            if !exclude_default(&value, &field_extra, serializer).map_err(py_err_se_err)? {
-                                let s = PydanticSerializer::new(
-                                    &value,
-                                    serializer,
-                                    next_include.as_ref(),
-                                    next_exclude.as_ref(),
-                                    &field_extra,
-                                );
-                                let output_key = field.get_key_json(key_str, &field_extra);
-                                map.serialize_entry(&output_key, &s)?;
-                            }
-                        }
-                    } else if self.mode == FieldsMode::TypedDictAllow {
-                        let output_key = infer_json_key(&key, &field_extra).map_err(py_err_se_err)?;
-                        let s = SerializeInfer::new(&value, next_include.as_ref(), next_exclude.as_ref(), &field_extra);
-                        map.serialize_entry(&output_key, &s)?;
-                    }
-                    // no error case here since unions (which need the error case) use `to_python(..., mode='json')`
-                }
+                self.process_serde_field::<S>(key_str, &key, &value, &mut map, include, exclude, &extra)?;
             }
         }
         Ok(map)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn process_serde_field<'py, S: serde::ser::Serializer>(
+        &self,
+        key_str: &str,
+        key: &Bound<'py, PyAny>,
+        value: &Bound<'py, PyAny>,
+        map: &mut S::SerializeMap,
+        include: Option<&Bound<'py, PyAny>>,
+        exclude: Option<&Bound<'py, PyAny>>,
+        extra: &Extra,
+    ) -> Result<(), S::Error> {
+        if extra.exclude_none && value.is_none() {
+            return Ok(());
+        }
+
+        let field_extra = Extra {
+            field_name: Some(key_str),
+            ..*extra
+        };
+
+        let filter = self.filter.key_filter(key, include, exclude).map_err(py_err_se_err)?;
+        if let Some((next_include, next_exclude)) = filter {
+            if let Some(field) = self.fields.get(key_str) {
+                if let Some(ref serializer) = field.serializer {
+                    if !exclude_default(value, &field_extra, serializer).map_err(py_err_se_err)? {
+                        // Get potentially sorted value
+                        if extra.sort_keys {
+                            let sorted_dict = sort_dict_recursive(value.py(), value).map_err(py_err_se_err)?;
+                            let s = PydanticSerializer::new(
+                                sorted_dict.as_ref(),
+                                serializer,
+                                next_include.as_ref(),
+                                next_exclude.as_ref(),
+                                &field_extra,
+                            );
+                            let output_key = field.get_key_json(key_str, &field_extra);
+                            map.serialize_entry(&output_key, &s)?;
+                        } else {
+                            let s = PydanticSerializer::new(
+                                value,
+                                serializer,
+                                next_include.as_ref(),
+                                next_exclude.as_ref(),
+                                &field_extra,
+                            );
+                            let output_key = field.get_key_json(key_str, &field_extra);
+                            map.serialize_entry(&output_key, &s)?;
+                        };
+                    }
+                }
+            } else if self.mode == FieldsMode::TypedDictAllow {
+                let output_key = infer_json_key(key, &field_extra).map_err(py_err_se_err)?;
+                // Get potentially sorted value
+                if extra.sort_keys {
+                    let sorted_dict = sort_dict_recursive(value.py(), value).map_err(py_err_se_err)?;
+                    let s = SerializeInfer::new(
+                        sorted_dict.as_ref(),
+                        next_include.as_ref(),
+                        next_exclude.as_ref(),
+                        &field_extra,
+                    );
+                    map.serialize_entry(&output_key, &s)?;
+                } else {
+                    let s = SerializeInfer::new(value, next_include.as_ref(), next_exclude.as_ref(), &field_extra);
+                    map.serialize_entry(&output_key, &s)?;
+                };
+            }
+        }
+        Ok(())
     }
 
     pub(crate) fn add_computed_fields_python(
