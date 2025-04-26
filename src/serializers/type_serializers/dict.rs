@@ -4,6 +4,7 @@ use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
+use pyo3::types::PyList;
 use pyo3::IntoPyObjectExt;
 use serde::ser::SerializeMap;
 
@@ -15,7 +16,30 @@ use super::{
     infer_serialize, infer_to_python, py_err_se_err, BuildSerializer, CombinedSerializer, Extra, PydanticSerializer,
     SchemaFilter, SerMode, TypeSerializer,
 };
-use crate::serializers::shared::sort_dict_recursive;
+
+// Add sort_dict_recursive function for reuse by different serializers
+pub(crate) fn sort_dict_recursive<'py>(py: Python<'py>, value: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
+    if let Ok(dict) = value.downcast::<PyDict>() {
+        let mut items: Vec<(Bound<'py, PyAny>, Bound<'py, PyAny>)> = dict.iter().collect();
+        items.sort_by_cached_key(|(key, _)| key.to_string());
+
+        let sorted_dict = PyDict::new(py);
+        for (k, v) in items {
+            let sorted_v = sort_dict_recursive(py, &v)?;
+            sorted_dict.set_item(k, sorted_v)?;
+        }
+        Ok(sorted_dict.into_any())
+    } else if let Ok(list) = value.downcast::<PyList>() {
+        let sorted_list = PyList::empty(py);
+        for item in list.iter() {
+            let sorted_item = sort_dict_recursive(py, &item)?;
+            sorted_list.append(sorted_item)?;
+        }
+        Ok(sorted_list.into_any())
+    } else {
+        Ok(value.clone())
+    }
+}
 
 #[derive(Debug)]
 pub struct DictSerializer {
