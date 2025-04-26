@@ -359,7 +359,7 @@ impl GeneralFieldsSerializer {
                             );
                             let output_key = field.get_key_json(key_str, &field_extra);
                             map.serialize_entry(&output_key, &s)?;
-                        };
+                        }
                     }
                 }
             } else if self.mode == FieldsMode::TypedDictAllow {
@@ -377,7 +377,7 @@ impl GeneralFieldsSerializer {
                 } else {
                     let s = SerializeInfer::new(value, next_include.as_ref(), next_exclude.as_ref(), &field_extra);
                     map.serialize_entry(&output_key, &s)?;
-                };
+                }
             }
         }
         Ok(())
