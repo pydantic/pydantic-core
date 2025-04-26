@@ -181,7 +181,7 @@ impl TypeSerializer for DictSerializer {
                                 extra,
                             );
                             map.serialize_entry(&key, &s)?;
-                        };
+                        }
                     }
                 }
                 map.end()
