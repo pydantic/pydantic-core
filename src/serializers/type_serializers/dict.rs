@@ -15,6 +15,7 @@ use super::{
     infer_serialize, infer_to_python, py_err_se_err, BuildSerializer, CombinedSerializer, Extra, PydanticSerializer,
     SchemaFilter, SerMode, TypeSerializer,
 };
+use crate::serializers::shared::sort_dict_recursive;
 
 #[derive(Debug)]
 pub struct DictSerializer {
@@ -92,8 +93,17 @@ impl TypeSerializer for DictSerializer {
                             SerMode::Json => self.key_serializer.json_key(&key, extra)?.into_py_any(py)?,
                             _ => self.key_serializer.to_python(&key, None, None, extra)?,
                         };
-                        let value =
-                            value_serializer.to_python(&value, next_include.as_ref(), next_exclude.as_ref(), extra)?;
+                        let value = if extra.sort_keys {
+                            let sorted_value = sort_dict_recursive(py, &value)?;
+                            value_serializer.to_python(
+                                &sorted_value,
+                                next_include.as_ref(),
+                                next_exclude.as_ref(),
+                                extra,
+                            )?
+                        } else {
+                            value_serializer.to_python(&value, next_include.as_ref(), next_exclude.as_ref(), extra)?
+                        };
                         new_dict.set_item(key, value)?;
                     }
                 }
@@ -128,14 +138,26 @@ impl TypeSerializer for DictSerializer {
                     let op_next = self.filter.key_filter(&key, include, exclude).map_err(py_err_se_err)?;
                     if let Some((next_include, next_exclude)) = op_next {
                         let key = key_serializer.json_key(&key, extra).map_err(py_err_se_err)?;
-                        let value_serialize = PydanticSerializer::new(
-                            &value,
-                            value_serializer,
-                            next_include.as_ref(),
-                            next_exclude.as_ref(),
-                            extra,
-                        );
-                        map.serialize_entry(&key, &value_serialize)?;
+                        if extra.sort_keys {
+                            let sorted_dict = sort_dict_recursive(value.py(), &value).map_err(py_err_se_err)?;
+                            let s = PydanticSerializer::new(
+                                sorted_dict.as_ref(),
+                                value_serializer,
+                                next_include.as_ref(),
+                                next_exclude.as_ref(),
+                                extra,
+                            );
+                            map.serialize_entry(&key, &s)?;
+                        } else {
+                            let s = PydanticSerializer::new(
+                                &value,
+                                value_serializer,
+                                next_include.as_ref(),
+                                next_exclude.as_ref(),
+                                extra,
+                            );
+                            map.serialize_entry(&key, &s)?;
+                        };
                     }
                 }
                 map.end()
