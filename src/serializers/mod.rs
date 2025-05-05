@@ -155,7 +155,7 @@ impl SchemaSerializer {
     }
 
     #[allow(clippy::too_many_arguments)]
-    #[pyo3(signature = (value, *, indent = None, include = None, exclude = None, by_alias = None,
+    #[pyo3(signature = (value, *, indent = None, ensure_ascii = false, include = None, exclude = None, by_alias = None,
         exclude_unset = false, exclude_defaults = false, exclude_none = false, round_trip = false, warnings = WarningsArg::Bool(true),
         fallback = None, serialize_as_any = false, context = None))]
     pub fn to_json(
@@ -163,6 +163,7 @@ impl SchemaSerializer {
         py: Python,
         value: &Bound<'_, PyAny>,
         indent: Option<usize>,
+        ensure_ascii: Option<bool>,
         include: Option<&Bound<'_, PyAny>>,
         exclude: Option<&Bound<'_, PyAny>>,
         by_alias: Option<bool>,
@@ -204,6 +205,7 @@ impl SchemaSerializer {
             exclude,
             &extra,
             indent,
+            ensure_ascii.unwrap_or(false),
             self.expected_json_size.load(Ordering::Relaxed),
         )?;
 
@@ -239,14 +241,15 @@ impl SchemaSerializer {
 
 #[allow(clippy::too_many_arguments)]
 #[pyfunction]
-#[pyo3(signature = (value, *, indent = None, include = None, exclude = None, by_alias = true,
-    exclude_none = false, round_trip = false, timedelta_mode = "iso8601", bytes_mode = "utf8",
+#[pyo3(signature = (value, *, indent = None, ensure_ascii = false, include = None, exclude = None,
+    by_alias = true, exclude_none = false, round_trip = false, timedelta_mode = "iso8601", bytes_mode = "utf8",
     inf_nan_mode = "constants", serialize_unknown = false, fallback = None, serialize_as_any = false,
     context = None))]
 pub fn to_json(
     py: Python,
     value: &Bound<'_, PyAny>,
     indent: Option<usize>,
+    ensure_ascii: Option<bool>,
     include: Option<&Bound<'_, PyAny>>,
     exclude: Option<&Bound<'_, PyAny>>,
     by_alias: bool,
@@ -274,7 +277,16 @@ pub fn to_json(
         context,
     );
     let serializer = type_serializers::any::AnySerializer.into();
-    let bytes = to_json_bytes(value, &serializer, include, exclude, &extra, indent, 1024)?;
+    let bytes = to_json_bytes(
+        value,
+        &serializer,
+        include,
+        exclude,
+        &extra,
+        indent,
+        ensure_ascii.unwrap_or(false),
+        1024,
+    )?;
     state.final_check(py)?;
     let py_bytes = PyBytes::new(py, &bytes);
     Ok(py_bytes.into())
