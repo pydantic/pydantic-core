@@ -105,8 +105,7 @@ jobs:
       - run: uv run pytest
         env:
           HYPOTHESIS_PROFILE: slow
-          # TODO: remove --inline-snapshot=disable after https://github.com/15r10nk/inline-snapshot/issues/192
-          PYTEST_ADDOPTS: ${{ endsWith(matrix.python-version, 't') && '--parallel-threads=2 --inline-snapshot=disable' || '' }}
+          PYTEST_ADDOPTS: ${{ endsWith(matrix.python-version, 't') && '--parallel-threads=2' || '' }}
 
   test-os:
     name: test on ${{ matrix.os }}
