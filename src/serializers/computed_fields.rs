@@ -7,7 +7,7 @@ use crate::build_tools::py_schema_error_type;
 use crate::definitions::DefinitionsBuilder;
 use crate::py_gc::PyGcTraverse;
 use crate::serializers::filter::SchemaFilter;
-use crate::serializers::shared::{BuildSerializer, CombinedSerializer, PydanticSerializer};
+use crate::serializers::shared::{get_unset_sentinel_object, BuildSerializer, CombinedSerializer, PydanticSerializer};
 use crate::tools::SchemaDict;
 
 use super::errors::py_err_se_err;
@@ -146,6 +146,10 @@ impl ComputedFields {
                 }
             };
             if extra.exclude_none && value.is_none() {
+                continue;
+            }
+            let unset_obj = get_unset_sentinel_object(model.py());
+            if value.is(unset_obj) {
                 continue;
             }
 

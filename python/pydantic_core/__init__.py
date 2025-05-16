@@ -3,6 +3,8 @@ from __future__ import annotations
 import sys as _sys
 from typing import Any as _Any
 
+from typing_extensions import Sentinel
+
 from ._pydantic_core import (
     ArgsKwargs,
     MultiHostUrl,
@@ -40,6 +42,7 @@ else:
 
 __all__ = [
     '__version__',
+    'UNSET',
     'CoreConfig',
     'CoreSchema',
     'CoreSchemaType',
@@ -140,3 +143,28 @@ class MultiHostHost(_TypedDict):
     """The host part of this host, or `None`."""
     port: int | None
     """The port part of this host, or `None`."""
+
+
+UNSET = Sentinel('UNSET')
+"""A singleton indicating a field value was not set during validation.
+
+This singleton can be used a default value, as an alternative to `None` when it has
+an explicit meaning. During serialization, any field with `UNSET` as a value is excluded
+from the output.
+
+Example:
+    ```python
+    from pydantic import BaseModel
+    from pydantic.experimental.unset import UNSET
+
+
+    class Configuration(BaseModel):
+        timeout: int | None | UNSET = UNSET
+
+
+    # configuration defaults, stored somewhere else:
+    defaults = {'timeout': 200}
+
+    conf = Configuration.model_validate({...})
+    timeout = conf.timeout if timeout.timeout is not UNSET else defaults['timeout']
+"""

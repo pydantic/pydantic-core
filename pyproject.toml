@@ -36,7 +36,7 @@ classifiers = [
     'Typing :: Typed',
 ]
 dependencies = [
-    'typing-extensions>=4.13.0',
+    'typing-extensions@git+https://github.com/python/typing_extensions',
 ]
 dynamic = ['license', 'readme', 'version']
 
