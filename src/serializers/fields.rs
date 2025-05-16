@@ -229,11 +229,6 @@ impl GeneralFieldsSerializer {
     ) -> PyResult<()> {
         let op_field = self.fields.get(key_str);
         if extra.exclude_none && value.is_none() {
-            if let Some(field) = op_field {
-                if field.required {
-                    *used_req_fields += 1;
-                }
-            }
             return Ok(());
         }
         let field_extra = Extra {
