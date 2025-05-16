@@ -8,7 +8,9 @@ use crate::build_tools::py_schema_error_type;
 use crate::definitions::DefinitionsBuilder;
 use crate::py_gc::PyGcTraverse;
 use crate::serializers::filter::SchemaFilter;
-use crate::serializers::shared::{BuildSerializer, CombinedSerializer, PydanticSerializer, TypeSerializer};
+use crate::serializers::shared::{
+    get_unset_sentinel_object, BuildSerializer, CombinedSerializer, PydanticSerializer, TypeSerializer,
+};
 use crate::tools::SchemaDict;
 
 use super::errors::py_err_se_err;
@@ -87,6 +89,10 @@ impl ComputedFields {
                 if extra.exclude_none && value.is_none() {
                     continue;
                 }
+                let unset_obj = get_unset_sentinel_object(model.py());
+                if value.is(unset_obj) {
+                    continue;
+                }
                 let field_extra = Extra {
                     field_name: Some(computed_field.property_name.as_str()),
                     ..*extra
@@ -163,6 +169,10 @@ impl ComputedField {
                 .serializer
                 .to_python(&next_value, next_include.as_ref(), next_exclude.as_ref(), extra)?;
             if extra.exclude_none && value.is_none(py) {
+                return Ok(());
+            }
+            let unset_obj = get_unset_sentinel_object(model.py());
+            if value.is(unset_obj) {
                 return Ok(());
             }
             let key = match extra.serialize_by_alias_or(self.serialize_by_alias) {
