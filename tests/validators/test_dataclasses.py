@@ -1,17 +1,16 @@
 import dataclasses
-import gc
 import platform
 import re
 import sys
 import weakref
-from typing import Any, ClassVar, Dict, List, Optional, Union
+from typing import Any, ClassVar, Optional, Union
 
 import pytest
 from dirty_equals import IsListOrTuple, IsStr
 
 from pydantic_core import ArgsKwargs, SchemaValidator, ValidationError, core_schema
 
-from ..conftest import Err, PyAndJson
+from ..conftest import Err, PyAndJson, assert_gc, is_free_threaded
 
 
 @pytest.mark.parametrize(
@@ -507,9 +506,7 @@ def test_dataclass_field_after_validator():
                 core_schema.dataclass_field(name='a', schema=core_schema.int_schema()),
                 core_schema.dataclass_field(
                     name='b',
-                    schema=core_schema.with_info_after_validator_function(
-                        Foo.validate_b, core_schema.str_schema(), field_name='b'
-                    ),
+                    schema=core_schema.with_info_after_validator_function(Foo.validate_b, core_schema.str_schema()),
                 ),
             ],
         ),
@@ -541,7 +538,7 @@ def test_dataclass_field_plain_validator():
             [
                 core_schema.dataclass_field(name='a', schema=core_schema.int_schema()),
                 core_schema.dataclass_field(
-                    name='b', schema=core_schema.with_info_plain_validator_function(Foo.validate_b, field_name='b')
+                    name='b', schema=core_schema.with_info_plain_validator_function(Foo.validate_b)
                 ),
             ],
         ),
@@ -574,9 +571,7 @@ def test_dataclass_field_before_validator():
                 core_schema.dataclass_field(name='a', schema=core_schema.int_schema()),
                 core_schema.dataclass_field(
                     name='b',
-                    schema=core_schema.with_info_before_validator_function(
-                        Foo.validate_b, core_schema.str_schema(), field_name='b'
-                    ),
+                    schema=core_schema.with_info_before_validator_function(Foo.validate_b, core_schema.str_schema()),
                 ),
             ],
         ),
@@ -613,9 +608,7 @@ def test_dataclass_field_wrap_validator1():
                 core_schema.dataclass_field(name='a', schema=core_schema.int_schema()),
                 core_schema.dataclass_field(
                     name='b',
-                    schema=core_schema.with_info_wrap_validator_function(
-                        Foo.validate_b, core_schema.str_schema(), field_name='b'
-                    ),
+                    schema=core_schema.with_info_wrap_validator_function(Foo.validate_b, core_schema.str_schema()),
                 ),
             ],
         ),
@@ -650,9 +643,7 @@ def test_dataclass_field_wrap_validator2():
                 core_schema.dataclass_field(name='a', schema=core_schema.int_schema()),
                 core_schema.dataclass_field(
                     name='b',
-                    schema=core_schema.with_info_wrap_validator_function(
-                        Foo.validate_b, core_schema.str_schema(), field_name='b'
-                    ),
+                    schema=core_schema.with_info_wrap_validator_function(Foo.validate_b, core_schema.str_schema()),
                 ),
             ],
         ),
@@ -879,9 +870,7 @@ def test_validate_assignment_function():
                     core_schema.dataclass_field('field_a', core_schema.str_schema()),
                     core_schema.dataclass_field(
                         'field_b',
-                        core_schema.with_info_after_validator_function(
-                            func, core_schema.int_schema(), field_name='field_b'
-                        ),
+                        core_schema.with_info_after_validator_function(func, core_schema.int_schema()),
                     ),
                     core_schema.dataclass_field('field_c', core_schema.int_schema()),
                 ],
@@ -968,7 +957,7 @@ def test_frozen_field():
         (core_schema.CoreConfig(extra_fields_behavior='allow'), {'extra_behavior': 'ignore'}),
     ],
 )
-def test_extra_behavior_ignore(config: Union[core_schema.CoreConfig, None], schema_extra_behavior_kw: Dict[str, Any]):
+def test_extra_behavior_ignore(config: Union[core_schema.CoreConfig, None], schema_extra_behavior_kw: dict[str, Any]):
     @dataclasses.dataclass
     class MyModel:
         f: str
@@ -1016,7 +1005,7 @@ def test_extra_behavior_ignore(config: Union[core_schema.CoreConfig, None], sche
         (core_schema.CoreConfig(extra_fields_behavior='ignore'), {'extra_behavior': 'forbid'}),
     ],
 )
-def test_extra_behavior_forbid(config: Union[core_schema.CoreConfig, None], schema_extra_behavior_kw: Dict[str, Any]):
+def test_extra_behavior_forbid(config: Union[core_schema.CoreConfig, None], schema_extra_behavior_kw: dict[str, Any]):
     @dataclasses.dataclass
     class MyModel:
         f: str
@@ -1062,7 +1051,7 @@ def test_extra_behavior_forbid(config: Union[core_schema.CoreConfig, None], sche
         (core_schema.CoreConfig(extra_fields_behavior='forbid'), {'extra_behavior': 'allow'}),
     ],
 )
-def test_extra_behavior_allow(config: Union[core_schema.CoreConfig, None], schema_extra_behavior_kw: Dict[str, Any]):
+def test_extra_behavior_allow(config: Union[core_schema.CoreConfig, None], schema_extra_behavior_kw: dict[str, Any]):
     @dataclasses.dataclass
     class MyModel:
         f: str
@@ -1090,7 +1079,7 @@ def test_extra_behavior_allow(config: Union[core_schema.CoreConfig, None], schem
 
 
 def test_function_validator_wrapping_args_schema_after() -> None:
-    calls: List[Any] = []
+    calls: list[Any] = []
 
     def func(*args: Any) -> Any:
         calls.append(args)
@@ -1122,7 +1111,7 @@ def test_function_validator_wrapping_args_schema_after() -> None:
 
 
 def test_function_validator_wrapping_args_schema_before() -> None:
-    calls: List[Any] = []
+    calls: list[Any] = []
 
     def func(*args: Any) -> Any:
         calls.append(args)
@@ -1154,7 +1143,7 @@ def test_function_validator_wrapping_args_schema_before() -> None:
 
 
 def test_function_validator_wrapping_args_schema_wrap() -> None:
-    calls: List[Any] = []
+    calls: list[Any] = []
 
     def func(*args: Any) -> Any:
         assert len(args) == 2
@@ -1296,9 +1285,7 @@ def test_dataclass_slots_field_before_validator():
                 core_schema.dataclass_field(name='a', schema=core_schema.int_schema()),
                 core_schema.dataclass_field(
                     name='b',
-                    schema=core_schema.with_info_before_validator_function(
-                        Foo.validate_b, core_schema.str_schema(), field_name='b'
-                    ),
+                    schema=core_schema.with_info_before_validator_function(Foo.validate_b, core_schema.str_schema()),
                 ),
             ],
         ),
@@ -1333,9 +1320,7 @@ def test_dataclass_slots_field_after_validator():
                 core_schema.dataclass_field(name='a', schema=core_schema.int_schema()),
                 core_schema.dataclass_field(
                     name='b',
-                    schema=core_schema.with_info_after_validator_function(
-                        Foo.validate_b, core_schema.str_schema(), field_name='b'
-                    ),
+                    schema=core_schema.with_info_after_validator_function(Foo.validate_b, core_schema.str_schema()),
                 ),
             ],
         ),
@@ -1531,6 +1516,7 @@ def test_dataclass_wrap_json():
     assert v.validate_json('{"a": "hello", "b": true}', strict=True) == FooDataclass(a='hello', b=True)
 
 
+@pytest.mark.xfail(is_free_threaded, reason='GC leaks on free-threaded')
 @pytest.mark.xfail(
     condition=platform.python_implementation() == 'PyPy', reason='https://foss.heptapod.net/pypy/pypy/-/issues/3899'
 )
@@ -1551,15 +1537,9 @@ def test_leak_dataclass(validator):
 
         field_schema = core_schema.int_schema()
         if validator == 'field':
-            field_schema = core_schema.with_info_before_validator_function(
-                Dataclass._validator, field_schema, field_name='a'
-            )
-            field_schema = core_schema.with_info_wrap_validator_function(
-                Dataclass._wrap_validator, field_schema, field_name='a'
-            )
-            field_schema = core_schema.with_info_after_validator_function(
-                Dataclass._validator, field_schema, field_name='a'
-            )
+            field_schema = core_schema.with_info_before_validator_function(Dataclass._validator, field_schema)
+            field_schema = core_schema.with_info_wrap_validator_function(Dataclass._wrap_validator, field_schema)
+            field_schema = core_schema.with_info_after_validator_function(Dataclass._validator, field_schema)
 
         dataclass_schema = core_schema.dataclass_schema(
             Dataclass,
@@ -1586,12 +1566,8 @@ def test_leak_dataclass(validator):
     assert ref() is not None
 
     del klass
-    gc.collect(0)
-    gc.collect(1)
-    gc.collect(2)
-    gc.collect()
 
-    assert ref() is None
+    assert_gc(lambda: ref() is None)
 
 
 init_test_cases = [
@@ -1713,3 +1689,125 @@ def test_dataclass_args_init_with_default(input_value, extra_behavior, expected)
             assert exc_info.value.errors(include_url=False) == expected.errors
     else:
         assert dataclasses.asdict(v.validate_python(input_value)) == expected
+
+
+@dataclasses.dataclass
+class BasicDataclass:
+    a: str
+
+
+def test_alias_allow_pop(py_and_json: PyAndJson):
+    schema = core_schema.dataclass_schema(
+        BasicDataclass,
+        core_schema.dataclass_args_schema(
+            'BasicDataclass',
+            [
+                core_schema.dataclass_field(name='a', schema=core_schema.str_schema(), validation_alias='FieldA'),
+            ],
+        ),
+        ['a'],
+        config=core_schema.CoreConfig(validate_by_name=True, validate_by_alias=True),
+    )
+    v = py_and_json(schema)
+    assert v.validate_test({'FieldA': 'hello'}) == BasicDataclass(a='hello')
+    assert v.validate_test({'a': 'hello'}) == BasicDataclass(a='hello')
+    assert v.validate_test(
+        {
+            'FieldA': 'hello',
+            'a': 'world',
+        }
+    ) == BasicDataclass(a='hello')
+    with pytest.raises(ValidationError, match=r'FieldA\n +Field required \[type=missing,'):
+        assert v.validate_test({'foobar': 'hello'})
+
+
+def test_only_validate_by_name(py_and_json) -> None:
+    schema = core_schema.dataclass_schema(
+        BasicDataclass,
+        core_schema.dataclass_args_schema(
+            'BasicDataclass',
+            [
+                core_schema.dataclass_field(name='a', schema=core_schema.str_schema(), validation_alias='FieldA'),
+            ],
+        ),
+        ['a'],
+        config=core_schema.CoreConfig(validate_by_name=True, validate_by_alias=False),
+    )
+    v = py_and_json(schema)
+    assert v.validate_test({'a': 'hello'}) == BasicDataclass(a='hello')
+    with pytest.raises(ValidationError, match=r'a\n +Field required \[type=missing,'):
+        assert v.validate_test({'FieldA': 'hello'})
+
+
+def test_only_allow_alias(py_and_json) -> None:
+    schema = core_schema.dataclass_schema(
+        BasicDataclass,
+        core_schema.dataclass_args_schema(
+            'BasicDataclass',
+            [
+                core_schema.dataclass_field(name='a', schema=core_schema.str_schema(), validation_alias='FieldA'),
+            ],
+        ),
+        ['a'],
+        config=core_schema.CoreConfig(validate_by_name=False, validate_by_alias=True),
+    )
+    v = py_and_json(schema)
+    assert v.validate_test({'FieldA': 'hello'}) == BasicDataclass(a='hello')
+    with pytest.raises(ValidationError, match=r'FieldA\n +Field required \[type=missing,'):
+        assert v.validate_test({'a': 'hello'})
+
+
+@pytest.mark.parametrize('config_by_alias', [None, True, False])
+@pytest.mark.parametrize('config_by_name', [None, True, False])
+@pytest.mark.parametrize('runtime_by_alias', [None, True, False])
+@pytest.mark.parametrize('runtime_by_name', [None, True, False])
+def test_by_alias_and_name_config_interaction(
+    config_by_alias: Union[bool, None],
+    config_by_name: Union[bool, None],
+    runtime_by_alias: Union[bool, None],
+    runtime_by_name: Union[bool, None],
+) -> None:
+    """This test reflects the priority that applies for config vs runtime validation alias configuration.
+
+    Runtime values take precedence over config values, when set.
+    By default, by_alias is True and by_name is False.
+    """
+
+    if config_by_alias is False and config_by_name is False and runtime_by_alias is False and runtime_by_name is False:
+        pytest.skip("Can't have both by_alias and by_name as effectively False")
+
+    core_config = {
+        **({'validate_by_alias': config_by_alias} if config_by_alias is not None else {}),
+        **({'validate_by_name': config_by_name} if config_by_name is not None else {}),
+    }
+
+    @dataclasses.dataclass
+    class MyDataclass:
+        my_field: int
+
+    schema = core_schema.dataclass_schema(
+        MyDataclass,
+        core_schema.dataclass_args_schema(
+            'MyDataclass',
+            [
+                core_schema.dataclass_field(
+                    name='my_field', schema=core_schema.int_schema(), validation_alias='my_alias'
+                ),
+            ],
+        ),
+        ['my_field'],
+        config=core_schema.CoreConfig(**core_config),
+    )
+    s = SchemaValidator(schema)
+
+    alias_allowed = next(x for x in (runtime_by_alias, config_by_alias, True) if x is not None)
+    name_allowed = next(x for x in (runtime_by_name, config_by_name, False) if x is not None)
+
+    if alias_allowed:
+        assert dataclasses.asdict(
+            s.validate_python({'my_alias': 1}, by_alias=runtime_by_alias, by_name=runtime_by_name)
+        ) == {'my_field': 1}
+    if name_allowed:
+        assert dataclasses.asdict(
+            s.validate_python({'my_field': 1}, by_alias=runtime_by_alias, by_name=runtime_by_name)
+        ) == {'my_field': 1}

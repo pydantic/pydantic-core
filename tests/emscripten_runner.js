@@ -86,7 +86,7 @@ async function main() {
     FS.mkdir('/test_dir');
     FS.mount(FS.filesystems.NODEFS, {root: path.join(root_dir, 'tests')}, '/test_dir');
     FS.chdir('/test_dir');
-    await pyodide.loadPackage(['micropip', 'pytest']);
+    await pyodide.loadPackage(['micropip', 'pytest', 'pygments']);
     // language=python
     errcode = await pyodide.runPythonAsync(`
 import micropip
@@ -98,6 +98,8 @@ import importlib
 
 await micropip.install([
     'dirty-equals',
+    # inline-snapshot 0.21 requires pytest 8.3.4, pyodide 0.26 ships with 8.1.1
+    'inline-snapshot < 0.21',
     'hypothesis',
     'pytest-speed',
     'pytest-mock',

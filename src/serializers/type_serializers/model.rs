@@ -5,6 +5,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PySet, PyString, PyType};
 
 use ahash::AHashMap;
+use pyo3::IntoPyObjectExt;
 
 use super::{
     infer_json_key, infer_json_key_known, infer_serialize, infer_to_python, py_err_se_err, BuildSerializer,
@@ -45,6 +46,8 @@ impl BuildSerializer for ModelFieldsBuilder {
             (_, _) => None,
         };
 
+        let serialize_by_alias = config.get_as(intern!(py, "serialize_by_alias"))?;
+
         for (key, value) in fields_dict {
             let key_py = key.downcast_into::<PyString>()?;
             let key: String = key_py.extract()?;
@@ -53,7 +56,7 @@ impl BuildSerializer for ModelFieldsBuilder {
             let key_py: Py<PyString> = key_py.into();
 
             if field_info.get_as(intern!(py, "serialization_exclude"))? == Some(true) {
-                fields.insert(key, SerField::new(py, key_py, None, None, true));
+                fields.insert(key, SerField::new(py, key_py, None, None, true, serialize_by_alias));
             } else {
                 let alias: Option<String> = field_info.get_as(intern!(py, "serialization_alias"))?;
 
@@ -61,7 +64,10 @@ impl BuildSerializer for ModelFieldsBuilder {
                 let serializer = CombinedSerializer::build(&schema, config, definitions)
                     .map_err(|e| py_schema_error_type!("Field `{}`:\n  {}", key, e))?;
 
-                fields.insert(key, SerField::new(py, key_py, alias, Some(serializer), true));
+                fields.insert(
+                    key,
+                    SerField::new(py, key_py, alias, Some(serializer), true, serialize_by_alias),
+                );
             }
         }
 
@@ -146,8 +152,7 @@ impl ModelSerializer {
 
         if self.has_extra {
             let model_extra = model.getattr(intern!(py, "__pydantic_extra__"))?;
-            let py_tuple = (attrs, model_extra).to_object(py).into_bound(py);
-            Ok(py_tuple)
+            (attrs, model_extra).into_bound_py_any(py)
         } else {
             Ok(attrs.into_any())
         }
@@ -176,7 +181,7 @@ impl TypeSerializer for ModelSerializer {
             let py = value.py();
             let root = value.getattr(intern!(py, ROOT_FIELD)).map_err(|original_err| {
                 if root_extra.check.enabled() {
-                    PydanticSerializationUnexpectedValue::new_err(None)
+                    PydanticSerializationUnexpectedValue::new_from_msg(None).to_py_err()
                 } else {
                     original_err
                 }

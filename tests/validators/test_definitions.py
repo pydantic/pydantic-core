@@ -76,7 +76,7 @@ def test_dict_repeat():
 def test_repeated_ref():
     with pytest.raises(SchemaError, match='SchemaError: Duplicate ref: `foobar`'):
         SchemaValidator(
-            core_schema.tuple_positional_schema(
+            schema=core_schema.tuple_positional_schema(
                 [
                     core_schema.definitions_schema(
                         core_schema.definition_reference_schema('foobar'), [core_schema.int_schema(ref='foobar')]
@@ -92,7 +92,7 @@ def test_repeated_ref():
 def test_repeat_after():
     with pytest.raises(SchemaError, match='SchemaError: Duplicate ref: `foobar`'):
         SchemaValidator(
-            core_schema.definitions_schema(
+            schema=core_schema.definitions_schema(
                 core_schema.tuple_positional_schema(
                     [
                         core_schema.definitions_schema(
@@ -147,6 +147,20 @@ def test_definition_chain():
         core_schema.definitions_schema(
             core_schema.definition_reference_schema('foo'),
             [core_schema.definition_reference_schema(ref='foo', schema_ref='bar'), core_schema.int_schema(ref='bar')],
-        ),
+        )
     )
     assert v.validate_python('1') == 1
+
+
+def test_forwards_get_default_value():
+    v = SchemaValidator(
+        core_schema.definitions_schema(
+            core_schema.definition_reference_schema('foo'),
+            [core_schema.with_default_schema(core_schema.int_schema(), default=1, ref='foo')],
+        )
+    )
+
+    default = v.get_default_value()
+
+    assert default is not None
+    assert default.value == 1

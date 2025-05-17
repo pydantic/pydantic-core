@@ -1,10 +1,12 @@
-use std::cell::RefCell;
+use std::convert::Infallible;
+use std::ffi::CString;
 use std::fmt;
+use std::sync::Mutex;
 
-use pyo3::exceptions::{PyTypeError, PyValueError};
-use pyo3::intern;
+use pyo3::exceptions::{PyTypeError, PyUserWarning, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyString};
+use pyo3::{intern, PyTypeInfo};
 
 use serde::ser::Error;
 
@@ -15,7 +17,6 @@ use crate::recursion_guard::ContainsRecursionState;
 use crate::recursion_guard::RecursionError;
 use crate::recursion_guard::RecursionGuard;
 use crate::recursion_guard::RecursionState;
-use crate::tools::truncate_safe_repr;
 use crate::PydanticSerializationError;
 
 /// this is ugly, would be much better if extra could be stored in `SerializationState`
@@ -43,7 +44,7 @@ impl SerializationState {
         &'py self,
         py: Python<'py>,
         mode: &'py SerMode,
-        by_alias: bool,
+        by_alias: Option<bool>,
         exclude_none: bool,
         round_trip: bool,
         serialize_unknown: bool,
@@ -81,7 +82,7 @@ pub(crate) struct Extra<'a> {
     pub mode: &'a SerMode,
     pub ob_type_lookup: &'a ObTypeLookup,
     pub warnings: &'a CollectWarnings,
-    pub by_alias: bool,
+    pub by_alias: Option<bool>,
     pub exclude_unset: bool,
     pub exclude_defaults: bool,
     pub exclude_none: bool,
@@ -106,7 +107,7 @@ impl<'a> Extra<'a> {
     pub fn new(
         py: Python<'a>,
         mode: &'a SerMode,
-        by_alias: bool,
+        by_alias: Option<bool>,
         warnings: &'a CollectWarnings,
         exclude_unset: bool,
         exclude_defaults: bool,
@@ -159,6 +160,14 @@ impl<'a> Extra<'a> {
     pub fn serialize_infer<'py>(&'py self, value: &'py Bound<'py, PyAny>) -> super::infer::SerializeInfer<'py> {
         super::infer::SerializeInfer::new(value, None, None, self)
     }
+
+    pub(crate) fn model_type_name(&self) -> Option<Bound<'a, PyString>> {
+        self.model.and_then(|model| model.get_type().name().ok())
+    }
+
+    pub fn serialize_by_alias_or(&self, serialize_by_alias: Option<bool>) -> bool {
+        self.by_alias.or(serialize_by_alias).unwrap_or(false)
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -183,7 +192,7 @@ impl SerCheck {
 pub(crate) struct ExtraOwned {
     mode: SerMode,
     warnings: CollectWarnings,
-    by_alias: bool,
+    by_alias: Option<bool>,
     exclude_unset: bool,
     exclude_defaults: bool,
     exclude_none: bool,
@@ -279,12 +288,16 @@ impl From<Option<&str>> for SerMode {
     }
 }
 
-impl ToPyObject for SerMode {
-    fn to_object(&self, py: Python<'_>) -> PyObject {
+impl<'py> IntoPyObject<'py> for &'_ SerMode {
+    type Target = PyString;
+    type Output = Bound<'py, PyString>;
+    type Error = Infallible;
+
+    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
         match self {
-            SerMode::Python => intern!(py, "python").to_object(py),
-            SerMode::Json => intern!(py, "json").to_object(py),
-            SerMode::Other(s) => s.to_object(py),
+            SerMode::Python => Ok(intern!(py, "python").clone()),
+            SerMode::Json => Ok(intern!(py, "json").clone()),
+            SerMode::Other(s) => Ok(PyString::new(py, s)),
         }
     }
 }
@@ -327,24 +340,33 @@ impl From<bool> for WarningsMode {
     }
 }
 
-#[derive(Clone)]
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub(crate) struct CollectWarnings {
     mode: WarningsMode,
-    warnings: RefCell<Option<Vec<String>>>,
+    // FIXME: mutex is to satisfy PyO3 0.23, we should be able to refactor this away
+    warnings: Mutex<Vec<PydanticSerializationUnexpectedValue>>,
+}
+
+impl Clone for CollectWarnings {
+    fn clone(&self) -> Self {
+        Self {
+            mode: self.mode,
+            warnings: Mutex::new(self.warnings.lock().expect("lock poisoned").clone()),
+        }
+    }
 }
 
 impl CollectWarnings {
     pub(crate) fn new(mode: WarningsMode) -> Self {
         Self {
             mode,
-            warnings: RefCell::new(None),
+            warnings: Mutex::new(Vec::new()),
         }
     }
 
-    pub fn custom_warning(&self, warning: String) {
+    pub fn register_warning(&self, warning: PydanticSerializationUnexpectedValue) {
         if self.mode != WarningsMode::None {
-            self.add_warning(warning);
+            self.warnings.lock().expect("lock poisoned").push(warning);
         }
     }
 
@@ -353,15 +375,11 @@ impl CollectWarnings {
         if value.is_none() {
             Ok(())
         } else if extra.check.enabled() {
-            let type_name = value
-                .get_type()
-                .qualname()
-                .unwrap_or_else(|_| PyString::new_bound(value.py(), "<unknown python object>"));
-
-            let value_str = truncate_safe_repr(value, None);
-            Err(PydanticSerializationUnexpectedValue::new_err(Some(format!(
-                "Expected `{field_type}` but got `{type_name}` with value `{value_str}` - serialized value may not be as expected"
-            ))))
+            Err(PydanticSerializationUnexpectedValue::new_from_parts(
+                Some(field_type.to_string()),
+                Some(value.clone().unbind()),
+            )
+            .to_py_err())
         } else {
             self.fallback_warning(field_type, value);
             Ok(())
@@ -390,25 +408,10 @@ impl CollectWarnings {
 
     fn fallback_warning(&self, field_type: &str, value: &Bound<'_, PyAny>) {
         if self.mode != WarningsMode::None {
-            let type_name = value
-                .get_type()
-                .qualname()
-                .unwrap_or_else(|_| PyString::new_bound(value.py(), "<unknown python object>"));
-
-            let value_str = truncate_safe_repr(value, None);
-
-            self.add_warning(format!(
-                "Expected `{field_type}` but got `{type_name}` with value `{value_str}` - serialized value may not be as expected"
+            self.register_warning(PydanticSerializationUnexpectedValue::new_from_parts(
+                Some(field_type.to_string()),
+                Some(value.clone().unbind()),
             ));
-        }
-    }
-
-    fn add_warning(&self, message: String) {
-        let mut op_warnings = self.warnings.borrow_mut();
-        if let Some(ref mut warnings) = *op_warnings {
-            warnings.push(message);
-        } else {
-            *op_warnings = Some(vec![message]);
         }
     }
 
@@ -416,29 +419,41 @@ impl CollectWarnings {
         if self.mode == WarningsMode::None {
             return Ok(());
         }
-        match *self.warnings.borrow() {
-            Some(ref warnings) => {
-                let message = format!("Pydantic serializer warnings:\n  {}", warnings.join("\n  "));
-                if self.mode == WarningsMode::Warn {
-                    let user_warning_type = py.import_bound("builtins")?.getattr("UserWarning")?;
-                    PyErr::warn_bound(py, &user_warning_type, &message, 0)
-                } else {
-                    Err(PydanticSerializationError::new_err(message))
-                }
-            }
-            _ => Ok(()),
+        let warnings = self.warnings.lock().expect("lock poisoned");
+
+        if warnings.is_empty() {
+            return Ok(());
+        }
+
+        let formatted_warnings: Vec<String> = warnings.iter().map(|w| w.__repr__(py).to_string()).collect();
+
+        let message = format!("Pydantic serializer warnings:\n  {}", formatted_warnings.join("\n  "));
+        if self.mode == WarningsMode::Warn {
+            let user_warning_type = PyUserWarning::type_object(py);
+            PyErr::warn(py, &user_warning_type, &CString::new(message)?, 0)
+        } else {
+            Err(PydanticSerializationError::new_err(message))
         }
     }
 }
 
-#[derive(Default, Clone)]
+#[derive(Default)]
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub struct SerRecursionState {
-    guard: RefCell<RecursionState>,
+    // FIXME: mutex is to satisfy PyO3 0.23, we should be able to refactor this away
+    guard: Mutex<RecursionState>,
+}
+
+impl Clone for SerRecursionState {
+    fn clone(&self) -> Self {
+        Self {
+            guard: Mutex::new(self.guard.lock().expect("lock poisoned").clone()),
+        }
+    }
 }
 
 impl ContainsRecursionState for &'_ Extra<'_> {
     fn access_recursion_state<R>(&mut self, f: impl FnOnce(&mut RecursionState) -> R) -> R {
-        f(&mut self.rec_guard.guard.borrow_mut())
+        f(&mut self.rec_guard.guard.lock().expect("lock poisoned"))
     }
 }

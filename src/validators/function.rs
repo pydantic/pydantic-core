@@ -100,10 +100,16 @@ impl FunctionBeforeValidator {
         state: &'s mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
         let r = if self.info_arg {
-            let info = ValidationInfo::new(py, state.extra(), &self.config, self.field_name.clone());
-            self.func.call1(py, (input.to_object(py), info))
+            let field_name = state
+                .extra()
+                .field_name
+                .clone()
+                .map(Bound::unbind)
+                .or_else(|| self.field_name.clone());
+            let info = ValidationInfo::new(py, state.extra(), &self.config, field_name);
+            self.func.call1(py, (input.to_object(py)?, info))
         } else {
-            self.func.call1(py, (input.to_object(py),))
+            self.func.call1(py, (input.to_object(py)?,))
         };
         let value = r.map_err(|e| convert_err(py, e, input))?;
         call(value.into_bound(py), state)
@@ -124,6 +130,7 @@ impl Validator for FunctionBeforeValidator {
         state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
         let validate = |v, s: &mut ValidationState<'_, 'py>| self.validator.validate(py, &v, s);
+        #[allow(clippy::used_underscore_items)]
         self._validate(validate, py, input, state)
     }
     fn validate_assignment<'py>(
@@ -137,6 +144,7 @@ impl Validator for FunctionBeforeValidator {
         let validate = move |v, s: &mut ValidationState<'_, 'py>| {
             self.validator.validate_assignment(py, &v, field_name, field_value, s)
         };
+        #[allow(clippy::used_underscore_items)]
         self._validate(validate, py, obj, state)
     }
 
@@ -167,10 +175,16 @@ impl FunctionAfterValidator {
     ) -> ValResult<PyObject> {
         let v = call(input, state)?;
         let r = if self.info_arg {
-            let info = ValidationInfo::new(py, state.extra(), &self.config, self.field_name.clone());
-            self.func.call1(py, (v.to_object(py), info))
+            let field_name = state
+                .extra()
+                .field_name
+                .clone()
+                .map(Bound::unbind)
+                .or_else(|| self.field_name.clone());
+            let info = ValidationInfo::new(py, state.extra(), &self.config, field_name);
+            self.func.call1(py, (v, info))
         } else {
-            self.func.call1(py, (v.to_object(py),))
+            self.func.call1(py, (v,))
         };
         r.map_err(|e| convert_err(py, e, input))
     }
@@ -190,6 +204,7 @@ impl Validator for FunctionAfterValidator {
         state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
         let validate = |v: &_, s: &mut ValidationState<'_, 'py>| self.validator.validate(py, v, s);
+        #[allow(clippy::used_underscore_items)]
         self._validate(validate, py, input, state)
     }
     fn validate_assignment<'py>(
@@ -203,6 +218,7 @@ impl Validator for FunctionAfterValidator {
         let validate = move |v: &Bound<'py, PyAny>, s: &mut ValidationState<'_, 'py>| {
             self.validator.validate_assignment(py, v, field_name, field_value, s)
         };
+        #[allow(clippy::used_underscore_items)]
         self._validate(validate, py, obj, state)
     }
 
@@ -254,10 +270,16 @@ impl Validator for FunctionPlainValidator {
         state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
         let r = if self.info_arg {
-            let info = ValidationInfo::new(py, state.extra(), &self.config, self.field_name.clone());
-            self.func.call1(py, (input.to_object(py), info))
+            let field_name = state
+                .extra()
+                .field_name
+                .clone()
+                .map(Bound::unbind)
+                .or_else(|| self.field_name.clone());
+            let info = ValidationInfo::new(py, state.extra(), &self.config, field_name);
+            self.func.call1(py, (input.to_object(py)?, info))
         } else {
-            self.func.call1(py, (input.to_object(py),))
+            self.func.call1(py, (input.to_object(py)?,))
         };
         r.map_err(|e| convert_err(py, e, input))
     }
@@ -318,10 +340,16 @@ impl FunctionWrapValidator {
         state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
         let r = if self.info_arg {
-            let info = ValidationInfo::new(py, state.extra(), &self.config, self.field_name.clone());
-            self.func.call1(py, (input.to_object(py), handler, info))
+            let field_name = state
+                .extra()
+                .field_name
+                .clone()
+                .map(Bound::unbind)
+                .or_else(|| self.field_name.clone());
+            let info = ValidationInfo::new(py, state.extra(), &self.config, field_name);
+            self.func.call1(py, (input.to_object(py)?, handler, info))
         } else {
-            self.func.call1(py, (input.to_object(py), handler))
+            self.func.call1(py, (input.to_object(py)?, handler))
         };
         r.map_err(|e| convert_err(py, e, input))
     }
@@ -342,7 +370,6 @@ impl Validator for FunctionWrapValidator {
     ) -> ValResult<PyObject> {
         let handler = ValidatorCallable {
             validator: InternalValidator::new(
-                py,
                 "ValidatorCallable",
                 self.validator.clone(),
                 state,
@@ -351,6 +378,7 @@ impl Validator for FunctionWrapValidator {
             ),
         };
         let handler = Bound::new(py, handler)?;
+        #[allow(clippy::used_underscore_items)]
         let result = self._validate(handler.as_any(), py, input, state);
         state.exactness = handler.borrow_mut().validator.exactness;
         result
@@ -366,7 +394,6 @@ impl Validator for FunctionWrapValidator {
     ) -> ValResult<PyObject> {
         let handler = AssignmentValidatorCallable {
             validator: InternalValidator::new(
-                py,
                 "AssignmentValidatorCallable",
                 self.validator.clone(),
                 state,
@@ -374,8 +401,9 @@ impl Validator for FunctionWrapValidator {
                 self.validation_error_cause,
             ),
             updated_field_name: field_name.to_string(),
-            updated_field_value: field_value.to_object(py),
+            updated_field_value: field_value.clone().into(),
         };
+        #[allow(clippy::used_underscore_items)]
         self._validate(Bound::new(py, handler)?.as_any(), py, obj, state)
     }
 
@@ -458,7 +486,7 @@ macro_rules! py_err_string {
             Ok(py_string) => match py_string.to_str() {
                 Ok(_) => ValError::new(
                     ErrorType::$type_member {
-                        error: Some($py_err.into_py($py)),
+                        error: pyo3::IntoPyObjectExt::into_py_any($py_err, $py).ok(),
                         context: None,
                     },
                     $input,
@@ -474,18 +502,18 @@ macro_rules! py_err_string {
 /// as validation errors, `TypeError` is now considered as a runtime error to catch errors in function signatures
 pub fn convert_err(py: Python<'_>, err: PyErr, input: impl ToErrorValue) -> ValError {
     if err.is_instance_of::<PyValueError>(py) {
-        let error_value = err.value_bound(py);
+        let error_value = err.value(py);
         if let Ok(pydantic_value_error) = error_value.extract::<PydanticCustomError>() {
             pydantic_value_error.into_val_error(input)
         } else if let Ok(pydantic_error_type) = error_value.extract::<PydanticKnownError>() {
             pydantic_error_type.into_val_error(input)
-        } else if let Ok(validation_error) = err.value_bound(py).extract::<ValidationError>() {
+        } else if let Ok(validation_error) = err.value(py).extract::<ValidationError>() {
             validation_error.into_val_error()
         } else {
             py_err_string!(py, err, error_value, ValueError, input)
         }
     } else if err.is_instance_of::<PyAssertionError>(py) {
-        py_err_string!(py, err, err.value_bound(py), AssertionError, input)
+        py_err_string!(py, err, err.value(py), AssertionError, input)
     } else if err.is_instance_of::<PydanticOmit>(py) {
         ValError::Omit
     } else if err.is_instance_of::<PydanticUseDefault>(py) {

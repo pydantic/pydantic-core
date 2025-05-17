@@ -14,7 +14,7 @@ static ENUM_META_OBJECT: GILOnceCell<Py<PyAny>> = GILOnceCell::new();
 pub fn get_enum_meta_object(py: Python) -> &Bound<'_, PyAny> {
     ENUM_META_OBJECT
         .get_or_init(py, || {
-            py.import_bound(intern!(py, "enum"))
+            py.import(intern!(py, "enum"))
                 .and_then(|enum_module| enum_module.getattr(intern!(py, "EnumMeta")))
                 .unwrap()
                 .into()
@@ -181,7 +181,7 @@ fn strip_leading_zeros(s: &str) -> Option<&str> {
         Some((_, c)) if ('1'..='9').contains(&c) || c == '-' => return Some(s),
         // anything else is invalid, we return None
         _ => return None,
-    };
+    }
     for (i, c) in char_iter {
         match c {
             // continue on more leading zeros or if we get an underscore we continue - we're "within the number"

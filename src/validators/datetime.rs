@@ -1,8 +1,9 @@
+use pyo3::exceptions::PyValueError;
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::sync::GILOnceCell;
 use pyo3::types::{PyDict, PyString};
-use speedate::{DateTime, Time};
+use speedate::{DateTime, MicrosecondsPrecisionOverflowBehavior, Time};
 use std::cmp::Ordering;
 use strum::EnumMessage;
 
@@ -130,7 +131,7 @@ impl Validator for DateTimeValidator {
                 tz_constraint.tz_check(speedate_dt.time.tz_offset, input)?;
             }
         }
-        Ok(datetime.try_into_py(py)?)
+        datetime.try_into_py(py, input)
     }
 
     fn get_name(&self) -> &str {
@@ -208,9 +209,14 @@ impl DateTimeConstraints {
     }
 }
 
-fn py_datetime_as_datetime(schema: &Bound<'_, PyDict>, field: &Bound<'_, PyString>) -> PyResult<Option<DateTime>> {
-    match schema.get_as(field)? {
-        Some(dt) => Ok(Some(EitherDateTime::Py(dt).as_raw()?)),
+fn py_datetime_as_datetime(schema: &Bound<'_, PyDict>, key: &Bound<'_, PyString>) -> PyResult<Option<DateTime>> {
+    match schema.get_item(key)? {
+        Some(value) => match value.validate_datetime(false, MicrosecondsPrecisionOverflowBehavior::Truncate) {
+            Ok(v) => Ok(Some(v.into_inner().as_raw()?)),
+            Err(_) => Err(PyValueError::new_err(format!(
+                "'{key}' must be coercible to a datetime instance",
+            ))),
+        },
         None => Ok(None),
     }
 }
@@ -247,10 +253,6 @@ pub struct NowConstraint {
 
 static TIME_LOCALTIME: GILOnceCell<PyObject> = GILOnceCell::new();
 
-fn get_localtime(py: Python) -> PyResult<PyObject> {
-    Ok(py.import_bound("time")?.getattr("localtime")?.into_py(py))
-}
-
 impl NowConstraint {
     /// Get the UTC offset in seconds either from the utc_offset field or by calling `time.localtime().tm_gmtoff`.
     /// Note: although the attribute is called "gmtoff", it is actually the offset in the UTC direction,
@@ -259,8 +261,8 @@ impl NowConstraint {
         if let Some(utc_offset) = self.utc_offset {
             Ok(utc_offset)
         } else {
-            let localtime = TIME_LOCALTIME.get_or_init(py, || get_localtime(py).unwrap());
-            localtime.bind(py).call0()?.getattr(intern!(py, "tm_gmtoff"))?.extract()
+            let localtime = TIME_LOCALTIME.import(py, "time", "localtime")?;
+            localtime.call0()?.getattr(intern!(py, "tm_gmtoff"))?.extract()
         }
     }
 

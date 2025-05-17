@@ -2,7 +2,7 @@ use std::fmt::Debug;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDict};
+use pyo3::types::{PyBytes, PyDict, PyTuple, PyType};
 use pyo3::{PyTraverseError, PyVisit};
 use type_serializers::any::AnySerializer;
 
@@ -15,7 +15,7 @@ pub use errors::{PydanticSerializationError, PydanticSerializationUnexpectedValu
 use extra::{CollectWarnings, SerRecursionState, WarningsMode};
 pub(crate) use extra::{Extra, SerMode, SerializationState};
 pub use shared::CombinedSerializer;
-use shared::{to_json_bytes, BuildSerializer, TypeSerializer};
+use shared::{to_json_bytes, TypeSerializer};
 
 mod computed_fields;
 mod config;
@@ -25,6 +25,7 @@ mod fields;
 mod filter;
 mod infer;
 mod ob_type;
+mod prebuilt;
 pub mod ser;
 mod shared;
 mod type_serializers;
@@ -54,7 +55,7 @@ impl SchemaSerializer {
         &'b self,
         py: Python<'a>,
         mode: &'a SerMode,
-        by_alias: bool,
+        by_alias: Option<bool>,
         warnings: &'a CollectWarnings,
         exclude_unset: bool,
         exclude_defaults: bool,
@@ -91,7 +92,7 @@ impl SchemaSerializer {
     #[pyo3(signature = (schema, config=None))]
     pub fn py_new(schema: Bound<'_, PyDict>, config: Option<&Bound<'_, PyDict>>) -> PyResult<Self> {
         let mut definitions_builder = DefinitionsBuilder::new();
-        let serializer = CombinedSerializer::build(schema.downcast()?, config, &mut definitions_builder)?;
+        let serializer = CombinedSerializer::build_base(schema.downcast()?, config, &mut definitions_builder)?;
         Ok(Self {
             serializer,
             definitions: definitions_builder.finish()?,
@@ -106,7 +107,7 @@ impl SchemaSerializer {
     }
 
     #[allow(clippy::too_many_arguments)]
-    #[pyo3(signature = (value, *, mode = None, include = None, exclude = None, by_alias = true,
+    #[pyo3(signature = (value, *, mode = None, include = None, exclude = None, by_alias = None,
         exclude_unset = false, exclude_defaults = false, exclude_none = false, round_trip = false, warnings = WarningsArg::Bool(true),
         fallback = None, serialize_as_any = false, context = None))]
     pub fn to_python(
@@ -116,7 +117,7 @@ impl SchemaSerializer {
         mode: Option<&str>,
         include: Option<&Bound<'_, PyAny>>,
         exclude: Option<&Bound<'_, PyAny>>,
-        by_alias: bool,
+        by_alias: Option<bool>,
         exclude_unset: bool,
         exclude_defaults: bool,
         exclude_none: bool,
@@ -158,7 +159,7 @@ impl SchemaSerializer {
     }
 
     #[allow(clippy::too_many_arguments)]
-    #[pyo3(signature = (value, *, indent = None, include = None, exclude = None, by_alias = true,
+    #[pyo3(signature = (value, *, indent = None, include = None, exclude = None, by_alias = None,
         exclude_unset = false, exclude_defaults = false, exclude_none = false, round_trip = false, warnings = WarningsArg::Bool(true),
         fallback = None, serialize_as_any = false, context = None))]
     pub fn to_json(
@@ -168,7 +169,7 @@ impl SchemaSerializer {
         indent: Option<usize>,
         include: Option<&Bound<'_, PyAny>>,
         exclude: Option<&Bound<'_, PyAny>>,
-        by_alias: bool,
+        by_alias: Option<bool>,
         exclude_unset: bool,
         exclude_defaults: bool,
         exclude_none: bool,
@@ -216,16 +217,13 @@ impl SchemaSerializer {
         warnings.final_check(py)?;
 
         self.expected_json_size.store(bytes.len(), Ordering::Relaxed);
-        let py_bytes = PyBytes::new_bound(py, &bytes);
+        let py_bytes = PyBytes::new(py, &bytes);
         Ok(py_bytes.into())
     }
 
-    pub fn __reduce__(slf: &Bound<Self>) -> PyResult<(PyObject, (PyObject, PyObject))> {
-        // Enables support for `pickle` serialization.
-        let py = slf.py();
-        let cls = slf.get_type().into();
-        let init_args = (slf.get().py_schema.to_object(py), slf.get().py_config.to_object(py));
-        Ok((cls, init_args))
+    pub fn __reduce__<'py>(slf: &Bound<'py, Self>) -> PyResult<(Bound<'py, PyType>, Bound<'py, PyTuple>)> {
+        let init_args = (&slf.get().py_schema, &slf.get().py_config).into_pyobject(slf.py())?;
+        Ok((slf.get_type(), init_args))
     }
 
     pub fn __repr__(&self) -> String {
@@ -273,7 +271,7 @@ pub fn to_json(
     let extra = state.extra(
         py,
         &SerMode::Json,
-        by_alias,
+        Some(by_alias),
         exclude_none,
         round_trip,
         serialize_unknown,
@@ -283,7 +281,7 @@ pub fn to_json(
     );
     let bytes = to_json_bytes(value, AnySerializer::get(), include, exclude, &extra, indent, 1024)?;
     state.final_check(py)?;
-    let py_bytes = PyBytes::new_bound(py, &bytes);
+    let py_bytes = PyBytes::new(py, &bytes);
     Ok(py_bytes.into())
 }
 
@@ -312,7 +310,7 @@ pub fn to_jsonable_python(
     let extra = state.extra(
         py,
         &SerMode::Json,
-        by_alias,
+        Some(by_alias),
         exclude_none,
         round_trip,
         serialize_unknown,

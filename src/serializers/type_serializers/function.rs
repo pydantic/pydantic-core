@@ -127,7 +127,7 @@ impl BuildSerializer for FunctionPlainSerializer {
 
         let name = format!("plain_function[{function_name}]");
         Ok(Self {
-            func: function.into_py(py),
+            func: function.unbind(),
             function_name,
             name,
             return_serializer,
@@ -153,7 +153,7 @@ impl FunctionPlainSerializer {
             let v = if self.is_field_serializer {
                 if let Some(model) = extra.model {
                     if self.info_arg {
-                        let info = SerializationInfo::new(py, include, exclude, extra, self.is_field_serializer)?;
+                        let info = SerializationInfo::new(include, exclude, extra, self.is_field_serializer)?;
                         self.func.call1(py, (model, value, info))?
                     } else {
                         self.func.call1(py, (model, value))?
@@ -162,14 +162,14 @@ impl FunctionPlainSerializer {
                     return Err(PyRuntimeError::new_err("Function plain serializer expected to be run inside the context of a model field but no model was found"));
                 }
             } else if self.info_arg {
-                let info = SerializationInfo::new(py, include, exclude, extra, self.is_field_serializer)?;
+                let info = SerializationInfo::new(include, exclude, extra, self.is_field_serializer)?;
                 self.func.call1(py, (value, info))?
             } else {
                 self.func.call1(py, (value,))?
             };
             Ok((true, v))
         } else {
-            Ok((false, value.into_py(py)))
+            Ok((false, value.clone().unbind()))
         }
     }
 
@@ -179,15 +179,22 @@ impl FunctionPlainSerializer {
             .expect("fallback_serializer unexpectedly none")
             .as_ref()
     }
+
+    fn retry_with_lax_check(&self) -> bool {
+        self.fallback_serializer
+            .as_ref()
+            .is_some_and(|f| f.retry_with_lax_check())
+            || self.return_serializer.retry_with_lax_check()
+    }
 }
 
 fn on_error(py: Python, err: PyErr, function_name: &str, extra: &Extra) -> PyResult<()> {
-    let exception = err.value_bound(py);
+    let exception = err.value(py);
     if let Ok(ser_err) = exception.extract::<PydanticSerializationUnexpectedValue>() {
         if extra.check.enabled() {
             Err(err)
         } else {
-            extra.warnings.custom_warning(ser_err.__repr__());
+            extra.warnings.register_warning(ser_err);
             Ok(())
         }
     } else if let Ok(err) = exception.extract::<PydanticSerializationError>() {
@@ -270,6 +277,10 @@ macro_rules! function_type_serializer {
 
             fn get_name(&self) -> &str {
                 &self.name
+            }
+
+            fn retry_with_lax_check(&self) -> bool {
+                self.retry_with_lax_check()
             }
         }
     };
@@ -360,7 +371,7 @@ impl BuildSerializer for FunctionWrapSerializer {
         let name = format!("wrap_function[{function_name}, {}]", serializer.get_name());
         Ok(Self {
             serializer: Arc::new(serializer),
-            func: function.into_py(py),
+            func: function.into(),
             function_name,
             name,
             return_serializer: Arc::new(return_serializer),
@@ -382,11 +393,11 @@ impl FunctionWrapSerializer {
     ) -> PyResult<(bool, PyObject)> {
         let py = value.py();
         if self.when_used.should_use(value, extra) {
-            let serialize = SerializationCallable::new(py, &self.serializer, include, exclude, extra);
+            let serialize = SerializationCallable::new(&self.serializer, include, exclude, extra);
             let v = if self.is_field_serializer {
                 if let Some(model) = extra.model {
                     if self.info_arg {
-                        let info = SerializationInfo::new(py, include, exclude, extra, self.is_field_serializer)?;
+                        let info = SerializationInfo::new(include, exclude, extra, self.is_field_serializer)?;
                         self.func.call1(py, (model, value, serialize, info))?
                     } else {
                         self.func.call1(py, (model, value, serialize))?
@@ -395,19 +406,23 @@ impl FunctionWrapSerializer {
                     return Err(PyRuntimeError::new_err("Function wrap serializer expected to be run inside the context of a model field but no model was found"));
                 }
             } else if self.info_arg {
-                let info = SerializationInfo::new(py, include, exclude, extra, self.is_field_serializer)?;
+                let info = SerializationInfo::new(include, exclude, extra, self.is_field_serializer)?;
                 self.func.call1(py, (value, serialize, info))?
             } else {
                 self.func.call1(py, (value, serialize))?
             };
             Ok((true, v))
         } else {
-            Ok((false, value.into_py(py)))
+            Ok((false, value.clone().unbind()))
         }
     }
 
     fn get_fallback_serializer(&self) -> &CombinedSerializer {
         self.serializer.as_ref()
+    }
+
+    fn retry_with_lax_check(&self) -> bool {
+        self.serializer.retry_with_lax_check() || self.return_serializer.retry_with_lax_check()
     }
 }
 
@@ -431,7 +446,6 @@ pub(crate) struct SerializationCallable {
 
 impl SerializationCallable {
     pub fn new(
-        py: Python,
         serializer: &Arc<CombinedSerializer>,
         include: Option<&Bound<'_, PyAny>>,
         exclude: Option<&Bound<'_, PyAny>>,
@@ -441,8 +455,8 @@ impl SerializationCallable {
             serializer: serializer.clone(),
             extra_owned: ExtraOwned::new(extra),
             filter: AnyFilter::new(),
-            include: include.map(|v| v.into_py(py)),
-            exclude: exclude.map(|v| v.into_py(py)),
+            include: include.map(|v| v.clone().unbind()),
+            exclude: exclude.map(|v| v.clone().unbind()),
         }
     }
 
@@ -530,9 +544,10 @@ struct SerializationInfo {
     exclude: Option<PyObject>,
     #[pyo3(get)]
     context: Option<PyObject>,
+    #[pyo3(get, name = "mode")]
     _mode: SerMode,
     #[pyo3(get)]
-    by_alias: bool,
+    by_alias: Option<bool>,
     #[pyo3(get)]
     exclude_unset: bool,
     #[pyo3(get)]
@@ -548,7 +563,6 @@ struct SerializationInfo {
 
 impl SerializationInfo {
     fn new(
-        py: Python,
         include: Option<&Bound<'_, PyAny>>,
         exclude: Option<&Bound<'_, PyAny>>,
         extra: &Extra,
@@ -557,9 +571,9 @@ impl SerializationInfo {
         if is_field_serializer {
             match extra.field_name {
                 Some(field_name) => Ok(Self {
-                    include: include.map(|i| i.into_py(py)),
-                    exclude: exclude.map(|e| e.into_py(py)),
-                    context: extra.context.map(|c| c.into_py(py)),
+                    include: include.map(|i| i.clone().unbind()),
+                    exclude: exclude.map(|e| e.clone().unbind()),
+                    context: extra.context.map(|c| c.clone().unbind()),
                     _mode: extra.mode.clone(),
                     by_alias: extra.by_alias,
                     exclude_unset: extra.exclude_unset,
@@ -575,9 +589,9 @@ impl SerializationInfo {
             }
         } else {
             Ok(Self {
-                include: include.map(|i| i.into_py(py)),
-                exclude: exclude.map(|e| e.into_py(py)),
-                context: extra.context.map(|c| c.into_py(py)),
+                include: include.map(|i| i.clone().unbind()),
+                exclude: exclude.map(|e| e.clone().unbind()),
+                context: extra.context.map(|c| c.clone().unbind()),
                 _mode: extra.mode.clone(),
                 by_alias: extra.by_alias,
                 exclude_unset: extra.exclude_unset,
@@ -612,18 +626,13 @@ impl SerializationInfo {
 
 #[pymethods]
 impl SerializationInfo {
-    #[getter]
-    fn mode(&self, py: Python) -> PyObject {
-        self._mode.to_object(py)
-    }
-
     fn mode_is_json(&self) -> bool {
         self._mode.is_json()
     }
 
     #[getter]
     fn __dict__<'py>(&'py self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
-        let d = PyDict::new_bound(py);
+        let d = PyDict::new(py);
         if let Some(ref include) = self.include {
             d.set_item("include", include)?;
         }
@@ -633,7 +642,7 @@ impl SerializationInfo {
         if let Some(ref context) = self.context {
             d.set_item("context", context)?;
         }
-        d.set_item("mode", self.mode(py))?;
+        d.set_item("mode", &self._mode)?;
         d.set_item("by_alias", self.by_alias)?;
         d.set_item("exclude_unset", self.exclude_unset)?;
         d.set_item("exclude_defaults", self.exclude_defaults)?;
@@ -659,7 +668,7 @@ impl SerializationInfo {
                 None => "None".to_owned(),
             },
             self._mode,
-            py_bool(self.by_alias),
+            py_bool(self.by_alias.unwrap_or(false)),
             py_bool(self.exclude_unset),
             py_bool(self.exclude_defaults),
             py_bool(self.exclude_none),
@@ -674,7 +683,7 @@ impl SerializationInfo {
     #[getter]
     fn get_field_name<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyString>> {
         match self.field_name {
-            Some(ref field_name) => Ok(PyString::new_bound(py, field_name)),
+            Some(ref field_name) => Ok(PyString::new(py, field_name)),
             None => Err(PyAttributeError::new_err("No attribute named 'field_name'")),
         }
     }

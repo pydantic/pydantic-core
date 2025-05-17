@@ -256,7 +256,7 @@ def input_data_lax():
         'field_tuple_var_len_float': tuple(i + 0.5 for i in range(100)),
         'field_tuple_var_len_float_con': tuple(i + 0.5 for i in range(42)),
         'field_tuple_fix_len': ('a', 1, 1.0, True),
-        'field_dict_any': {'a': 'b', 1: True, 1.0: 1.0},
+        'field_dict_any': {'a': 'b', 1: True, 1.0: 1.0},  # noqa: F601
         'field_dict_str_float': {f'{i}': i + 0.5 for i in range(100)},
         'field_literal_1_int': 1,
         'field_literal_1_str': 'foobar',
@@ -339,4 +339,23 @@ def input_data_wrong():
         'field_union': {'field_str': ('foo',), 'field_int': 'x', 'field_float': b'y'},
         'field_functions_model': {'field_before': 1, 'field_after': 1, 'field_wrap': 1, 'field_plain': 1},
         'field_recursive': {'name': 'foo', 'sub_branch': {'name': 'bar', 'sub_branch': {}}},
+    }
+
+
+def wrap_schema_in_root_model(schema: dict) -> dict:
+    class MyRootModel:
+        # __slots__ is not required, but it avoids __pydantic_fields_set__ falling into __dict__
+        __slots__ = '__dict__', '__pydantic_fields_set__', '__pydantic_extra__', '__pydantic_private__'
+
+    return {
+        'type': 'model',
+        'cls': MyRootModel,
+        'config': {},
+        'schema': {
+            'type': 'model-fields',
+            'fields': {
+                'root': {'type': 'model-field', 'schema': schema},
+            },
+        },
+        'root_model': True,
     }

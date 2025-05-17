@@ -1,12 +1,13 @@
+from __future__ import annotations
+
 import dataclasses
 import json
 import uuid
 import warnings
 from decimal import Decimal
-from typing import Any, ClassVar, Union
+from typing import Any, ClassVar, Literal, Union
 
 import pytest
-from typing_extensions import Literal
 
 from pydantic_core import PydanticSerializationUnexpectedValue, SchemaSerializer, core_schema
 
@@ -34,8 +35,8 @@ def test_union_error():
     s = SchemaSerializer(core_schema.union_schema([core_schema.bool_schema(), core_schema.int_schema()]))
 
     messages = [
-        "Expected `bool` but got `str` with value `'a string'` - serialized value may not be as expected",
-        "Expected `int` but got `str` with value `'a string'` - serialized value may not be as expected",
+        "Expected `bool` - serialized value may not be as expected [input_value='a string', input_type=str]",
+        "Expected `int` - serialized value may not be as expected [input_value='a string', input_type=str]",
     ]
 
     with warnings.catch_warnings(record=True) as w:
@@ -60,53 +61,36 @@ class ModelB:
 @pytest.fixture(scope='module')
 def model_serializer() -> SchemaSerializer:
     return SchemaSerializer(
-        {
-            'type': 'union',
-            'choices': [
-                {
-                    'type': 'model',
-                    'cls': ModelA,
-                    'schema': {
-                        'type': 'model-fields',
-                        'fields': {
-                            'a': {'type': 'model-field', 'schema': {'type': 'bytes'}},
-                            'b': {
-                                'type': 'model-field',
-                                'schema': {
-                                    'type': 'float',
-                                    'serialization': {
-                                        'type': 'format',
-                                        'formatting_string': '0.1f',
-                                        'when_used': 'unless-none',
-                                    },
-                                },
-                            },
-                        },
-                    },
-                },
-                {
-                    'type': 'model',
-                    'cls': ModelB,
-                    'schema': {
-                        'type': 'model-fields',
-                        'fields': {
-                            'c': {'type': 'model-field', 'schema': {'type': 'bytes'}},
-                            'd': {
-                                'type': 'model-field',
-                                'schema': {
-                                    'type': 'float',
-                                    'serialization': {
-                                        'type': 'format',
-                                        'formatting_string': '0.2f',
-                                        'when_used': 'unless-none',
-                                    },
-                                },
-                            },
-                        },
-                    },
-                },
+        core_schema.union_schema(
+            [
+                core_schema.model_schema(
+                    ModelA,
+                    core_schema.model_fields_schema(
+                        {
+                            'a': core_schema.model_field(core_schema.bytes_schema()),
+                            'b': core_schema.model_field(
+                                core_schema.float_schema(
+                                    serialization=core_schema.format_ser_schema('0.1f', when_used='unless-none')
+                                )
+                            ),
+                        }
+                    ),
+                ),
+                core_schema.model_schema(
+                    ModelB,
+                    core_schema.model_fields_schema(
+                        {
+                            'c': core_schema.model_field(core_schema.bytes_schema()),
+                            'd': core_schema.model_field(
+                                core_schema.float_schema(
+                                    serialization=core_schema.format_ser_schema('0.2f', when_used='unless-none')
+                                )
+                            ),
+                        }
+                    ),
+                ),
             ],
-        }
+        )
     )
 
 
@@ -776,5 +760,353 @@ def test_tagged_union_with_aliases() -> None:
 
     model_a = ModelA(field=1)
     model_b = ModelB(field=1)
-    assert s.to_python(model_a) == {'field': 1, 'TAG': 'a'}
-    assert s.to_python(model_b) == {'field': 1, 'TAG': 'b'}
+    assert s.to_python(model_a, by_alias=True) == {'field': 1, 'TAG': 'a'}
+    assert s.to_python(model_b, by_alias=True) == {'field': 1, 'TAG': 'b'}
+
+
+def test_union_model_wrap_serializer():
+    def wrap_serializer(value, handler):
+        return handler(value)
+
+    class Data:
+        pass
+
+    class ModelA:
+        a: Data
+
+    class ModelB:
+        a: Data
+
+    model_serializer = SchemaSerializer(
+        core_schema.union_schema(
+            [
+                core_schema.model_schema(
+                    ModelA,
+                    core_schema.model_fields_schema(
+                        {
+                            'a': core_schema.model_field(
+                                core_schema.model_schema(
+                                    Data,
+                                    core_schema.model_fields_schema({}),
+                                )
+                            ),
+                        },
+                    ),
+                    serialization=core_schema.wrap_serializer_function_ser_schema(wrap_serializer),
+                ),
+                core_schema.model_schema(
+                    ModelB,
+                    core_schema.model_fields_schema(
+                        {
+                            'a': core_schema.model_field(
+                                core_schema.model_schema(
+                                    Data,
+                                    core_schema.model_fields_schema({}),
+                                )
+                            ),
+                        },
+                    ),
+                    serialization=core_schema.wrap_serializer_function_ser_schema(wrap_serializer),
+                ),
+            ],
+        )
+    )
+
+    input_value = ModelA()
+    input_value.a = Data()
+
+    assert model_serializer.to_python(input_value) == {'a': {}}
+    assert model_serializer.to_python(input_value, mode='json') == {'a': {}}
+    assert model_serializer.to_json(input_value) == b'{"a":{}}'
+
+    # add some additional attribute, should be ignored & not break serialization
+
+    input_value.a._a = 'foo'
+
+    assert model_serializer.to_python(input_value) == {'a': {}}
+    assert model_serializer.to_python(input_value, mode='json') == {'a': {}}
+    assert model_serializer.to_json(input_value) == b'{"a":{}}'
+
+
+class ModelDog:
+    def __init__(self, type_: Literal['dog']) -> None:
+        self.type_ = 'dog'
+
+
+class ModelCat:
+    def __init__(self, type_: Literal['cat']) -> None:
+        self.type_ = 'cat'
+
+
+class ModelAlien:
+    def __init__(self, type_: Literal['alien']) -> None:
+        self.type_ = 'alien'
+
+
+@pytest.fixture
+def model_a_b_union_schema() -> core_schema.UnionSchema:
+    return core_schema.union_schema(
+        [
+            core_schema.model_schema(
+                cls=ModelA,
+                schema=core_schema.model_fields_schema(
+                    fields={
+                        'a': core_schema.model_field(core_schema.str_schema()),
+                        'b': core_schema.model_field(core_schema.str_schema()),
+                    },
+                ),
+            ),
+            core_schema.model_schema(
+                cls=ModelB,
+                schema=core_schema.model_fields_schema(
+                    fields={
+                        'c': core_schema.model_field(core_schema.str_schema()),
+                        'd': core_schema.model_field(core_schema.str_schema()),
+                    },
+                ),
+            ),
+        ]
+    )
+
+
+@pytest.fixture
+def union_of_unions_schema(model_a_b_union_schema: core_schema.UnionSchema) -> core_schema.UnionSchema:
+    return core_schema.union_schema(
+        [
+            model_a_b_union_schema,
+            core_schema.union_schema(
+                [
+                    core_schema.model_schema(
+                        cls=ModelCat,
+                        schema=core_schema.model_fields_schema(
+                            fields={
+                                'type_': core_schema.model_field(core_schema.literal_schema(['cat'])),
+                            },
+                        ),
+                    ),
+                    core_schema.model_schema(
+                        cls=ModelDog,
+                        schema=core_schema.model_fields_schema(
+                            fields={
+                                'type_': core_schema.model_field(core_schema.literal_schema(['dog'])),
+                            },
+                        ),
+                    ),
+                ]
+            ),
+        ]
+    )
+
+
+@pytest.mark.parametrize(
+    'input,expected',
+    [
+        (ModelA(a='a', b='b'), {'a': 'a', 'b': 'b'}),
+        (ModelB(c='c', d='d'), {'c': 'c', 'd': 'd'}),
+        (ModelCat(type_='cat'), {'type_': 'cat'}),
+        (ModelDog(type_='dog'), {'type_': 'dog'}),
+    ],
+)
+def test_union_of_unions_of_models(union_of_unions_schema: core_schema.UnionSchema, input: Any, expected: Any) -> None:
+    s = SchemaSerializer(union_of_unions_schema)
+    assert s.to_python(input, warnings='error') == expected
+
+
+def test_union_of_unions_of_models_invalid_variant(union_of_unions_schema: core_schema.UnionSchema) -> None:
+    s = SchemaSerializer(union_of_unions_schema)
+    # All warnings should be available
+    messages = [
+        'Expected `ModelA`',
+        'Expected `ModelB`',
+        'Expected `ModelCat`',
+        'Expected `ModelDog`',
+    ]
+
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter('always')
+        s.to_python(ModelAlien(type_='alien'))
+        for m in messages:
+            assert m in str(w[0].message)
+            assert 'input_type=ModelAlien' in str(w[0].message)
+
+
+@pytest.fixture
+def tagged_union_of_unions_schema(model_a_b_union_schema: core_schema.UnionSchema) -> core_schema.UnionSchema:
+    return core_schema.union_schema(
+        [
+            model_a_b_union_schema,
+            core_schema.tagged_union_schema(
+                discriminator='type_',
+                choices={
+                    'cat': core_schema.model_schema(
+                        cls=ModelCat,
+                        schema=core_schema.model_fields_schema(
+                            fields={
+                                'type_': core_schema.model_field(core_schema.literal_schema(['cat'])),
+                            },
+                        ),
+                    ),
+                    'dog': core_schema.model_schema(
+                        cls=ModelDog,
+                        schema=core_schema.model_fields_schema(
+                            fields={
+                                'type_': core_schema.model_field(core_schema.literal_schema(['dog'])),
+                            },
+                        ),
+                    ),
+                },
+            ),
+        ]
+    )
+
+
+@pytest.mark.parametrize(
+    'input,expected',
+    [
+        (ModelA(a='a', b='b'), {'a': 'a', 'b': 'b'}),
+        (ModelB(c='c', d='d'), {'c': 'c', 'd': 'd'}),
+        (ModelCat(type_='cat'), {'type_': 'cat'}),
+        (ModelDog(type_='dog'), {'type_': 'dog'}),
+    ],
+)
+def test_union_of_unions_of_models_with_tagged_union(
+    tagged_union_of_unions_schema: core_schema.UnionSchema, input: Any, expected: Any
+) -> None:
+    s = SchemaSerializer(tagged_union_of_unions_schema)
+    assert s.to_python(input, warnings='error') == expected
+
+
+def test_union_of_unions_of_models_with_tagged_union_invalid_variant(
+    tagged_union_of_unions_schema: core_schema.UnionSchema,
+) -> None:
+    s = SchemaSerializer(tagged_union_of_unions_schema)
+    # All warnings should be available
+    messages = [
+        'Expected `ModelA`',
+        'Expected `ModelB`',
+        'Expected `ModelCat`',
+        'Expected `ModelDog`',
+    ]
+
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter('always')
+        s.to_python(ModelAlien(type_='alien'))
+        for m in messages:
+            assert m in str(w[0].message)
+            assert 'input_type=ModelAlien' in str(w[0].message)
+
+
+def test_mixed_union_models_and_other_types() -> None:
+    s = SchemaSerializer(
+        core_schema.union_schema(
+            [
+                core_schema.tagged_union_schema(
+                    discriminator='type_',
+                    choices={
+                        'cat': core_schema.model_schema(
+                            cls=ModelCat,
+                            schema=core_schema.model_fields_schema(
+                                fields={
+                                    'type_': core_schema.model_field(core_schema.literal_schema(['cat'])),
+                                },
+                            ),
+                        ),
+                        'dog': core_schema.model_schema(
+                            cls=ModelDog,
+                            schema=core_schema.model_fields_schema(
+                                fields={
+                                    'type_': core_schema.model_field(core_schema.literal_schema(['dog'])),
+                                },
+                            ),
+                        ),
+                    },
+                ),
+                core_schema.str_schema(),
+            ]
+        )
+    )
+
+    assert s.to_python(ModelCat(type_='cat'), warnings='error') == {'type_': 'cat'}
+    assert s.to_python(ModelDog(type_='dog'), warnings='error') == {'type_': 'dog'}
+    # note, this fails as ModelCat and ModelDog (discriminator warnings, etc), but the warnings
+    # don't bubble up to this level :)
+    assert s.to_python('a string', warnings='error') == 'a string'
+
+
+@pytest.mark.parametrize(
+    'input,expected',
+    [
+        ({True: '1'}, b'{"true":"1"}'),
+        ({1: '1'}, b'{"1":"1"}'),
+        ({2.3: '1'}, b'{"2.3":"1"}'),
+        ({'a': 'b'}, b'{"a":"b"}'),
+    ],
+)
+def test_union_of_unions_of_models_with_tagged_union_json_key_serialization(
+    input: dict[bool | int | float | str, str], expected: bytes
+) -> None:
+    s = SchemaSerializer(
+        core_schema.dict_schema(
+            keys_schema=core_schema.union_schema(
+                [
+                    core_schema.union_schema([core_schema.bool_schema(), core_schema.int_schema()]),
+                    core_schema.union_schema([core_schema.float_schema(), core_schema.str_schema()]),
+                ]
+            ),
+            values_schema=core_schema.str_schema(),
+        )
+    )
+
+    assert s.to_json(input, warnings='error') == expected
+
+
+@pytest.mark.parametrize(
+    'input,expected',
+    [
+        ({'key': True}, b'{"key":true}'),
+        ({'key': 1}, b'{"key":1}'),
+        ({'key': 2.3}, b'{"key":2.3}'),
+        ({'key': 'a'}, b'{"key":"a"}'),
+    ],
+)
+def test_union_of_unions_of_models_with_tagged_union_json_serialization(
+    input: dict[str, bool | int | float | str], expected: bytes
+) -> None:
+    s = SchemaSerializer(
+        core_schema.dict_schema(
+            keys_schema=core_schema.str_schema(),
+            values_schema=core_schema.union_schema(
+                [
+                    core_schema.union_schema([core_schema.bool_schema(), core_schema.int_schema()]),
+                    core_schema.union_schema([core_schema.float_schema(), core_schema.str_schema()]),
+                ]
+            ),
+        )
+    )
+
+    assert s.to_json(input, warnings='error') == expected
+
+
+def test_discriminated_union_ser_with_typed_dict() -> None:
+    v = SchemaSerializer(
+        core_schema.tagged_union_schema(
+            {
+                'a': core_schema.typed_dict_schema(
+                    {
+                        'type': core_schema.typed_dict_field(core_schema.literal_schema(['a'])),
+                        'a': core_schema.typed_dict_field(core_schema.int_schema()),
+                    }
+                ),
+                'b': core_schema.typed_dict_schema(
+                    {
+                        'type': core_schema.typed_dict_field(core_schema.literal_schema(['b'])),
+                        'b': core_schema.typed_dict_field(core_schema.str_schema()),
+                    }
+                ),
+            },
+            discriminator='type',
+        )
+    )
+
+    assert v.to_python({'type': 'a', 'a': 1}, warnings='error') == {'type': 'a', 'a': 1}
+    assert v.to_python({'type': 'b', 'b': 'foo'}, warnings='error') == {'type': 'b', 'b': 'foo'}

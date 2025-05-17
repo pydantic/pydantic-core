@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
-use pyo3::prelude::*;
 use pyo3::types::{PyComplex, PyDict};
+use pyo3::{prelude::*, IntoPyObjectExt};
 
 use crate::definitions::DefinitionsBuilder;
 
@@ -34,20 +34,8 @@ impl TypeSerializer for ComplexSerializer {
         let py = value.py();
         match value.downcast::<PyComplex>() {
             Ok(py_complex) => match extra.mode {
-                SerMode::Json => {
-                    let re = py_complex.real();
-                    let im = py_complex.imag();
-                    let mut s = format!("{im}j");
-                    if re != 0.0 {
-                        let mut sign = "";
-                        if im >= 0.0 {
-                            sign = "+";
-                        }
-                        s = format!("{re}{sign}{s}");
-                    }
-                    Ok(s.into_py(py))
-                }
-                _ => Ok(value.into_py(py)),
+                SerMode::Json => complex_to_str(py_complex).into_py_any(py),
+                _ => Ok(value.clone().unbind()),
             },
             Err(_) => {
                 extra.warnings.on_fallback_py(self.get_name(), value, extra)?;
@@ -57,7 +45,7 @@ impl TypeSerializer for ComplexSerializer {
     }
 
     fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
-        self._invalid_as_json_key(key, extra, "complex")
+        self.invalid_as_json_key(key, extra, "complex")
     }
 
     fn serde_serialize<S: serde::ser::Serializer>(
@@ -70,16 +58,7 @@ impl TypeSerializer for ComplexSerializer {
     ) -> Result<S::Ok, S::Error> {
         match value.downcast::<PyComplex>() {
             Ok(py_complex) => {
-                let re = py_complex.real();
-                let im = py_complex.imag();
-                let mut s = format!("{im}j");
-                if re != 0.0 {
-                    let mut sign = "";
-                    if im >= 0.0 {
-                        sign = "+";
-                    }
-                    s = format!("{re}{sign}{s}");
-                }
+                let s = complex_to_str(py_complex);
                 Ok(serializer.collect_str::<String>(&s)?)
             }
             Err(_) => {
@@ -89,7 +68,21 @@ impl TypeSerializer for ComplexSerializer {
         }
     }
 
-    fn get_name(&self) -> &str {
+    fn get_name(&self) -> &'static str {
         "complex"
     }
+}
+
+pub fn complex_to_str(py_complex: &Bound<'_, PyComplex>) -> String {
+    let re = py_complex.real();
+    let im = py_complex.imag();
+    let mut s = format!("{im}j");
+    if re != 0.0 {
+        let mut sign = "";
+        if im >= 0.0 {
+            sign = "+";
+        }
+        s = format!("{re}{sign}{s}");
+    }
+    s
 }

@@ -15,16 +15,18 @@ from pydantic_core import core_schema as cs
 
 @pytest.fixture(scope='module')
 def datetime_schema():
-    return SchemaValidator({'type': 'datetime'})
+    return SchemaValidator(cs.datetime_schema())
 
 
 @given(strategies.datetimes())
+@pytest.mark.thread_unsafe  # https://github.com/Quansight-Labs/pytest-run-parallel/issues/20
 def test_datetime_datetime(datetime_schema, data):
     assert datetime_schema.validate_python(data) == data
 
 
 @pytest.mark.skipif(sys.platform == 'win32', reason='Can fail on windows, I guess due to 64-bit issue')
 @given(strategies.integers(min_value=-11_676_096_000, max_value=253_402_300_799_000))
+@pytest.mark.thread_unsafe  # https://github.com/Quansight-Labs/pytest-run-parallel/issues/20
 def test_datetime_int(datetime_schema, data):
     try:
         if abs(data) > 20_000_000_000:
@@ -41,6 +43,7 @@ def test_datetime_int(datetime_schema, data):
 
 
 @given(strategies.binary())
+@pytest.mark.thread_unsafe  # https://github.com/Quansight-Labs/pytest-run-parallel/issues/20
 def test_datetime_binary(datetime_schema, data):
     try:
         datetime_schema.validate_python(data)
@@ -89,6 +92,7 @@ class BranchModel(TypedDict):
 
 @pytest.mark.skipif(sys.platform == 'emscripten', reason='Seems to fail sometimes on pyodide no idea why')
 @given(strategies.from_type(BranchModel))
+@pytest.mark.thread_unsafe  # https://github.com/Quansight-Labs/pytest-run-parallel/issues/20
 def test_recursive(definition_schema, data):
     assert definition_schema.validate_python(data) == data
 
@@ -108,6 +112,7 @@ def branch_models_with_cycles(draw, existing=None):
 
 
 @given(branch_models_with_cycles())
+@pytest.mark.thread_unsafe  # https://github.com/Quansight-Labs/pytest-run-parallel/issues/20
 def test_definition_cycles(definition_schema, data):
     try:
         assert definition_schema.validate_python(data) == data
@@ -130,8 +135,9 @@ def test_definition_broken(definition_schema):
 
 
 @given(strategies.timedeltas())
+@pytest.mark.thread_unsafe  # https://github.com/Quansight-Labs/pytest-run-parallel/issues/20
 def test_pytimedelta_as_timedelta(dt):
-    v = SchemaValidator({'type': 'timedelta', 'gt': dt})
+    v = SchemaValidator(cs.timedelta_schema(gt=dt))
     # simplest way to check `pytimedelta_as_timedelta` is correct is to extract duration from repr of the validator
     m = re.search(r'Duration ?\{\s+positive: ?(\w+),\s+day: ?(\d+),\s+second: ?(\d+),\s+microsecond: ?(\d+)', repr(v))
     pos, day, sec, micro = m.groups()
@@ -142,7 +148,7 @@ def test_pytimedelta_as_timedelta(dt):
 
 @pytest.fixture(scope='module')
 def url_validator():
-    return SchemaValidator({'type': 'url'})
+    return SchemaValidator(cs.url_schema())
 
 
 # Parsing errors which hypothesis is likely to hit
@@ -150,6 +156,7 @@ _URL_PARSE_ERRORS = {'input is empty', 'relative URL without a base', 'empty hos
 
 
 @given(strategies.text())
+@pytest.mark.thread_unsafe  # https://github.com/Quansight-Labs/pytest-run-parallel/issues/20
 def test_urls_text(url_validator, text):
     try:
         url_validator.validate_python(text)
@@ -162,10 +169,11 @@ def test_urls_text(url_validator, text):
 
 @pytest.fixture(scope='module')
 def multi_host_url_validator():
-    return SchemaValidator({'type': 'multi-host-url'})
+    return SchemaValidator(cs.multi_host_url_schema())
 
 
 @given(strategies.text())
+@pytest.mark.thread_unsafe  # https://github.com/Quansight-Labs/pytest-run-parallel/issues/20
 def test_multi_host_urls_text(multi_host_url_validator, text):
     try:
         multi_host_url_validator.validate_python(text)
@@ -182,6 +190,7 @@ def str_serializer():
 
 
 @given(strategies.text())
+@pytest.mark.thread_unsafe  # https://github.com/Quansight-Labs/pytest-run-parallel/issues/20
 def test_serialize_string(str_serializer: SchemaSerializer, data):
     assert str_serializer.to_python(data) == data
     assert json.loads(str_serializer.to_json(data)) == data

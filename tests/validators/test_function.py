@@ -2,17 +2,19 @@ import datetime
 import platform
 import re
 from copy import deepcopy
-from typing import Any, Dict, List, Type
+from dataclasses import dataclass
+from typing import Any
 
 import pytest
 from dirty_equals import HasRepr
 
-from pydantic_core import SchemaError, SchemaValidator, ValidationError, core_schema, validate_core_schema
+from pydantic_core import CoreConfig, SchemaError, SchemaValidator, ValidationError, core_schema, validate_core_schema
+from pydantic_core import core_schema as cs
 
 from ..conftest import plain_repr
 
 
-def deepcopy_info(info: core_schema.ValidationInfo) -> Dict[str, Any]:
+def deepcopy_info(info: core_schema.ValidationInfo) -> dict[str, Any]:
     return {
         'context': deepcopy(info.context),
         'data': deepcopy(info.data),
@@ -67,7 +69,7 @@ def test_function_before_error():
         {
             'type': 'function-before',
             'function': {'type': 'with-info', 'function': my_function},
-            'schema': {'type': 'str', 'max_length': 5},
+            'schema': cs.str_schema(max_length=5),
         }
     )
 
@@ -90,8 +92,8 @@ def test_function_before_error():
     'config,input_str',
     (
         ({}, "type=string_too_long, input_value='12345x', input_type=str"),
-        ({'hide_input_in_errors': False}, "type=string_too_long, input_value='12345x', input_type=str"),
-        ({'hide_input_in_errors': True}, 'type=string_too_long'),
+        (CoreConfig(hide_input_in_errors=False), "type=string_too_long, input_value='12345x', input_type=str"),
+        (CoreConfig(hide_input_in_errors=True), 'type=string_too_long'),
     ),
 )
 def test_function_before_error_hide_input(config, input_str):
@@ -102,9 +104,9 @@ def test_function_before_error_hide_input(config, input_str):
         {
             'type': 'function-before',
             'function': {'type': 'with-info', 'function': my_function},
-            'schema': {'type': 'str', 'max_length': 5},
+            'schema': cs.str_schema(max_length=5),
         },
-        config,
+        config=config,
     )
 
     with pytest.raises(ValidationError, match=re.escape(f'String should have at most 5 characters [{input_str}]')):
@@ -121,10 +123,9 @@ def test_function_before_error_model():
         {
             'type': 'function-before',
             'function': {'type': 'with-info', 'function': f},
-            'schema': {
-                'type': 'typed-dict',
-                'fields': {'my_field': {'type': 'typed-dict-field', 'schema': {'type': 'str', 'max_length': 5}}},
-            },
+            'schema': cs.typed_dict_schema(
+                fields={'my_field': cs.typed_dict_field(schema=cs.str_schema(max_length=5))}
+            ),
         }
     )
 
@@ -148,7 +149,11 @@ def test_function_before_error_model():
         (None, {}, 'ValidationInfo(config=None, context=None, data=None, field_name=None)'),
         (None, {'context': {1: 2}}, 'ValidationInfo(config=None, context={1: 2}, data=None, field_name=None)'),
         (None, {'context': None}, 'ValidationInfo(config=None, context=None, data=None, field_name=None)'),
-        ({'title': 'hello'}, {}, "ValidationInfo(config={'title': 'hello'}, context=None, data=None, field_name=None)"),
+        (
+            CoreConfig(title='hello'),
+            {},
+            "ValidationInfo(config={'title': 'hello'}, context=None, data=None, field_name=None)",
+        ),
     ],
 )
 def test_val_info_repr(config, kwargs, expected_repr):
@@ -157,7 +162,7 @@ def test_val_info_repr(config, kwargs, expected_repr):
         assert str(info) == expected_repr
         return input_value
 
-    v = SchemaValidator(core_schema.with_info_before_validator_function(f, core_schema.str_schema()), config)
+    v = SchemaValidator(core_schema.with_info_before_validator_function(f, core_schema.str_schema()), config=config)
 
     assert v.validate_python('input value', **kwargs) == 'input value'
 
@@ -241,8 +246,8 @@ def test_wrap_error():
     'config,input_str',
     (
         ({}, "type=int_parsing, input_value='wrong', input_type=str"),
-        ({'hide_input_in_errors': False}, "type=int_parsing, input_value='wrong', input_type=str"),
-        ({'hide_input_in_errors': True}, 'type=int_parsing'),
+        (CoreConfig(hide_input_in_errors=False), "type=int_parsing, input_value='wrong', input_type=str"),
+        (CoreConfig(hide_input_in_errors=True), 'type=int_parsing'),
     ),
 )
 def test_function_wrap_error_hide_input(config, input_str):
@@ -254,7 +259,7 @@ def test_function_wrap_error_hide_input(config, input_str):
             assert str(e).startswith('1 validation error for ValidatorCallable\n')
             raise e
 
-    v = SchemaValidator(core_schema.with_info_wrap_validator_function(f, core_schema.int_schema()), config)
+    v = SchemaValidator(core_schema.with_info_wrap_validator_function(f, core_schema.int_schema()), config=config)
 
     with pytest.raises(
         ValidationError,
@@ -346,15 +351,15 @@ def test_function_after_raise():
     'config,input_str',
     (
         ({}, "type=value_error, input_value='input value', input_type=str"),
-        ({'hide_input_in_errors': False}, "type=value_error, input_value='input value', input_type=str"),
-        ({'hide_input_in_errors': True}, 'type=value_error'),
+        (CoreConfig(hide_input_in_errors=False), "type=value_error, input_value='input value', input_type=str"),
+        (CoreConfig(hide_input_in_errors=True), 'type=value_error'),
     ),
 )
 def test_function_after_error_hide_input(config, input_str):
     def f(input_value, info):
         raise ValueError('foobar')
 
-    v = SchemaValidator(core_schema.with_info_after_validator_function(f, core_schema.str_schema()), config)
+    v = SchemaValidator(core_schema.with_info_after_validator_function(f, core_schema.str_schema()), config=config)
 
     with pytest.raises(ValidationError, match=re.escape(f'Value error, foobar [{input_str}]')):
         v.validate_python('input value')
@@ -369,20 +374,18 @@ def test_function_after_config():
         return input_value + ' Changed'
 
     v = SchemaValidator(
-        {
-            'type': 'typed-dict',
-            'fields': {
-                'test_field': {
-                    'type': 'typed-dict-field',
-                    'schema': {
+        cs.typed_dict_schema(
+            fields={
+                'test_field': cs.typed_dict_field(
+                    schema={
                         'type': 'function-after',
                         'function': {'type': 'with-info', 'function': f, 'field_name': 'test_field'},
-                        'schema': {'type': 'str'},
-                    },
-                }
+                        'schema': cs.str_schema(),
+                    }
+                )
             },
-            'config': {'allow_inf_nan': True},
-        }
+            config=CoreConfig(allow_inf_nan=True),
+        )
     )
 
     assert v.validate_python({'test_field': b'321'}) == {'test_field': '321 Changed'}
@@ -499,7 +502,7 @@ def test_class_with_validator():
         {
             'type': 'function-after',
             'function': {'type': 'with-info', 'function': Foobar.__validate__},
-            'schema': {'type': 'str'},
+            'schema': cs.str_schema(),
         }
     )
 
@@ -560,7 +563,7 @@ def test_raise_assertion_error_plain():
 
 
 @pytest.mark.parametrize('base_error', [ValueError, AssertionError])
-def test_error_with_error(base_error: Type[Exception]):
+def test_error_with_error(base_error: type[Exception]):
     class MyError(base_error):
         def __str__(self):
             raise RuntimeError('internal error')
@@ -602,7 +605,7 @@ def test_model_field_before_validator() -> None:
             core_schema.model_fields_schema(
                 {
                     'x': core_schema.model_field(
-                        core_schema.with_info_before_validator_function(f, core_schema.str_schema(), field_name='x')
+                        core_schema.with_info_before_validator_function(f, core_schema.str_schema())
                     )
                 }
             ),
@@ -628,7 +631,7 @@ def test_model_field_after_validator() -> None:
             core_schema.model_fields_schema(
                 {
                     'x': core_schema.model_field(
-                        core_schema.with_info_after_validator_function(f, core_schema.str_schema(), field_name='x')
+                        core_schema.with_info_after_validator_function(f, core_schema.str_schema())
                     )
                 }
             ),
@@ -652,12 +655,45 @@ def test_model_field_plain_validator() -> None:
         core_schema.model_schema(
             Model,
             core_schema.model_fields_schema(
-                {'x': core_schema.model_field(core_schema.with_info_plain_validator_function(f, field_name='x'))}
+                {'x': core_schema.model_field(core_schema.with_info_plain_validator_function(f))}
             ),
         )
     )
 
     assert v.validate_python({'x': b'foo'}).x == 'input: foo'
+
+
+def test_model_field_validator_reuse() -> None:
+    class Model:
+        x: str
+        y: str
+
+    def f(input_value: Any, info: core_schema.ValidationInfo) -> Any:
+        return f'{info.field_name}: {input_value}'
+
+    # When a type alias with a validator function is used on multiple fields,
+    # its core schema is only generated once (with the first field_name) and reused.
+    # See https://github.com/pydantic/pydantic/issues/11737
+    with pytest.warns(
+        DeprecationWarning, match='`field_name` argument on `with_info_plain_validator_function` is deprecated'
+    ):
+        validator = core_schema.with_info_plain_validator_function(f, field_name='x')
+
+    v = SchemaValidator(
+        core_schema.model_schema(
+            Model,
+            core_schema.model_fields_schema(
+                {
+                    'x': core_schema.model_field(validator),
+                    'y': core_schema.model_field(validator),
+                }
+            ),
+        )
+    )
+
+    m = v.validate_python({'x': 'foo', 'y': 'bar'})
+    assert m.x == 'x: foo'
+    assert m.y == 'y: bar'
 
 
 def test_model_field_wrap_validator() -> None:
@@ -676,7 +712,7 @@ def test_model_field_wrap_validator() -> None:
             core_schema.model_fields_schema(
                 {
                     'x': core_schema.model_field(
-                        core_schema.with_info_wrap_validator_function(f, core_schema.str_schema(), field_name='x')
+                        core_schema.with_info_wrap_validator_function(f, core_schema.str_schema())
                     )
                 }
             ),
@@ -686,17 +722,13 @@ def test_model_field_wrap_validator() -> None:
     assert v.validate_python({'x': b'foo'}).x == 'input: foo'
 
 
-def check_info_field_name_none(info: core_schema.ValidationInfo) -> None:
-    assert info.field_name is None
-    assert info.data == {}
-
-
-def test_non_model_field_before_validator_tries_to_access_field_info() -> None:
+def test_non_model_field_before_validator_field_info() -> None:
     class Model:
         x: str
 
     def f(input_value: Any, info: core_schema.ValidationInfo) -> Any:
-        check_info_field_name_none(info)
+        assert info.field_name == 'x'
+        assert info.data == {}
         assert isinstance(input_value, bytes)
         return f'input: {input_value.decode()}'
 
@@ -716,12 +748,13 @@ def test_non_model_field_before_validator_tries_to_access_field_info() -> None:
     assert v.validate_python({'x': b'foo'}).x == 'input: foo'
 
 
-def test_non_model_field_after_validator_tries_to_access_field_info() -> None:
+def test_non_model_field_after_validator_field_info() -> None:
     class Model:
         x: str
 
     def f(input_value: Any, info: core_schema.ValidationInfo) -> Any:
-        check_info_field_name_none(info)
+        assert info.field_name == 'x'
+        assert info.data == {}
         return f'input: {input_value}'
 
     v = SchemaValidator(
@@ -740,12 +773,13 @@ def test_non_model_field_after_validator_tries_to_access_field_info() -> None:
     assert v.validate_python({'x': b'foo'}).x == 'input: foo'
 
 
-def test_non_model_field_plain_validator_tries_to_access_field_info() -> None:
+def test_non_model_field_plain_validator_field_info() -> None:
     class Model:
         x: str
 
     def f(input_value: Any, info: core_schema.ValidationInfo) -> Any:
-        check_info_field_name_none(info)
+        assert info.field_name == 'x'
+        assert info.data == {}
         assert isinstance(input_value, bytes)
         return f'input: {input_value.decode()}'
 
@@ -761,13 +795,14 @@ def test_non_model_field_plain_validator_tries_to_access_field_info() -> None:
     assert v.validate_python({'x': b'foo'}).x == 'input: foo'
 
 
-def test_non_model_field_wrap_validator_tries_to_access_field_info() -> None:
+def test_non_model_field_wrap_validator_field_info() -> None:
     class Model:
         __slots__ = '__dict__', '__pydantic_fields_set__', '__pydantic_extra__', '__pydantic_private__'
         x: str
 
     def f(input_value: Any, val: core_schema.ValidatorFunctionWrapHandler, info: core_schema.ValidationInfo) -> Any:
-        check_info_field_name_none(info)
+        assert info.field_name == 'x'
+        assert info.data == {}
         return f'input: {val(input_value)}'
 
     v = SchemaValidator(
@@ -801,7 +836,7 @@ def test_typed_dict_data() -> None:
                 'a': core_schema.typed_dict_field(core_schema.int_schema()),
                 'b': core_schema.typed_dict_field(core_schema.int_schema()),
                 'c': core_schema.typed_dict_field(
-                    core_schema.with_info_after_validator_function(f, core_schema.str_schema(), field_name='c')
+                    core_schema.with_info_after_validator_function(f, core_schema.str_schema())
                 ),
             }
         )
@@ -817,6 +852,68 @@ def test_typed_dict_data() -> None:
         v.validate_python({'a': 1, 'b': 'wrong', 'c': b'foo'})
 
     assert info_stuff == {'field_name': 'c', 'data': {'a': 1}}
+
+
+def test_typed_dict_validator_reuse() -> None:
+    def f(input_value: Any, info: core_schema.ValidationInfo) -> Any:
+        return f'{info.field_name}: {input_value}'
+
+    # When a type alias with a validator function is used on multiple fields,
+    # its core schema is only generated once (with the first field_name) and reused.
+    # See https://github.com/pydantic/pydantic/issues/11737
+    with pytest.warns(
+        DeprecationWarning, match='`field_name` argument on `with_info_plain_validator_function` is deprecated'
+    ):
+        validator = core_schema.with_info_plain_validator_function(f, field_name='x')
+
+    v = SchemaValidator(
+        core_schema.typed_dict_schema(
+            {
+                'x': core_schema.model_field(validator),
+                'y': core_schema.model_field(validator),
+            }
+        )
+    )
+
+    data = v.validate_python({'x': 'foo', 'y': 'bar'})
+    assert data['x'] == 'x: foo'
+    assert data['y'] == 'y: bar'
+
+
+def test_dataclass_validator_reuse() -> None:
+    @dataclass
+    class Model:
+        x: str
+        y: str
+
+    def f(input_value: Any, info: core_schema.ValidationInfo) -> Any:
+        return f'{info.field_name}: {input_value}'
+
+    # When a type alias with a validator function is used on multiple fields,
+    # its core schema is only generated once (with the first field_name) and reused.
+    # See https://github.com/pydantic/pydantic/issues/11737
+    with pytest.warns(
+        DeprecationWarning, match='`field_name` argument on `with_info_plain_validator_function` is deprecated'
+    ):
+        validator = core_schema.with_info_plain_validator_function(f, field_name='x')
+
+    v = SchemaValidator(
+        core_schema.dataclass_schema(
+            Model,
+            core_schema.dataclass_args_schema(
+                'Model',
+                [
+                    core_schema.dataclass_field(name='x', schema=validator),
+                    core_schema.dataclass_field(name='y', schema=validator),
+                ],
+            ),
+            ['x', 'y'],
+        )
+    )
+
+    m = v.validate_python({'x': 'foo', 'y': 'bar'})
+    assert m.x == 'x: foo'
+    assert m.y == 'y: bar'
 
 
 @pytest.mark.parametrize(
@@ -912,35 +1009,6 @@ def test_function_validation_info_mode():
     assert v.validate_json('1') == 1
     assert calls == ['json']
     calls.clear()
-
-
-def test_reprs() -> None:
-    reprs: List[str] = []
-
-    def sample_repr(v: Any, info: core_schema.ValidationInfo) -> Any:
-        reprs.append(repr(info))
-        return v
-
-    v = SchemaValidator(
-        core_schema.chain_schema(
-            [
-                core_schema.with_info_plain_validator_function(sample_repr),
-                core_schema.with_info_plain_validator_function(sample_repr, field_name='x'),
-            ]
-        )
-    )
-
-    class Foo:
-        def __repr__(self) -> str:
-            return 'This is Foo!'
-
-    v.validate_python(Foo())
-
-    # insert_assert(reprs)
-    assert reprs == [
-        'ValidationInfo(config=None, context=None, data=None, field_name=None)',
-        "ValidationInfo(config=None, context=None, data=None, field_name='x')",
-    ]
 
 
 def test_function_after_doesnt_change_mode() -> None:

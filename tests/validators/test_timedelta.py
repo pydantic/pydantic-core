@@ -1,11 +1,11 @@
 import re
 from datetime import timedelta
 from decimal import Decimal
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 
-from pydantic_core import SchemaError, SchemaValidator, ValidationError, validate_core_schema
+from pydantic_core import SchemaError, SchemaValidator, ValidationError, core_schema, validate_core_schema
 
 from ..conftest import Err, PyAndJson
 
@@ -13,6 +13,21 @@ try:
     import pandas
 except ImportError:
     pandas = None
+
+
+@pytest.mark.parametrize(
+    'constraint',
+    ['le', 'lt', 'ge', 'gt'],
+)
+def test_constraints_schema_validation_error(constraint: str) -> None:
+    with pytest.raises(SchemaError, match=f"'{constraint}' must be coercible to a timedelta instance"):
+        SchemaValidator(core_schema.timedelta_schema(**{constraint: 'bad_value'}))
+
+
+def test_constraints_schema_validation() -> None:
+    val = SchemaValidator(core_schema.timedelta_schema(gt=3))
+    with pytest.raises(ValidationError):
+        val.validate_python(1)
 
 
 @pytest.mark.parametrize(
@@ -57,7 +72,7 @@ except ImportError:
     ids=repr,
 )
 def test_timedelta(input_value, expected):
-    v = SchemaValidator({'type': 'timedelta'})
+    v = SchemaValidator(core_schema.timedelta_schema())
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
@@ -82,7 +97,7 @@ def test_timedelta(input_value, expected):
     ids=repr,
 )
 def test_timedelta_json(input_value, expected):
-    v = SchemaValidator({'type': 'timedelta'})
+    v = SchemaValidator(core_schema.timedelta_schema())
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_json(input_value)
@@ -103,7 +118,7 @@ def test_timedelta_json(input_value, expected):
     ],
 )
 def test_timedelta_strict(input_value, expected):
-    v = SchemaValidator({'type': 'timedelta', 'strict': True})
+    v = SchemaValidator(core_schema.timedelta_schema(strict=True))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
@@ -121,7 +136,7 @@ def test_timedelta_strict(input_value, expected):
     ],
 )
 def test_timedelta_strict_json(input_value, expected):
-    v = SchemaValidator({'type': 'timedelta', 'strict': True})
+    v = SchemaValidator(core_schema.timedelta_schema(strict=True))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_json(input_value)
@@ -178,8 +193,8 @@ def test_timedelta_strict_json(input_value, expected):
     ],
     ids=repr,
 )
-def test_timedelta_kwargs(kwargs: Dict[str, Any], input_value, expected):
-    v = SchemaValidator({'type': 'timedelta', **kwargs})
+def test_timedelta_kwargs(kwargs: dict[str, Any], input_value, expected):
+    v = SchemaValidator(core_schema.timedelta_schema(**kwargs))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
@@ -189,7 +204,7 @@ def test_timedelta_kwargs(kwargs: Dict[str, Any], input_value, expected):
 
 
 def test_timedelta_kwargs_strict():
-    v = SchemaValidator({'type': 'timedelta', 'strict': True, 'le': timedelta(days=3)})
+    v = SchemaValidator(core_schema.timedelta_schema(strict=True, le=timedelta(days=3)))
     output = v.validate_python(timedelta(days=2, hours=1))
     assert output == timedelta(days=2, hours=1)
 
@@ -209,7 +224,9 @@ def test_invalid_constraint():
 
 
 def test_dict_py():
-    v = SchemaValidator({'type': 'dict', 'keys_schema': {'type': 'timedelta'}, 'values_schema': {'type': 'int'}})
+    v = SchemaValidator(
+        core_schema.dict_schema(keys_schema=core_schema.timedelta_schema(), values_schema=core_schema.int_schema())
+    )
     assert v.validate_python({timedelta(days=2, hours=1): 2, timedelta(days=2, hours=2): 4}) == {
         timedelta(days=2, hours=1): 2,
         timedelta(days=2, hours=2): 4,
@@ -233,11 +250,11 @@ def test_dict_value(py_and_json: PyAndJson):
 
 
 def test_union():
-    v = SchemaValidator({'type': 'union', 'choices': [{'type': 'str'}, {'type': 'timedelta'}]})
+    v = SchemaValidator(core_schema.union_schema(choices=[core_schema.str_schema(), core_schema.timedelta_schema()]))
     assert v.validate_python('P2DT1H') == 'P2DT1H'
     assert v.validate_python(timedelta(days=2, hours=1)) == timedelta(days=2, hours=1)
 
-    v = SchemaValidator({'type': 'union', 'choices': [{'type': 'timedelta'}, {'type': 'str'}]})
+    v = SchemaValidator(core_schema.union_schema(choices=[core_schema.timedelta_schema(), core_schema.str_schema()]))
     assert v.validate_python('P2DT1H') == 'P2DT1H'
     assert v.validate_python(timedelta(days=2, hours=1)) == timedelta(days=2, hours=1)
 
@@ -265,7 +282,7 @@ def test_union():
     ids=repr,
 )
 def test_pytimedelta_as_timedelta(constraint, expected_duration):
-    v = SchemaValidator({'type': 'timedelta', 'gt': constraint})
+    v = SchemaValidator(core_schema.timedelta_schema(gt=constraint))
     # simplest way to check `pytimedelta_as_timedelta` is correct is to extract duration from repr of the validator
     m = re.search(r'Duration ?\{\s+positive: ?(\w+),\s+day: ?(\d+),\s+second: ?(\d+),\s+microsecond: ?(\d+)', repr(v))
     pos, day, sec, micro = m.groups()
@@ -274,7 +291,7 @@ def test_pytimedelta_as_timedelta(constraint, expected_duration):
 
 
 def test_large_value():
-    v = SchemaValidator({'type': 'timedelta'})
+    v = SchemaValidator(core_schema.timedelta_schema())
     assert v.validate_python('123days, 12:34') == timedelta(days=123, hours=12, minutes=34)
     assert v.validate_python(f'{999_999_999}days, 12:34') == timedelta(days=999_999_999, hours=12, minutes=34)
     with pytest.raises(ValidationError, match='should be a valid timedelta, durations may not exceed 999,999,999 days'):
@@ -283,7 +300,7 @@ def test_large_value():
 
 @pytest.mark.skipif(not pandas, reason='pandas not installed')
 def test_pandas():
-    v = SchemaValidator({'type': 'timedelta', 'ge': timedelta(hours=2)})
+    v = SchemaValidator(core_schema.timedelta_schema(ge=timedelta(hours=2)))
     two_hours = pandas.Timestamp('2023-01-01T02:00:00Z') - pandas.Timestamp('2023-01-01T00:00:00Z')
 
     assert v.validate_python(two_hours) == two_hours

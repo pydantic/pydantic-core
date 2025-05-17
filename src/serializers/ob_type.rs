@@ -69,12 +69,7 @@ impl ObTypeLookup {
             float: PyFloat::type_object_raw(py) as usize,
             list: PyList::type_object_raw(py) as usize,
             dict: PyDict::type_object_raw(py) as usize,
-            decimal_object: py
-                .import_bound("decimal")
-                .unwrap()
-                .getattr("Decimal")
-                .unwrap()
-                .to_object(py),
+            decimal_object: py.import("decimal").unwrap().getattr("Decimal").unwrap().unbind(),
             string: PyString::type_object_raw(py) as usize,
             bytes: PyBytes::type_object_raw(py) as usize,
             bytearray: PyByteArray::type_object_raw(py) as usize,
@@ -87,21 +82,11 @@ impl ObTypeLookup {
             timedelta: PyDelta::type_object_raw(py) as usize,
             url: PyUrl::type_object_raw(py) as usize,
             multi_host_url: PyMultiHostUrl::type_object_raw(py) as usize,
-            enum_object: py.import_bound("enum").unwrap().getattr("Enum").unwrap().to_object(py),
-            generator_object: py
-                .import_bound("types")
-                .unwrap()
-                .getattr("GeneratorType")
-                .unwrap()
-                .to_object(py),
-            path_object: py
-                .import_bound("pathlib")
-                .unwrap()
-                .getattr("Path")
-                .unwrap()
-                .to_object(py),
-            pattern_object: py.import_bound("re").unwrap().getattr("Pattern").unwrap().to_object(py),
-            uuid_object: py.import_bound("uuid").unwrap().getattr("UUID").unwrap().to_object(py),
+            enum_object: py.import("enum").unwrap().getattr("Enum").unwrap().unbind(),
+            generator_object: py.import("types").unwrap().getattr("GeneratorType").unwrap().unbind(),
+            path_object: py.import("pathlib").unwrap().getattr("Path").unwrap().unbind(),
+            pattern_object: py.import("re").unwrap().getattr("Pattern").unwrap().unbind(),
+            uuid_object: py.import("uuid").unwrap().getattr("UUID").unwrap().unbind(),
             complex: PyComplex::type_object_raw(py) as usize,
         }
     }
@@ -252,6 +237,8 @@ impl ObTypeLookup {
             ObType::Url
         } else if ob_type == self.multi_host_url {
             ObType::MultiHostUrl
+        } else if ob_type == self.complex {
+            ObType::Complex
         } else if ob_type == self.uuid_object.as_ptr() as usize {
             ObType::Uuid
         } else if is_pydantic_serializable(op_value) {

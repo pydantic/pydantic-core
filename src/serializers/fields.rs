@@ -8,7 +8,6 @@ use serde::ser::SerializeMap;
 use smallvec::SmallVec;
 
 use crate::serializers::extra::SerCheck;
-use crate::tools::truncate_safe_repr;
 use crate::PydanticSerializationUnexpectedValue;
 
 use super::computed_fields::ComputedFields;
@@ -29,6 +28,7 @@ pub(super) struct SerField {
     // None serializer means exclude
     pub serializer: Option<CombinedSerializer>,
     pub required: bool,
+    pub serialize_by_alias: Option<bool>,
 }
 
 impl_py_gc_traverse!(SerField { serializer });
@@ -40,21 +40,21 @@ impl SerField {
         alias: Option<String>,
         serializer: Option<CombinedSerializer>,
         required: bool,
+        serialize_by_alias: Option<bool>,
     ) -> Self {
-        let alias_py = alias
-            .as_ref()
-            .map(|alias| PyString::new_bound(py, alias.as_str()).into());
+        let alias_py = alias.as_ref().map(|alias| PyString::new(py, alias.as_str()).into());
         Self {
             key_py,
             alias,
             alias_py,
             serializer,
             required,
+            serialize_by_alias,
         }
     }
 
-    pub fn get_key_py<'py>(&'py self, py: Python<'py>, extra: &Extra) -> &Bound<'py, PyAny> {
-        if extra.by_alias {
+    pub fn get_key_py<'py>(&self, py: Python<'py>, extra: &Extra) -> &Bound<'py, PyAny> {
+        if extra.serialize_by_alias_or(self.serialize_by_alias) {
             if let Some(ref alias_py) = self.alias_py {
                 return alias_py.bind(py);
             }
@@ -63,7 +63,7 @@ impl SerField {
     }
 
     pub fn get_key_json<'a>(&'a self, key_str: &'a str, extra: &Extra) -> Cow<'a, str> {
-        if extra.by_alias {
+        if extra.serialize_by_alias_or(self.serialize_by_alias) {
             if let Some(ref alias) = self.alias {
                 return Cow::Borrowed(alias.as_str());
             }
@@ -153,7 +153,7 @@ impl GeneralFieldsSerializer {
         exclude: Option<&Bound<'py, PyAny>>,
         extra: Extra,
     ) -> PyResult<Bound<'py, PyDict>> {
-        let output_dict = PyDict::new_bound(py);
+        let output_dict = PyDict::new(py);
         let mut used_req_fields: usize = 0;
 
         // NOTE! we maintain the order of the input dict assuming that's right
@@ -162,11 +162,6 @@ impl GeneralFieldsSerializer {
             let key_str = key_str(&key)?;
             let op_field = self.fields.get(key_str);
             if extra.exclude_none && value.is_none() {
-                if let Some(field) = op_field {
-                    if field.required {
-                        used_req_fields += 1;
-                    }
-                }
                 continue;
             }
             let field_extra = Extra {
@@ -204,7 +199,12 @@ impl GeneralFieldsSerializer {
                     };
                     output_dict.set_item(key, value)?;
                 } else if field_extra.check == SerCheck::Strict {
-                    return Err(PydanticSerializationUnexpectedValue::new_err(None));
+                    return Err(PydanticSerializationUnexpectedValue::new(
+                        Some(format!("Unexpected field `{key}`")),
+                        field_extra.model_type_name().map(|bound| bound.to_string()),
+                        None,
+                    )
+                    .to_py_err());
                 }
             }
         }
@@ -216,23 +216,13 @@ impl GeneralFieldsSerializer {
             && self.required_fields > used_req_fields
         {
             let required_fields = self.required_fields;
-            let type_name = match extra.model {
-                Some(model) => model
-                    .get_type()
-                    .qualname()
-                    .ok()
-                    .unwrap_or_else(|| PyString::new_bound(py, "<unknown python object>"))
-                    .to_string(),
-                None => "<unknown python object>".to_string(),
-            };
-            let field_value = match extra.model {
-                Some(model) => truncate_safe_repr(model, Some(100)),
-                None => "<unknown python object>".to_string(),
-            };
 
-            Err(PydanticSerializationUnexpectedValue::new_err(Some(format!(
-                "Expected {required_fields} fields but got {used_req_fields} for type `{type_name}` with value `{field_value}` - serialized value may not be as expected."
-            ))))
+            Err(PydanticSerializationUnexpectedValue::new(
+                Some(format!("Expected {required_fields} fields but got {used_req_fields}").to_string()),
+                extra.model_type_name().map(|bound| bound.to_string()),
+                extra.model.map(|bound| bound.clone().unbind()),
+            )
+            .to_py_err())
         } else {
             Ok(output_dict)
         }
@@ -378,11 +368,11 @@ impl TypeSerializer for GeneralFieldsSerializer {
             }
         }
         self.add_computed_fields_python(model, &output_dict, include, exclude, extra)?;
-        Ok(output_dict.into_py(py))
+        Ok(output_dict.into())
     }
 
     fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
-        self._invalid_as_json_key(key, extra, "fields")
+        self.invalid_as_json_key(key, extra, "fields")
     }
 
     fn serde_serialize<S: serde::ser::Serializer>(
@@ -439,7 +429,7 @@ impl TypeSerializer for GeneralFieldsSerializer {
         map.end()
     }
 
-    fn get_name(&self) -> &str {
+    fn get_name(&self) -> &'static str {
         "general-fields"
     }
 }

@@ -1,3 +1,5 @@
+use std::convert::Infallible;
+
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::DowncastError;
@@ -58,6 +60,12 @@ impl From<DowncastIntoError<'_>> for ValError {
 impl From<Vec<ValLineError>> for ValError {
     fn from(line_errors: Vec<ValLineError>) -> Self {
         Self::LineErrors(line_errors)
+    }
+}
+
+impl From<Infallible> for ValError {
+    fn from(infallible: Infallible) -> Self {
+        match infallible {}
     }
 }
 
@@ -145,20 +153,19 @@ impl ValLineError {
         self.error_type = error_type;
         self
     }
+
+    pub fn first_loc_item(&self) -> Option<&LocItem> {
+        match &self.location {
+            Location::Empty => None,
+            // last because order is reversed
+            Location::List(loc_items) => loc_items.last(),
+        }
+    }
 }
 
 #[cfg_attr(debug_assertions, derive(Debug))]
-#[derive(Clone)]
+#[derive(Clone, IntoPyObject)]
 pub enum InputValue {
     Python(PyObject),
     Json(JsonValue<'static>),
-}
-
-impl ToPyObject for InputValue {
-    fn to_object(&self, py: Python) -> PyObject {
-        match self {
-            Self::Python(input) => input.clone_ref(py),
-            Self::Json(input) => input.to_object(py),
-        }
-    }
 }

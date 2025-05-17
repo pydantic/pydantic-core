@@ -8,7 +8,7 @@ use pyo3::exceptions::PyValueError;
 use pyo3::pyclass::CompareOp;
 use pyo3::sync::GILOnceCell;
 use pyo3::types::{PyDict, PyType};
-use pyo3::{intern, prelude::*};
+use pyo3::{intern, prelude::*, IntoPyObjectExt};
 use url::Url;
 
 use crate::tools::SchemaDict;
@@ -34,7 +34,7 @@ impl PyUrl {
 }
 
 fn build_schema_validator(py: Python, schema_type: &str) -> SchemaValidator {
-    let schema = PyDict::new_bound(py);
+    let schema = PyDict::new(py);
     schema.set_item("type", schema_type).unwrap();
     SchemaValidator::py_new(py, &schema, None).unwrap()
 }
@@ -45,7 +45,7 @@ impl PyUrl {
     pub fn py_new(py: Python, url: &Bound<'_, PyAny>) -> PyResult<Self> {
         let schema_obj = SCHEMA_DEFINITION_URL
             .get_or_init(py, || build_schema_validator(py, "url"))
-            .validate_python(py, url, None, None, None, None)?;
+            .validate_python(py, url, None, None, None, None, false.into(), None, None)?;
         schema_obj.extract(py)
     }
 
@@ -98,13 +98,13 @@ impl PyUrl {
         self.lib_url.query()
     }
 
-    pub fn query_params(&self, py: Python) -> PyObject {
+    pub fn query_params<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         // `query_pairs` is a pure iterator, so can't implement `ExactSizeIterator`, hence we need the temporary `Vec`
         self.lib_url
             .query_pairs()
-            .map(|(key, value)| (key, value).into_py(py))
-            .collect::<Vec<PyObject>>()
-            .into_py(py)
+            .map(|(key, value)| (key, value).into_pyobject(py))
+            .collect::<PyResult<Vec<_>>>()?
+            .into_pyobject(py)
     }
 
     #[getter]
@@ -147,8 +147,8 @@ impl PyUrl {
     }
 
     #[pyo3(signature = (_memo, /))]
-    pub fn __deepcopy__(&self, py: Python, _memo: Bound<'_, PyAny>) -> Py<PyAny> {
-        self.clone().into_py(py)
+    pub fn __deepcopy__(&self, py: Python, _memo: Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+        self.clone().into_py_any(py)
     }
 
     fn __getnewargs__(&self) -> (&str,) {
@@ -225,7 +225,7 @@ impl PyMultiHostUrl {
     pub fn py_new(py: Python, url: &Bound<'_, PyAny>) -> PyResult<Self> {
         let schema_obj = SCHEMA_DEFINITION_MULTI_HOST_URL
             .get_or_init(py, || build_schema_validator(py, "multi-host-url"))
-            .validate_python(py, url, None, None, None, None)?;
+            .validate_python(py, url, None, None, None, None, false.into(), None, None)?;
         schema_obj.extract(py)
     }
 
@@ -259,7 +259,7 @@ impl PyMultiHostUrl {
         self.ref_url.query()
     }
 
-    pub fn query_params(&self, py: Python) -> PyObject {
+    pub fn query_params<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         self.ref_url.query_params(py)
     }
 
@@ -350,8 +350,8 @@ impl PyMultiHostUrl {
         true // an empty string is not a valid URL
     }
 
-    pub fn __deepcopy__(&self, py: Python, _memo: &Bound<'_, PyDict>) -> Py<PyAny> {
-        self.clone().into_py(py)
+    pub fn __deepcopy__(&self, py: Python, _memo: &Bound<'_, PyDict>) -> PyResult<Py<PyAny>> {
+        self.clone().into_py_any(py)
     }
 
     fn __getnewargs__(&self) -> (String,) {
@@ -392,7 +392,7 @@ impl PyMultiHostUrl {
                     multi_url.push_str(&single_host.to_string());
                     if index != hosts.len() - 1 {
                         multi_url.push(',');
-                    };
+                    }
                 }
                 multi_url
             } else if host.is_some() {
@@ -400,7 +400,7 @@ impl PyMultiHostUrl {
                     username: username.map(Into::into),
                     password: password.map(Into::into),
                     host: host.map(Into::into),
-                    port: port.map(Into::into),
+                    port,
                 };
                 format!("{scheme}://{url_host}")
             } else {
@@ -456,7 +456,7 @@ impl fmt::Display for UrlHostParts {
             (None, Some(password)) => write!(f, ":{password}@")?,
             (Some(username), Some(password)) => write!(f, "{username}:{password}@")?,
             (None, None) => {}
-        };
+        }
         if let Some(host) = &self.host {
             write!(f, "{host}")?;
         }
@@ -468,14 +468,8 @@ impl fmt::Display for UrlHostParts {
 }
 
 fn host_to_dict<'a>(py: Python<'a>, lib_url: &Url) -> PyResult<Bound<'a, PyDict>> {
-    let dict = PyDict::new_bound(py);
-    dict.set_item(
-        "username",
-        match lib_url.username() {
-            "" => py.None(),
-            user => user.to_object(py),
-        },
-    )?;
+    let dict = PyDict::new(py);
+    dict.set_item("username", Some(lib_url.username()).filter(|s| !s.is_empty()))?;
     dict.set_item("password", lib_url.password())?;
     dict.set_item("host", lib_url.host_str())?;
     dict.set_item("port", lib_url.port_or_known_default())?;

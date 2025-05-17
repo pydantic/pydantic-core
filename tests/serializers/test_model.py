@@ -3,7 +3,7 @@ import json
 import platform
 import warnings
 from random import randint
-from typing import Any, ClassVar, Dict
+from typing import Any, ClassVar
 
 try:
     from functools import cached_property
@@ -217,7 +217,7 @@ def test_alias():
         )
     )
     value = BasicModel(cat=0, dog=1, bird=2)
-    assert s.to_python(value) == IsStrictDict(Meow=0, Woof=1, bird=2)
+    assert s.to_python(value, by_alias=True) == IsStrictDict(Meow=0, Woof=1, bird=2)
 
 
 def test_model_wrong_warn():
@@ -236,16 +236,25 @@ def test_model_wrong_warn():
     assert s.to_python(None, mode='json') is None
     assert s.to_json(None) == b'null'
 
-    with pytest.warns(UserWarning, match='Expected `MyModel` but got `int` with value `123` - serialized value may.+'):
+    with pytest.warns(
+        UserWarning,
+        match=r'Expected `MyModel` - serialized value may not be as expected \[input_value=123, input_type=int\]',
+    ):
         assert s.to_python(123) == 123
-    with pytest.warns(UserWarning, match='Expected `MyModel` but got `int` with value `123` - serialized value may.+'):
+    with pytest.warns(
+        UserWarning,
+        match=r'Expected `MyModel` - serialized value may not be as expected \[input_value=123, input_type=int\]',
+    ):
         assert s.to_python(123, mode='json') == 123
-    with pytest.warns(UserWarning, match='Expected `MyModel` but got `int` with value `123` - serialized value may.+'):
+    with pytest.warns(
+        UserWarning,
+        match=r'Expected `MyModel` - serialized value may not be as expected \[input_value=123, input_type=int\]',
+    ):
         assert s.to_json(123) == b'123'
 
     with pytest.warns(
         UserWarning,
-        match="Expected `MyModel` but got `dict` with value `{'foo': 1, 'bar': b'more'}` - serialized value may.+",
+        match=r"Expected `MyModel` - serialized value may not be as expected \[input_value={'foo': 1, 'bar': b'more'}, input_type=dict\]",
     ):
         assert s.to_python({'foo': 1, 'bar': b'more'}) == {'foo': 1, 'bar': b'more'}
 
@@ -407,7 +416,7 @@ def test_advanced_exclude_nested_lists(exclude, expected):
 
     # class SubModel(BaseModel):
     #     k: int
-    #     subsubs: List[SubSubModel]
+    #     subsubs: list[SubSubModel]
 
     sub_model_schema = core_schema.model_schema(
         type('SubModel', (), {}),
@@ -420,7 +429,7 @@ def test_advanced_exclude_nested_lists(exclude, expected):
     )
 
     # class Model(BaseModel):
-    #     subs: List[SubModel]
+    #     subs: list[SubModel]
 
     model_schema = core_schema.model_schema(
         BasicModel,
@@ -700,9 +709,9 @@ def test_property_alias():
             ),
         )
     )
-    assert s.to_python(Model(3, 4)) == {'width': 3, 'height': 4, 'Area': 12, 'volume': 48}
-    assert s.to_python(Model(3, 4), mode='json') == {'width': 3, 'height': 4, 'Area': 12, 'volume': 48}
-    assert s.to_json(Model(3, 4)) == b'{"width":3,"height":4,"Area":12,"volume":48}'
+    assert s.to_python(Model(3, 4), by_alias=True) == {'width': 3, 'height': 4, 'Area': 12, 'volume': 48}
+    assert s.to_python(Model(3, 4), mode='json', by_alias=True) == {'width': 3, 'height': 4, 'Area': 12, 'volume': 48}
+    assert s.to_json(Model(3, 4), by_alias=True) == b'{"width":3,"height":4,"Area":12,"volume":48}'
 
 
 def test_computed_field_exclude_none():
@@ -734,17 +743,28 @@ def test_computed_field_exclude_none():
             ),
         )
     )
-    assert s.to_python(Model(3, 4), exclude_none=False) == {'width': 3, 'height': 4, 'Area': 12, 'volume': None}
-    assert s.to_python(Model(3, 4), exclude_none=True) == {'width': 3, 'height': 4, 'Area': 12}
-    assert s.to_python(Model(3, 4), mode='json', exclude_none=False) == {
+    assert s.to_python(Model(3, 4), exclude_none=False, by_alias=True) == {
         'width': 3,
         'height': 4,
         'Area': 12,
         'volume': None,
     }
-    assert s.to_python(Model(3, 4), mode='json', exclude_none=True) == {'width': 3, 'height': 4, 'Area': 12}
-    assert s.to_json(Model(3, 4), exclude_none=False) == b'{"width":3,"height":4,"Area":12,"volume":null}'
-    assert s.to_json(Model(3, 4), exclude_none=True) == b'{"width":3,"height":4,"Area":12}'
+    assert s.to_python(Model(3, 4), exclude_none=True, by_alias=True) == {'width': 3, 'height': 4, 'Area': 12}
+    assert s.to_python(Model(3, 4), mode='json', exclude_none=False, by_alias=True) == {
+        'width': 3,
+        'height': 4,
+        'Area': 12,
+        'volume': None,
+    }
+    assert s.to_python(Model(3, 4), mode='json', exclude_none=True, by_alias=True) == {
+        'width': 3,
+        'height': 4,
+        'Area': 12,
+    }
+    assert (
+        s.to_json(Model(3, 4), exclude_none=False, by_alias=True) == b'{"width":3,"height":4,"Area":12,"volume":null}'
+    )
+    assert s.to_json(Model(3, 4), exclude_none=True, by_alias=True) == b'{"width":3,"height":4,"Area":12}'
 
 
 def test_computed_field_exclude_none_different_order():
@@ -779,17 +799,28 @@ def test_computed_field_exclude_none_different_order():
             ),
         )
     )
-    assert s.to_python(Model(3, 4), exclude_none=False) == {'width': 3, 'height': 4, 'Area': 12, 'volume': None}
-    assert s.to_python(Model(3, 4), exclude_none=True) == {'width': 3, 'height': 4, 'Area': 12}
-    assert s.to_python(Model(3, 4), mode='json', exclude_none=False) == {
+    assert s.to_python(Model(3, 4), by_alias=True, exclude_none=False) == {
         'width': 3,
         'height': 4,
         'Area': 12,
         'volume': None,
     }
-    assert s.to_python(Model(3, 4), mode='json', exclude_none=True) == {'width': 3, 'height': 4, 'Area': 12}
-    assert s.to_json(Model(3, 4), exclude_none=False) == b'{"width":3,"height":4,"volume":null,"Area":12}'
-    assert s.to_json(Model(3, 4), exclude_none=True) == b'{"width":3,"height":4,"Area":12}'
+    assert s.to_python(Model(3, 4), by_alias=True, exclude_none=True) == {'width': 3, 'height': 4, 'Area': 12}
+    assert s.to_python(Model(3, 4), by_alias=True, mode='json', exclude_none=False) == {
+        'width': 3,
+        'height': 4,
+        'Area': 12,
+        'volume': None,
+    }
+    assert s.to_python(Model(3, 4), mode='json', by_alias=True, exclude_none=True) == {
+        'width': 3,
+        'height': 4,
+        'Area': 12,
+    }
+    assert (
+        s.to_json(Model(3, 4), exclude_none=False, by_alias=True) == b'{"width":3,"height":4,"volume":null,"Area":12}'
+    )
+    assert s.to_json(Model(3, 4), exclude_none=True, by_alias=True) == b'{"width":3,"height":4,"Area":12}'
 
 
 @pytest.mark.skipif(cached_property is None, reason='cached_property is not available')
@@ -1067,7 +1098,7 @@ def test_extra_config_nested_model():
 def test_extra_custom_serializer():
     class Model:
         __slots__ = ('__pydantic_extra__', '__dict__')
-        __pydantic_extra__: Dict[str, Any]
+        __pydantic_extra__: dict[str, Any]
 
     schema = core_schema.model_schema(
         Model,
@@ -1149,6 +1180,47 @@ def test_warn_on_missing_field() -> None:
         )
     )
 
-    with pytest.warns(UserWarning, match='Expected 2 fields but got 1 for type `.*AModel` with value `.*`.+'):
+    with pytest.warns(
+        UserWarning, match='Expected 2 fields but got 1: Expected `AModel` - serialized value may not be as expected .+'
+    ):
         value = BasicModel(root=AModel(type='a'))
         s.to_python(value)
+
+
+@pytest.mark.parametrize(
+    'config,runtime,expected',
+    [
+        (True, True, {'my_alias': 1}),
+        (True, False, {'my_field': 1}),
+        (True, None, {'my_alias': 1}),
+        (False, True, {'my_alias': 1}),
+        (False, False, {'my_field': 1}),
+        (False, None, {'my_field': 1}),
+        (None, True, {'my_alias': 1}),
+        (None, False, {'my_field': 1}),
+        (None, None, {'my_field': 1}),
+    ],
+)
+def test_by_alias_and_name_config_interaction(config, runtime, expected) -> None:
+    """This test reflects the priority that applies for config vs runtime serialization alias configuration.
+
+    If the runtime value (by_alias) is set, that value is used.
+    If the runtime value is unset, the config value (serialize_by_alias) is used.
+    If neither are set, the default, False, is used.
+    """
+
+    class Model:
+        def __init__(self, my_field: int) -> None:
+            self.my_field = my_field
+
+    schema = core_schema.model_schema(
+        Model,
+        core_schema.model_fields_schema(
+            {
+                'my_field': core_schema.model_field(core_schema.int_schema(), serialization_alias='my_alias'),
+            }
+        ),
+        config=core_schema.CoreConfig(serialize_by_alias=config or False),
+    )
+    s = SchemaSerializer(schema)
+    assert s.to_python(Model(1), by_alias=runtime) == expected
