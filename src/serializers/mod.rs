@@ -149,11 +149,12 @@ impl SchemaSerializer {
             serialize_as_any,
             context,
         );
-        let v = if serialize_as_any {
-            infer::infer_to_python(value, include, exclude, &extra)?
+        let serializer = if serialize_as_any {
+            AnySerializer::get()
         } else {
-            self.serializer.to_python(value, include, exclude, &extra)?
+            &self.serializer
         };
+        let v = serializer.to_python(value, include, exclude, &extra)?;
         warnings.final_check(py)?;
         Ok(v)
     }
@@ -200,13 +201,14 @@ impl SchemaSerializer {
             serialize_as_any,
             context,
         );
+        let serializer = if serialize_as_any {
+            AnySerializer::get()
+        } else {
+            &self.serializer
+        };
         let bytes = to_json_bytes(
             value,
-            if serialize_as_any {
-                AnySerializer::get()
-            } else {
-                &self.serializer
-            },
+            serializer,
             include,
             exclude,
             &extra,

@@ -483,6 +483,14 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
                 .getattr(intern!(py, "__pydantic_serializer__"))
                 .map_err(py_err_se_err)?;
             let extracted_serializer: PyRef<SchemaSerializer> = py_serializer.extract().map_err(py_err_se_err)?;
+
+            // TODO: I think what needs to happen here is that we need to enumerate the different serializers,
+            // and then either infer an ob type or pass off to model serialization.
+            //
+            // Maybe call function serializers to process contained values? 🤔
+            //
+            // Probably the samse in Python mode.
+
             let extra = extracted_serializer.build_extra(
                 py,
                 extra.mode,
