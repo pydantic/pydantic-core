@@ -3,7 +3,7 @@ use std::fmt;
 
 use pyo3::exceptions::PyValueError;
 use pyo3::types::{PyDict, PyList, PyString};
-use pyo3::{intern, prelude::*};
+use pyo3::{intern, prelude::*, IntoPyObjectExt};
 
 use crate::errors::{ErrorTypeDefaults, InputValue, LocItem, ValError, ValResult};
 use crate::lookup_key::{LookupKey, LookupPath};
@@ -23,15 +23,16 @@ pub enum InputType {
 
 impl<'py> IntoPyObject<'py> for InputType {
     type Target = PyString;
-    type Output = Bound<'py, PyString>;
+    type Output = Borrowed<'py, 'py, PyString>;
     type Error = Infallible;
 
-    fn into_pyobject(self, py: Python<'_>) -> Result<Bound<'_, PyString>, Infallible> {
-        Ok(match self {
-            Self::Json => intern!(py, "json").clone(),
-            Self::Python => intern!(py, "python").clone(),
-            Self::String => intern!(py, "string").clone(),
-        })
+    fn into_pyobject(self, py: Python<'py>) -> Result<Borrowed<'py, 'py, PyString>, Infallible> {
+        let text = match self {
+            Self::Json => intern!(py, "json"),
+            Self::Python => intern!(py, "python"),
+            Self::String => intern!(py, "string"),
+        };
+        Ok(text.as_borrowed())
     }
 }
 
@@ -54,7 +55,14 @@ pub type ValMatch<T> = ValResult<ValidationMatch<T>>;
 /// the convention is to either implement:
 /// * `strict_*` & `lax_*` if they have different behavior
 /// * or, `validate_*` and `strict_*` to just call `validate_*` if the behavior for strict and lax is the same
-pub trait Input<'py>: fmt::Debug + ToPyObject {
+pub trait Input<'py>: fmt::Debug {
+    fn py_converter(&self) -> impl IntoPyObject<'py> + '_;
+
+    #[inline]
+    fn to_object<'a>(&'a self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        self.py_converter().into_bound_py_any(py)
+    }
+
     fn as_error_value(&self) -> InputValue;
 
     fn is_none(&self) -> bool {
@@ -72,6 +80,8 @@ pub trait Input<'py>: fmt::Debug + ToPyObject {
         Self: 'a;
 
     fn validate_args(&self) -> ValResult<Self::Arguments<'_>>;
+
+    fn validate_args_v3(&self) -> ValResult<Self::Arguments<'_>>;
 
     fn validate_dataclass_args<'a>(&'a self, dataclass_name: &str) -> ValResult<Self::Arguments<'a>>;
 
@@ -208,7 +218,7 @@ pub trait KeywordArgs<'py> {
     type Key<'a>: BorrowInput<'py> + Clone + Into<LocItem>
     where
         Self: 'a;
-    type Item<'a>: BorrowInput<'py> + ToPyObject
+    type Item<'a>: BorrowInput<'py>
     where
         Self: 'a;
     fn len(&self) -> usize;
@@ -257,6 +267,7 @@ pub trait ValidatedList<'py> {
 pub trait ValidatedTuple<'py> {
     type Item: BorrowInput<'py>;
     fn len(&self) -> Option<usize>;
+    fn try_for_each(self, f: impl FnMut(PyResult<Self::Item>) -> ValResult<()>) -> ValResult<()>;
     fn iterate<R>(self, consumer: impl ConsumeIterator<PyResult<Self::Item>, Output = R>) -> ValResult<R>;
 }
 
@@ -303,6 +314,9 @@ impl<'py> ValidatedList<'py> for Never {
 impl<'py> ValidatedTuple<'py> for Never {
     type Item = Bound<'py, PyAny>;
     fn len(&self) -> Option<usize> {
+        unreachable!()
+    }
+    fn try_for_each(self, _f: impl FnMut(PyResult<Self::Item>) -> ValResult<()>) -> ValResult<()> {
         unreachable!()
     }
     fn iterate<R>(self, _consumer: impl ConsumeIterator<PyResult<Self::Item>, Output = R>) -> ValResult<R> {

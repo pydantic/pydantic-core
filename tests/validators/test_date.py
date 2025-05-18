@@ -8,8 +8,24 @@ from typing import Any
 import pytest
 
 from pydantic_core import SchemaError, SchemaValidator, ValidationError, core_schema, validate_core_schema
+from pydantic_core import core_schema as cs
 
 from ..conftest import Err, PyAndJson
+
+
+@pytest.mark.parametrize(
+    'constraint',
+    ['le', 'lt', 'ge', 'gt'],
+)
+def test_constraints_schema_validation_error(constraint: str) -> None:
+    with pytest.raises(SchemaError, match=f"'{constraint}' must be coercible to a date instance"):
+        SchemaValidator(cs.date_schema(**{constraint: 'bad_value'}))
+
+
+def test_constraints_schema_validation() -> None:
+    val = SchemaValidator(cs.date_schema(gt='2020-01-01'))
+    with pytest.raises(ValidationError):
+        val.validate_python('2019-01-01')
 
 
 @pytest.mark.parametrize(
@@ -73,7 +89,7 @@ from ..conftest import Err, PyAndJson
     ],
 )
 def test_date(input_value, expected):
-    v = SchemaValidator({'type': 'date'})
+    v = SchemaValidator(cs.date_schema())
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             result = v.validate_python(input_value)
@@ -136,7 +152,7 @@ def test_date_json(py_and_json: PyAndJson, input_value, expected):
     ids=repr,
 )
 def test_date_strict(input_value, expected, strict_mode_type):
-    v = SchemaValidator({'type': 'date', 'strict': strict_mode_type.schema})
+    v = SchemaValidator(cs.date_schema(strict=strict_mode_type.schema))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value, **strict_mode_type.validator_args)
@@ -157,7 +173,7 @@ def test_date_strict(input_value, expected, strict_mode_type):
     ],
 )
 def test_date_strict_json(input_value, expected, strict_mode_type):
-    v = SchemaValidator({'type': 'date', 'strict': strict_mode_type.schema})
+    v = SchemaValidator(cs.date_schema(strict=strict_mode_type.schema))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_json(input_value, **strict_mode_type.validator_args)
@@ -167,7 +183,7 @@ def test_date_strict_json(input_value, expected, strict_mode_type):
 
 
 def test_date_strict_json_ctx():
-    v = SchemaValidator({'type': 'date', 'strict': True})
+    v = SchemaValidator(cs.date_schema(strict=True))
     with pytest.raises(ValidationError) as exc_info:
         v.validate_json('"foobar"')
     assert exc_info.value.errors(include_url=False) == [
@@ -204,7 +220,7 @@ def test_date_strict_json_ctx():
     ],
 )
 def test_date_kwargs(kwargs: dict[str, Any], input_value: date, expected: Err | date):
-    v = SchemaValidator({'type': 'date', **kwargs})  # type: ignore
+    v = SchemaValidator(cs.date_schema(**kwargs))  # type: ignore
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
@@ -219,7 +235,7 @@ def test_invalid_constraint():
 
 
 def test_dict_py():
-    v = SchemaValidator({'type': 'dict', 'keys_schema': {'type': 'date'}, 'values_schema': {'type': 'int'}})
+    v = SchemaValidator(cs.dict_schema(keys_schema=cs.date_schema(), values_schema=cs.int_schema()))
     assert v.validate_python({date(2000, 1, 1): 2, date(2000, 1, 2): 4}) == {date(2000, 1, 1): 2, date(2000, 1, 2): 4}
 
 
@@ -229,11 +245,11 @@ def test_dict(py_and_json: PyAndJson):
 
 
 def test_union():
-    v = SchemaValidator({'type': 'union', 'choices': [{'type': 'str'}, {'type': 'date'}]})
+    v = SchemaValidator(cs.union_schema(choices=[cs.str_schema(), cs.date_schema()]))
     assert v.validate_python('2022-01-02') == '2022-01-02'
     assert v.validate_python(date(2022, 1, 2)) == date(2022, 1, 2)
 
-    v = SchemaValidator({'type': 'union', 'choices': [{'type': 'date'}, {'type': 'str'}]})
+    v = SchemaValidator(cs.union_schema(choices=[cs.date_schema(), cs.str_schema()]))
     assert v.validate_python('2022-01-02') == '2022-01-02'
     assert v.validate_python(date(2022, 1, 2)) == date(2022, 1, 2)
 

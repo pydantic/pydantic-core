@@ -75,6 +75,11 @@ impl From<Bound<'_, PyAny>> for LocItem {
 }
 
 impl<'py> Input<'py> for Bound<'py, PyAny> {
+    #[inline]
+    fn py_converter(&self) -> impl IntoPyObject<'py> + '_ {
+        self
+    }
+
     fn as_error_value(&self) -> InputValue {
         InputValue::Python(self.clone().into())
     }
@@ -107,6 +112,16 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
             Ok(PyArgs::new(Some(tuple.clone()), None))
         } else if let Ok(list) = self.downcast::<PyList>() {
             Ok(PyArgs::new(Some(list.to_tuple()), None))
+        } else {
+            Err(ValError::new(ErrorTypeDefaults::ArgumentsType, self))
+        }
+    }
+
+    fn validate_args_v3(&self) -> ValResult<PyArgs<'py>> {
+        if let Ok(args_kwargs) = self.extract::<ArgsKwargs>() {
+            let args = args_kwargs.args.into_bound(self.py());
+            let kwargs = args_kwargs.kwargs.map(|d| d.into_bound(self.py()));
+            Ok(PyArgs::new(Some(args), kwargs))
         } else {
             Err(ValError::new(ErrorTypeDefaults::ArgumentsType, self))
         }
@@ -472,7 +487,7 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
     }
 
     fn validate_iter(&self) -> ValResult<GenericIterator<'static>> {
-        if self.iter().is_ok() {
+        if self.try_iter().is_ok() {
             Ok(self.into())
         } else {
             Err(ValError::new(ErrorTypeDefaults::IterableType, self))
@@ -851,7 +866,7 @@ impl<'py> ValidatedDict<'py> for GenericPyMapping<'_, 'py> {
             Self::Mapping(mapping) => mapping
                 .call_method0(intern!(mapping.py(), "keys"))
                 .ok()?
-                .iter()
+                .try_iter()
                 .ok()?
                 .last()?
                 .ok(),
@@ -891,7 +906,7 @@ fn extract_sequence_iterable<'a, 'py>(obj: &'a Bound<'py, PyAny>) -> ValResult<P
             || obj.is_instance_of::<PyDict>()
             || obj.downcast::<PyMapping>().is_ok())
         {
-            if let Ok(iter) = obj.iter() {
+            if let Ok(iter) = obj.try_iter() {
                 return Ok(PySequenceIterable::Iterator(iter));
             }
         }
@@ -910,7 +925,15 @@ impl<'py> PySequenceIterable<'_, 'py> {
             PySequenceIterable::Iterator(iter) => iter.len().ok(),
         }
     }
-
+    fn generic_try_for_each(self, f: impl FnMut(PyResult<Bound<'py, PyAny>>) -> ValResult<()>) -> ValResult<()> {
+        match self {
+            PySequenceIterable::List(iter) => iter.iter().map(Ok).try_for_each(f),
+            PySequenceIterable::Tuple(iter) => iter.iter().map(Ok).try_for_each(f),
+            PySequenceIterable::Set(iter) => iter.iter().map(Ok).try_for_each(f),
+            PySequenceIterable::FrozenSet(iter) => iter.iter().map(Ok).try_for_each(f),
+            PySequenceIterable::Iterator(mut iter) => iter.try_for_each(f),
+        }
+    }
     fn generic_iterate<R>(
         self,
         consumer: impl ConsumeIterator<PyResult<Bound<'py, PyAny>>, Output = R>,
@@ -920,7 +943,7 @@ impl<'py> PySequenceIterable<'_, 'py> {
             PySequenceIterable::Tuple(iter) => Ok(consumer.consume_iterator(iter.iter().map(Ok))),
             PySequenceIterable::Set(iter) => Ok(consumer.consume_iterator(iter.iter().map(Ok))),
             PySequenceIterable::FrozenSet(iter) => Ok(consumer.consume_iterator(iter.iter().map(Ok))),
-            PySequenceIterable::Iterator(iter) => Ok(consumer.consume_iterator(iter.iter()?)),
+            PySequenceIterable::Iterator(iter) => Ok(consumer.consume_iterator(iter.try_iter()?)),
         }
     }
 }
@@ -945,6 +968,9 @@ impl<'py> ValidatedTuple<'py> for PySequenceIterable<'_, 'py> {
     type Item = Bound<'py, PyAny>;
     fn len(&self) -> Option<usize> {
         self.generic_len()
+    }
+    fn try_for_each(self, f: impl FnMut(PyResult<Self::Item>) -> ValResult<()>) -> ValResult<()> {
+        self.generic_try_for_each(f)
     }
     fn iterate<R>(self, consumer: impl ConsumeIterator<PyResult<Self::Item>, Output = R>) -> ValResult<R> {
         self.generic_iterate(consumer)

@@ -4,6 +4,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PySet, PyString, PyType};
 
 use ahash::AHashSet;
+use pyo3::IntoPyObjectExt;
 
 use crate::build_tools::py_schema_err;
 use crate::build_tools::{is_strict, schema_or_config_same, ExtraBehavior};
@@ -11,7 +12,7 @@ use crate::errors::LocItem;
 use crate::errors::{ErrorType, ErrorTypeDefaults, ValError, ValLineError, ValResult};
 use crate::input::ConsumeIterator;
 use crate::input::{BorrowInput, Input, ValidatedDict, ValidationMatch};
-use crate::lookup_key::LookupKey;
+use crate::lookup_key::LookupKeyCollection;
 use crate::tools::SchemaDict;
 
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
@@ -19,7 +20,7 @@ use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuild
 #[derive(Debug)]
 struct Field {
     name: String,
-    lookup_key: LookupKey,
+    lookup_key_collection: LookupKeyCollection,
     name_py: Py<PyString>,
     validator: CombinedValidator,
     frozen: bool,
@@ -33,9 +34,12 @@ pub struct ModelFieldsValidator {
     model_name: String,
     extra_behavior: ExtraBehavior,
     extras_validator: Option<Box<CombinedValidator>>,
+    extras_keys_validator: Option<Box<CombinedValidator>>,
     strict: bool,
     from_attributes: bool,
     loc_by_alias: bool,
+    validate_by_alias: Option<bool>,
+    validate_by_name: Option<bool>,
 }
 
 impl BuildValidator for ModelFieldsValidator {
@@ -47,16 +51,21 @@ impl BuildValidator for ModelFieldsValidator {
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
+
         let strict = is_strict(schema, config)?;
 
         let from_attributes = schema_or_config_same(schema, config, intern!(py, "from_attributes"))?.unwrap_or(false);
-        let populate_by_name = schema_or_config_same(schema, config, intern!(py, "populate_by_name"))?.unwrap_or(false);
 
         let extra_behavior = ExtraBehavior::from_schema_or_config(py, schema, config, ExtraBehavior::Ignore)?;
 
         let extras_validator = match (schema.get_item(intern!(py, "extras_schema"))?, &extra_behavior) {
             (Some(v), ExtraBehavior::Allow) => Some(Box::new(build_validator(&v, config, definitions)?)),
             (Some(_), _) => return py_schema_err!("extras_schema can only be used if extra_behavior=allow"),
+            (_, _) => None,
+        };
+        let extras_keys_validator = match (schema.get_item(intern!(py, "extras_keys_schema"))?, &extra_behavior) {
+            (Some(v), ExtraBehavior::Allow) => Some(Box::new(build_validator(&v, config, definitions)?)),
+            (Some(_), _) => return py_schema_err!("extras_keys_schema can only be used if extra_behavior=allow"),
             (_, _) => None,
         };
         let model_name: String = schema
@@ -78,17 +87,12 @@ impl BuildValidator for ModelFieldsValidator {
                 Err(err) => return py_schema_err!("Field \"{}\":\n  {}", field_name, err),
             };
 
-            let lookup_key = match field_info.get_item(intern!(py, "validation_alias"))? {
-                Some(alias) => {
-                    let alt_alias = if populate_by_name { Some(field_name) } else { None };
-                    LookupKey::from_py(py, &alias, alt_alias)?
-                }
-                None => LookupKey::from_string(py, field_name),
-            };
+            let validation_alias = field_info.get_item(intern!(py, "validation_alias"))?;
+            let lookup_key_collection = LookupKeyCollection::new(py, validation_alias, field_name)?;
 
             fields.push(Field {
                 name: field_name.to_string(),
-                lookup_key,
+                lookup_key_collection,
                 name_py: field_name_py.into(),
                 validator,
                 frozen: field_info.get_as::<bool>(intern!(py, "frozen"))?.unwrap_or(false),
@@ -100,9 +104,12 @@ impl BuildValidator for ModelFieldsValidator {
             model_name,
             extra_behavior,
             extras_validator,
+            extras_keys_validator,
             strict,
             from_attributes,
             loc_by_alias: config.get_as(intern!(py, "loc_by_alias"))?.unwrap_or(true),
+            validate_by_alias: config.get_as(intern!(py, "validate_by_alias"))?,
+            validate_by_name: config.get_as(intern!(py, "validate_by_name"))?,
         }
         .into())
     }
@@ -155,6 +162,9 @@ impl Validator for ModelFieldsValidator {
         let mut fields_set_vec: Vec<Py<PyString>> = Vec::with_capacity(self.fields.len());
         let mut fields_set_count: usize = 0;
 
+        let validate_by_alias = state.validate_by_alias_or(self.validate_by_alias);
+        let validate_by_name = state.validate_by_name_or(self.validate_by_name);
+
         // we only care about which keys have been used if we're iterating over the object for extra after
         // the first pass
         let mut used_keys: Option<AHashSet<&str>> =
@@ -168,7 +178,10 @@ impl Validator for ModelFieldsValidator {
             let state = &mut state.rebind_extra(|extra| extra.data = Some(model_dict.clone()));
 
             for field in &self.fields {
-                let op_key_value = match dict.get_item(&field.lookup_key) {
+                let lookup_key = field
+                    .lookup_key_collection
+                    .select(validate_by_alias, validate_by_name)?;
+                let op_key_value = match dict.get_item(lookup_key) {
                     Ok(v) => v,
                     Err(ValError::LineErrors(line_errors)) => {
                         for err in line_errors {
@@ -184,6 +197,10 @@ impl Validator for ModelFieldsValidator {
                         // extra logic either way
                         used_keys.insert(lookup_path.first_key());
                     }
+
+                    let state =
+                        &mut state.rebind_extra(|extra| extra.field_name = Some(field.name_py.bind(py).clone()));
+
                     match field.validator.validate(py, value.borrow_input(), state) {
                         Ok(value) => {
                             model_dict.set_item(&field.name_py, value)?;
@@ -208,14 +225,14 @@ impl Validator for ModelFieldsValidator {
                     }
                     Ok(None) => {
                         // This means there was no default value
-                        errors.push(field.lookup_key.error(
+                        errors.push(lookup_key.error(
                             ErrorTypeDefaults::Missing,
                             input,
                             self.loc_by_alias,
                             &field.name,
                         ));
                     }
-                    Err(ValError::Omit) => continue,
+                    Err(ValError::Omit) => {}
                     Err(ValError::LineErrors(line_errors)) => {
                         for err in line_errors {
                             // Note: this will always use the field name even if there is an alias
@@ -238,6 +255,7 @@ impl Validator for ModelFieldsValidator {
                 fields_set_vec: &'a mut Vec<Py<PyString>>,
                 extra_behavior: ExtraBehavior,
                 extras_validator: Option<&'a CombinedValidator>,
+                extras_keys_validator: Option<&'a CombinedValidator>,
                 state: &'a mut ValidationState<'s, 'py>,
             }
 
@@ -288,7 +306,22 @@ impl Validator for ModelFieldsValidator {
                             }
                             ExtraBehavior::Ignore => {}
                             ExtraBehavior::Allow => {
-                                let py_key = either_str.as_py_string(self.py, self.state.cache_str());
+                                let py_key = match self.extras_keys_validator {
+                                    Some(validator) => {
+                                        match validator.validate(self.py, raw_key.borrow_input(), self.state) {
+                                            Ok(value) => value.downcast_bound::<PyString>(self.py)?.clone(),
+                                            Err(ValError::LineErrors(line_errors)) => {
+                                                for err in line_errors {
+                                                    self.errors.push(err.with_outer_location(raw_key.clone()));
+                                                }
+                                                continue;
+                                            }
+                                            Err(err) => return Err(err),
+                                        }
+                                    }
+                                    None => either_str.as_py_string(self.py, self.state.cache_str()),
+                                };
+
                                 if let Some(validator) = self.extras_validator {
                                     match validator.validate(self.py, value, self.state) {
                                         Ok(value) => {
@@ -303,9 +336,9 @@ impl Validator for ModelFieldsValidator {
                                         Err(err) => return Err(err),
                                     }
                                 } else {
-                                    model_extra_dict.set_item(&py_key, value.to_object(self.py))?;
+                                    model_extra_dict.set_item(&py_key, value.to_object(self.py)?)?;
                                     self.fields_set_vec.push(py_key.into());
-                                };
+                                }
                             }
                         }
                     }
@@ -320,6 +353,7 @@ impl Validator for ModelFieldsValidator {
                 fields_set_vec: &mut fields_set_vec,
                 extra_behavior: self.extra_behavior,
                 extras_validator: self.extras_validator.as_deref(),
+                extras_keys_validator: self.extras_keys_validator.as_deref(),
                 state,
             })??;
 
@@ -338,9 +372,9 @@ impl Validator for ModelFieldsValidator {
             // from attributes, set it now so __pydantic_extra__ is always a dict if extra=allow
             if matches!(self.extra_behavior, ExtraBehavior::Allow) && model_extra_dict_op.is_none() {
                 model_extra_dict_op = Some(PyDict::new(py));
-            };
+            }
 
-            Ok((model_dict, model_extra_dict_op, fields_set).to_object(py))
+            Ok((model_dict, model_extra_dict_op, fields_set).into_py_any(py)?)
         }
     }
 
@@ -354,13 +388,13 @@ impl Validator for ModelFieldsValidator {
     ) -> ValResult<PyObject> {
         let dict = obj.downcast::<PyDict>()?;
 
-        let get_updated_dict = |output: PyObject| {
+        let get_updated_dict = |output: &Bound<'py, PyAny>| {
             dict.set_item(field_name, output)?;
             Ok(dict)
         };
 
         let prepare_result = |result: ValResult<PyObject>| match result {
-            Ok(output) => get_updated_dict(output),
+            Ok(output) => get_updated_dict(&output.into_bound(py)),
             Err(ValError::LineErrors(line_errors)) => {
                 let errors = line_errors
                     .into_iter()
@@ -392,6 +426,8 @@ impl Validator for ModelFieldsValidator {
                     ));
                 }
 
+                let state = &mut state.rebind_extra(|extra| extra.field_name = Some(field.name_py.bind(py).clone()));
+
                 prepare_result(field.validator.validate(py, field_value, state))?
             } else {
                 // Handle extra (unknown) field
@@ -402,7 +438,7 @@ impl Validator for ModelFieldsValidator {
                 match self.extra_behavior {
                     ExtraBehavior::Allow => match self.extras_validator {
                         Some(ref validator) => prepare_result(validator.validate(py, field_value, state))?,
-                        None => get_updated_dict(field_value.to_object(py))?,
+                        None => get_updated_dict(field_value)?,
                     },
                     ExtraBehavior::Forbid | ExtraBehavior::Ignore => {
                         return Err(ValError::new_with_loc(
@@ -434,13 +470,13 @@ impl Validator for ModelFieldsValidator {
                 let new_extra = new_data.copy()?;
                 new_data.clear();
                 new_data.update(non_extra_data.as_mapping())?;
-                new_extra.to_object(py)
+                new_extra.into()
             }
             _ => py.None(),
         };
 
         let fields_set = PySet::new(py, &[field_name.to_string()])?;
-        Ok((new_data.to_object(py), new_extra, fields_set.to_object(py)).to_object(py))
+        Ok((new_data, new_extra, fields_set).into_py_any(py)?)
     }
 
     fn get_name(&self) -> &str {

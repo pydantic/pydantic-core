@@ -5,10 +5,9 @@ import json
 import uuid
 import warnings
 from decimal import Decimal
-from typing import Any, ClassVar, Union
+from typing import Any, ClassVar, Literal, Union
 
 import pytest
-from typing_extensions import Literal
 
 from pydantic_core import PydanticSerializationUnexpectedValue, SchemaSerializer, core_schema
 
@@ -36,8 +35,8 @@ def test_union_error():
     s = SchemaSerializer(core_schema.union_schema([core_schema.bool_schema(), core_schema.int_schema()]))
 
     messages = [
-        "Expected `bool` but got `str` with value `'a string'` - serialized value may not be as expected",
-        "Expected `int` but got `str` with value `'a string'` - serialized value may not be as expected",
+        "Expected `bool` - serialized value may not be as expected [input_value='a string', input_type=str]",
+        "Expected `int` - serialized value may not be as expected [input_value='a string', input_type=str]",
     ]
 
     with warnings.catch_warnings(record=True) as w:
@@ -761,8 +760,8 @@ def test_tagged_union_with_aliases() -> None:
 
     model_a = ModelA(field=1)
     model_b = ModelB(field=1)
-    assert s.to_python(model_a) == {'field': 1, 'TAG': 'a'}
-    assert s.to_python(model_b) == {'field': 1, 'TAG': 'b'}
+    assert s.to_python(model_a, by_alias=True) == {'field': 1, 'TAG': 'a'}
+    assert s.to_python(model_b, by_alias=True) == {'field': 1, 'TAG': 'b'}
 
 
 def test_union_model_wrap_serializer():
@@ -917,10 +916,10 @@ def test_union_of_unions_of_models_invalid_variant(union_of_unions_schema: core_
     s = SchemaSerializer(union_of_unions_schema)
     # All warnings should be available
     messages = [
-        'Expected `ModelA` but got `ModelAlien`',
-        'Expected `ModelB` but got `ModelAlien`',
-        'Expected `ModelCat` but got `ModelAlien`',
-        'Expected `ModelDog` but got `ModelAlien`',
+        'Expected `ModelA`',
+        'Expected `ModelB`',
+        'Expected `ModelCat`',
+        'Expected `ModelDog`',
     ]
 
     with warnings.catch_warnings(record=True) as w:
@@ -928,6 +927,7 @@ def test_union_of_unions_of_models_invalid_variant(union_of_unions_schema: core_
         s.to_python(ModelAlien(type_='alien'))
         for m in messages:
             assert m in str(w[0].message)
+            assert 'input_type=ModelAlien' in str(w[0].message)
 
 
 @pytest.fixture
@@ -982,10 +982,10 @@ def test_union_of_unions_of_models_with_tagged_union_invalid_variant(
     s = SchemaSerializer(tagged_union_of_unions_schema)
     # All warnings should be available
     messages = [
-        'Expected `ModelA` but got `ModelAlien`',
-        'Expected `ModelB` but got `ModelAlien`',
-        'Expected `ModelCat` but got `ModelAlien`',
-        'Expected `ModelDog` but got `ModelAlien`',
+        'Expected `ModelA`',
+        'Expected `ModelB`',
+        'Expected `ModelCat`',
+        'Expected `ModelDog`',
     ]
 
     with warnings.catch_warnings(record=True) as w:
@@ -993,6 +993,7 @@ def test_union_of_unions_of_models_with_tagged_union_invalid_variant(
         s.to_python(ModelAlien(type_='alien'))
         for m in messages:
             assert m in str(w[0].message)
+            assert 'input_type=ModelAlien' in str(w[0].message)
 
 
 def test_mixed_union_models_and_other_types() -> None:

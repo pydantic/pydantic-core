@@ -100,10 +100,16 @@ impl FunctionBeforeValidator {
         state: &'s mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
         let r = if self.info_arg {
-            let info = ValidationInfo::new(py, state.extra(), &self.config, self.field_name.clone());
-            self.func.call1(py, (input.to_object(py), info))
+            let field_name = state
+                .extra()
+                .field_name
+                .clone()
+                .map(Bound::unbind)
+                .or_else(|| self.field_name.clone());
+            let info = ValidationInfo::new(py, state.extra(), &self.config, field_name);
+            self.func.call1(py, (input.to_object(py)?, info))
         } else {
-            self.func.call1(py, (input.to_object(py),))
+            self.func.call1(py, (input.to_object(py)?,))
         };
         let value = r.map_err(|e| convert_err(py, e, input))?;
         call(value.into_bound(py), state)
@@ -169,10 +175,16 @@ impl FunctionAfterValidator {
     ) -> ValResult<PyObject> {
         let v = call(input, state)?;
         let r = if self.info_arg {
-            let info = ValidationInfo::new(py, state.extra(), &self.config, self.field_name.clone());
-            self.func.call1(py, (v.to_object(py), info))
+            let field_name = state
+                .extra()
+                .field_name
+                .clone()
+                .map(Bound::unbind)
+                .or_else(|| self.field_name.clone());
+            let info = ValidationInfo::new(py, state.extra(), &self.config, field_name);
+            self.func.call1(py, (v, info))
         } else {
-            self.func.call1(py, (v.to_object(py),))
+            self.func.call1(py, (v,))
         };
         r.map_err(|e| convert_err(py, e, input))
     }
@@ -258,10 +270,16 @@ impl Validator for FunctionPlainValidator {
         state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
         let r = if self.info_arg {
-            let info = ValidationInfo::new(py, state.extra(), &self.config, self.field_name.clone());
-            self.func.call1(py, (input.to_object(py), info))
+            let field_name = state
+                .extra()
+                .field_name
+                .clone()
+                .map(Bound::unbind)
+                .or_else(|| self.field_name.clone());
+            let info = ValidationInfo::new(py, state.extra(), &self.config, field_name);
+            self.func.call1(py, (input.to_object(py)?, info))
         } else {
-            self.func.call1(py, (input.to_object(py),))
+            self.func.call1(py, (input.to_object(py)?,))
         };
         r.map_err(|e| convert_err(py, e, input))
     }
@@ -322,10 +340,16 @@ impl FunctionWrapValidator {
         state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
         let r = if self.info_arg {
-            let info = ValidationInfo::new(py, state.extra(), &self.config, self.field_name.clone());
-            self.func.call1(py, (input.to_object(py), handler, info))
+            let field_name = state
+                .extra()
+                .field_name
+                .clone()
+                .map(Bound::unbind)
+                .or_else(|| self.field_name.clone());
+            let info = ValidationInfo::new(py, state.extra(), &self.config, field_name);
+            self.func.call1(py, (input.to_object(py)?, handler, info))
         } else {
-            self.func.call1(py, (input.to_object(py), handler))
+            self.func.call1(py, (input.to_object(py)?, handler))
         };
         r.map_err(|e| convert_err(py, e, input))
     }
@@ -356,7 +380,9 @@ impl Validator for FunctionWrapValidator {
         let handler = Bound::new(py, handler)?;
         #[allow(clippy::used_underscore_items)]
         let result = self._validate(handler.as_any(), py, input, state);
-        state.exactness = handler.borrow_mut().validator.exactness;
+        let handler = handler.borrow();
+        state.exactness = handler.validator.exactness;
+        state.fields_set_count = handler.validator.fields_set_count;
         result
     }
 
@@ -377,7 +403,7 @@ impl Validator for FunctionWrapValidator {
                 self.validation_error_cause,
             ),
             updated_field_name: field_name.to_string(),
-            updated_field_value: field_value.to_object(py),
+            updated_field_value: field_value.clone().into(),
         };
         #[allow(clippy::used_underscore_items)]
         self._validate(Bound::new(py, handler)?.as_any(), py, obj, state)

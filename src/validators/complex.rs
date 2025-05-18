@@ -13,7 +13,7 @@ static COMPLEX_TYPE: GILOnceCell<Py<PyType>> = GILOnceCell::new();
 
 pub fn get_complex_type(py: Python) -> &Bound<'_, PyType> {
     COMPLEX_TYPE
-        .get_or_init(py, || py.get_type_bound::<PyComplex>().into())
+        .get_or_init(py, || py.get_type::<PyComplex>().into())
         .bind(py)
 }
 
@@ -49,7 +49,7 @@ impl Validator for ComplexValidator {
         Ok(res.into_pyobject(py)?.into())
     }
 
-    fn get_name(&self) -> &str {
+    fn get_name(&self) -> &'static str {
         "complex"
     }
 }

@@ -1,7 +1,7 @@
 use std::fmt;
 use std::sync::Arc;
 
-use pyo3::types::PyDict;
+use pyo3::types::{PyDict, PyString};
 use pyo3::{prelude::*, IntoPyObjectExt, PyTraverseError, PyVisit};
 
 use crate::errors::{ErrorType, LocItem, ValError, ValResult};
@@ -139,7 +139,7 @@ impl ValidatorIterator {
                                     );
                                     return Err(ValidationError::from_val_error(
                                         py,
-                                        "ValidatorIterator".to_object(py),
+                                        "ValidatorIterator".into_pyobject(py)?.into(),
                                         InputType::Python,
                                         val_error,
                                         None,
@@ -152,7 +152,7 @@ impl ValidatorIterator {
                                 .validate(py, next.borrow_input(), Some(index.into()))
                                 .map(Some)
                         }
-                        None => Ok(Some(next.to_object(py))),
+                        None => Ok(Some(next.into_pyobject(py)?.unbind())),
                     },
                     None => {
                         if let Some(min_length) = min_length {
@@ -168,7 +168,7 @@ impl ValidatorIterator {
                                 );
                                 return Err(ValidationError::from_val_error(
                                     py,
-                                    "ValidatorIterator".to_object(py),
+                                    "ValidatorIterator".into_pyobject(py)?.into(),
                                     InputType::Python,
                                     val_error,
                                     None,
@@ -225,6 +225,7 @@ pub struct InternalValidator {
     self_instance: Option<PyObject>,
     recursion_guard: RecursionState,
     pub(crate) exactness: Option<Exactness>,
+    pub(crate) fields_set_count: Option<usize>,
     validation_mode: InputType,
     hide_input_in_errors: bool,
     validation_error_cause: bool,
@@ -256,6 +257,7 @@ impl InternalValidator {
             self_instance: extra.self_instance.map(|d| d.clone().unbind()),
             recursion_guard: state.recursion_guard.clone(),
             exactness: state.exactness,
+            fields_set_count: state.fields_set_count,
             validation_mode: extra.input_type,
             hide_input_in_errors,
             validation_error_cause,
@@ -276,9 +278,12 @@ impl InternalValidator {
             data: self.data.as_ref().map(|data| data.bind(py).clone()),
             strict: self.strict,
             from_attributes: self.from_attributes,
+            field_name: Some(PyString::new(py, field_name)),
             context: self.context.as_ref().map(|data| data.bind(py)),
             self_instance: self.self_instance.as_ref().map(|data| data.bind(py)),
             cache_str: self.cache_str,
+            by_alias: None,
+            by_name: None,
         };
         let mut state = ValidationState::new(extra, &mut self.recursion_guard, false.into());
         state.exactness = self.exactness;
@@ -288,7 +293,7 @@ impl InternalValidator {
             .map_err(|e| {
                 ValidationError::from_val_error(
                     py,
-                    self.name.to_object(py),
+                    PyString::new(py, &self.name).into(),
                     InputType::Python,
                     e,
                     outer_location,
@@ -311,16 +316,20 @@ impl InternalValidator {
             data: self.data.as_ref().map(|data| data.bind(py).clone()),
             strict: self.strict,
             from_attributes: self.from_attributes,
+            field_name: None,
             context: self.context.as_ref().map(|data| data.bind(py)),
             self_instance: self.self_instance.as_ref().map(|data| data.bind(py)),
             cache_str: self.cache_str,
+            by_alias: None,
+            by_name: None,
         };
         let mut state = ValidationState::new(extra, &mut self.recursion_guard, false.into());
         state.exactness = self.exactness;
+        state.fields_set_count = self.fields_set_count;
         let result = self.validator.validate(py, input, &mut state).map_err(|e| {
             ValidationError::from_val_error(
                 py,
-                self.name.to_object(py),
+                PyString::new(py, &self.name).into(),
                 InputType::Python,
                 e,
                 outer_location,
@@ -329,6 +338,7 @@ impl InternalValidator {
             )
         });
         self.exactness = state.exactness;
+        self.fields_set_count = state.fields_set_count;
         result
     }
 }

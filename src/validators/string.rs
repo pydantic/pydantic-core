@@ -147,7 +147,7 @@ impl Validator for StrConstrainedValidator {
         Ok(py_string.into_py_any(py)?)
     }
 
-    fn get_name(&self) -> &str {
+    fn get_name(&self) -> &'static str {
         "constrained-str"
     }
 }
@@ -260,7 +260,7 @@ impl Pattern {
             // so that any flags, etc. are preserved
             Ok(Self {
                 pattern: pattern_str,
-                engine: RegexEngine::PythonRe(pattern.to_object(py)),
+                engine: RegexEngine::PythonRe(pattern.unbind()),
             })
         } else {
             let engine = match engine {

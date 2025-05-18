@@ -183,7 +183,7 @@ impl FunctionPlainSerializer {
     fn retry_with_lax_check(&self) -> bool {
         self.fallback_serializer
             .as_ref()
-            .map_or(false, |f| f.retry_with_lax_check())
+            .is_some_and(|f| f.retry_with_lax_check())
             || self.return_serializer.retry_with_lax_check()
     }
 }
@@ -194,7 +194,7 @@ fn on_error(py: Python, err: PyErr, function_name: &str, extra: &Extra) -> PyRes
         if extra.check.enabled() {
             Err(err)
         } else {
-            extra.warnings.custom_warning(ser_err.__repr__());
+            extra.warnings.register_warning(ser_err);
             Ok(())
         }
     } else if let Ok(err) = exception.extract::<PydanticSerializationError>() {
@@ -544,9 +544,10 @@ struct SerializationInfo {
     exclude: Option<PyObject>,
     #[pyo3(get)]
     context: Option<PyObject>,
+    #[pyo3(get, name = "mode")]
     _mode: SerMode,
     #[pyo3(get)]
-    by_alias: bool,
+    by_alias: Option<bool>,
     #[pyo3(get)]
     exclude_unset: bool,
     #[pyo3(get)]
@@ -625,11 +626,6 @@ impl SerializationInfo {
 
 #[pymethods]
 impl SerializationInfo {
-    #[getter]
-    fn mode(&self, py: Python) -> PyObject {
-        self._mode.to_object(py)
-    }
-
     fn mode_is_json(&self) -> bool {
         self._mode.is_json()
     }
@@ -646,7 +642,7 @@ impl SerializationInfo {
         if let Some(ref context) = self.context {
             d.set_item("context", context)?;
         }
-        d.set_item("mode", self.mode(py))?;
+        d.set_item("mode", &self._mode)?;
         d.set_item("by_alias", self.by_alias)?;
         d.set_item("exclude_unset", self.exclude_unset)?;
         d.set_item("exclude_defaults", self.exclude_defaults)?;
@@ -672,7 +668,7 @@ impl SerializationInfo {
                 None => "None".to_owned(),
             },
             self._mode,
-            py_bool(self.by_alias),
+            py_bool(self.by_alias.unwrap_or(false)),
             py_bool(self.exclude_unset),
             py_bool(self.exclude_defaults),
             py_bool(self.exclude_none),
