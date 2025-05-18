@@ -7,11 +7,10 @@ use crate::build_tools::py_schema_error_type;
 use crate::definitions::DefinitionsBuilder;
 use crate::py_gc::PyGcTraverse;
 use crate::serializers::filter::SchemaFilter;
-use crate::serializers::shared::{BuildSerializer, CombinedSerializer, PydanticSerializer, TypeSerializer};
+use crate::serializers::shared::{BuildSerializer, CombinedSerializer, PydanticSerializer};
 use crate::tools::SchemaDict;
 
 use super::errors::py_err_se_err;
-use super::type_serializers::any::AnySerializer;
 use super::Extra;
 
 #[derive(Debug)]
@@ -66,13 +65,10 @@ impl ComputedFields {
                     true => computed_field.alias_py.bind(model.py()),
                     false => computed_field.property_name_py.bind(model.py()),
                 };
-                let serializer = if extra.serialize_as_any {
-                    AnySerializer::get()
-                } else {
-                    &computed_field.serializer
-                };
-
-                let value = serializer.to_python(&value, include.as_ref(), exclude.as_ref(), &field_extra)?;
+                let value =
+                    computed_field
+                        .serializer
+                        .to_python(&value, include.as_ref(), exclude.as_ref(), &field_extra)?;
                 output_dict.set_item(key, value)
             },
         )
@@ -107,11 +103,7 @@ impl ComputedFields {
                 };
                 let s = PydanticSerializer::new(
                     &value,
-                    if extra.serialize_as_any {
-                        AnySerializer::get()
-                    } else {
-                        &computed_field.serializer
-                    },
+                    &computed_field.serializer,
                     include.as_ref(),
                     exclude.as_ref(),
                     &field_extra,

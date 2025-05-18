@@ -17,7 +17,6 @@ use super::filter::SchemaFilter;
 use super::infer::{infer_json_key, infer_serialize, infer_to_python, SerializeInfer};
 use super::shared::PydanticSerializer;
 use super::shared::{CombinedSerializer, TypeSerializer};
-use super::type_serializers::any::AnySerializer;
 
 /// representation of a field for serialization
 #[derive(Debug)]
@@ -172,16 +171,12 @@ impl GeneralFieldsSerializer {
                 if let Some(field) = op_field {
                     if let Some(ref serializer) = field.serializer {
                         if !exclude_default(&value, &field_extra, serializer)? {
-                            let value = if extra.serialize_as_any {
-                                infer_to_python(&value, next_include.as_ref(), next_exclude.as_ref(), &field_extra)?
-                            } else {
-                                serializer.to_python(
-                                    &value,
-                                    next_include.as_ref(),
-                                    next_exclude.as_ref(),
-                                    &field_extra,
-                                )?
-                            };
+                            let value = serializer.to_python(
+                                &value,
+                                next_include.as_ref(),
+                                next_exclude.as_ref(),
+                                &field_extra,
+                            )?;
                             let output_key = field.get_key_py(output_dict.py(), &field_extra);
                             output_dict.set_item(output_key, value)?;
                         }
@@ -192,7 +187,7 @@ impl GeneralFieldsSerializer {
                     }
                 } else if self.mode == FieldsMode::TypedDictAllow {
                     let value = match &self.extra_serializer {
-                        Some(serializer) if !extra.serialize_as_any => {
+                        Some(serializer) => {
                             serializer.to_python(&value, next_include.as_ref(), next_exclude.as_ref(), &field_extra)?
                         }
                         _ => infer_to_python(&value, next_include.as_ref(), next_exclude.as_ref(), &field_extra)?,
@@ -259,11 +254,7 @@ impl GeneralFieldsSerializer {
                         if !exclude_default(&value, &field_extra, serializer).map_err(py_err_se_err)? {
                             let s = PydanticSerializer::new(
                                 &value,
-                                if extra.serialize_as_any {
-                                    AnySerializer::get()
-                                } else {
-                                    serializer
-                                },
+                                serializer,
                                 next_include.as_ref(),
                                 next_exclude.as_ref(),
                                 &field_extra,
@@ -358,7 +349,7 @@ impl TypeSerializer for GeneralFieldsSerializer {
                 }
                 if let Some((next_include, next_exclude)) = self.filter.key_filter(&key, include, exclude)? {
                     let value = match &self.extra_serializer {
-                        Some(serializer) if !extra.serialize_as_any => {
+                        Some(serializer) => {
                             serializer.to_python(&value, next_include.as_ref(), next_exclude.as_ref(), extra)?
                         }
                         _ => infer_to_python(&value, next_include.as_ref(), next_exclude.as_ref(), extra)?,

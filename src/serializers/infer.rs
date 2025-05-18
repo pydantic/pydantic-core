@@ -21,7 +21,7 @@ use super::errors::{py_err_se_err, PydanticSerializationError};
 use super::extra::{Extra, SerMode};
 use super::filter::{AnyFilter, SchemaFilter};
 use super::ob_type::ObType;
-use super::shared::{any_dataclass_iter, PydanticSerializer, TypeSerializer};
+use super::shared::any_dataclass_iter;
 use super::SchemaSerializer;
 
 pub(crate) fn infer_to_python(
@@ -109,7 +109,11 @@ pub(crate) fn infer_to_python_known(
             extra.serialize_as_any,
             extra.context,
         );
-        serializer.serializer.to_python(value, include, exclude, &extra)
+        // Avoid falling immediately back into inference because we need to use the serializer
+        // to drive the next step of serialization
+        serializer
+            .serializer
+            .to_python_no_infer(value, include, exclude, &extra)
     };
 
     let value = match extra.mode {
@@ -484,13 +488,6 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
                 .map_err(py_err_se_err)?;
             let extracted_serializer: PyRef<SchemaSerializer> = py_serializer.extract().map_err(py_err_se_err)?;
 
-            // TODO: I think what needs to happen here is that we need to enumerate the different serializers,
-            // and then either infer an ob type or pass off to model serialization.
-            //
-            // Maybe call function serializers to process contained values? 🤔
-            //
-            // Probably the samse in Python mode.
-
             let extra = extracted_serializer.build_extra(
                 py,
                 extra.mode,
@@ -506,9 +503,11 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
                 extra.serialize_as_any,
                 extra.context,
             );
-            let pydantic_serializer =
-                PydanticSerializer::new(value, &extracted_serializer.serializer, include, exclude, &extra);
-            pydantic_serializer.serialize(serializer)
+            // Avoid falling immediately back into inference because we need to use the serializer
+            // to drive the next step of serialization
+            extracted_serializer
+                .serializer
+                .serde_serialize_no_infer(value, serializer, include, exclude, &extra)
         }
         ObType::Dataclass => {
             let (pairs_iter, fields_dict) = any_dataclass_iter(value).map_err(py_err_se_err)?;

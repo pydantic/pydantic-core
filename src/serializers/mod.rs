@@ -14,8 +14,8 @@ use config::SerializationConfig;
 pub use errors::{PydanticSerializationError, PydanticSerializationUnexpectedValue};
 use extra::{CollectWarnings, SerRecursionState, WarningsMode};
 pub(crate) use extra::{Extra, SerMode, SerializationState};
+use shared::to_json_bytes;
 pub use shared::CombinedSerializer;
-use shared::{to_json_bytes, TypeSerializer};
 
 mod computed_fields;
 mod config;
@@ -149,12 +149,7 @@ impl SchemaSerializer {
             serialize_as_any,
             context,
         );
-        let serializer = if serialize_as_any {
-            AnySerializer::get()
-        } else {
-            &self.serializer
-        };
-        let v = serializer.to_python(value, include, exclude, &extra)?;
+        let v = self.serializer.to_python(value, include, exclude, &extra)?;
         warnings.final_check(py)?;
         Ok(v)
     }
@@ -201,14 +196,9 @@ impl SchemaSerializer {
             serialize_as_any,
             context,
         );
-        let serializer = if serialize_as_any {
-            AnySerializer::get()
-        } else {
-            &self.serializer
-        };
         let bytes = to_json_bytes(
             value,
-            serializer,
+            &self.serializer,
             include,
             exclude,
             &extra,

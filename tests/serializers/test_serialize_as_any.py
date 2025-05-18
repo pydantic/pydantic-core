@@ -263,7 +263,74 @@ def test_serialize_with_recursive_models() -> None:
     Node.__pydantic_serializer__ = SchemaSerializer(Node.__pydantic_core_schema__)
     other = Node.__pydantic_validator__.validate_python({'next': {'value': 4}})
 
+    assert Node.__pydantic_serializer__.to_python(other, serialize_as_any=False) == {
+        'next': {'next': None, 'value': 4},
+        'value': 42,
+    }
     assert Node.__pydantic_serializer__.to_python(other, serialize_as_any=True) == {
         'next': {'next': None, 'value': 4},
         'value': 42,
+    }
+
+
+def test_serialize_with_custom_type_and_subclasses():
+    class Node:
+        x: int
+
+    Node.__pydantic_core_schema__ = core_schema.model_schema(
+        Node,
+        core_schema.model_fields_schema(
+            {
+                'x': core_schema.model_field(core_schema.int_schema()),
+            }
+        ),
+        ref='Node',
+    )
+    Node.__pydantic_validator__ = SchemaValidator(Node.__pydantic_core_schema__)
+    Node.__pydantic_serializer__ = SchemaSerializer(Node.__pydantic_core_schema__)
+
+    class NodeSubClass(Node):
+        y: int
+
+    NodeSubClass.__pydantic_core_schema__ = core_schema.model_schema(
+        NodeSubClass,
+        core_schema.model_fields_schema(
+            {
+                'x': core_schema.model_field(core_schema.int_schema()),
+                'y': core_schema.model_field(core_schema.int_schema()),
+            }
+        ),
+    )
+    NodeSubClass.__pydantic_validator__ = SchemaValidator(NodeSubClass.__pydantic_core_schema__)
+    NodeSubClass.__pydantic_serializer__ = SchemaSerializer(NodeSubClass.__pydantic_core_schema__)
+
+    class CustomType:
+        values: list[Node]
+
+    CustomType.__pydantic_core_schema__ = core_schema.model_schema(
+        CustomType,
+        core_schema.definitions_schema(
+            core_schema.model_fields_schema(
+                {
+                    'values': core_schema.model_field(
+                        core_schema.list_schema(core_schema.definition_reference_schema('Node'))
+                    ),
+                }
+            ),
+            [
+                Node.__pydantic_core_schema__,
+            ],
+        ),
+    )
+    CustomType.__pydantic_validator__ = SchemaValidator(CustomType.__pydantic_core_schema__)
+    CustomType.__pydantic_serializer__ = SchemaSerializer(CustomType.__pydantic_core_schema__)
+
+    value = CustomType.__pydantic_validator__.validate_python({'values': [{'x': 1}, {'x': 2}]})
+    value.values.append(NodeSubClass.__pydantic_validator__.validate_python({'x': 3, 'y': 4}))
+
+    assert CustomType.__pydantic_serializer__.to_python(value, serialize_as_any=False) == {
+        'values': [{'x': 1}, {'x': 2}, {'x': 3}],
+    }
+    assert CustomType.__pydantic_serializer__.to_python(value, serialize_as_any=True) == {
+        'values': [{'x': 1}, {'x': 2}, {'x': 3, 'y': 4}],
     }
