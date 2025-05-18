@@ -132,8 +132,8 @@ impl ComputedFields {
         }
 
         for computed_field in &self.0 {
-            let Ok(property_name_py) = (&computed_field.property_name).into_pyobject(model.py());
-            let (next_include, next_exclude) = match filter.key_filter(&property_name_py, include, exclude) {
+            let property_name_py = computed_field.property_name_py.bind(model.py());
+            let (next_include, next_exclude) = match filter.key_filter(property_name_py, include, exclude) {
                 Ok(Some((next_include, next_exclude))) => (next_include, next_exclude),
                 Ok(None) => continue,
                 Err(e) => return Err(convert_error(e)),
