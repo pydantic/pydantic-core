@@ -112,188 +112,202 @@ pub(crate) fn infer_to_python_known(
         serializer.serializer.to_python(value, include, exclude, &extra)
     };
 
-    let value = match extra.mode {
-        SerMode::Json => match ob_type {
-            // `bool` and `None` can't be subclasses, `ObType::Int`, `ObType::Float`, `ObType::Str` refer to exact types
-            ObType::None | ObType::Bool | ObType::Int | ObType::Str => value.clone().unbind(),
-            // have to do this to make sure subclasses of for example str are upcast to `str`
-            ObType::IntSubclass => {
-                if let Some(i) = extract_int(value) {
-                    i.into_py_any(py)?
-                } else {
-                    return py_err!(PyTypeError; "Expected int, got {}", safe_repr(value));
-                }
+    let value = match (ob_type, extra.mode) {
+        // When serializing to JSON, many values need converting to a primitive type
+        (ObType::IntSubclass, SerMode::Json) => {
+            if let Some(i) = extract_int(value) {
+                i.into_py_any(py)?
+            } else {
+                return py_err!(PyTypeError; "Expected int, got {}", safe_repr(value));
             }
-            ObType::Float | ObType::FloatSubclass => {
-                let v = value.extract::<f64>()?;
-                if (v.is_nan() || v.is_infinite()) && extra.config.inf_nan_mode == InfNanMode::Null {
-                    return Ok(py.None());
-                }
-                v.into_py_any(py)?
+        }
+        (ObType::Float | ObType::FloatSubclass, SerMode::Json) => {
+            let v = value.extract::<f64>()?;
+            if (v.is_nan() || v.is_infinite()) && extra.config.inf_nan_mode == InfNanMode::Null {
+                return Ok(py.None());
             }
-            ObType::Decimal => value.to_string().into_py_any(py)?,
-            ObType::StrSubclass => PyString::new(py, value.downcast::<PyString>()?.to_str()?).into(),
-            ObType::Bytes => extra
+            v.into_py_any(py)?
+        }
+        (ObType::StrSubclass, SerMode::Json) => PyString::new(py, value.downcast::<PyString>()?.to_str()?).into(),
+        (ObType::Bytes, SerMode::Json) => extra
+            .config
+            .bytes_mode
+            .bytes_to_string(py, value.downcast::<PyBytes>()?.as_bytes())?
+            .into_py_any(py)?,
+        (ObType::Bytearray, SerMode::Json) => {
+            let py_byte_array = value.downcast::<PyByteArray>()?;
+            // Safety: the GIL is held while bytes_to_string is running; it doesn't run
+            // arbitrary Python code, so py_byte_array cannot be mutated.
+            let bytes = unsafe { py_byte_array.as_bytes() };
+            extra.config.bytes_mode.bytes_to_string(py, bytes)?.into_py_any(py)?
+        }
+        (ObType::Datetime, SerMode::Json) => {
+            let iso_dt = super::type_serializers::datetime_etc::datetime_to_string(value.downcast()?)?;
+            iso_dt.into_py_any(py)?
+        }
+        (ObType::Date, SerMode::Json) => {
+            let iso_date = super::type_serializers::datetime_etc::date_to_string(value.downcast()?)?;
+            iso_date.into_py_any(py)?
+        }
+        (ObType::Time, SerMode::Json) => {
+            let iso_time = super::type_serializers::datetime_etc::time_to_string(value.downcast()?)?;
+            iso_time.into_py_any(py)?
+        }
+        (ObType::Timedelta, SerMode::Json) => {
+            let either_delta = EitherTimedelta::try_from(value)?;
+            extra
                 .config
-                .bytes_mode
-                .bytes_to_string(py, value.downcast::<PyBytes>()?.as_bytes())?
-                .into_py_any(py)?,
-            ObType::Bytearray => {
-                let py_byte_array = value.downcast::<PyByteArray>()?;
-                // Safety: the GIL is held while bytes_to_string is running; it doesn't run
-                // arbitrary Python code, so py_byte_array cannot be mutated.
-                let bytes = unsafe { py_byte_array.as_bytes() };
-                extra.config.bytes_mode.bytes_to_string(py, bytes)?.into_py_any(py)?
-            }
-            ObType::Tuple => {
-                let elements = serialize_seq_filter!(PyTuple);
-                PyList::new(py, elements)?.into()
-            }
-            ObType::List => {
-                let elements = serialize_seq_filter!(PyList);
-                PyList::new(py, elements)?.into()
-            }
-            ObType::Set => {
-                let elements = serialize_seq!(PySet);
-                PyList::new(py, elements)?.into()
-            }
-            ObType::Frozenset => {
-                let elements = serialize_seq!(PyFrozenSet);
-                PyList::new(py, elements)?.into()
-            }
-            ObType::Dict => {
-                let dict = value.downcast::<PyDict>()?;
-                serialize_pairs_python(py, dict.iter().map(Ok), include, exclude, extra, |k| {
-                    Ok(PyString::new(py, &infer_json_key(&k, extra)?).into_any())
-                })?
-            }
-            ObType::Datetime => {
-                let iso_dt = super::type_serializers::datetime_etc::datetime_to_string(value.downcast()?)?;
-                iso_dt.into_py_any(py)?
-            }
-            ObType::Date => {
-                let iso_date = super::type_serializers::datetime_etc::date_to_string(value.downcast()?)?;
-                iso_date.into_py_any(py)?
-            }
-            ObType::Time => {
-                let iso_time = super::type_serializers::datetime_etc::time_to_string(value.downcast()?)?;
-                iso_time.into_py_any(py)?
-            }
-            ObType::Timedelta => {
-                let either_delta = EitherTimedelta::try_from(value)?;
-                extra
-                    .config
-                    .timedelta_mode
-                    .either_delta_to_json(value.py(), either_delta)?
-            }
-            ObType::Url => {
-                let py_url: PyUrl = value.extract()?;
-                py_url.__str__().into_py_any(py)?
-            }
-            ObType::MultiHostUrl => {
-                let py_url: PyMultiHostUrl = value.extract()?;
-                py_url.__str__().into_py_any(py)?
-            }
-            ObType::Uuid => {
-                let uuid = super::type_serializers::uuid::uuid_to_string(value)?;
-                uuid.into_py_any(py)?
-            }
-            ObType::PydanticSerializable => serialize_with_serializer()?,
-            ObType::Dataclass => {
-                serialize_pairs_python(py, any_dataclass_iter(value)?.0, include, exclude, extra, |k| {
-                    Ok(PyString::new(py, &infer_json_key(&k, extra)?).into_any())
-                })?
-            }
-            ObType::Enum => {
-                let v = value.getattr(intern!(py, "value"))?;
-                infer_to_python(&v, include, exclude, extra)?
-            }
-            ObType::Generator => {
-                let py_seq = value.downcast::<PyIterator>()?;
-                let mut items = Vec::new();
-                let filter = AnyFilter::new();
+                .timedelta_mode
+                .either_delta_to_json(value.py(), either_delta)?
+        }
+        (ObType::Uuid, SerMode::Json) => {
+            let uuid = super::type_serializers::uuid::uuid_to_string(value)?;
+            uuid.into_py_any(py)?
+        }
+        (ObType::Complex, SerMode::Json) => {
+            let v = value.downcast::<PyComplex>()?;
+            let complex_str = type_serializers::complex::complex_to_str(v);
+            complex_str.into_py_any(py)?
+        }
+        (ObType::Path, SerMode::Json) => value.str()?.into_py_any(py)?,
+        (ObType::Pattern, SerMode::Json) => value.getattr(intern!(py, "pattern"))?.unbind(),
 
-                for (index, r) in py_seq.try_iter()?.enumerate() {
-                    let element = r?;
-                    let op_next = filter.index_filter(index, include, exclude, None)?;
-                    if let Some((next_include, next_exclude)) = op_next {
-                        items.push(infer_to_python(
-                            &element,
-                            next_include.as_ref(),
-                            next_exclude.as_ref(),
-                            extra,
-                        )?);
-                    }
+        // Primitive types which are just cast to string from JSON mode
+        (ObType::Decimal | ObType::Url | ObType::MultiHostUrl, SerMode::Json) => value.str()?.into_any().unbind(),
+
+        // Collections always need reprocessing to serialize their contents
+        //
+        // In JSON mode sequences always need to be converted to lists
+        (ObType::List, _) => {
+            let elements = serialize_seq_filter!(PyList);
+            PyList::new(py, elements)?.into()
+        }
+        (ObType::Tuple, SerMode::Json) => {
+            let elements = serialize_seq_filter!(PyTuple);
+            PyList::new(py, elements)?.into()
+        }
+        (ObType::Tuple, SerMode::Python | SerMode::Other(_)) => {
+            let elements = serialize_seq_filter!(PyTuple);
+            PyTuple::new(py, elements)?.into()
+        }
+        (ObType::Set, SerMode::Json) => {
+            let elements = serialize_seq!(PySet);
+            PyList::new(py, elements)?.into()
+        }
+        (ObType::Set, SerMode::Python | SerMode::Other(_)) => {
+            let elements = serialize_seq!(PySet);
+            PySet::new(py, elements)?.into()
+        }
+        (ObType::Frozenset, SerMode::Json) => {
+            let elements = serialize_seq!(PyFrozenSet);
+            PyList::new(py, elements)?.into()
+        }
+        (ObType::Frozenset, SerMode::Python | SerMode::Other(_)) => {
+            let elements = serialize_seq!(PyFrozenSet);
+            PyFrozenSet::new(py, elements)?.into()
+        }
+        (ObType::Dict, SerMode::Json) => {
+            let dict = value.downcast::<PyDict>()?;
+            serialize_pairs_python(py, dict.iter().map(Ok), include, exclude, extra, |k| {
+                Ok(PyString::new(py, &infer_json_key(&k, extra)?).into_any())
+            })?
+        }
+        (ObType::Dict, SerMode::Python | SerMode::Other(_)) => {
+            let dict = value.downcast::<PyDict>()?;
+            serialize_pairs_python(py, dict.iter().map(Ok), include, exclude, extra, Ok)?
+        }
+        (ObType::PydanticSerializable, _) => serialize_with_serializer()?,
+        (ObType::Dataclass, SerMode::Json) => {
+            serialize_pairs_python(py, any_dataclass_iter(value)?.0, include, exclude, extra, |k| {
+                Ok(PyString::new(py, &infer_json_key(&k, extra)?).into_any())
+            })?
+        }
+        (ObType::Dataclass, SerMode::Python | SerMode::Other(_)) => {
+            serialize_pairs_python(py, any_dataclass_iter(value)?.0, include, exclude, extra, Ok)?
+        }
+        (ObType::Enum, SerMode::Json) => {
+            let v = value.getattr(intern!(py, "value"))?;
+            infer_to_python(&v, include, exclude, extra)?
+        }
+        (ObType::Generator, SerMode::Json) => {
+            let py_seq = value.downcast::<PyIterator>()?;
+            let mut items = Vec::new();
+            let filter = AnyFilter::new();
+
+            for (index, r) in py_seq.try_iter()?.enumerate() {
+                let element = r?;
+                let op_next = filter.index_filter(index, include, exclude, None)?;
+                if let Some((next_include, next_exclude)) = op_next {
+                    items.push(infer_to_python(
+                        &element,
+                        next_include.as_ref(),
+                        next_exclude.as_ref(),
+                        extra,
+                    )?);
                 }
-                PyList::new(py, items)?.into()
             }
-            ObType::Complex => {
-                let v = value.downcast::<PyComplex>()?;
-                let complex_str = type_serializers::complex::complex_to_str(v);
-                complex_str.into_py_any(py)?
-            }
-            ObType::Path => value.str()?.into_py_any(py)?,
-            ObType::Pattern => value.getattr(intern!(py, "pattern"))?.unbind(),
-            ObType::Unknown => {
-                if let Some(fallback) = extra.fallback {
-                    let next_value = fallback.call1((value,))?;
-                    let next_result = infer_to_python(&next_value, include, exclude, extra);
-                    return next_result;
-                } else if extra.serialize_unknown {
+            PyList::new(py, items)?.into()
+        }
+        (ObType::Generator, SerMode::Python | SerMode::Other(_)) => {
+            let iter = super::type_serializers::generator::SerializationIterator::new(
+                value.downcast()?,
+                super::type_serializers::any::AnySerializer::get(),
+                SchemaFilter::default(),
+                include,
+                exclude,
+                extra,
+            );
+            iter.into_py_any(py)?
+        }
+
+        // Unknown type handling
+        (ObType::Unknown, _) => {
+            if let Some(fallback) = extra.fallback {
+                let next_value = fallback.call1((value,))?;
+                infer_to_python(&next_value, include, exclude, extra)?
+            } else if matches!(extra.mode, SerMode::Json) {
+                // On JSON mode we _need_ to serialize to something, and
+                // fail if we cannot
+                if extra.serialize_unknown {
                     serialize_unknown(value).into_py_any(py)?
                 } else {
                     return Err(unknown_type_error(value));
                 }
-            }
-        },
-        _ => match ob_type {
-            ObType::Tuple => {
-                let elements = serialize_seq_filter!(PyTuple);
-                PyTuple::new(py, elements)?.into()
-            }
-            ObType::List => {
-                let elements = serialize_seq_filter!(PyList);
-                PyList::new(py, elements)?.into()
-            }
-            ObType::Set => {
-                let elements = serialize_seq!(PySet);
-                PySet::new(py, &elements)?.into()
-            }
-            ObType::Frozenset => {
-                let elements = serialize_seq!(PyFrozenSet);
-                PyFrozenSet::new(py, &elements)?.into()
-            }
-            ObType::Dict => {
-                let dict = value.downcast::<PyDict>()?;
-                serialize_pairs_python(py, dict.iter().map(Ok), include, exclude, extra, Ok)?
-            }
-            ObType::PydanticSerializable => serialize_with_serializer()?,
-            ObType::Dataclass => serialize_pairs_python(py, any_dataclass_iter(value)?.0, include, exclude, extra, Ok)?,
-            ObType::Generator => {
-                let iter = super::type_serializers::generator::SerializationIterator::new(
-                    value.downcast()?,
-                    super::type_serializers::any::AnySerializer::get(),
-                    SchemaFilter::default(),
-                    include,
-                    exclude,
-                    extra,
-                );
-                iter.into_py_any(py)?
-            }
-            ObType::Complex => {
-                let v = value.downcast::<PyComplex>()?;
-                v.into_py_any(py)?
-            }
-            ObType::Unknown => {
-                if let Some(fallback) = extra.fallback {
-                    let next_value = fallback.call1((value,))?;
-                    let next_result = infer_to_python(&next_value, include, exclude, extra);
-                    return next_result;
-                }
+            } else {
+                // Just give up and return the original value
                 value.clone().unbind()
             }
-            _ => value.clone().unbind(),
-        },
+        }
+
+        // Types which don't need to be handled specially when serializing to jsonable Python.
+        // NB every other type _does_ need handling, to convert contents to primitive types.
+        (ObType::None | ObType::Bool | ObType::Int | ObType::Str, SerMode::Json) |
+        // Types which don't need any special handling when serializing to Python
+        (
+            ObType::Int
+            | ObType::None
+            | ObType::IntSubclass
+            | ObType::Bool
+            | ObType::Float
+            | ObType::FloatSubclass
+            | ObType::Decimal
+            | ObType::Str
+            | ObType::StrSubclass
+            | ObType::Bytes
+            | ObType::Bytearray
+            | ObType::Datetime
+            | ObType::Date
+            | ObType::Time
+            | ObType::Timedelta
+            | ObType::Url
+            | ObType::MultiHostUrl
+            | ObType::Enum
+            | ObType::Path
+            | ObType::Pattern
+            | ObType::Uuid
+            | ObType::Complex,
+            SerMode::Python | SerMode::Other(_),
+        ) => value.clone().unbind(),
     };
     Ok(value)
 }
