@@ -49,7 +49,7 @@ jobs:
 
       - run: |
           source <(cargo llvm-cov show-env --export-prefix)
-          cargo llvm --codecov --output-path=codecov.json
+          cargo llvm-cov --codecov --output-path=codecov.json
 
       - uses: codecov/codecov-action@v5
         with:
