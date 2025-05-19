@@ -24,6 +24,7 @@ classifiers = [
     'Programming Language :: Python :: 3.11',
     'Programming Language :: Python :: 3.12',
     'Programming Language :: Python :: 3.13',
+    'Programming Language :: Python :: 3.14',
     'Programming Language :: Rust',
     'Framework :: Pydantic',
     'Intended Audience :: Developers',
@@ -71,7 +72,7 @@ linting = [{ include-group = "dev" }, 'griffe', 'pyright', 'ruff', 'mypy']
 wasm = [{ include-group = "dev" }, 'typing_extensions', 'ruff']
 codspeed = [
     # codspeed is only run on CI, with latest version of CPython
-    'pytest-codspeed; python_version == "3.13" and implementation_name == "cpython"',
+    'pytest-codspeed; python_version == "3.14" and implementation_name == "cpython"',
 ]
 
 all = [
