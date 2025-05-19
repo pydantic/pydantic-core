@@ -4,6 +4,7 @@ use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
+use pyo3::types::PyList;
 use pyo3::IntoPyObjectExt;
 use serde::ser::SerializeMap;
 
@@ -15,6 +16,30 @@ use super::{
     infer_serialize, infer_to_python, py_err_se_err, BuildSerializer, CombinedSerializer, Extra, PydanticSerializer,
     SchemaFilter, SerMode, TypeSerializer,
 };
+
+// Add sort_dict_recursive function for reuse by different serializers
+pub(crate) fn sort_dict_recursive<'py>(py: Python<'py>, value: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
+    if let Ok(dict) = value.downcast::<PyDict>() {
+        let mut items: Vec<(Bound<'py, PyAny>, Bound<'py, PyAny>)> = dict.iter().collect();
+        items.sort_by_cached_key(|(key, _)| key.to_string());
+
+        let sorted_dict = PyDict::new(py);
+        for (k, v) in items {
+            let sorted_v = sort_dict_recursive(py, &v)?;
+            sorted_dict.set_item(k, sorted_v)?;
+        }
+        Ok(sorted_dict.into_any())
+    } else if let Ok(list) = value.downcast::<PyList>() {
+        let sorted_list = PyList::empty(py);
+        for item in list.iter() {
+            let sorted_item = sort_dict_recursive(py, &item)?;
+            sorted_list.append(sorted_item)?;
+        }
+        Ok(sorted_list.into_any())
+    } else {
+        Ok(value.clone())
+    }
+}
 
 #[derive(Debug)]
 pub struct DictSerializer {
@@ -92,8 +117,17 @@ impl TypeSerializer for DictSerializer {
                             SerMode::Json => self.key_serializer.json_key(&key, extra)?.into_py_any(py)?,
                             _ => self.key_serializer.to_python(&key, None, None, extra)?,
                         };
-                        let value =
-                            value_serializer.to_python(&value, next_include.as_ref(), next_exclude.as_ref(), extra)?;
+                        let value = if extra.sort_keys {
+                            let sorted_value = sort_dict_recursive(py, &value)?;
+                            value_serializer.to_python(
+                                &sorted_value,
+                                next_include.as_ref(),
+                                next_exclude.as_ref(),
+                                extra,
+                            )?
+                        } else {
+                            value_serializer.to_python(&value, next_include.as_ref(), next_exclude.as_ref(), extra)?
+                        };
                         new_dict.set_item(key, value)?;
                     }
                 }
@@ -128,14 +162,26 @@ impl TypeSerializer for DictSerializer {
                     let op_next = self.filter.key_filter(&key, include, exclude).map_err(py_err_se_err)?;
                     if let Some((next_include, next_exclude)) = op_next {
                         let key = key_serializer.json_key(&key, extra).map_err(py_err_se_err)?;
-                        let value_serialize = PydanticSerializer::new(
-                            &value,
-                            value_serializer,
-                            next_include.as_ref(),
-                            next_exclude.as_ref(),
-                            extra,
-                        );
-                        map.serialize_entry(&key, &value_serialize)?;
+                        if extra.sort_keys {
+                            let sorted_dict = sort_dict_recursive(value.py(), &value).map_err(py_err_se_err)?;
+                            let s = PydanticSerializer::new(
+                                sorted_dict.as_ref(),
+                                value_serializer,
+                                next_include.as_ref(),
+                                next_exclude.as_ref(),
+                                extra,
+                            );
+                            map.serialize_entry(&key, &s)?;
+                        } else {
+                            let s = PydanticSerializer::new(
+                                &value,
+                                value_serializer,
+                                next_include.as_ref(),
+                                next_exclude.as_ref(),
+                                extra,
+                            );
+                            map.serialize_entry(&key, &s)?;
+                        }
                     }
                 }
                 map.end()
