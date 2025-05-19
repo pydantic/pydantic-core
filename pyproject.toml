@@ -34,7 +34,9 @@ classifiers = [
     'Operating System :: MacOS',
     'Typing :: Typed',
 ]
-dependencies = ['typing-extensions>=4.6.0,!=4.7.0']
+dependencies = [
+    'typing-extensions@git+https://github.com/python/typing_extensions',
+]
 dynamic = ['description', 'license', 'readme', 'version']
 
 [project.urls]
