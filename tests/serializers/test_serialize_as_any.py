@@ -334,3 +334,39 @@ def test_serialize_with_custom_type_and_subclasses():
     assert CustomType.__pydantic_serializer__.to_python(value, serialize_as_any=True) == {
         'values': [{'x': 1}, {'x': 2}, {'x': 3, 'y': 4}],
     }
+
+
+def test_serialize_as_any_wrap_serializer_applied_once() -> None:
+    # https://github.com/pydantic/pydantic/issues/11139
+
+    class InnerModel:
+        an_inner_field: int
+
+    InnerModel.__pydantic_core_schema__ = core_schema.model_schema(
+        InnerModel,
+        core_schema.model_fields_schema({'an_inner_field': core_schema.model_field(core_schema.int_schema())}),
+    )
+    InnerModel.__pydantic_validator__ = SchemaValidator(InnerModel.__pydantic_core_schema__)
+    InnerModel.__pydantic_serializer__ = SchemaSerializer(InnerModel.__pydantic_core_schema__)
+
+    class MyModel:
+        a_field: InnerModel
+
+        def a_model_serializer(self, handler, info):
+            return {k + '_wrapped': v for k, v in handler(self).items()}
+
+    MyModel.__pydantic_core_schema__ = core_schema.model_schema(
+        MyModel,
+        core_schema.model_fields_schema({'a_field': core_schema.model_field(InnerModel.__pydantic_core_schema__)}),
+        serialization=core_schema.wrap_serializer_function_ser_schema(
+            MyModel.a_model_serializer,
+            info_arg=True,
+        ),
+    )
+    MyModel.__pydantic_validator__ = SchemaValidator(MyModel.__pydantic_core_schema__)
+    MyModel.__pydantic_serializer__ = SchemaSerializer(MyModel.__pydantic_core_schema__)
+
+    instance = MyModel.__pydantic_validator__.validate_python({'a_field': {'an_inner_field': 1}})
+    assert MyModel.__pydantic_serializer__.to_python(instance, serialize_as_any=True) == {
+        'a_field_wrapped': {'an_inner_field': 1},
+    }
