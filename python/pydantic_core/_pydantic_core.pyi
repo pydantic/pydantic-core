@@ -1010,12 +1010,3 @@ class TzInfo(datetime.tzinfo):
         More info can be found at [`tzinfo.fromutc`][datetime.tzinfo.fromutc]."""
 
     def __deepcopy__(self, _memo: dict[Any, Any]) -> TzInfo: ...
-
-def validate_core_schema(schema: CoreSchema, *, strict: bool | None = None) -> CoreSchema:
-    """Validate a core schema.
-
-    This currently uses lax mode for validation (i.e. will coerce strings to dates and such)
-    but may use strict mode in the future.
-    We may also remove this function altogether, do not rely on it being present if you are
-    using pydantic-core directly.
-    """
