@@ -3838,6 +3838,7 @@ def url_schema(
     default_host: str | None = None,
     default_port: int | None = None,
     default_path: str | None = None,
+    extra_trailing_slash: bool | None = None,
     strict: bool | None = None,
     ref: str | None = None,
     metadata: dict[str, Any] | None = None,
@@ -3862,6 +3863,8 @@ def url_schema(
         default_host: The default host to use if the URL does not have a host
         default_port: The default port to use if the URL does not have a port
         default_path: The default path to use if the URL does not have a path
+        extra_trailing_slash: Whether to add an extra trailing slash to the URL, defaults to `True` for
+            backward compatibility, default will change to `False` in v3 version.
         strict: Whether to use strict URL parsing
         ref: optional unique identifier of the schema, used to reference the schema in other places
         metadata: Any other information you want to include with the schema, not used by pydantic-core
@@ -3879,6 +3882,7 @@ def url_schema(
         ref=ref,
         metadata=metadata,
         serialization=serialization,
+        extra_trailing_slash=extra_trailing_slash,
     )
 
 

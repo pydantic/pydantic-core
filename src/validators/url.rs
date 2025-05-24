@@ -34,6 +34,7 @@ pub struct UrlValidator {
     default_port: Option<u16>,
     default_path: Option<String>,
     name: String,
+    extra_trailing_slash: bool,
 }
 
 impl BuildValidator for UrlValidator {
@@ -55,6 +56,9 @@ impl BuildValidator for UrlValidator {
             default_path: schema.get_as(intern!(schema.py(), "default_path"))?,
             allowed_schemes,
             name,
+            extra_trailing_slash: schema
+                .get_as(intern!(schema.py(), "extra_trailing_slash"))?
+                .unwrap_or(true),
         }
         .into())
     }
@@ -69,7 +73,7 @@ impl Validator for UrlValidator {
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
-        let mut either_url = self.get_url(input, state.strict_or(self.strict))?;
+        let mut either_url = self.get_url(input, state.strict_or(self.strict), self.extra_trailing_slash)?;
 
         if let Some((ref allowed_schemes, ref expected_schemes_repr)) = self.allowed_schemes {
             if !allowed_schemes.contains(either_url.url().scheme()) {
@@ -106,7 +110,12 @@ impl Validator for UrlValidator {
 }
 
 impl UrlValidator {
-    fn get_url<'py>(&self, input: &(impl Input<'py> + ?Sized), strict: bool) -> ValResult<EitherUrl<'py>> {
+    fn get_url<'py>(
+        &self,
+        input: &(impl Input<'py> + ?Sized),
+        strict: bool,
+        extra_trailing_slash: bool,
+    ) -> ValResult<EitherUrl<'py>> {
         match input.validate_str(strict, false) {
             Ok(val_match) => {
                 let either_str = val_match.into_inner();
@@ -115,19 +124,19 @@ impl UrlValidator {
 
                 self.check_length(input, url_str)?;
 
-                parse_url(url_str, input, strict).map(EitherUrl::Rust)
+                parse_url(url_str, input, strict, extra_trailing_slash).map(EitherUrl::Owned)
             }
             Err(_) => {
                 // we don't need to worry about whether the url was parsed in strict mode before,
                 // even if it was, any syntax errors would have been fixed by the first validation
                 if let Some(py_url) = downcast_python_input::<PyUrl>(input) {
                     self.check_length(input, py_url.get().url().as_str())?;
-                    Ok(EitherUrl::Py(py_url.clone()))
+                    Ok(EitherUrl::Bound(py_url.clone()))
                 } else if let Some(multi_host_url) = downcast_python_input::<PyMultiHostUrl>(input) {
                     let url_str = multi_host_url.get().__str__();
                     self.check_length(input, &url_str)?;
 
-                    parse_url(&url_str, input, strict).map(EitherUrl::Rust)
+                    parse_url(&url_str, input, strict, extra_trailing_slash).map(EitherUrl::Owned)
                 } else {
                     Err(ValError::new(ErrorTypeDefaults::UrlType, input))
                 }
@@ -151,9 +160,10 @@ impl UrlValidator {
     }
 }
 
+// TODO do we still need this?
 enum EitherUrl<'py> {
-    Py(Bound<'py, PyUrl>),
-    Rust(Url),
+    Bound(Bound<'py, PyUrl>),
+    Owned(PyUrl),
 }
 
 impl<'py> IntoPyObject<'py> for EitherUrl<'py> {
@@ -163,8 +173,8 @@ impl<'py> IntoPyObject<'py> for EitherUrl<'py> {
 
     fn into_pyobject(self, py: Python<'py>) -> PyResult<Self::Output> {
         match self {
-            EitherUrl::Py(py_url) => Ok(py_url),
-            EitherUrl::Rust(rust_url) => Bound::new(py, PyUrl::new(rust_url)),
+            EitherUrl::Bound(py_url) => Ok(py_url),
+            EitherUrl::Owned(py_url) => Bound::new(py, py_url),
         }
     }
 }
@@ -172,18 +182,18 @@ impl<'py> IntoPyObject<'py> for EitherUrl<'py> {
 impl CopyFromPyUrl for EitherUrl<'_> {
     fn url(&self) -> &Url {
         match self {
-            EitherUrl::Py(py_url) => py_url.get().url(),
-            EitherUrl::Rust(rust_url) => rust_url,
+            EitherUrl::Bound(py_url) => py_url.get().url(),
+            EitherUrl::Owned(rust_url) => rust_url.url(),
         }
     }
 
     fn url_mut(&mut self) -> &mut Url {
-        if let EitherUrl::Py(py_url) = self {
-            *self = EitherUrl::Rust(py_url.get().url().clone());
+        if let EitherUrl::Bound(py_url) = self {
+            *self = EitherUrl::Owned(py_url.get().clone());
         }
         match self {
-            EitherUrl::Py(_) => unreachable!(),
-            EitherUrl::Rust(rust_url) => rust_url,
+            EitherUrl::Bound(_) => unreachable!(),
+            EitherUrl::Owned(ref mut rust_url) => rust_url.mut_url(),
         }
     }
 }
@@ -198,6 +208,7 @@ pub struct MultiHostUrlValidator {
     default_port: Option<u16>,
     default_path: Option<String>,
     name: String,
+    extra_trailing_slash: bool,
 }
 
 impl BuildValidator for MultiHostUrlValidator {
@@ -225,6 +236,9 @@ impl BuildValidator for MultiHostUrlValidator {
             default_port: schema.get_as(intern!(schema.py(), "default_port"))?,
             default_path: schema.get_as(intern!(schema.py(), "default_path"))?,
             name,
+            extra_trailing_slash: schema
+                .get_as(intern!(schema.py(), "extra_trailing_slash"))?
+                .unwrap_or(false),
         }
         .into())
     }
@@ -239,7 +253,7 @@ impl Validator for MultiHostUrlValidator {
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
-        let mut multi_url = self.get_url(input, state.strict_or(self.strict))?;
+        let mut multi_url = self.get_url(input, state.strict_or(self.strict), self.extra_trailing_slash)?;
 
         if let Some((ref allowed_schemes, ref expected_schemes_repr)) = self.allowed_schemes {
             if !allowed_schemes.contains(multi_url.url().scheme()) {
@@ -275,7 +289,12 @@ impl Validator for MultiHostUrlValidator {
 }
 
 impl MultiHostUrlValidator {
-    fn get_url<'py>(&self, input: &(impl Input<'py> + ?Sized), strict: bool) -> ValResult<EitherMultiHostUrl<'py>> {
+    fn get_url<'py>(
+        &self,
+        input: &(impl Input<'py> + ?Sized),
+        strict: bool,
+        extra_trailing_slash: bool,
+    ) -> ValResult<EitherMultiHostUrl<'py>> {
         match input.validate_str(strict, false) {
             Ok(val_match) => {
                 let either_str = val_match.into_inner();
@@ -284,7 +303,7 @@ impl MultiHostUrlValidator {
 
                 self.check_length(input, || url_str.len())?;
 
-                parse_multihost_url(url_str, input, strict).map(EitherMultiHostUrl::Rust)
+                parse_multihost_url(url_str, input, strict, extra_trailing_slash).map(EitherMultiHostUrl::Rust)
             }
             Err(_) => {
                 // we don't need to worry about whether the url was parsed in strict mode before,
@@ -295,7 +314,7 @@ impl MultiHostUrlValidator {
                 } else if let Some(py_url) = downcast_python_input::<PyUrl>(input) {
                     self.check_length(input, || py_url.get().url().as_str().len())?;
                     Ok(EitherMultiHostUrl::Rust(PyMultiHostUrl::new(
-                        py_url.get().url().clone(),
+                        py_url.get().clone(),
                         None,
                     )))
                 } else {
@@ -365,6 +384,7 @@ fn parse_multihost_url<'py>(
     url_str: &str,
     input: &(impl Input<'py> + ?Sized),
     strict: bool,
+    extra_trailing_slash: bool,
 ) -> ValResult<PyMultiHostUrl> {
     macro_rules! parsing_err {
         ($parse_error:expr) => {
@@ -454,21 +474,21 @@ fn parse_multihost_url<'py>(
     // with just one host, for consistent behaviour, we parse the URL the same as with multiple hosts
 
     let reconstructed_url = format!("{prefix}{}", &url_str[start..]);
-    let ref_url = parse_url(&reconstructed_url, input, strict)?;
+    let ref_url = parse_url(&reconstructed_url, input, strict, extra_trailing_slash)?;
 
     if hosts.is_empty() {
         // if there's no one host (e.g. no `,`), we allow it to be empty to allow for default hosts
         Ok(PyMultiHostUrl::new(ref_url, None))
     } else {
         // with more than one host, none of them can be empty
-        if !ref_url.has_host() {
+        if !ref_url.url().has_host() {
             return parsing_err!(ParseError::EmptyHost);
         }
         let extra_urls: Vec<Url> = hosts
             .iter()
             .map(|host| {
                 let reconstructed_url = format!("{prefix}{host}");
-                parse_url(&reconstructed_url, input, strict)
+                parse_url(&reconstructed_url, input, strict, extra_trailing_slash).map(Into::into)
             })
             .collect::<ValResult<_>>()?;
 
@@ -480,7 +500,7 @@ fn parse_multihost_url<'py>(
     }
 }
 
-fn parse_url(url_str: &str, input: impl ToErrorValue, strict: bool) -> ValResult<Url> {
+fn parse_url(url_str: &str, input: impl ToErrorValue, strict: bool, extra_trailing_slash: bool) -> ValResult<PyUrl> {
     if url_str.is_empty() {
         return Err(ValError::new(
             ErrorType::UrlParsing {
@@ -490,8 +510,9 @@ fn parse_url(url_str: &str, input: impl ToErrorValue, strict: bool) -> ValResult
             input,
         ));
     }
+    let remove_trailing_slash = !extra_trailing_slash && !url_str.ends_with('/');
 
-    // if we're in strict mode, we collect consider a syntax violation as an error
+    // if we're in strict mode, we consider a syntax violation as an error
     if strict {
         // we could build a vec of syntax violations and return them all, but that seems like overkill
         // and unlike other parser style validators
@@ -517,7 +538,7 @@ fn parse_url(url_str: &str, input: impl ToErrorValue, strict: bool) -> ValResult
                         input,
                     ))
                 } else {
-                    Ok(url)
+                    Ok(PyUrl::new(url, remove_trailing_slash))
                 }
             }
             Err(e) => Err(ValError::new(
@@ -529,15 +550,16 @@ fn parse_url(url_str: &str, input: impl ToErrorValue, strict: bool) -> ValResult
             )),
         }
     } else {
-        Url::parse(url_str).map_err(move |e| {
-            ValError::new(
+        match Url::parse(url_str) {
+            Ok(url) => Ok(PyUrl::new(url, remove_trailing_slash)),
+            Err(e) => Err(ValError::new(
                 ErrorType::UrlParsing {
                     error: e.to_string(),
                     context: None,
                 },
                 input,
-            )
-        })
+            )),
+        }
     }
 }
 
