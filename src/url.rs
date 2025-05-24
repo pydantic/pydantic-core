@@ -45,33 +45,12 @@ impl From<PyUrl> for Url {
     }
 }
 
-static SCHEMA_URL_SINGLE_TRUE: GILOnceCell<SchemaValidator> = GILOnceCell::new();
-static SCHEMA_URL_SINGLE_FALSE: GILOnceCell<SchemaValidator> = GILOnceCell::new();
-static SCHEMA_URL_MULTI_TRUE: GILOnceCell<SchemaValidator> = GILOnceCell::new();
-static SCHEMA_URL_MULTI_FALSE: GILOnceCell<SchemaValidator> = GILOnceCell::new();
-
-fn get_schema_validator(py: Python<'_>, multi_host: bool, add_trailing_slash: bool) -> &SchemaValidator {
-    match (multi_host, add_trailing_slash) {
-        (false, true) => SCHEMA_URL_SINGLE_TRUE.get_or_init(py, || build_schema_validator(py, "url", true)),
-        (false, false) => SCHEMA_URL_SINGLE_FALSE.get_or_init(py, || build_schema_validator(py, "url", false)),
-        (true, true) => SCHEMA_URL_MULTI_TRUE.get_or_init(py, || build_schema_validator(py, "multi-host-url", true)),
-        (true, false) => SCHEMA_URL_MULTI_FALSE.get_or_init(py, || build_schema_validator(py, "multi-host-url", false)),
-    }
-}
-
-fn build_schema_validator(py: Python, schema_type: &str, add_trailing_slash: bool) -> SchemaValidator {
-    let schema = PyDict::new(py);
-    schema.set_item("type", schema_type).unwrap();
-    schema.set_item("add_trailing_slash", add_trailing_slash).unwrap();
-    SchemaValidator::py_new(py, &schema, None).unwrap()
-}
-
 #[pymethods]
 impl PyUrl {
     #[new]
     #[pyo3(signature = (url, *, add_trailing_slash=true))]
     pub fn py_new(py: Python, url: &Bound<'_, PyAny>, add_trailing_slash: bool) -> PyResult<Self> {
-        let schema_validator = get_schema_validator(py, false, add_trailing_slash);
+        let schema_validator = get_schema_validator(py, false, add_trailing_slash)?;
         let schema_obj = schema_validator.validate_python(py, url, None, None, None, None, false.into(), None, None)?;
         schema_obj.extract(py)
     }
@@ -250,7 +229,7 @@ impl PyMultiHostUrl {
     #[new]
     #[pyo3(signature = (url, *, add_trailing_slash=true))]
     pub fn py_new(py: Python, url: &Bound<'_, PyAny>, add_trailing_slash: bool) -> PyResult<Self> {
-        let schema_validator = get_schema_validator(py, true, add_trailing_slash);
+        let schema_validator = get_schema_validator(py, true, add_trailing_slash)?;
         let schema_obj = schema_validator.validate_python(py, url, None, None, None, None, false.into(), None, None)?;
         schema_obj.extract(py)
     }
@@ -544,4 +523,30 @@ fn is_punnycode_domain(lib_url: &Url, domain: &str) -> bool {
 // based on https://github.com/servo/rust-url/blob/1c1e406874b3d2aa6f36c5d2f3a5c2ea74af9efb/url/src/parser.rs#L161-L167
 pub fn schema_is_special(schema: &str) -> bool {
     matches!(schema, "http" | "https" | "ws" | "wss" | "ftp" | "file")
+}
+
+static SCHEMA_URL_SINGLE_TRUE: GILOnceCell<SchemaValidator> = GILOnceCell::new();
+static SCHEMA_URL_SINGLE_FALSE: GILOnceCell<SchemaValidator> = GILOnceCell::new();
+static SCHEMA_URL_MULTI_TRUE: GILOnceCell<SchemaValidator> = GILOnceCell::new();
+static SCHEMA_URL_MULTI_FALSE: GILOnceCell<SchemaValidator> = GILOnceCell::new();
+
+macro_rules! make_schema_val {
+    ($py:ident, $schema_type:literal, $add_trailing_slash:literal) => {{
+        let schema = PyDict::new($py);
+        schema.set_item(intern!($py, "type"), intern!($py, $schema_type))?;
+        // add_trailing_slash defaults to true, so only set it if false
+        if !$add_trailing_slash {
+            schema.set_item(intern!($py, "add_trailing_slash"), false)?;
+        }
+        SchemaValidator::py_new($py, &schema, None)
+    }};
+}
+
+fn get_schema_validator(py: Python<'_>, multi_host: bool, add_trailing_slash: bool) -> PyResult<&SchemaValidator> {
+    match (multi_host, add_trailing_slash) {
+        (false, true) => SCHEMA_URL_SINGLE_TRUE.get_or_try_init(py, || make_schema_val!(py, "url", true)),
+        (false, false) => SCHEMA_URL_SINGLE_FALSE.get_or_try_init(py, || make_schema_val!(py, "url", false)),
+        (true, true) => SCHEMA_URL_MULTI_TRUE.get_or_try_init(py, || make_schema_val!(py, "multi-host-url", true)),
+        (true, false) => SCHEMA_URL_MULTI_FALSE.get_or_try_init(py, || make_schema_val!(py, "multi-host-url", false)),
+    }
 }
