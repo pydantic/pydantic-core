@@ -69,7 +69,7 @@ fn build_schema_validator(py: Python, schema_type: &str, extra_trailing_slash: b
 #[pymethods]
 impl PyUrl {
     #[new]
-    #[pyo3(signature = (url, *, extra_trailing_slash=false))]
+    #[pyo3(signature = (url, *, extra_trailing_slash=true))]
     pub fn py_new(py: Python, url: &Bound<'_, PyAny>, extra_trailing_slash: bool) -> PyResult<Self> {
         let schema_validator = get_schema_validator(py, false, extra_trailing_slash);
         let schema_obj = schema_validator.validate_python(py, url, None, None, None, None, false.into(), None, None)?;
@@ -248,7 +248,7 @@ impl PyMultiHostUrl {
 #[pymethods]
 impl PyMultiHostUrl {
     #[new]
-    #[pyo3(signature = (url, *, extra_trailing_slash=false))]
+    #[pyo3(signature = (url, *, extra_trailing_slash=true))]
     pub fn py_new(py: Python, url: &Bound<'_, PyAny>, extra_trailing_slash: bool) -> PyResult<Self> {
         let schema_validator = get_schema_validator(py, true, extra_trailing_slash);
         let schema_obj = schema_validator.validate_python(py, url, None, None, None, None, false.into(), None, None)?;
@@ -305,12 +305,12 @@ impl PyMultiHostUrl {
 
             // special urls will have had a trailing slash added, non-special urls will not
             // hence we need to remove the last char if the schema is special
-            let sub: usize = (!self.ref_url.remove_trailing_slash && schema_is_special(schema)).into();
+            let sub: usize = schema_is_special(schema).into();
 
             let hosts = extra_urls
                 .iter()
                 .map(|url| {
-                    let str = unicode_url(url, self.ref_url.remove_trailing_slash);
+                    let str = unicode_url(url, false);
                     str[host_offset..str.len() - sub].to_string()
                 })
                 .collect::<Vec<String>>()
@@ -327,13 +327,12 @@ impl PyMultiHostUrl {
             let schema = self.ref_url.lib_url.scheme();
             let host_offset = schema.len() + 3;
 
-            let mut full_url = self.ref_url.lib_url.to_string();
+            let mut full_url = self.ref_url.__str__().to_string();
             full_url.insert(host_offset, ',');
 
             // special urls will have had a trailing slash added, non-special urls will not
             // hence we need to remove the last char if the schema is special
-            #[allow(clippy::bool_to_int_with_if)]
-            let sub = if schema_is_special(schema) { 1 } else { 0 };
+            let sub: usize = schema_is_special(schema).into();
 
             let hosts = extra_urls
                 .iter()
@@ -341,7 +340,7 @@ impl PyMultiHostUrl {
                     let str = url.as_str();
                     &str[host_offset..str.len() - sub]
                 })
-                .collect::<Vec<&str>>()
+                .collect::<Vec<_>>()
                 .join(",");
             full_url.insert_str(host_offset, &hosts);
             full_url

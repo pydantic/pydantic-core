@@ -238,7 +238,7 @@ impl BuildValidator for MultiHostUrlValidator {
             name,
             extra_trailing_slash: schema
                 .get_as(intern!(schema.py(), "extra_trailing_slash"))?
-                .unwrap_or(false),
+                .unwrap_or(true),
         }
         .into())
     }

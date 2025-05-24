@@ -12,7 +12,7 @@ authors = [
     { name = 'David Montague', email = 'david@pydantic.dev' },
     { name = 'David Hewitt', email = 'mail@davidhewitt.dev' },
     { name = 'Sydney Runkle', email = 'sydneymarierunkle@gmail.com' },
-    { name = 'Victorien Plot', email='contact@vctrn.dev' },
+    { name = 'Victorien Plot', email = 'contact@vctrn.dev' },
 ]
 classifiers = [
     'Development Status :: 3 - Alpha',
@@ -149,6 +149,9 @@ require_change_file = false
 [tool.pyright]
 include = ['python/pydantic_core', 'tests/test_typing.py']
 reportUnnecessaryTypeIgnoreComment = true
+executionEnvironments = [
+    { root = "tests", reportPrivateImportUsage = false, reportMissingParameterType = false },
+]
 
 [tool.inline-snapshot.shortcuts]
 fix = ["create", "fix"]
