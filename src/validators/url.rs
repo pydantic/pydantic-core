@@ -10,7 +10,7 @@ use ahash::AHashSet;
 use pyo3::IntoPyObjectExt;
 use url::{ParseError, SyntaxViolation, Url};
 
-use crate::build_tools::{is_strict, py_schema_err};
+use crate::build_tools::{is_strict, py_schema_err, schema_or_config};
 use crate::errors::ToErrorValue;
 use crate::errors::{ErrorType, ErrorTypeDefaults, ValError, ValResult};
 use crate::input::downcast_python_input;
@@ -34,7 +34,17 @@ pub struct UrlValidator {
     default_port: Option<u16>,
     default_path: Option<String>,
     name: String,
-    extra_trailing_slash: bool,
+    add_trailing_slash: bool,
+}
+
+fn get_add_trailing_slash(schema: &Bound<'_, PyDict>, config: Option<&Bound<'_, PyDict>>) -> PyResult<bool> {
+    schema_or_config(
+        schema,
+        config,
+        intern!(schema.py(), "add_trailing_slash"),
+        intern!(schema.py(), "url_add_trailing_slash"),
+    )
+    .map(|v| v.unwrap_or(true))
 }
 
 impl BuildValidator for UrlValidator {
@@ -56,9 +66,7 @@ impl BuildValidator for UrlValidator {
             default_path: schema.get_as(intern!(schema.py(), "default_path"))?,
             allowed_schemes,
             name,
-            extra_trailing_slash: schema
-                .get_as(intern!(schema.py(), "extra_trailing_slash"))?
-                .unwrap_or(true),
+            add_trailing_slash: get_add_trailing_slash(schema, config)?,
         }
         .into())
     }
@@ -73,7 +81,7 @@ impl Validator for UrlValidator {
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
-        let mut either_url = self.get_url(input, state.strict_or(self.strict), self.extra_trailing_slash)?;
+        let mut either_url = self.get_url(input, state.strict_or(self.strict), self.add_trailing_slash)?;
 
         if let Some((ref allowed_schemes, ref expected_schemes_repr)) = self.allowed_schemes {
             if !allowed_schemes.contains(either_url.url().scheme()) {
@@ -114,7 +122,7 @@ impl UrlValidator {
         &self,
         input: &(impl Input<'py> + ?Sized),
         strict: bool,
-        extra_trailing_slash: bool,
+        add_trailing_slash: bool,
     ) -> ValResult<EitherUrl<'py>> {
         match input.validate_str(strict, false) {
             Ok(val_match) => {
@@ -124,7 +132,7 @@ impl UrlValidator {
 
                 self.check_length(input, url_str)?;
 
-                parse_url(url_str, input, strict, extra_trailing_slash).map(EitherUrl::Owned)
+                parse_url(url_str, input, strict, add_trailing_slash).map(EitherUrl::Owned)
             }
             Err(_) => {
                 // we don't need to worry about whether the url was parsed in strict mode before,
@@ -136,7 +144,7 @@ impl UrlValidator {
                     let url_str = multi_host_url.get().__str__();
                     self.check_length(input, &url_str)?;
 
-                    parse_url(&url_str, input, strict, extra_trailing_slash).map(EitherUrl::Owned)
+                    parse_url(&url_str, input, strict, add_trailing_slash).map(EitherUrl::Owned)
                 } else {
                     Err(ValError::new(ErrorTypeDefaults::UrlType, input))
                 }
@@ -208,7 +216,7 @@ pub struct MultiHostUrlValidator {
     default_port: Option<u16>,
     default_path: Option<String>,
     name: String,
-    extra_trailing_slash: bool,
+    add_trailing_slash: bool,
 }
 
 impl BuildValidator for MultiHostUrlValidator {
@@ -236,9 +244,7 @@ impl BuildValidator for MultiHostUrlValidator {
             default_port: schema.get_as(intern!(schema.py(), "default_port"))?,
             default_path: schema.get_as(intern!(schema.py(), "default_path"))?,
             name,
-            extra_trailing_slash: schema
-                .get_as(intern!(schema.py(), "extra_trailing_slash"))?
-                .unwrap_or(true),
+            add_trailing_slash: get_add_trailing_slash(schema, config)?,
         }
         .into())
     }
@@ -253,7 +259,7 @@ impl Validator for MultiHostUrlValidator {
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
-        let mut multi_url = self.get_url(input, state.strict_or(self.strict), self.extra_trailing_slash)?;
+        let mut multi_url = self.get_url(input, state.strict_or(self.strict), self.add_trailing_slash)?;
 
         if let Some((ref allowed_schemes, ref expected_schemes_repr)) = self.allowed_schemes {
             if !allowed_schemes.contains(multi_url.url().scheme()) {
@@ -293,7 +299,7 @@ impl MultiHostUrlValidator {
         &self,
         input: &(impl Input<'py> + ?Sized),
         strict: bool,
-        extra_trailing_slash: bool,
+        add_trailing_slash: bool,
     ) -> ValResult<EitherMultiHostUrl<'py>> {
         match input.validate_str(strict, false) {
             Ok(val_match) => {
@@ -303,7 +309,7 @@ impl MultiHostUrlValidator {
 
                 self.check_length(input, || url_str.len())?;
 
-                parse_multihost_url(url_str, input, strict, extra_trailing_slash).map(EitherMultiHostUrl::Rust)
+                parse_multihost_url(url_str, input, strict, add_trailing_slash).map(EitherMultiHostUrl::Rust)
             }
             Err(_) => {
                 // we don't need to worry about whether the url was parsed in strict mode before,
@@ -384,7 +390,7 @@ fn parse_multihost_url<'py>(
     url_str: &str,
     input: &(impl Input<'py> + ?Sized),
     strict: bool,
-    extra_trailing_slash: bool,
+    add_trailing_slash: bool,
 ) -> ValResult<PyMultiHostUrl> {
     macro_rules! parsing_err {
         ($parse_error:expr) => {
@@ -474,7 +480,7 @@ fn parse_multihost_url<'py>(
     // with just one host, for consistent behaviour, we parse the URL the same as with multiple hosts
 
     let reconstructed_url = format!("{prefix}{}", &url_str[start..]);
-    let ref_url = parse_url(&reconstructed_url, input, strict, extra_trailing_slash)?;
+    let ref_url = parse_url(&reconstructed_url, input, strict, add_trailing_slash)?;
 
     if hosts.is_empty() {
         // if there's no one host (e.g. no `,`), we allow it to be empty to allow for default hosts
@@ -488,7 +494,7 @@ fn parse_multihost_url<'py>(
             .iter()
             .map(|host| {
                 let reconstructed_url = format!("{prefix}{host}");
-                parse_url(&reconstructed_url, input, strict, extra_trailing_slash).map(Into::into)
+                parse_url(&reconstructed_url, input, strict, add_trailing_slash).map(Into::into)
             })
             .collect::<ValResult<_>>()?;
 
@@ -500,7 +506,7 @@ fn parse_multihost_url<'py>(
     }
 }
 
-fn parse_url(url_str: &str, input: impl ToErrorValue, strict: bool, extra_trailing_slash: bool) -> ValResult<PyUrl> {
+fn parse_url(url_str: &str, input: impl ToErrorValue, strict: bool, add_trailing_slash: bool) -> ValResult<PyUrl> {
     if url_str.is_empty() {
         return Err(ValError::new(
             ErrorType::UrlParsing {
@@ -510,7 +516,7 @@ fn parse_url(url_str: &str, input: impl ToErrorValue, strict: bool, extra_traili
             input,
         ));
     }
-    let remove_trailing_slash = !extra_trailing_slash && !url_str.ends_with('/');
+    let remove_trailing_slash = !add_trailing_slash && !url_str.ends_with('/');
 
     // if we're in strict mode, we consider a syntax violation as an error
     if strict {

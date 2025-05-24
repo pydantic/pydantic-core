@@ -50,8 +50,8 @@ static SCHEMA_URL_SINGLE_FALSE: GILOnceCell<SchemaValidator> = GILOnceCell::new(
 static SCHEMA_URL_MULTI_TRUE: GILOnceCell<SchemaValidator> = GILOnceCell::new();
 static SCHEMA_URL_MULTI_FALSE: GILOnceCell<SchemaValidator> = GILOnceCell::new();
 
-fn get_schema_validator(py: Python<'_>, multi_host: bool, extra_trailing_slash: bool) -> &SchemaValidator {
-    match (multi_host, extra_trailing_slash) {
+fn get_schema_validator(py: Python<'_>, multi_host: bool, add_trailing_slash: bool) -> &SchemaValidator {
+    match (multi_host, add_trailing_slash) {
         (false, true) => SCHEMA_URL_SINGLE_TRUE.get_or_init(py, || build_schema_validator(py, "url", true)),
         (false, false) => SCHEMA_URL_SINGLE_FALSE.get_or_init(py, || build_schema_validator(py, "url", false)),
         (true, true) => SCHEMA_URL_MULTI_TRUE.get_or_init(py, || build_schema_validator(py, "multi-host-url", true)),
@@ -59,19 +59,19 @@ fn get_schema_validator(py: Python<'_>, multi_host: bool, extra_trailing_slash: 
     }
 }
 
-fn build_schema_validator(py: Python, schema_type: &str, extra_trailing_slash: bool) -> SchemaValidator {
+fn build_schema_validator(py: Python, schema_type: &str, add_trailing_slash: bool) -> SchemaValidator {
     let schema = PyDict::new(py);
     schema.set_item("type", schema_type).unwrap();
-    schema.set_item("extra_trailing_slash", extra_trailing_slash).unwrap();
+    schema.set_item("add_trailing_slash", add_trailing_slash).unwrap();
     SchemaValidator::py_new(py, &schema, None).unwrap()
 }
 
 #[pymethods]
 impl PyUrl {
     #[new]
-    #[pyo3(signature = (url, *, extra_trailing_slash=true))]
-    pub fn py_new(py: Python, url: &Bound<'_, PyAny>, extra_trailing_slash: bool) -> PyResult<Self> {
-        let schema_validator = get_schema_validator(py, false, extra_trailing_slash);
+    #[pyo3(signature = (url, *, add_trailing_slash=true))]
+    pub fn py_new(py: Python, url: &Bound<'_, PyAny>, add_trailing_slash: bool) -> PyResult<Self> {
+        let schema_validator = get_schema_validator(py, false, add_trailing_slash);
         let schema_obj = schema_validator.validate_python(py, url, None, None, None, None, false.into(), None, None)?;
         schema_obj.extract(py)
     }
@@ -248,9 +248,9 @@ impl PyMultiHostUrl {
 #[pymethods]
 impl PyMultiHostUrl {
     #[new]
-    #[pyo3(signature = (url, *, extra_trailing_slash=true))]
-    pub fn py_new(py: Python, url: &Bound<'_, PyAny>, extra_trailing_slash: bool) -> PyResult<Self> {
-        let schema_validator = get_schema_validator(py, true, extra_trailing_slash);
+    #[pyo3(signature = (url, *, add_trailing_slash=true))]
+    pub fn py_new(py: Python, url: &Bound<'_, PyAny>, add_trailing_slash: bool) -> PyResult<Self> {
+        let schema_validator = get_schema_validator(py, true, add_trailing_slash);
         let schema_obj = schema_validator.validate_python(py, url, None, None, None, None, false.into(), None, None)?;
         schema_obj.extract(py)
     }

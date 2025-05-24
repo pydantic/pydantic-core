@@ -150,7 +150,7 @@ require_change_file = false
 include = ['python/pydantic_core', 'tests/test_typing.py']
 reportUnnecessaryTypeIgnoreComment = true
 executionEnvironments = [
-    { root = "tests", reportPrivateImportUsage = false, reportMissingParameterType = false },
+    { root = "tests", reportPrivateImportUsage = false, reportMissingParameterType = false, reportAny = false },
 ]
 
 [tool.inline-snapshot.shortcuts]

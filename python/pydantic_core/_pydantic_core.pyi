@@ -522,15 +522,15 @@ class Url(SupportsAllComparisons):
     by Mozilla.
     """
 
-    def __init__(self, url: str, *, extra_trailing_slash: bool = True) -> None:
+    def __init__(self, url: str, *, add_trailing_slash: bool = True) -> None:
         """Initialize a new URL object.
 
         Args:
             url: The URL string to parse.
-            extra_trailing_slash: Whether to add an extra trailing slash to the URL, defaults to `True` for
+            add_trailing_slash: Whether to add an extra trailing slash to some URLs, defaults to `True` for
                 backward compatibility, default will change to `False` in v3 version.
         """
-    def __new__(cls, url: str, *, extra_trailing_slash: bool = True) -> Self: ...
+    def __new__(cls, url: str, *, add_trailing_slash: bool = True) -> Self: ...
     @property
     def scheme(self) -> str: ...
     @property
@@ -575,15 +575,15 @@ class MultiHostUrl(SupportsAllComparisons):
     by Mozilla.
     """
 
-    def __init__(self, url: str, *, extra_trailing_slash: bool = True) -> None:
+    def __init__(self, url: str, *, add_trailing_slash: bool = True) -> None:
         """Initialize a new MultiHostUrl object.
 
         Args:
             url: The URL string to parse.
-            extra_trailing_slash: Whether to add an extra trailing slash to the URL, defaults to `True` for
+            add_trailing_slash: Whether to add an extra trailing slash to some URLs, defaults to `True` for
                 backward compatibility, default will change to `False` in v3 version.
         """
-    def __new__(cls, url: str, *, extra_trailing_slash: bool = True) -> Self: ...
+    def __new__(cls, url: str, *, add_trailing_slash: bool = True) -> Self: ...
     @property
     def scheme(self) -> str: ...
     @property
