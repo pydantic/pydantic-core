@@ -34,7 +34,6 @@ __all__ = [
     'to_jsonable_python',
     'list_all_errors',
     'TzInfo',
-    'validate_core_schema',
 ]
 __version__: str
 build_profile: str
