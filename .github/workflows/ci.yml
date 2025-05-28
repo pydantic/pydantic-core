@@ -415,6 +415,10 @@ jobs:
             interpreter: 3.9 3.10 3.11 3.12 3.13
           - os: linux
             manylinux: auto
+            target: armv6
+            interpreter: 3.9 3.10 3.11 3.12 3.13
+          - os: linux
+            manylinux: auto
             target: ppc64le
             interpreter: 3.9 3.10 3.11 3.12 3.13
           - os: linux
@@ -436,6 +440,9 @@ jobs:
           - os: linux
             manylinux: musllinux_1_1
             target: armv7
+          - os: linux
+            manylinux: musllinux_1_1
+            target: armv6
 
           # macos;
           # all versions x86_64
@@ -592,9 +599,11 @@ jobs:
       fail-fast: false
       matrix:
         target: [aarch64, armv7, s390x, ppc64le]
-        distro: ['ubuntu22.04']
+        distro: ['ubuntu_latest']
         include:
           - target: aarch64
+            distro: alpine_latest
+          - target: armv6
             distro: alpine_latest
 
     steps:
