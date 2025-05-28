@@ -1,6 +1,10 @@
-from decimal import Decimal
+from __future__ import annotations
 
-from pydantic_core import CoreSchema
+from decimal import Decimal
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pydantic_core import CoreSchema
 
 
 def schema(*, strict: bool = False) -> CoreSchema:
