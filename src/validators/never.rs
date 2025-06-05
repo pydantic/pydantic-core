@@ -22,7 +22,7 @@ impl BuildValidator for NeverValidator {
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
         Ok(Self {
-            undefined: PydanticUndefinedType::new(py).to_object(py),
+            undefined: PydanticUndefinedType::new(py).into_any(),
         }
         .into())
     }
@@ -37,9 +37,9 @@ impl Validator for NeverValidator {
         input: &(impl Input<'py> + ?Sized),
         _state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
-        let obj = input.to_object(py);
+        let obj = input.to_object(py)?;
         if obj.is(&self.undefined) {
-            Ok(obj)
+            Ok(obj.into())
         } else {
             Err(ValError::new(ErrorTypeDefaults::Never, input))
         }

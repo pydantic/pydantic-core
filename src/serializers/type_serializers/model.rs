@@ -67,10 +67,7 @@ impl BuildSerializer for ModelFieldsBuilder {
                 match serializer {
                     CombinedSerializer::Never(_) => {}
                     s => {
-                        fields.insert(
-                            key,
-                            SerField::new(py, key_py, alias, Some(serializer), true, serialize_by_alias),
-                        );
+                        fields.insert(key, SerField::new(py, key_py, alias, Some(s), true, serialize_by_alias));
                     }
                 }
             }
