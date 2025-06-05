@@ -12,10 +12,8 @@ include = [
     "/LICENSE",
     "/Makefile",
     "/build.rs",
-    "/generate_self_schema.py",
     "/rust-toolchain",
     "/src",
-    "!/src/self_schema.py",
     "/python/pydantic_core",
     "/tests",
     "/.cargo",
@@ -33,12 +31,12 @@ pyo3 = { version = "0.24", features = ["generate-import-lib", "num-bigint", "py-
 regex = "1.11.1"
 strum = { version = "0.26.3", features = ["derive"] }
 strum_macros = "0.26.4"
-serde_json = {version = "1.0.140", features = ["arbitrary_precision", "preserve_order"]}
+serde_json = { version = "1.0.140", features = ["arbitrary_precision"] }
 enum_dispatch = "0.3.13"
 serde = { version = "1.0.219", features = ["derive"] }
 speedate = "0.15.0"
 smallvec = "1.15.0"
-ahash = "0.8.10"
+ahash = "0.8.12"
 url = "2.5.4"
 # idna is already required by url, added here to be explicit
 idna = "1.0.3"
@@ -46,7 +44,7 @@ base64 = "0.22.1"
 num-bigint = "0.4.6"
 num-traits = "0.2.19"
 uuid = "1.16.0"
-jiter = { version = "0.9.0", features = ["python"] }
+jiter = { version = "0.9.1", features = ["python"] }
 hex = "0.4.3"
 
 [lib]
