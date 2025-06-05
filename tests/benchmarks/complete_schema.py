@@ -1,7 +1,13 @@
+from __future__ import annotations
+
 from decimal import Decimal
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pydantic_core import CoreSchema
 
 
-def schema(*, strict: bool = False) -> dict:
+def schema(*, strict: bool = False) -> CoreSchema:
     class MyModel:
         # __slots__ is not required, but it avoids __pydantic_fields_set__ falling into __dict__
         __slots__ = '__dict__', '__pydantic_fields_set__', '__pydantic_extra__', '__pydantic_private__'
@@ -12,7 +18,7 @@ def schema(*, strict: bool = False) -> dict:
     def wrap_function(input_value, validator, info):
         return f'Input {validator(input_value)} Changed'
 
-    return {
+    return {  # type: ignore
         'type': 'model',
         'cls': MyModel,
         'config': {'strict': strict},
@@ -339,4 +345,23 @@ def input_data_wrong():
         'field_union': {'field_str': ('foo',), 'field_int': 'x', 'field_float': b'y'},
         'field_functions_model': {'field_before': 1, 'field_after': 1, 'field_wrap': 1, 'field_plain': 1},
         'field_recursive': {'name': 'foo', 'sub_branch': {'name': 'bar', 'sub_branch': {}}},
+    }
+
+
+def wrap_schema_in_root_model(schema: CoreSchema) -> CoreSchema:
+    class MyRootModel:
+        # __slots__ is not required, but it avoids __pydantic_fields_set__ falling into __dict__
+        __slots__ = '__dict__', '__pydantic_fields_set__', '__pydantic_extra__', '__pydantic_private__'
+
+    return {
+        'type': 'model',
+        'cls': MyRootModel,
+        'config': {},
+        'schema': {
+            'type': 'model-fields',
+            'fields': {
+                'root': {'type': 'model-field', 'schema': schema},
+            },
+        },
+        'root_model': True,
     }

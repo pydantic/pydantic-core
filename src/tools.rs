@@ -8,7 +8,7 @@ use pyo3::types::{PyDict, PyString};
 use pyo3::{intern, FromPyObject};
 
 use crate::input::Int;
-use jiter::{cached_py_string, pystring_fast_new, StringCacheMode};
+use jiter::{cached_py_string, StringCacheMode};
 
 pub trait SchemaDict<'py> {
     fn get_as<T>(&self, key: &Bound<'py, PyString>) -> PyResult<Option<T>>
@@ -118,6 +118,7 @@ pub fn safe_repr<'py>(v: &Bound<'py, PyAny>) -> ReprOutput<'py> {
     }
 }
 
+// warning: this function can be incredibly slow, so use with caution
 pub fn truncate_safe_repr(v: &Bound<'_, PyAny>, max_len: Option<usize>) -> String {
     let max_len = max_len.unwrap_or(50); // default to 100 bytes
     let input_str = safe_repr(v);
@@ -128,14 +129,6 @@ pub fn truncate_safe_repr(v: &Bound<'_, PyAny>, max_len: Option<usize>) -> Strin
 }
 
 pub fn extract_i64(v: &Bound<'_, PyAny>) -> Option<i64> {
-    #[cfg(PyPy)]
-    if !v.is_instance_of::<pyo3::types::PyInt>() {
-        // PyPy used __int__ to cast floats to ints after CPython removed it,
-        // see https://github.com/pypy/pypy/issues/4949
-        //
-        // Can remove this after PyPy 7.3.17 is released
-        return None;
-    }
     v.extract().ok()
 }
 
@@ -147,11 +140,10 @@ pub fn extract_int(v: &Bound<'_, PyAny>) -> Option<Int> {
 
 pub(crate) fn new_py_string<'py>(py: Python<'py>, s: &str, cache_str: StringCacheMode) -> Bound<'py, PyString> {
     // we could use `bytecount::num_chars(s.as_bytes()) == s.len()` as orjson does, but it doesn't appear to be faster
-    let ascii_only = false;
     if matches!(cache_str, StringCacheMode::All) {
-        cached_py_string(py, s, ascii_only)
+        cached_py_string(py, s)
     } else {
-        pystring_fast_new(py, s, ascii_only)
+        PyString::new(py, s)
     }
 }
 

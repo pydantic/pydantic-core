@@ -4,7 +4,7 @@ use pyo3::{PyTraverseError, PyVisit};
 use crate::lookup_key::LookupKey;
 use crate::py_gc::PyGcTraverse;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum Discriminator {
     /// use `LookupKey` to find the tag, same as we do to find values in typed_dict aliases
     LookupKey(LookupKey),
@@ -15,7 +15,7 @@ pub enum Discriminator {
 impl Discriminator {
     pub fn new(py: Python, raw: &Bound<'_, PyAny>) -> PyResult<Self> {
         if raw.is_callable() {
-            return Ok(Self::Function(raw.to_object(py)));
+            return Ok(Self::Function(raw.clone().unbind()));
         }
 
         let lookup_key = LookupKey::from_py(py, raw, None)?;

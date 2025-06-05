@@ -3,7 +3,7 @@ from enum import IntEnum
 
 import pytest
 
-from pydantic_core import SchemaSerializer, core_schema
+from pydantic_core import CoreConfig, SchemaSerializer, core_schema
 
 try:
     import numpy
@@ -110,19 +110,19 @@ def test_simple_serializers_fallback(schema_type):
     s = SchemaSerializer({'type': schema_type})
     with pytest.warns(
         UserWarning,
-        match=f'Expected `{schema_type}` but got `list` with value `\\[1, 2, 3\\]` - serialized value may not be as expected',
+        match=rf'Expected `{schema_type}` - serialized value may not be as expected \[input_value=\[1, 2, 3\], input_type=list\]',
     ):
         assert s.to_python([1, 2, 3]) == [1, 2, 3]
 
     with pytest.warns(
         UserWarning,
-        match=f"Expected `{schema_type}` but got `list` with value `\\[1, 2, b'bytes'\\]` - serialized value may not be as expected",
+        match=rf"Expected `{schema_type}` - serialized value may not be as expected \[input_value=\[1, 2, b'bytes'\], input_type=list\]",
     ):
         assert s.to_python([1, 2, b'bytes'], mode='json') == [1, 2, 'bytes']
 
     with pytest.warns(
         UserWarning,
-        match=f'Expected `{schema_type}` but got `list` with value `\\[1, 2, 3\\]` - serialized value may not be as expected',
+        match=rf'Expected `{schema_type}` - serialized value may not be as expected \[input_value=\[1, 2, 3\], input_type=list\]',
     ):
         assert s.to_json([1, 2, 3]) == b'[1,2,3]'
 
@@ -149,15 +149,15 @@ def test_numpy():
         (float('-inf'), 'null', {}),
         (float('nan'), 'null', {}),
         # explicit values of ser_json_inf_nan
-        (float('inf'), 'null', {'ser_json_inf_nan': 'null'}),
-        (float('-inf'), 'null', {'ser_json_inf_nan': 'null'}),
-        (float('nan'), 'null', {'ser_json_inf_nan': 'null'}),
-        (float('inf'), 'Infinity', {'ser_json_inf_nan': 'constants'}),
-        (float('-inf'), '-Infinity', {'ser_json_inf_nan': 'constants'}),
-        (float('nan'), 'NaN', {'ser_json_inf_nan': 'constants'}),
-        (float('inf'), '"Infinity"', {'ser_json_inf_nan': 'strings'}),
-        (float('-inf'), '"-Infinity"', {'ser_json_inf_nan': 'strings'}),
-        (float('nan'), '"NaN"', {'ser_json_inf_nan': 'strings'}),
+        (float('inf'), 'null', CoreConfig(ser_json_inf_nan='null')),
+        (float('-inf'), 'null', CoreConfig(ser_json_inf_nan='null')),
+        (float('nan'), 'null', CoreConfig(ser_json_inf_nan='null')),
+        (float('inf'), 'Infinity', CoreConfig(ser_json_inf_nan='constants')),
+        (float('-inf'), '-Infinity', CoreConfig(ser_json_inf_nan='constants')),
+        (float('nan'), 'NaN', CoreConfig(ser_json_inf_nan='constants')),
+        (float('inf'), '"Infinity"', CoreConfig(ser_json_inf_nan='strings')),
+        (float('-inf'), '"-Infinity"', CoreConfig(ser_json_inf_nan='strings')),
+        (float('nan'), '"NaN"', CoreConfig(ser_json_inf_nan='strings')),
     ],
 )
 def test_float_inf_and_nan_serializers(value, expected_json, config):

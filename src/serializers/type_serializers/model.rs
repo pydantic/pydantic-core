@@ -5,6 +5,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PySet, PyString, PyType};
 
 use ahash::AHashMap;
+use pyo3::IntoPyObjectExt;
 
 use super::{
     infer_json_key, infer_json_key_known, infer_serialize, infer_to_python, py_err_se_err, BuildSerializer,
@@ -15,7 +16,6 @@ use crate::build_tools::py_schema_err;
 use crate::build_tools::{py_schema_error_type, ExtraBehavior};
 use crate::definitions::DefinitionsBuilder;
 use crate::serializers::errors::PydanticSerializationUnexpectedValue;
-use crate::serializers::extra::DuckTypingSerMode;
 use crate::tools::SchemaDict;
 
 const ROOT_FIELD: &str = "root";
@@ -46,6 +46,8 @@ impl BuildSerializer for ModelFieldsBuilder {
             (_, _) => None,
         };
 
+        let serialize_by_alias = config.get_as(intern!(py, "serialize_by_alias"))?;
+
         for (key, value) in fields_dict {
             let key_py = key.downcast_into::<PyString>()?;
             let key: String = key_py.extract()?;
@@ -54,7 +56,7 @@ impl BuildSerializer for ModelFieldsBuilder {
             let key_py: Py<PyString> = key_py.into();
 
             if field_info.get_as(intern!(py, "serialization_exclude"))? == Some(true) {
-                fields.insert(key, SerField::new(py, key_py, None, None, true));
+                fields.insert(key, SerField::new(py, key_py, None, None, true, serialize_by_alias));
             } else {
                 let alias: Option<String> = field_info.get_as(intern!(py, "serialization_alias"))?;
 
@@ -65,7 +67,10 @@ impl BuildSerializer for ModelFieldsBuilder {
                 match serializer {
                     CombinedSerializer::Never(_) => {}
                     s => {
-                        fields.insert(key, SerField::new(py, key_py, alias, Some(s), true));
+                        fields.insert(
+                            key,
+                            SerField::new(py, key_py, alias, Some(serializer), true, serialize_by_alias),
+                        );
                     }
                 }
             }
@@ -152,8 +157,7 @@ impl ModelSerializer {
 
         if self.has_extra {
             let model_extra = model.getattr(intern!(py, "__pydantic_extra__"))?;
-            let py_tuple = (attrs, model_extra).to_object(py).into_bound(py);
-            Ok(py_tuple)
+            (attrs, model_extra).into_bound_py_any(py)
         } else {
             Ok(attrs.into_any())
         }
@@ -171,16 +175,8 @@ impl TypeSerializer for ModelSerializer {
         extra: &Extra,
     ) -> PyResult<PyObject> {
         let model = Some(value);
-        let duck_typing_ser_mode = extra.duck_typing_ser_mode.next_mode();
 
-        let model_extra = Extra {
-            model,
-            duck_typing_ser_mode,
-            ..*extra
-        };
-        if model_extra.duck_typing_ser_mode == DuckTypingSerMode::Inferred {
-            return infer_to_python(value, include, exclude, &model_extra);
-        }
+        let model_extra = Extra { model, ..*extra };
         if self.root_model {
             let field_name = Some(ROOT_FIELD);
             let root_extra = Extra {
@@ -190,7 +186,7 @@ impl TypeSerializer for ModelSerializer {
             let py = value.py();
             let root = value.getattr(intern!(py, ROOT_FIELD)).map_err(|original_err| {
                 if root_extra.check.enabled() {
-                    PydanticSerializationUnexpectedValue::new_err(None)
+                    PydanticSerializationUnexpectedValue::new_from_msg(None).to_py_err()
                 } else {
                     original_err
                 }
@@ -198,7 +194,10 @@ impl TypeSerializer for ModelSerializer {
             self.serializer.to_python(&root, include, exclude, &root_extra)
         } else if self.allow_value(value, &model_extra)? {
             let inner_value = self.get_inner_value(value, &model_extra)?;
-            self.serializer.to_python(&inner_value, include, exclude, &model_extra)
+            // There is strong coupling between a model serializer and its child, we should
+            // not fall back to type inference in the midddle.
+            self.serializer
+                .to_python_no_infer(&inner_value, include, exclude, &model_extra)
         } else {
             extra.warnings.on_fallback_py(self.get_name(), value, &model_extra)?;
             infer_to_python(value, include, exclude, &model_extra)
@@ -223,15 +222,7 @@ impl TypeSerializer for ModelSerializer {
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         let model = Some(value);
-        let duck_typing_ser_mode = extra.duck_typing_ser_mode.next_mode();
-        let model_extra = Extra {
-            model,
-            duck_typing_ser_mode,
-            ..*extra
-        };
-        if model_extra.duck_typing_ser_mode == DuckTypingSerMode::Inferred {
-            return infer_serialize(value, serializer, include, exclude, &model_extra);
-        }
+        let model_extra = Extra { model, ..*extra };
         if self.root_model {
             let field_name = Some(ROOT_FIELD);
             let root_extra = Extra {
@@ -244,8 +235,10 @@ impl TypeSerializer for ModelSerializer {
                 .serde_serialize(&root, serializer, include, exclude, &root_extra)
         } else if self.allow_value(value, &model_extra).map_err(py_err_se_err)? {
             let inner_value = self.get_inner_value(value, &model_extra).map_err(py_err_se_err)?;
+            // There is strong coupling between a model serializer and its child, we should
+            // not fall back to type inference in the midddle.
             self.serializer
-                .serde_serialize(&inner_value, serializer, include, exclude, &model_extra)
+                .serde_serialize_no_infer(&inner_value, serializer, include, exclude, &model_extra)
         } else {
             extra
                 .warnings

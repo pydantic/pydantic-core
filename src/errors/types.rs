@@ -22,7 +22,7 @@ pub fn list_all_errors(py: Python) -> PyResult<Bound<'_, PyList>> {
     let mut errors: Vec<Bound<'_, PyDict>> = Vec::with_capacity(100);
     for error_type in ErrorType::iter() {
         if !matches!(error_type, ErrorType::CustomError { .. }) {
-            let d = PyDict::new_bound(py);
+            let d = PyDict::new(py);
             d.set_item("type", error_type.to_string())?;
             let message_template_python = error_type.message_template_python();
             d.set_item("message_template_python", message_template_python)?;
@@ -39,7 +39,7 @@ pub fn list_all_errors(py: Python) -> PyResult<Bound<'_, PyList>> {
             errors.push(d);
         }
     }
-    Ok(PyList::new_bound(py, errors))
+    PyList::new(py, errors)
 }
 
 fn field_from_context<'py, T: FromPyObject<'py>>(
@@ -124,7 +124,7 @@ macro_rules! error_types {
                     $(
                         Self::$item { context, $($key,)* } => {
                             $(
-                                dict.set_item::<&str, Py<PyAny>>(stringify!($key), $key.to_object(py))?;
+                                dict.set_item(stringify!($key), $key)?;
                             )*
                             if let Some(ctx) = context {
                                 dict.update(ctx.bind(py).downcast::<PyMapping>()?)?;
@@ -268,6 +268,7 @@ error_types! {
     // ---------------------
     // set errors
     SetType {},
+    SetItemNotHashable {},
     // ---------------------
     // bool errors
     BoolType {},
@@ -515,6 +516,7 @@ impl ErrorType {
             Self::ListType {..} => "Input should be a valid list",
             Self::TupleType {..} => "Input should be a valid tuple",
             Self::SetType {..} => "Input should be a valid set",
+            Self::SetItemNotHashable {..} => "Set items should be hashable",
             Self::BoolType {..} => "Input should be a valid boolean",
             Self::BoolParsing {..} => "Input should be a valid boolean, unable to interpret input",
             Self::IntType {..} => "Input should be a valid integer",
@@ -749,7 +751,7 @@ impl ErrorType {
     }
 
     pub fn py_dict(&self, py: Python) -> PyResult<Option<Py<PyDict>>> {
-        let dict = PyDict::new_bound(py);
+        let dict = PyDict::new(py);
         let custom_ctx_used = self.py_dict_update_ctx(py, &dict)?;
 
         if let Self::CustomError { .. } = self {
@@ -770,7 +772,7 @@ impl ErrorType {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, IntoPyObject, IntoPyObjectRef)]
 pub enum Number {
     Int(i64),
     BigInt(BigInt),
@@ -825,16 +827,6 @@ impl fmt::Display for Number {
             Self::Int(i) => write!(f, "{i}"),
             Self::BigInt(i) => write!(f, "{i}"),
             Self::String(s) => write!(f, "{s}"),
-        }
-    }
-}
-impl ToPyObject for Number {
-    fn to_object(&self, py: Python<'_>) -> PyObject {
-        match self {
-            Self::Int(i) => i.into_py(py),
-            Self::BigInt(i) => i.clone().into_py(py),
-            Self::Float(f) => f.into_py(py),
-            Self::String(s) => s.into_py(py),
         }
     }
 }

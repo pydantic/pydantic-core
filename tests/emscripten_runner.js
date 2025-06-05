@@ -98,13 +98,15 @@ import importlib
 
 await micropip.install([
     'dirty-equals',
-    'inline-snapshot',
+    # inline-snapshot 0.21 requires pytest 8.3.4, pyodide 0.26 ships with 8.1.1
+    'inline-snapshot < 0.21',
     'hypothesis',
     'pytest-speed',
     'pytest-mock',
     'tzdata',
     'file:${wheel_path}',
     'typing-extensions',
+    'typing-inspection',
 ])
 importlib.invalidate_caches()
 

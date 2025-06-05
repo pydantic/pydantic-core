@@ -1,10 +1,11 @@
 import re
 from enum import Enum
-from typing import Any, Callable, List
+from typing import Any, Callable
 
 import pytest
 
 from pydantic_core import SchemaError, SchemaValidator, ValidationError, core_schema
+from pydantic_core import core_schema as cs
 
 from ..conftest import Err, PyAndJson, plain_repr
 
@@ -147,7 +148,7 @@ def test_literal_py_and_json(py_and_json: PyAndJson, kwarg_expected, input_value
     ],
 )
 def test_literal_not_json(kwarg_expected, input_value, expected):
-    v = SchemaValidator({'type': 'literal', 'expected': kwarg_expected})
+    v = SchemaValidator(cs.literal_schema(expected=kwarg_expected))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)) as exc_info:
             v.validate_python(input_value)
@@ -160,7 +161,7 @@ def test_literal_not_json(kwarg_expected, input_value, expected):
 
 def test_build_error():
     with pytest.raises(SchemaError, match='SchemaError: `expected` should have length > 0'):
-        SchemaValidator({'type': 'literal', 'expected': []})
+        SchemaValidator(cs.literal_schema(expected=[]))
 
 
 def test_literal_none():
@@ -317,7 +318,7 @@ def test_int_enum_values():
         ),
     ],
 )
-def test_mix_int_enum_with_int(reverse: Callable[[List[Any]], List[Any]], err: Any):
+def test_mix_int_enum_with_int(reverse: Callable[[list[Any]], list[Any]], err: Any):
     class Foo(int, Enum):
         foo = 1
 
@@ -363,7 +364,7 @@ def test_mix_int_enum_with_int(reverse: Callable[[List[Any]], List[Any]], err: A
         ),
     ],
 )
-def test_mix_str_enum_with_str(reverse: Callable[[List[Any]], List[Any]], err: Any):
+def test_mix_str_enum_with_str(reverse: Callable[[list[Any]], list[Any]], err: Any):
     class Foo(str, Enum):
         foo = 'foo_val'
 

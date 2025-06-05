@@ -5,6 +5,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyDict, PyList, PyString};
 
 use ahash::AHashSet;
+use pyo3::IntoPyObjectExt;
 use serde::Serialize;
 
 use crate::build_tools::py_schema_err;
@@ -40,7 +41,7 @@ impl BuildSerializer for LiteralSerializer {
         let mut expected_int = AHashSet::new();
         let mut expected_str = AHashSet::new();
         let py = expected.py();
-        let expected_py = PyList::empty_bound(py);
+        let expected_py = PyList::empty(py);
         let mut repr_args: Vec<String> = Vec::new();
         for item in expected {
             repr_args.push(item.repr()?.extract()?);
@@ -89,7 +90,7 @@ impl LiteralSerializer {
                 if let Ok(py_str) = value.downcast::<PyString>() {
                     let s = py_str.to_str()?;
                     if self.expected_str.contains(s) {
-                        return Ok(OutputValue::OkStr(PyString::new_bound(value.py(), s)));
+                        return Ok(OutputValue::OkStr(PyString::new(value.py(), s)));
                     }
                 }
             }
@@ -119,12 +120,12 @@ impl TypeSerializer for LiteralSerializer {
         let py = value.py();
         match self.check(value, extra)? {
             OutputValue::OkInt(int) => match extra.mode {
-                SerMode::Json => Ok(int.to_object(py)),
-                _ => Ok(value.to_object(py)),
+                SerMode::Json => int.into_py_any(py),
+                _ => Ok(value.clone().unbind()),
             },
             OutputValue::OkStr(s) => match extra.mode {
-                SerMode::Json => Ok(s.to_object(py)),
-                _ => Ok(value.to_object(py)),
+                SerMode::Json => Ok(s.into()),
+                _ => Ok(value.clone().unbind()),
             },
             OutputValue::Ok => infer_to_python(value, include, exclude, extra),
             OutputValue::Fallback => {

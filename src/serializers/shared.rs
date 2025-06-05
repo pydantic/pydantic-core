@@ -20,7 +20,7 @@ use crate::tools::{py_err, SchemaDict};
 
 use super::errors::se_err_py_err;
 use super::extra::Extra;
-use super::infer::infer_json_key;
+use super::infer::{infer_json_key, infer_serialize, infer_to_python};
 use super::ob_type::{IsType, ObType};
 
 pub(crate) trait BuildSerializer: Sized {
@@ -84,6 +84,8 @@ combined_serializer! {
         Function: super::type_serializers::function::FunctionPlainSerializer;
         FunctionWrap: super::type_serializers::function::FunctionWrapSerializer;
         Fields: super::fields::GeneralFieldsSerializer;
+        // prebuilt serializers are manually constructed, and thus manually added to the `CombinedSerializer` enum
+        Prebuilt: super::prebuilt::PrebuiltSerializer;
     }
     // `find_only` is for type_serializers which are built directly via the `type` key and `find_serializer`
     // but aren't actually used for serialization, e.g. their `build` method must return another serializer
@@ -148,10 +150,21 @@ combined_serializer! {
 }
 
 impl CombinedSerializer {
+    // Used when creating the base serializer instance, to avoid reusing the instance
+    // when unpickling:
+    pub fn build_base(
+        schema: &Bound<'_, PyDict>,
+        config: Option<&Bound<'_, PyDict>>,
+        definitions: &mut DefinitionsBuilder<CombinedSerializer>,
+    ) -> PyResult<CombinedSerializer> {
+        Self::_build(schema, config, definitions, false)
+    }
+
     fn _build(
         schema: &Bound<'_, PyDict>,
         config: Option<&Bound<'_, PyDict>>,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
+        use_prebuilt: bool,
     ) -> PyResult<CombinedSerializer> {
         let py = schema.py();
         let type_key = intern!(py, "type");
@@ -196,7 +209,86 @@ impl CombinedSerializer {
         }
 
         let type_: Bound<'_, PyString> = schema.get_as_req(type_key)?;
-        Self::find_serializer(type_.to_str()?, schema, config, definitions)
+        let type_ = type_.to_str()?;
+
+        if use_prebuilt {
+            // if we have a SchemaValidator on the type already, use it
+            if let Ok(Some(prebuilt_serializer)) =
+                super::prebuilt::PrebuiltSerializer::try_get_from_schema(type_, schema)
+            {
+                return Ok(prebuilt_serializer);
+            }
+        }
+
+        Self::find_serializer(type_, schema, config, definitions)
+    }
+
+    /// Main recursive way to call serializers, supports possible recursive type inference by
+    /// switching to type inference mode eagerly.
+    pub fn to_python(
+        &self,
+        value: &Bound<'_, PyAny>,
+        include: Option<&Bound<'_, PyAny>>,
+        exclude: Option<&Bound<'_, PyAny>>,
+        extra: &Extra,
+    ) -> PyResult<PyObject> {
+        if extra.serialize_as_any {
+            infer_to_python(value, include, exclude, extra)
+        } else {
+            self.to_python_no_infer(value, include, exclude, extra)
+        }
+    }
+
+    /// Variant of the above which does not fall back to inference mode immediately
+    #[inline]
+    pub fn to_python_no_infer(
+        &self,
+        value: &Bound<'_, PyAny>,
+        include: Option<&Bound<'_, PyAny>>,
+        exclude: Option<&Bound<'_, PyAny>>,
+        extra: &Extra,
+    ) -> PyResult<PyObject> {
+        TypeSerializer::to_python(self, value, include, exclude, extra)
+    }
+
+    pub fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
+        if extra.serialize_as_any {
+            infer_json_key(key, extra)
+        } else {
+            self.json_key_no_infer(key, extra)
+        }
+    }
+
+    #[inline]
+    pub fn json_key_no_infer<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
+        TypeSerializer::json_key(self, key, extra)
+    }
+
+    pub fn serde_serialize<S: serde::ser::Serializer>(
+        &self,
+        value: &Bound<'_, PyAny>,
+        serializer: S,
+        include: Option<&Bound<'_, PyAny>>,
+        exclude: Option<&Bound<'_, PyAny>>,
+        extra: &Extra,
+    ) -> Result<S::Ok, S::Error> {
+        if extra.serialize_as_any {
+            infer_serialize(value, serializer, include, exclude, extra)
+        } else {
+            self.serde_serialize_no_infer(value, serializer, include, exclude, extra)
+        }
+    }
+
+    #[inline]
+    pub fn serde_serialize_no_infer<S: serde::ser::Serializer>(
+        &self,
+        value: &Bound<'_, PyAny>,
+        serializer: S,
+        include: Option<&Bound<'_, PyAny>>,
+        exclude: Option<&Bound<'_, PyAny>>,
+        extra: &Extra,
+    ) -> Result<S::Ok, S::Error> {
+        TypeSerializer::serde_serialize(self, value, serializer, include, exclude, extra)
     }
 }
 
@@ -209,7 +301,7 @@ impl BuildSerializer for CombinedSerializer {
         config: Option<&Bound<'_, PyDict>>,
         definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
-        Self::_build(schema, config, definitions)
+        Self::_build(schema, config, definitions, true)
     }
 }
 
@@ -220,6 +312,7 @@ impl PyGcTraverse for CombinedSerializer {
             CombinedSerializer::Function(inner) => inner.py_gc_traverse(visit),
             CombinedSerializer::FunctionWrap(inner) => inner.py_gc_traverse(visit),
             CombinedSerializer::Fields(inner) => inner.py_gc_traverse(visit),
+            CombinedSerializer::Prebuilt(inner) => inner.py_gc_traverse(visit),
             CombinedSerializer::None(inner) => inner.py_gc_traverse(visit),
             CombinedSerializer::Nullable(inner) => inner.py_gc_traverse(visit),
             CombinedSerializer::Int(inner) => inner.py_gc_traverse(visit),
@@ -389,7 +482,7 @@ where
 
     let next = move |(field_name, field): (Bound<'py, PyAny>, Bound<'py, PyAny>)| -> PyResult<Option<(Bound<'py, PyAny>, Bound<'py, PyAny>)>> {
         let field_type = field.getattr(intern!(py, "_field_type"))?;
-        if field_type.is(&field_type_marker) {
+        if field_type.is(field_type_marker) {
             let value = dataclass.getattr(field_name.downcast::<PyString>()?)?;
             Ok(Some((field_name, value)))
         } else {
@@ -403,9 +496,6 @@ where
 static DC_FIELD_MARKER: GILOnceCell<PyObject> = GILOnceCell::new();
 
 /// needed to match the logic from dataclasses.fields `tuple(f for f in fields.values() if f._field_type is _FIELD)`
-fn get_field_marker(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
-    let field_type_marker_obj = DC_FIELD_MARKER.get_or_try_init(py, || {
-        py.import_bound("dataclasses")?.getattr("_FIELD").map(|f| f.into_py(py))
-    })?;
-    Ok(field_type_marker_obj.bind(py).clone())
+fn get_field_marker(py: Python<'_>) -> PyResult<&Bound<'_, PyAny>> {
+    DC_FIELD_MARKER.import(py, "dataclasses", "_FIELD")
 }

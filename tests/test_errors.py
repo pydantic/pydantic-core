@@ -306,6 +306,7 @@ all_errors = [
     ('iteration_error', 'Error iterating over object, error: foobar', {'error': 'foobar'}),
     ('list_type', 'Input should be a valid list', None),
     ('tuple_type', 'Input should be a valid tuple', None),
+    ('set_item_not_hashable', 'Set items should be hashable', None),
     ('set_type', 'Input should be a valid set', None),
     ('bool_type', 'Input should be a valid boolean', None),
     ('bool_parsing', 'Input should be a valid boolean, unable to interpret input', None),
@@ -540,7 +541,7 @@ def test_all_errors():
 
 @pytest.mark.skipif(sys.version_info < (3, 11), reason='This is the modern version used post 3.10.')
 def test_validation_error_cause_contents():
-    enabled_config: CoreConfig = {'validation_error_cause': True}
+    enabled_config: CoreConfig = CoreConfig(validation_error_cause=True)
 
     def multi_raise_py_error(v: Any) -> Any:
         try:
@@ -606,7 +607,7 @@ def test_validation_error_cause_contents():
 def test_validation_error_cause_contents_legacy():
     from exceptiongroup import BaseExceptionGroup
 
-    enabled_config: CoreConfig = {'validation_error_cause': True}
+    enabled_config: CoreConfig = CoreConfig(validation_error_cause=True)
 
     def multi_raise_py_error(v: Any) -> Any:
         try:
@@ -684,10 +685,10 @@ class CauseResult(enum.Enum):
     [  # Without the backport should still work after 3.10 as not needed:
         (
             'Enabled',
-            {'validation_error_cause': True},
+            CoreConfig(validation_error_cause=True),
             CauseResult.CAUSE if sys.version_info >= (3, 11) else CauseResult.IMPORT_ERROR,
         ),
-        ('Disabled specifically', {'validation_error_cause': False}, CauseResult.NO_CAUSE),
+        ('Disabled specifically', CoreConfig(validation_error_cause=False), CauseResult.NO_CAUSE),
         ('Disabled implicitly', {}, CauseResult.NO_CAUSE),
     ],
 )
@@ -722,7 +723,7 @@ def test_validation_error_cause_config_variants(desc: str, config: CoreConfig, e
 def test_validation_error_cause_traceback_preserved():
     """Makes sure historic bug of traceback being lost is fixed."""
 
-    enabled_config: CoreConfig = {'validation_error_cause': True}
+    enabled_config: CoreConfig = CoreConfig(validation_error_cause=True)
 
     def singular_raise_py_error(v: Any) -> Any:
         raise ValueError('Oh no!')
@@ -750,7 +751,7 @@ class BadRepr:
 
 
 def test_error_on_repr(pydantic_version):
-    s = SchemaValidator({'type': 'int'})
+    s = SchemaValidator(core_schema.int_schema())
     with pytest.raises(ValidationError) as exc_info:
         s.validate_python(BadRepr())
 
@@ -776,7 +777,7 @@ def test_error_on_repr(pydantic_version):
 
 
 def test_error_json(pydantic_version):
-    s = SchemaValidator({'type': 'str', 'min_length': 3})
+    s = SchemaValidator(core_schema.str_schema(min_length=3))
     with pytest.raises(ValidationError) as exc_info:
         s.validate_python('12')
 
@@ -854,7 +855,7 @@ def test_error_json_python_error(pydantic_version: str):
 
 
 def test_error_json_cycle():
-    s = SchemaValidator({'type': 'str', 'min_length': 3})
+    s = SchemaValidator(core_schema.str_schema(min_length=3))
     cycle = []
     cycle.append(cycle)
     msg = '[type=string_type, input_value=[[...]], input_type=list]'
@@ -876,7 +877,7 @@ class CustomStr:
 
 
 def test_error_json_unknown():
-    s = SchemaValidator({'type': 'str'})
+    s = SchemaValidator(core_schema.str_schema())
     with pytest.raises(ValidationError) as exc_info:
         s.validate_python(Foobar())
 
@@ -1090,7 +1091,7 @@ def test_loc_with_dots(pydantic_version):
 
 
 def test_hide_input_in_error() -> None:
-    s = SchemaValidator({'type': 'int'})
+    s = SchemaValidator(core_schema.int_schema())
     with pytest.raises(ValidationError) as exc_info:
         s.validate_python('definitely not an int')
 
@@ -1099,7 +1100,7 @@ def test_hide_input_in_error() -> None:
 
 
 def test_hide_input_in_json() -> None:
-    s = SchemaValidator({'type': 'int'})
+    s = SchemaValidator(core_schema.int_schema())
     with pytest.raises(ValidationError) as exc_info:
         s.validate_python('definitely not an int')
 
@@ -1112,7 +1113,7 @@ def test_hide_input_in_json() -> None:
     reason='PyPy before 3.9 cannot pickle this correctly',
 )
 def test_validation_error_pickle() -> None:
-    s = SchemaValidator({'type': 'int'})
+    s = SchemaValidator(core_schema.int_schema())
     with pytest.raises(ValidationError) as exc_info:
         s.validate_python('definitely not an int')
 
@@ -1123,7 +1124,7 @@ def test_validation_error_pickle() -> None:
 
 @pytest.mark.skipif('PYDANTIC_ERRORS_INCLUDE_URL' in os.environ, reason="can't test when envvar is set")
 def test_errors_include_url() -> None:
-    s = SchemaValidator({'type': 'int'})
+    s = SchemaValidator(core_schema.int_schema())
     with pytest.raises(ValidationError) as exc_info:
         s.validate_python('definitely not an int')
     assert 'https://errors.pydantic.dev' in repr(exc_info.value)
@@ -1150,7 +1151,7 @@ def test_errors_include_url_envvar(env_var, env_var_value, expected_to_have_url)
     Since it can only be set before `ValidationError.__repr__()` is first called,
     we need to spawn a subprocess to test it.
     """
-    code = "import pydantic_core; pydantic_core.SchemaValidator({'type': 'int'}).validate_python('ooo')"
+    code = "import pydantic_core; from pydantic_core import core_schema; pydantic_core.SchemaValidator(core_schema.int_schema()).validate_python('ooo')"
     env = os.environ.copy()
     env.pop('PYDANTIC_ERRORS_OMIT_URL', None)  # in case the ambient environment has it set
     if env_var_value is not None:

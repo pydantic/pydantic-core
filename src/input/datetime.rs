@@ -3,11 +3,14 @@ use pyo3::prelude::*;
 
 use pyo3::exceptions::PyValueError;
 use pyo3::pyclass::CompareOp;
+use pyo3::types::PyTuple;
 use pyo3::types::{PyDate, PyDateTime, PyDelta, PyDeltaAccess, PyDict, PyTime, PyTzInfo};
+use pyo3::IntoPyObjectExt;
 use speedate::MicrosecondsPrecisionOverflowBehavior;
 use speedate::{Date, DateTime, Duration, ParseError, Time, TimeConfig};
 use std::borrow::Cow;
 use std::collections::hash_map::DefaultHasher;
+use std::fmt::Write;
 use std::hash::Hash;
 use std::hash::Hasher;
 
@@ -19,9 +22,9 @@ use crate::errors::{ErrorType, ValError, ValResult};
 use crate::tools::py_err;
 
 #[cfg_attr(debug_assertions, derive(Debug))]
-pub enum EitherDate<'a> {
+pub enum EitherDate<'py> {
     Raw(Date),
-    Py(Bound<'a, PyDate>),
+    Py(Bound<'py, PyDate>),
 }
 
 impl From<Date> for EitherDate<'_> {
@@ -30,8 +33,8 @@ impl From<Date> for EitherDate<'_> {
     }
 }
 
-impl<'a> From<Bound<'a, PyDate>> for EitherDate<'a> {
-    fn from(date: Bound<'a, PyDate>) -> Self {
+impl<'py> From<Bound<'py, PyDate>> for EitherDate<'py> {
+    fn from(date: Bound<'py, PyDate>) -> Self {
         Self::Py(date)
     }
 }
@@ -45,27 +48,38 @@ pub fn pydate_as_date(py_date: &Bound<'_, PyAny>) -> PyResult<Date> {
     })
 }
 
-impl EitherDate<'_> {
+impl<'py> EitherDate<'py> {
+    pub fn try_into_py(self, py: Python<'py>, input: &(impl Input<'py> + ?Sized)) -> ValResult<PyObject> {
+        match self {
+            Self::Raw(date) => {
+                if date.year == 0 {
+                    return Err(ValError::new(
+                        ErrorType::DateParsing {
+                            error: Cow::Borrowed("year 0 is out of range"),
+                            context: None,
+                        },
+                        input,
+                    ));
+                }
+                let py_date = PyDate::new(py, date.year.into(), date.month, date.day)?;
+                Ok(py_date.into())
+            }
+            Self::Py(py_date) => Ok(py_date.into()),
+        }
+    }
+
     pub fn as_raw(&self) -> PyResult<Date> {
         match self {
             Self::Raw(date) => Ok(date.clone()),
             Self::Py(py_date) => pydate_as_date(py_date),
         }
     }
-
-    pub fn try_into_py(self, py: Python<'_>) -> PyResult<PyObject> {
-        let date = match self {
-            Self::Py(date) => Ok(date),
-            Self::Raw(date) => PyDate::new_bound(py, date.year.into(), date.month, date.day),
-        }?;
-        Ok(date.into_py(py))
-    }
 }
 
 #[cfg_attr(debug_assertions, derive(Debug))]
-pub enum EitherTime<'a> {
+pub enum EitherTime<'py> {
     Raw(Time),
-    Py(Bound<'a, PyTime>),
+    Py(Bound<'py, PyTime>),
 }
 
 impl From<Time> for EitherTime<'_> {
@@ -74,17 +88,32 @@ impl From<Time> for EitherTime<'_> {
     }
 }
 
-impl<'a> From<Bound<'a, PyTime>> for EitherTime<'a> {
-    fn from(time: Bound<'a, PyTime>) -> Self {
+impl<'py> From<Bound<'py, PyTime>> for EitherTime<'py> {
+    fn from(time: Bound<'py, PyTime>) -> Self {
         Self::Py(time)
     }
 }
 
 #[cfg_attr(debug_assertions, derive(Debug))]
-pub enum EitherTimedelta<'a> {
+#[derive(Clone)]
+pub enum EitherTimedelta<'py> {
     Raw(Duration),
-    PyExact(Bound<'a, PyDelta>),
-    PySubclass(Bound<'a, PyDelta>),
+    PyExact(Bound<'py, PyDelta>),
+    PySubclass(Bound<'py, PyDelta>),
+}
+
+impl<'py> IntoPyObject<'py> for EitherTimedelta<'py> {
+    type Target = PyDelta;
+    type Output = Bound<'py, PyDelta>;
+    type Error = PyErr;
+
+    fn into_pyobject(self, py: Python<'py>) -> PyResult<Self::Output> {
+        match self {
+            Self::Raw(duration) => duration_as_pytimedelta(py, &duration),
+            Self::PyExact(py_timedelta) => Ok(py_timedelta),
+            Self::PySubclass(py_timedelta) => Ok(py_timedelta),
+        }
+    }
 }
 
 impl From<Duration> for EitherTimedelta<'_> {
@@ -93,7 +122,7 @@ impl From<Duration> for EitherTimedelta<'_> {
     }
 }
 
-impl<'a> EitherTimedelta<'a> {
+impl EitherTimedelta<'_> {
     pub fn to_duration(&self) -> PyResult<Duration> {
         match self {
             Self::Raw(timedelta) => Ok(timedelta.clone()),
@@ -101,20 +130,12 @@ impl<'a> EitherTimedelta<'a> {
             Self::PySubclass(py_timedelta) => pytimedelta_subclass_as_duration(py_timedelta),
         }
     }
-
-    pub fn try_into_py(&self, py: Python<'a>) -> PyResult<Bound<'a, PyDelta>> {
-        match self {
-            Self::PyExact(timedelta) => Ok(timedelta.clone()),
-            Self::PySubclass(timedelta) => Ok(timedelta.clone()),
-            Self::Raw(duration) => duration_as_pytimedelta(py, duration),
-        }
-    }
 }
 
-impl<'a> TryFrom<&'_ Bound<'a, PyAny>> for EitherTimedelta<'a> {
+impl<'py> TryFrom<&'_ Bound<'py, PyAny>> for EitherTimedelta<'py> {
     type Error = PyErr;
 
-    fn try_from(value: &Bound<'a, PyAny>) -> PyResult<Self> {
+    fn try_from(value: &Bound<'py, PyAny>) -> PyResult<Self> {
         if let Ok(dt) = value.downcast_exact() {
             Ok(EitherTimedelta::PyExact(dt.clone()))
         } else {
@@ -165,7 +186,7 @@ pub fn pytimedelta_subclass_as_duration(py_timedelta: &Bound<'_, PyDelta>) -> Py
 
 pub fn duration_as_pytimedelta<'py>(py: Python<'py>, duration: &Duration) -> PyResult<Bound<'py, PyDelta>> {
     let sign = if duration.positive { 1 } else { -1 };
-    PyDelta::new_bound(
+    PyDelta::new(
         py,
         sign * duration.day as i32,
         sign * duration.second as i32,
@@ -200,18 +221,14 @@ pub fn pytime_as_time(py_time: &Bound<'_, PyAny>, py_dt: Option<&Bound<'_, PyAny
     })
 }
 
-impl EitherTime<'_> {
-    pub fn as_raw(&self) -> PyResult<Time> {
-        match self {
-            Self::Raw(time) => Ok(time.clone()),
-            Self::Py(py_time) => pytime_as_time(py_time, None),
-        }
-    }
+impl<'py> IntoPyObject<'py> for EitherTime<'py> {
+    type Target = PyTime;
+    type Output = Bound<'py, PyTime>;
+    type Error = PyErr;
 
-    pub fn try_into_py(self, py: Python<'_>) -> PyResult<PyObject> {
-        let time = match self {
-            Self::Py(time) => Ok(time),
-            Self::Raw(time) => PyTime::new_bound(
+    fn into_pyobject(self, py: Python<'py>) -> PyResult<Self::Output> {
+        match self {
+            Self::Raw(time) => PyTime::new(
                 py,
                 time.hour,
                 time.minute,
@@ -219,8 +236,17 @@ impl EitherTime<'_> {
                 time.microsecond,
                 time_as_tzinfo(py, &time)?.as_ref(),
             ),
-        }?;
-        Ok(time.into_py(py))
+            Self::Py(time) => Ok(time),
+        }
+    }
+}
+
+impl EitherTime<'_> {
+    pub fn as_raw(&self) -> PyResult<Time> {
+        match self {
+            Self::Raw(time) => Ok(time.clone()),
+            Self::Py(py_time) => pytime_as_time(py_time, None),
+        }
     }
 }
 
@@ -259,30 +285,41 @@ pub fn pydatetime_as_datetime(py_dt: &Bound<'_, PyAny>) -> PyResult<DateTime> {
     })
 }
 
-impl<'a> EitherDateTime<'a> {
+impl<'py> EitherDateTime<'py> {
+    pub fn try_into_py(self, py: Python<'py>, input: &(impl Input<'py> + ?Sized)) -> ValResult<PyObject> {
+        match self {
+            Self::Raw(dt) => {
+                if dt.date.year == 0 {
+                    return Err(ValError::new(
+                        ErrorType::DatetimeParsing {
+                            error: Cow::Borrowed("year 0 is out of range"),
+                            context: None,
+                        },
+                        input,
+                    ));
+                }
+                let py_dt = PyDateTime::new(
+                    py,
+                    dt.date.year.into(),
+                    dt.date.month,
+                    dt.date.day,
+                    dt.time.hour,
+                    dt.time.minute,
+                    dt.time.second,
+                    dt.time.microsecond,
+                    time_as_tzinfo(py, &dt.time)?.as_ref(),
+                )?;
+                Ok(py_dt.into())
+            }
+            Self::Py(py_dt) => Ok(py_dt.into()),
+        }
+    }
+
     pub fn as_raw(&self) -> PyResult<DateTime> {
         match self {
             Self::Raw(dt) => Ok(dt.clone()),
             Self::Py(py_dt) => pydatetime_as_datetime(py_dt),
         }
-    }
-
-    pub fn try_into_py(self, py: Python<'a>) -> PyResult<PyObject> {
-        let dt = match self {
-            Self::Raw(datetime) => PyDateTime::new_bound(
-                py,
-                datetime.date.year.into(),
-                datetime.date.month,
-                datetime.date.day,
-                datetime.time.hour,
-                datetime.time.minute,
-                datetime.time.second,
-                datetime.time.microsecond,
-                time_as_tzinfo(py, &datetime.time)?.as_ref(),
-            )?,
-            Self::Py(dt) => dt.clone(),
-        };
-        Ok(dt.into_py(py))
     }
 }
 
@@ -393,7 +430,7 @@ pub fn float_as_datetime<'py>(input: &(impl Input<'py> + ?Sized), timestamp: f64
 
 pub fn date_as_datetime<'py>(date: &Bound<'py, PyDate>) -> PyResult<EitherDateTime<'py>> {
     let py = date.py();
-    let dt = PyDateTime::new_bound(
+    let dt = PyDateTime::new(
         py,
         date.getattr(intern!(py, "year"))?.extract()?,
         date.getattr(intern!(py, "month"))?.extract()?,
@@ -502,7 +539,7 @@ pub fn float_as_duration(input: impl ToErrorValue, total_seconds: f64) -> ValRes
         .map_err(|err| map_timedelta_err(input, err))
 }
 
-#[pyclass(module = "pydantic_core._pydantic_core", extends = PyTzInfo)]
+#[pyclass(module = "pydantic_core._pydantic_core", extends = PyTzInfo, frozen)]
 #[derive(Clone)]
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub struct TzInfo {
@@ -518,7 +555,7 @@ impl TzInfo {
 
     #[allow(unused_variables)]
     fn utcoffset<'py>(&self, py: Python<'py>, dt: &Bound<'_, PyAny>) -> PyResult<Bound<'py, PyDelta>> {
-        PyDelta::new_bound(py, 0, self.seconds, 0, true)
+        PyDelta::new(py, 0, self.seconds, 0, true)
     }
 
     #[allow(unused_variables)]
@@ -554,7 +591,7 @@ impl TzInfo {
         );
 
         if seconds != 0 {
-            result.push_str(&format!(":{:02}", seconds.abs()));
+            write!(result, ":{:02}", seconds.abs()).expect("writing to string should never fail");
         }
 
         result
@@ -575,7 +612,7 @@ impl TzInfo {
             }
             let offset_seconds: f64 = offset_delta.call_method0(intern!(py, "total_seconds"))?.extract()?;
             let offset = offset_seconds.round() as i32;
-            Ok(op.matches(self.seconds.cmp(&offset)).into_py(py))
+            op.matches(self.seconds.cmp(&offset)).into_py_any(py)
         } else {
             Ok(py.NotImplemented())
         }
@@ -585,10 +622,9 @@ impl TzInfo {
         Py::new(py, self.clone())
     }
 
-    pub fn __reduce__(&self, py: Python) -> PyResult<PyObject> {
-        let args = (self.seconds,);
-        let cls = Py::new(py, self.clone())?.getattr(py, "__class__")?;
-        Ok((cls, args).into_py(py))
+    pub fn __reduce__<'py>(slf: &Bound<'py, Self>) -> PyResult<Bound<'py, PyTuple>> {
+        let args = (slf.get().seconds,);
+        (slf.get_type(), args).into_pyobject(slf.py())
     }
 }
 
