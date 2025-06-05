@@ -66,7 +66,7 @@ name = "cffi"
 version = "1.17.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pycparser", marker = "python_full_version == '3.14.*' and implementation_name == 'cpython'" },
+    { name = "pycparser", marker = "python_full_version == '3.13.*' and implementation_name == 'cpython'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/fc/97/c783634659c2920c3fc70419e3af40972dbaf758daa229a7d6ea6135c90d/cffi-1.17.1.tar.gz", hash = "sha256:1c39c6016c32bc48dd54561950ebd6836e1670f2ae46128f67cf49e789c52824", size = 516621, upload-time = "2024-09-04T20:45:21.852Z" }
 wheels = [
@@ -597,7 +597,7 @@ all = [
     { name = "tzdata" },
 ]
 codspeed = [
-    { name = "pytest-codspeed", marker = "python_full_version == '3.14.*' and implementation_name == 'cpython'" },
+    { name = "pytest-codspeed", marker = "python_full_version == '3.13.*' and implementation_name == 'cpython'" },
 ]
 dev = [
     { name = "maturin" },
@@ -663,7 +663,7 @@ all = [
     { name = "typing-inspection", specifier = ">=0.4.1" },
     { name = "tzdata" },
 ]
-codspeed = [{ name = "pytest-codspeed", marker = "python_full_version == '3.14.*' and implementation_name == 'cpython'" }]
+codspeed = [{ name = "pytest-codspeed", marker = "python_full_version == '3.13.*' and implementation_name == 'cpython'" }]
 dev = [{ name = "maturin" }]
 linting = [
     { name = "griffe" },
@@ -741,9 +741,9 @@ name = "pytest-codspeed"
 version = "3.1.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "cffi", marker = "python_full_version == '3.14.*' and implementation_name == 'cpython'" },
-    { name = "pytest", marker = "python_full_version == '3.14.*' and implementation_name == 'cpython'" },
-    { name = "rich", marker = "python_full_version == '3.14.*' and implementation_name == 'cpython'" },
+    { name = "cffi", marker = "python_full_version == '3.13.*' and implementation_name == 'cpython'" },
+    { name = "pytest", marker = "python_full_version == '3.13.*' and implementation_name == 'cpython'" },
+    { name = "rich", marker = "python_full_version == '3.13.*' and implementation_name == 'cpython'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/36/39/4a94b61e981f993d52d0fbff259c3de08a2fb884a77464f35522031125d5/pytest_codspeed-3.1.2.tar.gz", hash = "sha256:09c1733af3aab35e94a621aa510f2d2114f65591e6f644c42ca3f67547edad4b", size = 18277, upload-time = "2025-01-09T13:42:03.27Z" }
 wheels = [

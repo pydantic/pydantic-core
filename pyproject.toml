@@ -74,7 +74,7 @@ linting = [{ include-group = "dev" }, 'griffe', 'pyright', 'ruff', 'mypy']
 wasm = [{ include-group = "dev" }, 'ruff']
 codspeed = [
     # codspeed is only run on CI, with latest version of CPython
-    'pytest-codspeed; python_version == "3.14" and implementation_name == "cpython"',
+    'pytest-codspeed; python_version == "3.13" and implementation_name == "cpython"',
 ]
 
 all = [
