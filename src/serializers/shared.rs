@@ -437,15 +437,31 @@ struct EscapeNonAsciiFormatter;
 
 impl Formatter for EscapeNonAsciiFormatter {
     fn write_string_fragment<W: ?Sized + Write>(&mut self, writer: &mut W, fragment: &str) -> io::Result<()> {
-        for ch in fragment.chars() {
-            if ch.is_ascii() {
-                writer.write_all(ch.encode_utf8(&mut [0; 4]).as_bytes())?;
+        let mut input = fragment;
+
+        while let Some((idx, non_ascii_char)) = input.chars().enumerate().find(|(_, c)| !c.is_ascii()) {
+            if idx > 0 {
+                // write all ascii characters before the non-ascii one
+                let ascii_run = &input[..idx];
+                writer.write_all(ascii_run.as_bytes()).unwrap();
+            }
+
+            let codepoint = non_ascii_char as u32;
+            if codepoint < 0xFFFF {
+                // write basic codepoint as single escape
+                write!(writer, "\\u{codepoint:04x}").unwrap();
             } else {
-                for escape in ch.encode_utf16(&mut [0; 2]) {
-                    write!(writer, "\\u{escape:04x}")?;
+                // encode extended plane character as utf16 pair
+                for escape in non_ascii_char.encode_utf16(&mut [0; 2]) {
+                    write!(writer, "\\u{escape:04x}").unwrap();
                 }
             }
+
+            input = &input[(idx + non_ascii_char.len_utf8())..];
         }
+
+        // write any ascii trailer
+        writer.write_all(input.as_bytes())?;
         Ok(())
     }
 }
@@ -484,7 +500,7 @@ macro_rules! defer {
 }
 
 #[allow(clippy::needless_lifetimes)]
-impl<'a> Formatter for EscapeNonAsciiPrettyFormatter<'a> {
+impl Formatter for EscapeNonAsciiPrettyFormatter<'_> {
     defer!(escape_non_ascii, write_string_fragment, &str);
     defer!(pretty, begin_array);
     defer!(pretty, end_array);
