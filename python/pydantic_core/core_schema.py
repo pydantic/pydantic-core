@@ -4024,13 +4024,13 @@ def definition_reference_schema(
 class NeverSchema(TypedDict, total=False):
     type: Required[Literal['never']]
     ref: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
 
 
 def never_schema(
     *,
     ref: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> NeverSchema:
     """
     Returns a schema that represents a `typing.Never` field, e.g.:
