@@ -402,6 +402,7 @@ def to_json(
     exclude_none: bool = False,
     round_trip: bool = False,
     timedelta_mode: Literal['iso8601', 'float'] = 'iso8601',
+    termporal_mode: Literal['iso8601', 'seconds', 'milliseconds'] = 'iso8601',
     bytes_mode: Literal['utf8', 'base64', 'hex'] = 'utf8',
     inf_nan_mode: Literal['null', 'constants', 'strings'] = 'constants',
     serialize_unknown: bool = False,

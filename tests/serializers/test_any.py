@@ -722,3 +722,44 @@ def test_simple_any_ser_schema():
     assert v.to_json({MyEnum.A: 'x'}) == b'{"1":"x"}'
     assert v.to_python(1) == 1
     assert v.to_json(1) == b'1'
+
+@pytest.mark.parametrize(
+    'dt,expected_to_python,expected_to_json,expected_to_python_dict,expected_to_json_dict,mode',
+    [
+        (
+                datetime(2024, 1, 1, 0, 0, 0),
+                '2024-01-01T00:00:00',
+                b'"2024-01-01T00:00:00"',
+                {'2024-01-01T00:00:00': 'foo'},
+                b'{"2024-01-01T00:00:00":"foo"}',
+                'iso8601',
+        ),
+        (
+                datetime(2024, 1, 1, 0, 0, 0),
+                1704067200,
+                b'1704067200',
+                {'1704067200': 'foo'},
+                b'{"1704067200":"foo"}',
+                'seconds',
+        ),
+        (
+                datetime(2024, 1, 1, 0, 0, 0),
+                1704067200000,
+                b'1704067200000',
+                {'1704067200000': 'foo'},
+                b'{"1704067200000":"foo"}',
+                'milliseconds',
+        ),
+    ],
+)
+def test_any_config_datetime(
+        dt: datetime, expected_to_python, expected_to_json, expected_to_python_dict, expected_to_json_dict, mode
+):
+    s = SchemaSerializer(core_schema.any_schema(), config={'ser_json_temporal': mode})
+    assert s.to_python(dt) == dt
+    assert s.to_python(dt, mode='json') == expected_to_python
+    assert s.to_json(dt) == expected_to_json
+
+    assert s.to_python({dt: 'foo'}) == {dt: 'foo'}
+    assert s.to_python({dt: 'foo'}, mode='json') == expected_to_python_dict
+    assert s.to_json({dt: 'foo'}) == expected_to_json_dict
