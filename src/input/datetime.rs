@@ -6,7 +6,7 @@ use pyo3::pyclass::CompareOp;
 use pyo3::types::PyTuple;
 use pyo3::types::{PyDate, PyDateTime, PyDelta, PyDeltaAccess, PyDict, PyTime, PyTzInfo};
 use pyo3::IntoPyObjectExt;
-use speedate::MicrosecondsPrecisionOverflowBehavior;
+use speedate::{DateTimeConfig, MicrosecondsPrecisionOverflowBehavior};
 use speedate::{Date, DateTime, Duration, ParseError, Time, TimeConfig};
 use std::borrow::Cow;
 use std::collections::hash_map::DefaultHasher;
@@ -366,10 +366,12 @@ pub fn bytes_as_datetime<'py>(
 ) -> ValResult<EitherDateTime<'py>> {
     match DateTime::parse_bytes_with_config(
         bytes,
-        &TimeConfig {
-            microseconds_precision_overflow_behavior: microseconds_overflow_behavior,
-            unix_timestamp_offset: Some(0),
-        },
+        &DateTimeConfig::builder().time_config(
+            TimeConfig {
+                microseconds_precision_overflow_behavior: microseconds_overflow_behavior,
+                unix_timestamp_offset: Some(0),
+            },
+        ).build()
     ) {
         Ok(dt) => Ok(dt.into()),
         Err(err) => Err(ValError::new(
@@ -390,10 +392,12 @@ pub fn int_as_datetime<'py>(
     match DateTime::from_timestamp_with_config(
         timestamp,
         timestamp_microseconds,
-        &TimeConfig {
-            unix_timestamp_offset: Some(0),
-            ..Default::default()
-        },
+        &DateTimeConfig::builder().time_config(
+            TimeConfig {
+                unix_timestamp_offset: Some(0),
+                ..Default::default()
+            },
+        ).build()
     ) {
         Ok(dt) => Ok(dt.into()),
         Err(err) => Err(ValError::new(
