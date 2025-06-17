@@ -33,7 +33,7 @@ pub(crate) fn extract_microseconds_precision(
     schema_or_config_same(schema, config, intern!(schema.py(), "microseconds_precision"))?
         .map_or(
             Ok(speedate::MicrosecondsPrecisionOverflowBehavior::Truncate),
-            |v: Bound<'_, PyString>| speedate::MicrosecondsPrecisionOverflowBehavior::from_str(v.to_str().unwrap()),
+            |v: Bound<'_, PyString>| v.to_str().unwrap().parse(),
         )
         .map_err(|_| {
             py_schema_error_type!("Invalid `microseconds_precision`, must be one of \"truncate\" or \"error\"")
