@@ -16,19 +16,19 @@ pub(crate) fn datetime_to_string(py_dt: &Bound<'_, PyDateTime>) -> PyResult<Stri
     pydatetime_as_datetime(py_dt).map(|dt| dt.to_string())
 }
 
-pub(crate) fn datetime_to_seconds(py_dt: &Bound<'_, PyDateTime>) -> PyResult<i64> {
-    pydatetime_as_datetime(py_dt).map(|dt| dt.timestamp())
+pub(crate) fn datetime_to_seconds(py_dt: &Bound<'_, PyDateTime>) -> PyResult<f64> {
+    pydatetime_as_datetime(py_dt).map(|dt| dt.timestamp() as f64)
 }
 
-pub(crate) fn datetime_to_milliseconds(py_dt: &Bound<'_, PyDateTime>) -> PyResult<i64> {
-    pydatetime_as_datetime(py_dt).map(|dt| dt.timestamp_ms())
+pub(crate) fn datetime_to_milliseconds(py_dt: &Bound<'_, PyDateTime>) -> PyResult<f64> {
+    pydatetime_as_datetime(py_dt).map(|dt| dt.timestamp_ms() as f64)
 }
 
-pub(crate) fn date_to_seconds(py_date: &Bound<'_, PyDate>) -> PyResult<i64> {
-    pydate_as_date(py_date).map(|dt| dt.timestamp())
+pub(crate) fn date_to_seconds(py_date: &Bound<'_, PyDate>) -> PyResult<f64> {
+    pydate_as_date(py_date).map(|dt| dt.timestamp() as f64)
 }
-pub(crate) fn date_to_milliseconds(py_date: &Bound<'_, PyDate>) -> PyResult<i64> {
-    pydate_as_date(py_date).map(|dt| dt.timestamp_ms())
+pub(crate) fn date_to_milliseconds(py_date: &Bound<'_, PyDate>) -> PyResult<f64> {
+    pydate_as_date(py_date).map(|dt| dt.timestamp_ms() as f64)
 }
 
 pub(crate) fn date_to_string(py_date: &Bound<'_, PyDate>) -> PyResult<String> {
@@ -39,12 +39,12 @@ pub(crate) fn time_to_string(py_time: &Bound<'_, PyTime>) -> PyResult<String> {
     pytime_as_time(py_time, None).map(|dt| dt.to_string())
 }
 
-pub(crate) fn time_to_seconds(py_time: &Bound<'_, PyTime>) -> PyResult<u32> {
-    pytime_as_time(py_time, None).map(|t| t.total_seconds())
+pub(crate) fn time_to_seconds(py_time: &Bound<'_, PyTime>) -> PyResult<f32> {
+    pytime_as_time(py_time, None).map(|t| t.total_seconds() as f32)
 }
 
-pub(crate) fn time_to_milliseconds(py_time: &Bound<'_, PyTime>) -> PyResult<u32> {
-    pytime_as_time(py_time, None).map(|t| t.total_ms())
+pub(crate) fn time_to_milliseconds(py_time: &Bound<'_, PyTime>) -> PyResult<f32> {
+    pytime_as_time(py_time, None).map(|t| t.total_ms() as f32)
 }
 
 fn downcast_date_reject_datetime<'a, 'py>(py_date: &'a Bound<'py, PyAny>) -> PyResult<&'a Bound<'py, PyDate>> {

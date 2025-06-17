@@ -16,7 +16,7 @@ use super::{
 pub struct TimeDeltaSerializer {
     timedelta_mode: TimedeltaMode,
     temporal_mode: TemporalMode,
-    prefer_timedelta_mode: bool,
+    prefer_timedelta: bool,
 }
 
 pub enum EffectiveDeltaMode {
@@ -42,7 +42,7 @@ impl BuildSerializer for TimeDeltaSerializer {
         Ok(Self {
             timedelta_mode,
             temporal_mode,
-            prefer_timedelta_mode,
+            prefer_timedelta: prefer_timedelta_mode,
         }
         .into())
     }
@@ -50,10 +50,10 @@ impl BuildSerializer for TimeDeltaSerializer {
 
 impl TimeDeltaSerializer {
     pub fn effective_delta_mode(&self) -> EffectiveDeltaMode {
-        if self.prefer_timedelta_mode {
-            EffectiveDeltaMode::Timedelta(self.timedelta_mode.clone())
+        if self.prefer_timedelta {
+            EffectiveDeltaMode::Timedelta(self.timedelta_mode)
         } else {
-            EffectiveDeltaMode::Temporal(self.temporal_mode.clone())
+            EffectiveDeltaMode::Temporal(self.temporal_mode)
         }
     }
 }
