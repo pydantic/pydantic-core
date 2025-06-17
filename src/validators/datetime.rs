@@ -5,7 +5,6 @@ use pyo3::sync::GILOnceCell;
 use pyo3::types::{PyDict, PyString};
 use speedate::{DateTime, MicrosecondsPrecisionOverflowBehavior, Time};
 use std::cmp::Ordering;
-use std::str::FromStr;
 use strum::EnumMessage;
 
 use crate::build_tools::{is_strict, py_schema_error_type};

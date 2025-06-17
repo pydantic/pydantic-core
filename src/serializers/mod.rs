@@ -9,7 +9,6 @@ use type_serializers::any::AnySerializer;
 use crate::definitions::{Definitions, DefinitionsBuilder};
 use crate::py_gc::PyGcTraverse;
 
-use crate::serializers::config::TemporalMode;
 pub(crate) use config::BytesMode;
 use config::SerializationConfig;
 pub use errors::{PydanticSerializationError, PydanticSerializationUnexpectedValue};

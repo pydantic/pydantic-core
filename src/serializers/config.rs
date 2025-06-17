@@ -9,7 +9,7 @@ use pyo3::{intern, IntoPyObjectExt};
 use serde::ser::Error;
 
 use crate::build_tools::py_schema_err;
-use crate::input::{pydatetime_as_datetime, EitherTimedelta};
+use crate::input::EitherTimedelta;
 use crate::serializers::type_serializers::datetime_etc::{
     date_to_milliseconds, date_to_seconds, date_to_string, datetime_to_milliseconds, datetime_to_seconds,
     datetime_to_string, time_to_milliseconds, time_to_seconds, time_to_string,
