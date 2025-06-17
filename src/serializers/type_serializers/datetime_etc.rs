@@ -40,6 +40,14 @@ pub(crate) fn time_to_string(py_time: &Bound<'_, PyTime>) -> PyResult<String> {
     pytime_as_time(py_time, None).map(|dt| dt.to_string())
 }
 
+pub(crate) fn time_to_seconds(py_time: &Bound<'_, PyTime>) -> PyResult<u32> {
+    pytime_as_time(py_time, None).map(|t| t.total_seconds())
+}
+
+pub(crate) fn time_to_milliseconds(py_time: &Bound<'_, PyTime>) -> PyResult<u32> {
+    pytime_as_time(py_time, None).map(|t| t.total_ms())
+}
+
 fn downcast_date_reject_datetime<'a, 'py>(py_date: &'a Bound<'py, PyAny>) -> PyResult<&'a Bound<'py, PyDate>> {
     if let Ok(py_date) = py_date.downcast::<PyDate>() {
         // because `datetime` is a subclass of `date` we have to check that the value is not a
@@ -279,4 +287,73 @@ impl TypeSerializer for DateSerializer {
     }
 }
 
-build_serializer!(TimeSerializer, "time", PyAnyMethods::downcast::<PyTime>, time_to_string);
+#[derive(Debug)]
+pub struct TimeSerializer {
+    temporal_mode: TemporalMode,
+}
+
+impl BuildSerializer for TimeSerializer {
+    const EXPECTED_TYPE: &'static str = "time";
+
+    fn build(
+        _schema: &Bound<'_, PyDict>,
+        config: Option<&Bound<'_, PyDict>>,
+        _definitions: &mut DefinitionsBuilder<CombinedSerializer>,
+    ) -> PyResult<CombinedSerializer> {
+        let temporal_mode = TemporalMode::from_config(config)?;
+        Ok(Self { temporal_mode }.into())
+    }
+}
+impl_py_gc_traverse!(TimeSerializer {});
+
+impl TypeSerializer for TimeSerializer {
+    fn to_python(
+        &self,
+        value: &Bound<'_, PyAny>,
+        include: Option<&Bound<'_, PyAny>>,
+        exclude: Option<&Bound<'_, PyAny>>,
+        extra: &Extra,
+    ) -> PyResult<PyObject> {
+        match extra.mode {
+            SerMode::Json => match PyAnyMethods::downcast::<PyTime>(value) {
+                Ok(py_value) => Ok(self.temporal_mode.time_to_json(value.py(), py_value)?),
+                Err(_) => {
+                    extra.warnings.on_fallback_py(self.get_name(), value, extra)?;
+                    infer_to_python(value, include, exclude, extra)
+                }
+            },
+            _ => infer_to_python(value, include, exclude, extra),
+        }
+    }
+
+    fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
+        match PyAnyMethods::downcast::<PyTime>(key) {
+            Ok(py_value) => Ok(self.temporal_mode.time_json_key(py_value)?),
+            Err(_) => {
+                extra.warnings.on_fallback_py(self.get_name(), key, extra)?;
+                infer_json_key(key, extra)
+            }
+        }
+    }
+
+    fn serde_serialize<S: serde::ser::Serializer>(
+        &self,
+        value: &Bound<'_, PyAny>,
+        serializer: S,
+        include: Option<&Bound<'_, PyAny>>,
+        exclude: Option<&Bound<'_, PyAny>>,
+        extra: &Extra,
+    ) -> Result<S::Ok, S::Error> {
+        match PyAnyMethods::downcast::<PyTime>(value) {
+            Ok(py_value) => self.temporal_mode.time_serialize(py_value, serializer),
+            Err(_) => {
+                extra.warnings.on_fallback_ser::<S>(self.get_name(), value, extra)?;
+                infer_serialize(value, serializer, include, exclude, extra)
+            }
+        }
+    }
+
+    fn get_name(&self) -> &str {
+        Self::EXPECTED_TYPE
+    }
+}

@@ -187,8 +187,8 @@ pub(crate) fn infer_to_python_known(
                 date.into_py_any(py)?
             }
             ObType::Time => {
-                let iso_time = super::type_serializers::datetime_etc::time_to_string(value.downcast()?)?;
-                iso_time.into_py_any(py)?
+                let time = extra.config.temporal_mode.time_to_json(value.py(), value.downcast()?)?;
+                time.into_py_any(py)?
             }
             ObType::Timedelta => {
                 let either_delta = EitherTimedelta::try_from(value)?;
@@ -470,8 +470,7 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
         }
         ObType::Time => {
             let py_time = value.downcast().map_err(py_err_se_err)?;
-            let iso_time = super::type_serializers::datetime_etc::time_to_string(py_time).map_err(py_err_se_err)?;
-            serializer.serialize_str(&iso_time)
+            extra.config.temporal_mode.time_serialize(py_time, serializer)
         }
         ObType::Timedelta => {
             let either_delta = EitherTimedelta::try_from(value).map_err(py_err_se_err)?;
@@ -638,10 +637,7 @@ pub(crate) fn infer_json_key_known<'a>(
         }
         ObType::Datetime => extra.config.temporal_mode.datetime_json_key(key.downcast()?),
         ObType::Date => extra.config.temporal_mode.date_json_key(key.downcast()?),
-        ObType::Time => {
-            let iso_time = super::type_serializers::datetime_etc::time_to_string(key.downcast()?)?;
-            Ok(Cow::Owned(iso_time))
-        }
+        ObType::Time => extra.config.temporal_mode.time_json_key(key.downcast()?),
         ObType::Uuid => {
             let uuid = super::type_serializers::uuid::uuid_to_string(key)?;
             Ok(Cow::Owned(uuid))
