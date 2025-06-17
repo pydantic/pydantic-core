@@ -9,6 +9,7 @@ use type_serializers::any::AnySerializer;
 use crate::definitions::{Definitions, DefinitionsBuilder};
 use crate::py_gc::PyGcTraverse;
 
+use crate::serializers::config::TemporalMode;
 pub(crate) use config::BytesMode;
 use config::SerializationConfig;
 pub use errors::{PydanticSerializationError, PydanticSerializationUnexpectedValue};
@@ -16,7 +17,6 @@ use extra::{CollectWarnings, SerRecursionState, WarningsMode};
 pub(crate) use extra::{Extra, SerMode, SerializationState};
 use shared::to_json_bytes;
 pub use shared::CombinedSerializer;
-use crate::serializers::config::TemporalMode;
 
 mod computed_fields;
 mod config;

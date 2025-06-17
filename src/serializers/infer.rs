@@ -178,13 +178,13 @@ pub(crate) fn infer_to_python_known(
             ObType::Datetime => {
                 let datetime = extra
                     .config
-                    .datetime_mode
+                    .temporal_mode
                     .datetime_to_json(value.py(), value.downcast()?)?;
                 datetime.into_py_any(py)?
             }
             ObType::Date => {
-                let iso_date = super::type_serializers::datetime_etc::date_to_string(value.downcast()?)?;
-                iso_date.into_py_any(py)?
+                let date = extra.config.temporal_mode.date_to_json(value.py(), value.downcast()?)?;
+                date.into_py_any(py)?
             }
             ObType::Time => {
                 let iso_time = super::type_serializers::datetime_etc::time_to_string(value.downcast()?)?;
@@ -462,12 +462,11 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
         ObType::Frozenset => serialize_seq!(PyFrozenSet),
         ObType::Datetime => {
             let py_datetime = value.downcast().map_err(py_err_se_err)?;
-            extra.config.datetime_mode.datetime_serialize(py_datetime, serializer)
+            extra.config.temporal_mode.datetime_serialize(py_datetime, serializer)
         }
         ObType::Date => {
             let py_date = value.downcast().map_err(py_err_se_err)?;
-            let iso_date = super::type_serializers::datetime_etc::date_to_string(py_date).map_err(py_err_se_err)?;
-            serializer.serialize_str(&iso_date)
+            extra.config.temporal_mode.date_serialize(py_date, serializer)
         }
         ObType::Time => {
             let py_time = value.downcast().map_err(py_err_se_err)?;
@@ -637,11 +636,8 @@ pub(crate) fn infer_json_key_known<'a>(
             })
             .map(|cow| Cow::Owned(cow.into_owned()))
         }
-        ObType::Datetime => extra.config.datetime_mode.json_key(key.downcast()?),
-        ObType::Date => {
-            let iso_date = super::type_serializers::datetime_etc::date_to_string(key.downcast()?)?;
-            Ok(Cow::Owned(iso_date))
-        }
+        ObType::Datetime => extra.config.temporal_mode.datetime_json_key(key.downcast()?),
+        ObType::Date => extra.config.temporal_mode.date_json_key(key.downcast()?),
         ObType::Time => {
             let iso_time = super::type_serializers::datetime_etc::time_to_string(key.downcast()?)?;
             Ok(Cow::Owned(iso_time))

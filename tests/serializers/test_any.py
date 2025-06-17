@@ -763,3 +763,44 @@ def test_any_config_datetime(
     assert s.to_python({dt: 'foo'}) == {dt: 'foo'}
     assert s.to_python({dt: 'foo'}, mode='json') == expected_to_python_dict
     assert s.to_json({dt: 'foo'}) == expected_to_json_dict
+
+@pytest.mark.parametrize(
+    'dt,expected_to_python,expected_to_json,expected_to_python_dict,expected_to_json_dict,mode',
+    [
+        (
+                date(2024, 1, 1),
+                '2024-01-01',
+                b'"2024-01-01"',
+                {'2024-01-01': 'foo'},
+                b'{"2024-01-01":"foo"}',
+                'iso8601',
+        ),
+        (
+                date(2024, 1, 1),
+                1704067200,
+                b'1704067200',
+                {'1704067200': 'foo'},
+                b'{"1704067200":"foo"}',
+                'seconds',
+        ),
+        (
+                date(2024, 1, 1),
+                1704067200000,
+                b'1704067200000',
+                {'1704067200000': 'foo'},
+                b'{"1704067200000":"foo"}',
+                'milliseconds',
+        ),
+    ],
+)
+def test_any_config_date(
+        dt: date, expected_to_python, expected_to_json, expected_to_python_dict, expected_to_json_dict, mode
+):
+    s = SchemaSerializer(core_schema.any_schema(), config={'ser_json_temporal': mode})
+    assert s.to_python(dt) == dt
+    assert s.to_python(dt, mode='json') == expected_to_python
+    assert s.to_json(dt) == expected_to_json
+
+    assert s.to_python({dt: 'foo'}) == {dt: 'foo'}
+    assert s.to_python({dt: 'foo'}, mode='json') == expected_to_python_dict
+    assert s.to_json({dt: 'foo'}) == expected_to_json_dict

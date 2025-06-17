@@ -10,7 +10,7 @@ use super::{
 };
 use crate::definitions::DefinitionsBuilder;
 use crate::input::{pydate_as_date, pydatetime_as_datetime, pytime_as_time};
-use crate::serializers::config::{TemporalMode, FromConfig};
+use crate::serializers::config::{FromConfig, TemporalMode};
 use crate::PydanticSerializationUnexpectedValue;
 
 pub(crate) fn datetime_to_string(py_dt: &Bound<'_, PyDateTime>) -> PyResult<String> {
@@ -23,6 +23,13 @@ pub(crate) fn datetime_to_seconds(py_dt: &Bound<'_, PyDateTime>) -> PyResult<i64
 
 pub(crate) fn datetime_to_milliseconds(py_dt: &Bound<'_, PyDateTime>) -> PyResult<i64> {
     pydatetime_as_datetime(py_dt).map(|dt| dt.timestamp_ms())
+}
+
+pub(crate) fn date_to_seconds(py_date: &Bound<'_, PyDate>) -> PyResult<i64> {
+    pydate_as_date(py_date).map(|dt| dt.timestamp())
+}
+pub(crate) fn date_to_milliseconds(py_date: &Bound<'_, PyDate>) -> PyResult<i64> {
+    pydate_as_date(py_date).map(|dt| dt.timestamp_ms())
 }
 
 pub(crate) fn date_to_string(py_date: &Bound<'_, PyDate>) -> PyResult<String> {
@@ -140,8 +147,8 @@ impl BuildSerializer for DatetimeSerializer {
         config: Option<&Bound<'_, PyDict>>,
         _definitions: &mut DefinitionsBuilder<CombinedSerializer>,
     ) -> PyResult<CombinedSerializer> {
-        let datetime_mode = TemporalMode::from_config(config)?;
-        Ok(Self { temporal_mode: datetime_mode }.into())
+        let temporal_mode = TemporalMode::from_config(config)?;
+        Ok(Self { temporal_mode }.into())
     }
 }
 impl_py_gc_traverse!(DatetimeSerializer {});
@@ -168,7 +175,7 @@ impl TypeSerializer for DatetimeSerializer {
 
     fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
         match PyAnyMethods::downcast::<PyDateTime>(key) {
-            Ok(py_value) => Ok(self.temporal_mode.json_key(py_value)?),
+            Ok(py_value) => Ok(self.temporal_mode.datetime_json_key(py_value)?),
             Err(_) => {
                 extra.warnings.on_fallback_py(self.get_name(), key, extra)?;
                 infer_json_key(key, extra)
@@ -197,5 +204,79 @@ impl TypeSerializer for DatetimeSerializer {
         Self::EXPECTED_TYPE
     }
 }
-build_serializer!(DateSerializer, "date", downcast_date_reject_datetime, date_to_string);
+
+#[derive(Debug)]
+pub struct DateSerializer {
+    temporal_mode: TemporalMode,
+}
+
+impl BuildSerializer for DateSerializer {
+    const EXPECTED_TYPE: &'static str = "date";
+
+    fn build(
+        _schema: &Bound<'_, PyDict>,
+        config: Option<&Bound<'_, PyDict>>,
+        _definitions: &mut DefinitionsBuilder<CombinedSerializer>,
+    ) -> PyResult<CombinedSerializer> {
+        let temporal_mode = TemporalMode::from_config(config)?;
+        Ok(Self {
+            temporal_mode: temporal_mode,
+        }
+        .into())
+    }
+}
+impl_py_gc_traverse!(DateSerializer {});
+
+impl TypeSerializer for DateSerializer {
+    fn to_python(
+        &self,
+        value: &Bound<'_, PyAny>,
+        include: Option<&Bound<'_, PyAny>>,
+        exclude: Option<&Bound<'_, PyAny>>,
+        extra: &Extra,
+    ) -> PyResult<PyObject> {
+        match extra.mode {
+            SerMode::Json => match downcast_date_reject_datetime(value) {
+                Ok(py_value) => Ok(self.temporal_mode.date_to_json(value.py(), py_value)?),
+                Err(_) => {
+                    extra.warnings.on_fallback_py(self.get_name(), value, extra)?;
+                    infer_to_python(value, include, exclude, extra)
+                }
+            },
+            _ => infer_to_python(value, include, exclude, extra),
+        }
+    }
+
+    fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
+        match downcast_date_reject_datetime(key) {
+            Ok(py_value) => Ok(self.temporal_mode.date_json_key(py_value)?),
+            Err(_) => {
+                extra.warnings.on_fallback_py(self.get_name(), key, extra)?;
+                infer_json_key(key, extra)
+            }
+        }
+    }
+
+    fn serde_serialize<S: serde::ser::Serializer>(
+        &self,
+        value: &Bound<'_, PyAny>,
+        serializer: S,
+        include: Option<&Bound<'_, PyAny>>,
+        exclude: Option<&Bound<'_, PyAny>>,
+        extra: &Extra,
+    ) -> Result<S::Ok, S::Error> {
+        match downcast_date_reject_datetime(value) {
+            Ok(py_value) => self.temporal_mode.date_serialize(py_value, serializer),
+            Err(_) => {
+                extra.warnings.on_fallback_ser::<S>(self.get_name(), value, extra)?;
+                infer_serialize(value, serializer, include, exclude, extra)
+            }
+        }
+    }
+
+    fn get_name(&self) -> &str {
+        Self::EXPECTED_TYPE
+    }
+}
+
 build_serializer!(TimeSerializer, "time", PyAnyMethods::downcast::<PyTime>, time_to_string);
