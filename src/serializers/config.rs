@@ -14,6 +14,7 @@ use crate::serializers::type_serializers::datetime_etc::{
     date_to_milliseconds, date_to_seconds, date_to_string, datetime_to_milliseconds, datetime_to_seconds,
     datetime_to_string, time_to_milliseconds, time_to_seconds, time_to_string,
 };
+use crate::serializers::type_serializers::timedelta::EffectiveDeltaMode;
 use crate::tools::SchemaDict;
 
 use super::errors::py_err_se_err;
@@ -23,6 +24,7 @@ use super::errors::py_err_se_err;
 pub(crate) struct SerializationConfig {
     pub timedelta_mode: TimedeltaMode,
     pub temporal_mode: TemporalMode,
+    prefer_timedelta_mode: bool,
     pub bytes_mode: BytesMode,
     pub inf_nan_mode: InfNanMode,
 }
@@ -30,12 +32,16 @@ pub(crate) struct SerializationConfig {
 impl SerializationConfig {
     pub fn from_config(config: Option<&Bound<'_, PyDict>>) -> PyResult<Self> {
         let timedelta_mode = TimedeltaMode::from_config(config)?;
-        let datetime_mode = TemporalMode::from_config(config)?;
+        let temporal_mode = TemporalMode::from_config(config)?;
+        let prefer_timedelta_mode = config
+            .and_then(|cfg| cfg.contains(intern!(cfg.py(), "ser_json_timedelta")).ok())
+            .unwrap_or(false);
         let bytes_mode = BytesMode::from_config(config)?;
         let inf_nan_mode = InfNanMode::from_config(config)?;
         Ok(Self {
             timedelta_mode,
-            temporal_mode: datetime_mode,
+            temporal_mode,
+            prefer_timedelta_mode,
             bytes_mode,
             inf_nan_mode,
         })
@@ -50,9 +56,18 @@ impl SerializationConfig {
         Ok(Self {
             timedelta_mode: TimedeltaMode::from_str(timedelta_mode)?,
             temporal_mode: TemporalMode::from_str(datetime_mode)?,
+            prefer_timedelta_mode: true, // This is not settable via args
             bytes_mode: BytesMode::from_str(bytes_mode)?,
             inf_nan_mode: InfNanMode::from_str(inf_nan_mode)?,
         })
+    }
+
+    pub fn effective_delta_mode(&self) -> EffectiveDeltaMode {
+        if self.prefer_timedelta_mode {
+            EffectiveDeltaMode::Timedelta(self.timedelta_mode.clone())
+        } else {
+            EffectiveDeltaMode::Temporal(self.temporal_mode.clone())
+        }
     }
 }
 
@@ -209,6 +224,23 @@ impl TemporalMode {
         }
     }
 
+    pub fn timedelta_to_json(self, py: Python, either_delta: EitherTimedelta) -> PyResult<PyObject> {
+        match self {
+            Self::Iso8601 => {
+                let d = either_delta.to_duration()?;
+                Ok(d.to_string().into_py_any(py)?)
+            }
+            Self::SecondsInt => {
+                let seconds: f64 = either_delta.total_seconds()?;
+                Ok(seconds.into_py_any(py)?)
+            }
+            Self::MillisecondsInt => {
+                let milliseconds: f64 = either_delta.total_milliseconds()?;
+                Ok(milliseconds.into_py_any(py)?)
+            }
+        }
+    }
+
     pub fn datetime_json_key<'py>(self, datetime: &Bound<'_, PyDateTime>) -> PyResult<Cow<'py, str>> {
         match self {
             Self::Iso8601 => Ok(datetime_to_string(datetime)?.to_string().into()),
@@ -230,6 +262,23 @@ impl TemporalMode {
             Self::Iso8601 => Ok(time_to_string(time)?.to_string().into()),
             Self::SecondsInt => Ok(time_to_seconds(time)?.to_string().into()),
             Self::MillisecondsInt => Ok(time_to_milliseconds(time)?.to_string().into()),
+        }
+    }
+
+    pub fn timedelta_json_key<'py>(self, either_delta: &EitherTimedelta) -> PyResult<Cow<'py, str>> {
+        match self {
+            Self::Iso8601 => {
+                let d = either_delta.to_duration()?;
+                Ok(d.to_string().into())
+            }
+            Self::SecondsInt => {
+                let seconds: f64 = either_delta.total_seconds()?;
+                Ok(seconds.to_string().into())
+            }
+            Self::MillisecondsInt => {
+                let milliseconds: f64 = either_delta.total_milliseconds()?;
+                Ok(milliseconds.to_string().into())
+            }
         }
     }
 
@@ -292,6 +341,27 @@ impl TemporalMode {
             Self::MillisecondsInt => {
                 let s = time_to_milliseconds(time).map_err(py_err_se_err)?;
                 serializer.serialize_u32(s)
+            }
+        }
+    }
+
+    pub fn timedelta_serialize<S: serde::ser::Serializer>(
+        self,
+        either_delta: EitherTimedelta,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Iso8601 => {
+                let d = either_delta.to_duration().map_err(py_err_se_err)?;
+                serializer.serialize_str(&d.to_string())
+            }
+            Self::SecondsInt => {
+                let seconds: f64 = either_delta.total_seconds().map_err(py_err_se_err)?;
+                serializer.serialize_f64(seconds)
+            }
+            Self::MillisecondsInt => {
+                let milliseconds: f64 = either_delta.total_milliseconds().map_err(py_err_se_err)?;
+                serializer.serialize_f64(milliseconds)
             }
         }
     }

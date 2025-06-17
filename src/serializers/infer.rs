@@ -12,6 +12,7 @@ use serde::ser::{Error, Serialize, SerializeMap, SerializeSeq, Serializer};
 
 use crate::input::{EitherTimedelta, Int};
 use crate::serializers::type_serializers;
+use crate::serializers::type_serializers::timedelta::EffectiveDeltaMode;
 use crate::tools::{extract_int, py_err, safe_repr};
 use crate::url::{PyMultiHostUrl, PyUrl};
 
@@ -192,10 +193,15 @@ pub(crate) fn infer_to_python_known(
             }
             ObType::Timedelta => {
                 let either_delta = EitherTimedelta::try_from(value)?;
-                extra
-                    .config
-                    .timedelta_mode
-                    .either_delta_to_json(value.py(), either_delta)?
+                let x = match extra.config.effective_delta_mode() {
+                    EffectiveDeltaMode::Temporal(temporal_mode) => {
+                        temporal_mode.timedelta_to_json(value.py(), either_delta)
+                    }
+                    EffectiveDeltaMode::Timedelta(timedelta_mode) => {
+                        timedelta_mode.either_delta_to_json(value.py(), either_delta)
+                    }
+                }?;
+                x
             }
             ObType::Url => {
                 let py_url: PyUrl = value.extract()?;
@@ -474,10 +480,14 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
         }
         ObType::Timedelta => {
             let either_delta = EitherTimedelta::try_from(value).map_err(py_err_se_err)?;
-            extra
-                .config
-                .timedelta_mode
-                .timedelta_serialize(value.py(), either_delta, serializer)
+            match extra.config.effective_delta_mode() {
+                EffectiveDeltaMode::Temporal(temporal_mode) => {
+                    temporal_mode.timedelta_serialize(either_delta, serializer)
+                }
+                EffectiveDeltaMode::Timedelta(timedelta_mode) => {
+                    timedelta_mode.timedelta_serialize(value.py(), either_delta, serializer)
+                }
+            }
         }
         ObType::Url => {
             let py_url: PyUrl = value.extract().map_err(py_err_se_err)?;
@@ -644,7 +654,10 @@ pub(crate) fn infer_json_key_known<'a>(
         }
         ObType::Timedelta => {
             let either_delta = EitherTimedelta::try_from(key)?;
-            extra.config.timedelta_mode.json_key(key.py(), either_delta)
+            match extra.config.effective_delta_mode() {
+                EffectiveDeltaMode::Temporal(temporal_mode) => temporal_mode.timedelta_json_key(&either_delta),
+                EffectiveDeltaMode::Timedelta(timedelta_mode) => timedelta_mode.json_key(key.py(), either_delta),
+            }
         }
         ObType::Url => {
             let py_url: PyUrl = key.extract()?;
