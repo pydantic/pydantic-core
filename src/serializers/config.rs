@@ -202,25 +202,25 @@ impl TimedeltaMode {
 impl TemporalMode {
     pub fn datetime_to_json(self, py: Python, datetime: &Bound<'_, PyDateTime>) -> PyResult<PyObject> {
         match self {
-            Self::Iso8601 => Ok(datetime_to_string(datetime)?.into_py_any(py)?),
-            Self::Seconds => Ok(datetime_to_seconds(datetime)?.into_py_any(py)?),
-            Self::Milliseconds => Ok(datetime_to_milliseconds(datetime)?.into_py_any(py)?),
+            Self::Iso8601 => datetime_to_string(datetime)?.into_py_any(py),
+            Self::Seconds => datetime_to_seconds(datetime)?.into_py_any(py),
+            Self::Milliseconds => datetime_to_milliseconds(datetime)?.into_py_any(py),
         }
     }
 
     pub fn date_to_json(self, py: Python, date: &Bound<'_, PyDate>) -> PyResult<PyObject> {
         match self {
-            Self::Iso8601 => Ok(date_to_string(date)?.into_py_any(py)?),
-            Self::Seconds => Ok(date_to_seconds(date)?.into_py_any(py)?),
-            Self::Milliseconds => Ok(date_to_milliseconds(date)?.into_py_any(py)?),
+            Self::Iso8601 => date_to_string(date)?.into_py_any(py),
+            Self::Seconds => date_to_seconds(date)?.into_py_any(py),
+            Self::Milliseconds => date_to_milliseconds(date)?.into_py_any(py),
         }
     }
 
     pub fn time_to_json(self, py: Python, time: &Bound<'_, PyTime>) -> PyResult<PyObject> {
         match self {
-            Self::Iso8601 => Ok(time_to_string(time)?.into_py_any(py)?),
-            Self::Seconds => Ok(time_to_seconds(time)?.into_py_any(py)?),
-            Self::Milliseconds => Ok(time_to_milliseconds(time)?.into_py_any(py)?),
+            Self::Iso8601 => time_to_string(time)?.into_py_any(py),
+            Self::Seconds => time_to_seconds(time)?.into_py_any(py),
+            Self::Milliseconds => time_to_milliseconds(time)?.into_py_any(py),
         }
     }
 
@@ -228,15 +228,15 @@ impl TemporalMode {
         match self {
             Self::Iso8601 => {
                 let d = either_delta.to_duration()?;
-                Ok(d.to_string().into_py_any(py)?)
+                d.to_string().into_py_any(py)
             }
             Self::Seconds => {
                 let seconds: f64 = either_delta.total_seconds()?;
-                Ok(seconds.into_py_any(py)?)
+                seconds.into_py_any(py)
             }
             Self::Milliseconds => {
                 let milliseconds: f64 = either_delta.total_milliseconds()?;
-                Ok(milliseconds.into_py_any(py)?)
+                milliseconds.into_py_any(py)
             }
         }
     }
