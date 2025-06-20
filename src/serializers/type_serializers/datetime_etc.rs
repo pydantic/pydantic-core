@@ -97,26 +97,18 @@ macro_rules! build_temporal_serializer {
                 extra: &Extra,
             ) -> PyResult<PyObject> {
                 match extra.mode {
-                    SerMode::Json => {
-                        match $downcast(value) {
-                            Ok(py_value) => {
-                                Ok(self.temporal_mode.$to_json(value.py(), py_value)?)
-                            }
-                            Err(_) => {
-                                extra.warnings.on_fallback_py(self.get_name(), value, extra)?;
-                                infer_to_python(value, include, exclude, extra)
-                            }
+                    SerMode::Json => match $downcast(value) {
+                        Ok(py_value) => Ok(self.temporal_mode.$to_json(value.py(), py_value)?),
+                        Err(_) => {
+                            extra.warnings.on_fallback_py(self.get_name(), value, extra)?;
+                            infer_to_python(value, include, exclude, extra)
                         }
-                    }
+                    },
                     _ => infer_to_python(value, include, exclude, extra),
                 }
             }
 
-            fn json_key<'a>(
-                &self,
-                key: &'a Bound<'_, PyAny>,
-                extra: &Extra,
-            ) -> PyResult<Cow<'a, str>> {
+            fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
                 match $downcast(key) {
                     Ok(py_value) => Ok(self.temporal_mode.$json_key_fn(py_value)?),
                     Err(_) => {
@@ -137,7 +129,9 @@ macro_rules! build_temporal_serializer {
                 match $downcast(value) {
                     Ok(py_value) => self.temporal_mode.$serialize_fn(py_value, serializer),
                     Err(_) => {
-                        extra.warnings.on_fallback_ser::<S>(self.get_name(), value, extra)?;
+                        extra
+                            .warnings
+                            .on_fallback_ser::<S>(self.get_name(), value, extra)?;
                         infer_serialize(value, serializer, include, exclude, extra)
                     }
                 }
