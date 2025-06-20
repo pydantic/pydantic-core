@@ -49,13 +49,13 @@ impl SerializationConfig {
 
     pub fn from_args(
         timedelta_mode: &str,
-        datetime_mode: &str,
+        temporal_mode: &str,
         bytes_mode: &str,
         inf_nan_mode: &str,
     ) -> PyResult<Self> {
         Ok(Self {
             timedelta_mode: TimedeltaMode::from_str(timedelta_mode)?,
-            temporal_mode: TemporalMode::from_str(datetime_mode)?,
+            temporal_mode: TemporalMode::from_str(temporal_mode)?,
             prefer_timedelta_mode: true, // This is not settable via args
             bytes_mode: BytesMode::from_str(bytes_mode)?,
             inf_nan_mode: InfNanMode::from_str(inf_nan_mode)?,
