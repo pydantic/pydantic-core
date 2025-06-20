@@ -17,11 +17,23 @@ pub(crate) fn datetime_to_string(py_dt: &Bound<'_, PyDateTime>) -> PyResult<Stri
 }
 
 pub(crate) fn datetime_to_seconds(py_dt: &Bound<'_, PyDateTime>) -> PyResult<f64> {
-    pydatetime_as_datetime(py_dt).map(|dt| dt.timestamp() as f64)
+    pydatetime_as_datetime(py_dt).map(|dt|
+        dt.date.timestamp() as f64
+            + dt.time.hour as f64 * 3600.0
+            + dt.time.minute as f64 * 60.0
+            + dt.time.second as f64
+            + dt.time.microsecond as f64 / 1_000_000.0
+    )
 }
 
 pub(crate) fn datetime_to_milliseconds(py_dt: &Bound<'_, PyDateTime>) -> PyResult<f64> {
-    pydatetime_as_datetime(py_dt).map(|dt| dt.timestamp_ms() as f64)
+    pydatetime_as_datetime(py_dt).map(|dt|
+        dt.date.timestamp_ms() as f64
+            + dt.time.hour as f64 * 3_600_000.0
+            + dt.time.minute as f64 * 60_000.0
+            + dt.time.second as f64 * 1_000.0
+            + dt.time.microsecond as f64 / 1_000.0
+    )
 }
 
 pub(crate) fn date_to_seconds(py_date: &Bound<'_, PyDate>) -> PyResult<f64> {
@@ -39,12 +51,19 @@ pub(crate) fn time_to_string(py_time: &Bound<'_, PyTime>) -> PyResult<String> {
     pytime_as_time(py_time, None).map(|dt| dt.to_string())
 }
 
-pub(crate) fn time_to_seconds(py_time: &Bound<'_, PyTime>) -> PyResult<f32> {
-    pytime_as_time(py_time, None).map(|t| t.total_seconds() as f32)
+pub(crate) fn time_to_seconds(py_time: &Bound<'_, PyTime>) -> PyResult<f64> {
+    pytime_as_time(py_time, None).map(|t| {
+        t.hour as f64 * 3600.0 + t.minute as f64 * 60.0 + t.second as f64 + t.microsecond as f64 / 1_000_000.0
+    })
 }
 
-pub(crate) fn time_to_milliseconds(py_time: &Bound<'_, PyTime>) -> PyResult<f32> {
-    pytime_as_time(py_time, None).map(|t| t.total_ms() as f32)
+pub(crate) fn time_to_milliseconds(py_time: &Bound<'_, PyTime>) -> PyResult<f64> {
+    pytime_as_time(py_time, None).map(|t| {
+        t.hour as f64 * 3_600_000.0
+            + t.minute as f64 * 60_000.0
+            + t.second as f64 * 1_000.0
+            + t.microsecond as f64 / 1_000.0
+    })
 }
 
 fn downcast_date_reject_datetime<'a, 'py>(py_date: &'a Bound<'py, PyAny>) -> PyResult<&'a Bound<'py, PyDate>> {

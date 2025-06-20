@@ -336,11 +336,11 @@ impl TemporalMode {
             }
             Self::Seconds => {
                 let s = time_to_seconds(time).map_err(py_err_se_err)?;
-                serializer.serialize_f32(s)
+                serializer.serialize_f64(s)
             }
             Self::Milliseconds => {
                 let s = time_to_milliseconds(time).map_err(py_err_se_err)?;
-                serializer.serialize_f32(s)
+                serializer.serialize_f64(s)
             }
         }
     }
