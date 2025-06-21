@@ -46,7 +46,11 @@ Funding = 'https://github.com/sponsors/samuelcolvin'
 Source = 'https://github.com/pydantic/pydantic-core'
 
 [dependency-groups]
-dev = ["maturin"]
+dev = [
+    "maturin",
+    "pytest-csv>=3.0.0",
+    "pytest-repeat>=0.9.4",
+]
 testing = [
     { include-group = "dev" },
     'coverage',

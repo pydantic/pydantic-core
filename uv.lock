@@ -585,9 +585,11 @@ all = [
     { name = "pandas", marker = "python_full_version < '3.13' and implementation_name == 'cpython' and platform_machine == 'x86_64'" },
     { name = "pyright" },
     { name = "pytest" },
+    { name = "pytest-csv" },
     { name = "pytest-examples", marker = "implementation_name == 'cpython' and platform_machine == 'x86_64'" },
     { name = "pytest-mock" },
     { name = "pytest-pretty" },
+    { name = "pytest-repeat" },
     { name = "pytest-run-parallel" },
     { name = "pytest-speed" },
     { name = "pytest-timeout" },
@@ -601,12 +603,16 @@ codspeed = [
 ]
 dev = [
     { name = "maturin" },
+    { name = "pytest-csv" },
+    { name = "pytest-repeat" },
 ]
 linting = [
     { name = "griffe" },
     { name = "maturin" },
     { name = "mypy" },
     { name = "pyright" },
+    { name = "pytest-csv" },
+    { name = "pytest-repeat" },
     { name = "ruff" },
 ]
 testing = [
@@ -620,9 +626,11 @@ testing = [
     { name = "numpy", version = "2.2.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10' and python_full_version < '3.13' and implementation_name == 'cpython' and platform_machine == 'x86_64'" },
     { name = "pandas", marker = "python_full_version < '3.13' and implementation_name == 'cpython' and platform_machine == 'x86_64'" },
     { name = "pytest" },
+    { name = "pytest-csv" },
     { name = "pytest-examples", marker = "implementation_name == 'cpython' and platform_machine == 'x86_64'" },
     { name = "pytest-mock" },
     { name = "pytest-pretty" },
+    { name = "pytest-repeat" },
     { name = "pytest-run-parallel" },
     { name = "pytest-speed" },
     { name = "pytest-timeout" },
@@ -632,6 +640,8 @@ testing = [
 ]
 wasm = [
     { name = "maturin" },
+    { name = "pytest-csv" },
+    { name = "pytest-repeat" },
     { name = "ruff" },
 ]
 
@@ -652,9 +662,11 @@ all = [
     { name = "pandas", marker = "python_full_version < '3.13' and implementation_name == 'cpython' and platform_machine == 'x86_64'" },
     { name = "pyright" },
     { name = "pytest" },
+    { name = "pytest-csv", specifier = ">=3.0.0" },
     { name = "pytest-examples", marker = "implementation_name == 'cpython' and platform_machine == 'x86_64'" },
     { name = "pytest-mock" },
     { name = "pytest-pretty" },
+    { name = "pytest-repeat", specifier = ">=0.9.4" },
     { name = "pytest-run-parallel" },
     { name = "pytest-speed" },
     { name = "pytest-timeout" },
@@ -664,12 +676,18 @@ all = [
     { name = "tzdata" },
 ]
 codspeed = [{ name = "pytest-codspeed", marker = "python_full_version == '3.13.*' and implementation_name == 'cpython'" }]
-dev = [{ name = "maturin" }]
+dev = [
+    { name = "maturin" },
+    { name = "pytest-csv", specifier = ">=3.0.0" },
+    { name = "pytest-repeat", specifier = ">=0.9.4" },
+]
 linting = [
     { name = "griffe" },
     { name = "maturin" },
     { name = "mypy" },
     { name = "pyright" },
+    { name = "pytest-csv", specifier = ">=3.0.0" },
+    { name = "pytest-repeat", specifier = ">=0.9.4" },
     { name = "ruff" },
 ]
 testing = [
@@ -682,9 +700,11 @@ testing = [
     { name = "numpy", marker = "python_full_version < '3.13' and implementation_name == 'cpython' and platform_machine == 'x86_64'" },
     { name = "pandas", marker = "python_full_version < '3.13' and implementation_name == 'cpython' and platform_machine == 'x86_64'" },
     { name = "pytest" },
+    { name = "pytest-csv", specifier = ">=3.0.0" },
     { name = "pytest-examples", marker = "implementation_name == 'cpython' and platform_machine == 'x86_64'" },
     { name = "pytest-mock" },
     { name = "pytest-pretty" },
+    { name = "pytest-repeat", specifier = ">=0.9.4" },
     { name = "pytest-run-parallel" },
     { name = "pytest-speed" },
     { name = "pytest-timeout" },
@@ -694,6 +714,8 @@ testing = [
 ]
 wasm = [
     { name = "maturin" },
+    { name = "pytest-csv", specifier = ">=3.0.0" },
+    { name = "pytest-repeat", specifier = ">=0.9.4" },
     { name = "ruff" },
 ]
 
@@ -761,6 +783,19 @@ wheels = [
 ]
 
 [[package]]
+name = "pytest-csv"
+version = "3.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pytest" },
+    { name = "six" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/76/a6/dd9820c07c0d6251ab9c8764307aca3cd2ce9057f7f9459edd173dab342e/pytest-csv-3.0.0.tar.gz", hash = "sha256:6d01e7db1aa2137eae822d3fdb2d6a5dd0ce736548593b5311ae3cf41e2d12d4", size = 21923, upload-time = "2021-04-22T19:31:53.512Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e6/2c/2ce553f606e1544655928d7a9280c63270d57a431e3dad621132e09a8147/pytest_csv-3.0.0-py2.py3-none-any.whl", hash = "sha256:599ab855d2ba748275dc7f814f63f9f6593bdd9a064f27cfd3940e68e6525c36", size = 26401, upload-time = "2021-04-22T19:31:52.472Z" },
+]
+
+[[package]]
 name = "pytest-examples"
 version = "0.0.15"
 source = { registry = "https://pypi.org/simple" }
@@ -797,6 +832,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/a5/18/30ad0408295f3157f7a4913f0eaa51a0a377ebad0ffa51ff239e833c6c72/pytest_pretty-1.2.0.tar.gz", hash = "sha256:105a355f128e392860ad2c478ae173ff96d2f03044692f9818ff3d49205d3a60", size = 6542, upload-time = "2023-04-05T17:11:50.917Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/bf/fe/d44d391312c1b8abee2af58ee70fabb1c00b6577ac4e0bdf25b70c1caffb/pytest_pretty-1.2.0-py3-none-any.whl", hash = "sha256:6f79122bf53864ae2951b6c9e94d7a06a87ef753476acd4588aeac018f062036", size = 6180, upload-time = "2023-04-05T17:11:49.801Z" },
+]
+
+[[package]]
+name = "pytest-repeat"
+version = "0.9.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pytest" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/80/d4/69e9dbb9b8266df0b157c72be32083403c412990af15c7c15f7a3fd1b142/pytest_repeat-0.9.4.tar.gz", hash = "sha256:d92ac14dfaa6ffcfe6917e5d16f0c9bc82380c135b03c2a5f412d2637f224485", size = 6488, upload-time = "2025-04-07T14:59:53.077Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/73/d4/8b706b81b07b43081bd68a2c0359fe895b74bf664b20aca8005d2bb3be71/pytest_repeat-0.9.4-py3-none-any.whl", hash = "sha256:c1738b4e412a6f3b3b9e0b8b29fcd7a423e50f87381ad9307ef6f5a8601139f3", size = 4180, upload-time = "2025-04-07T14:59:51.492Z" },
 ]
 
 [[package]]

@@ -350,10 +350,20 @@ def test_model_list_core_json(benchmark):
 
 
 @pytest.mark.benchmark(group='model-list-json')
-def test_datetime(benchmark):
-    v = SchemaSerializer(core_schema.datetime_schema())
+@pytest.mark.parametrize(
+    ['temporal_mode', 'output'],
+    [
+        ('iso8601', '2022-12-02T12:13:14'),
+        ('seconds', 1669983194.0),
+        ('milliseconds', 1669983194000.0),
+    ],
+)
+def test_datetime(benchmark, temporal_mode, output):
+    v = SchemaSerializer(core_schema.datetime_schema(), config={
+        "ser_json_temporal": temporal_mode,
+    })
     d = datetime(2022, 12, 2, 12, 13, 14)
-    assert v.to_python(d, mode='json') == '2022-12-02T12:13:14'
+    assert v.to_python(d, mode='json') == output
 
     @benchmark
     def r():
