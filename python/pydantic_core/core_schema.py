@@ -61,6 +61,10 @@ class CoreConfig(TypedDict, total=False):
         str_to_upper: Whether to convert string fields to uppercase.
         allow_inf_nan: Whether to allow infinity and NaN values for float fields. Default is `True`.
         ser_json_timedelta: The serialization option for `timedelta` values. Default is 'iso8601'.
+            Note that if ser_json_temporal is set, then this param will be ignored.
+        ser_json_temporal: The serialization option for datetime like values. Default is 'iso8601'.
+            The types this covers are datetime, date, time and timedelta.
+            If this is set, it will take precedence over ser_json_timedelta
         ser_json_bytes: The serialization option for `bytes` values. Default is 'utf8'.
         ser_json_inf_nan: The serialization option for infinity and NaN values
             in float fields. Default is 'null'.

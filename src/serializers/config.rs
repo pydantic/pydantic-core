@@ -3,7 +3,7 @@ use std::str::{from_utf8, FromStr, Utf8Error};
 
 use base64::Engine;
 use pyo3::prelude::*;
-use pyo3::types::{PyDate, PyDateTime, PyDelta, PyDict, PyString, PyTime};
+use pyo3::types::{PyDate, PyDateTime, PyDict, PyString, PyTime};
 use pyo3::{intern, IntoPyObjectExt};
 
 use serde::ser::Error;
@@ -14,7 +14,6 @@ use crate::serializers::type_serializers::datetime_etc::{
     date_to_milliseconds, date_to_seconds, date_to_string, datetime_to_milliseconds, datetime_to_seconds,
     datetime_to_string, time_to_milliseconds, time_to_seconds, time_to_string,
 };
-use crate::serializers::type_serializers::timedelta::EffectiveDeltaMode;
 use crate::tools::SchemaDict;
 
 use super::errors::py_err_se_err;
@@ -22,26 +21,25 @@ use super::errors::py_err_se_err;
 #[derive(Debug, Clone)]
 #[allow(clippy::struct_field_names)]
 pub(crate) struct SerializationConfig {
-    pub timedelta_mode: TimedeltaMode,
     pub temporal_mode: TemporalMode,
-    prefer_timedelta_mode: bool,
     pub bytes_mode: BytesMode,
     pub inf_nan_mode: InfNanMode,
 }
 
 impl SerializationConfig {
     pub fn from_config(config: Option<&Bound<'_, PyDict>>) -> PyResult<Self> {
-        let timedelta_mode = TimedeltaMode::from_config(config)?;
-        let temporal_mode = TemporalMode::from_config(config)?;
-        let prefer_timedelta_mode = config
-            .and_then(|cfg| cfg.contains(intern!(cfg.py(), "ser_json_timedelta")).ok())
+        let temporal_set = config
+            .and_then(|cfg| cfg.contains(intern!(cfg.py(), "ser_json_temporal")).ok())
             .unwrap_or(false);
+        let temporal_mode = if temporal_set {
+            TemporalMode::from_config(config)?
+        } else {
+            TimedeltaMode::from_config(config)?.into()
+        };
         let bytes_mode = BytesMode::from_config(config)?;
         let inf_nan_mode = InfNanMode::from_config(config)?;
         Ok(Self {
-            timedelta_mode,
             temporal_mode,
-            prefer_timedelta_mode,
             bytes_mode,
             inf_nan_mode,
         })
@@ -53,21 +51,16 @@ impl SerializationConfig {
         bytes_mode: &str,
         inf_nan_mode: &str,
     ) -> PyResult<Self> {
+        let resolved_temporal_mode = if temporal_mode != "iso8601" {
+            TemporalMode::from_str(temporal_mode)?
+        } else {
+            TimedeltaMode::from_str(timedelta_mode)?.into()
+        };
         Ok(Self {
-            timedelta_mode: TimedeltaMode::from_str(timedelta_mode)?,
-            temporal_mode: TemporalMode::from_str(temporal_mode)?,
-            prefer_timedelta_mode: true, // This is not settable via args
+            temporal_mode: resolved_temporal_mode,
             bytes_mode: BytesMode::from_str(bytes_mode)?,
             inf_nan_mode: InfNanMode::from_str(inf_nan_mode)?,
         })
-    }
-
-    pub fn effective_delta_mode(&self) -> EffectiveDeltaMode {
-        if self.prefer_timedelta_mode {
-            EffectiveDeltaMode::Timedelta(self.timedelta_mode)
-        } else {
-            EffectiveDeltaMode::Temporal(self.temporal_mode)
-        }
     }
 }
 
@@ -143,58 +136,13 @@ serialization_mode! {
     Strings => "strings",
 }
 
-impl TimedeltaMode {
-    fn total_seconds<'py>(py_timedelta: &Bound<'py, PyDelta>) -> PyResult<Bound<'py, PyAny>> {
-        py_timedelta.call_method0(intern!(py_timedelta.py(), "total_seconds"))
-    }
+impl TimedeltaMode {}
 
-    pub fn either_delta_to_json(self, py: Python, either_delta: EitherTimedelta) -> PyResult<PyObject> {
-        match self {
-            Self::Iso8601 => {
-                let d = either_delta.to_duration()?;
-                d.to_string().into_py_any(py)
-            }
-            Self::Float => {
-                // convert to int via a py timedelta not duration since we know this this case the input would have
-                // been a py timedelta
-                let py_timedelta = either_delta.into_pyobject(py)?;
-                let seconds = Self::total_seconds(&py_timedelta)?;
-                Ok(seconds.unbind())
-            }
-        }
-    }
-
-    pub fn json_key<'py>(self, py: Python, either_delta: EitherTimedelta) -> PyResult<Cow<'py, str>> {
-        match self {
-            Self::Iso8601 => {
-                let d = either_delta.to_duration()?;
-                Ok(d.to_string().into())
-            }
-            Self::Float => {
-                let py_timedelta = either_delta.into_pyobject(py)?;
-                let seconds: f64 = Self::total_seconds(&py_timedelta)?.extract()?;
-                Ok(seconds.to_string().into())
-            }
-        }
-    }
-
-    pub fn timedelta_serialize<S: serde::ser::Serializer>(
-        self,
-        py: Python,
-        either_delta: EitherTimedelta,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Iso8601 => {
-                let d = either_delta.to_duration().map_err(py_err_se_err)?;
-                serializer.serialize_str(&d.to_string())
-            }
-            Self::Float => {
-                let py_timedelta = either_delta.into_pyobject(py).map_err(py_err_se_err)?;
-                let seconds = Self::total_seconds(&py_timedelta).map_err(py_err_se_err)?;
-                let seconds: f64 = seconds.extract().map_err(py_err_se_err)?;
-                serializer.serialize_f64(seconds)
-            }
+impl From<TimedeltaMode> for TemporalMode {
+    fn from(value: TimedeltaMode) -> Self {
+        match value {
+            TimedeltaMode::Iso8601 => TemporalMode::Iso8601,
+            TimedeltaMode::Float => TemporalMode::Seconds,
         }
     }
 }
