@@ -160,7 +160,7 @@ impl SchemaSerializer {
 
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (value, *, indent = None, ensure_ascii = false, include = None, exclude = None, by_alias = None,
-        exclude_unset = false, exclude_defaults = false, exclude_none = false, round_trip = false, 
+        exclude_unset = false, exclude_defaults = false, exclude_none = false, round_trip = false,
         sort_keys = false,warnings = WarningsArg::Bool(true),
         fallback = None, serialize_as_any = false, context = None))]
     pub fn to_json(
