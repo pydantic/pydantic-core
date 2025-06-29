@@ -130,36 +130,73 @@ impl ComputedFields {
             // Do not serialize computed fields
             return Ok(());
         }
+        if extra.sort_keys {
+            let mut sorted_fields: Vec<&ComputedField> = self.0.iter().collect();
+            sorted_fields.sort_by_cached_key(|field| match extra.serialize_by_alias_or(field.serialize_by_alias) {
+                true => field.alias.as_str(),
+                false => field.property_name.as_str(),
+            });
+            for computed_field in sorted_fields {
+                let property_name_py = computed_field.property_name_py.bind(model.py());
+                let (next_include, next_exclude) = match filter.key_filter(property_name_py, include, exclude) {
+                    Ok(Some((next_include, next_exclude))) => (next_include, next_exclude),
+                    Ok(None) => continue,
+                    Err(e) => return Err(convert_error(e)),
+                };
 
-        for computed_field in &self.0 {
-            let property_name_py = computed_field.property_name_py.bind(model.py());
-            let (next_include, next_exclude) = match filter.key_filter(property_name_py, include, exclude) {
-                Ok(Some((next_include, next_exclude))) => (next_include, next_exclude),
-                Ok(None) => continue,
-                Err(e) => return Err(convert_error(e)),
-            };
-
-            let value = match model.getattr(property_name_py) {
-                Ok(field_value) => field_value,
-                Err(e) => {
-                    return Err(convert_error(e));
+                let value = match model.getattr(property_name_py) {
+                    Ok(field_value) => field_value,
+                    Err(e) => {
+                        return Err(convert_error(e));
+                    }
+                };
+                if extra.exclude_none && value.is_none() {
+                    continue;
                 }
-            };
-            if extra.exclude_none && value.is_none() {
-                continue;
-            }
 
-            let field_extra = Extra {
-                field_name: Some(&computed_field.property_name),
-                ..*extra
-            };
-            serialize(ComputedFieldToSerialize {
-                computed_field,
-                value,
-                include: next_include,
-                exclude: next_exclude,
-                field_extra,
-            })?;
+                let field_extra = Extra {
+                    field_name: Some(&computed_field.property_name),
+                    ..*extra
+                };
+                serialize(ComputedFieldToSerialize {
+                    computed_field,
+                    value,
+                    include: next_include,
+                    exclude: next_exclude,
+                    field_extra,
+                })?;
+            }
+        } else {
+            for computed_field in &self.0 {
+                let property_name_py = computed_field.property_name_py.bind(model.py());
+                let (next_include, next_exclude) = match filter.key_filter(property_name_py, include, exclude) {
+                    Ok(Some((next_include, next_exclude))) => (next_include, next_exclude),
+                    Ok(None) => continue,
+                    Err(e) => return Err(convert_error(e)),
+                };
+
+                let value = match model.getattr(property_name_py) {
+                    Ok(field_value) => field_value,
+                    Err(e) => {
+                        return Err(convert_error(e));
+                    }
+                };
+                if extra.exclude_none && value.is_none() {
+                    continue;
+                }
+
+                let field_extra = Extra {
+                    field_name: Some(&computed_field.property_name),
+                    ..*extra
+                };
+                serialize(ComputedFieldToSerialize {
+                    computed_field,
+                    value,
+                    include: next_include,
+                    exclude: next_exclude,
+                    field_extra,
+                })?;
+            }
         }
         Ok(())
     }

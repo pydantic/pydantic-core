@@ -12,6 +12,7 @@ except ImportError:
 
 import pytest
 from dirty_equals import IsJson
+from inline_snapshot import snapshot
 
 from pydantic_core import (
     PydanticSerializationError,
@@ -1044,6 +1045,244 @@ def test_extra():
     assert s.to_json(m, exclude={'field_d': [0]}) == b'{"field_a":"test","field_b":12,"field_c":null,"field_d":[2,3]}'
 
 
+def test_extra_sort_keys():
+    class MyModel:
+        field_123: str
+        field_b: int
+        field_a: str
+        field_c: dict[str, Any]
+
+    schema = core_schema.model_schema(
+        MyModel,
+        core_schema.model_fields_schema(
+            {
+                'field_123': core_schema.model_field(core_schema.bytes_schema()),
+                'field_b': core_schema.model_field(core_schema.int_schema()),
+                'field_a': core_schema.model_field(core_schema.bytes_schema()),
+                'field_c': core_schema.model_field(core_schema.dict_schema(core_schema.any_schema())),
+                'field_n': core_schema.model_field(core_schema.list_schema(core_schema.any_schema())),
+            },
+            extra_behavior='allow',
+        ),
+        extra_behavior='allow',
+    )
+    v = SchemaValidator(schema)
+    m = v.validate_python(
+        {
+            'field_123': b'test_123',
+            'field_b': 12,
+            'field_a': b'test',
+            'field_c': {'mango': 2, 'banana': 3, 'apple': 1},
+            'field_n': [{'mango': 3, 'banana': 2, 'apple': 1}, 2, 3],
+        }
+    )
+    s = SchemaSerializer(schema)
+    assert 'mode:ModelExtra' in plain_repr(s)
+    assert 'has_extra:true' in plain_repr(s)
+    assert s.to_python(m, mode='json') == snapshot(
+        {
+            'field_123': 'test_123',
+            'field_b': 12,
+            'field_a': 'test',
+            'field_c': {'mango': 2, 'banana': 3, 'apple': 1},
+            'field_n': [{'mango': 3, 'banana': 2, 'apple': 1}, 2, 3],
+        }
+    )
+    assert s.to_python(m, mode='json', sort_keys=True) == snapshot(
+        {
+            'field_123': 'test_123',
+            'field_a': 'test',
+            'field_b': 12,
+            'field_c': {'apple': 1, 'banana': 3, 'mango': 2},
+            'field_n': [{'apple': 1, 'banana': 2, 'mango': 3}, 2, 3],
+        }
+    )
+    assert s.to_json(m) == snapshot(
+        b'{"field_123":"test_123","field_b":12,"field_a":"test","field_c":{"mango":2,"banana":3,"apple":1},"field_n":[{"mango":3,"banana":2,"apple":1},2,3]}'
+    )
+    assert s.to_json(m, sort_keys=True) == snapshot(
+        b'{"field_123":"test_123","field_a":"test","field_b":12,"field_c":{"apple":1,"banana":3,"mango":2},"field_n":[{"apple":1,"banana":2,"mango":3},2,3]}'
+    )
+
+    # test filterings
+    m = v.validate_python(
+        {
+            'field_123': b'test_123',
+            'field_b': 12,
+            'field_a': b'test',
+            'field_c': {'mango': 2, 'banana': 3, 'apple': 1},
+            'field_n': [
+                {'mango': 3, 'banana': 2, 'apple': 1},
+                [{'mango': 3, 'banana': 2, 'apple': 1}, {'d': 3, 'b': 2, 'a': 1}],
+                3,
+            ],
+            'field_d': [
+                [[{'mango': 3, 'banana': 2, 'apple': 1}], {'d': 3, 'b': 2, 'a': 1}],
+                3,
+            ],
+            'field_e': {'c': 1, 'b': {'c': 2, 'd': {'mango': 3, 'banana': 2, 'apple': 1}}, 'a': 3},
+            'field_none': None,
+        }
+    )
+    assert s.to_python(m, sort_keys=True) == snapshot(
+        {
+            'field_123': b'test_123',
+            'field_a': b'test',
+            'field_b': 12,
+            'field_c': {'apple': 1, 'banana': 3, 'mango': 2},
+            'field_n': [
+                {'apple': 1, 'banana': 2, 'mango': 3},
+                [{'apple': 1, 'banana': 2, 'mango': 3}, {'a': 1, 'b': 2, 'd': 3}],
+                3,
+            ],
+            'field_d': [
+                [[{'apple': 1, 'banana': 2, 'mango': 3}], {'a': 1, 'b': 2, 'd': 3}],
+                3,
+            ],
+            'field_e': {'a': 3, 'b': {'c': 2, 'd': {'apple': 1, 'banana': 2, 'mango': 3}}, 'c': 1},
+            'field_none': None,
+        }
+    )
+    assert s.to_python(m, exclude_none=True) == snapshot(
+        {
+            'field_123': b'test_123',
+            'field_a': b'test',
+            'field_b': 12,
+            'field_c': {'mango': 2, 'banana': 3, 'apple': 1},
+            'field_n': [
+                {'mango': 3, 'banana': 2, 'apple': 1},
+                [{'mango': 3, 'banana': 2, 'apple': 1}, {'d': 3, 'b': 2, 'a': 1}],
+                3,
+            ],
+            'field_d': [
+                [[{'mango': 3, 'banana': 2, 'apple': 1}], {'d': 3, 'b': 2, 'a': 1}],
+                3,
+            ],
+            'field_e': {'c': 1, 'b': {'c': 2, 'd': {'mango': 3, 'banana': 2, 'apple': 1}}, 'a': 3},
+        }
+    )
+    assert s.to_python(m, exclude_none=True, sort_keys=True) == snapshot(
+        {
+            'field_123': b'test_123',
+            'field_a': b'test',
+            'field_b': 12,
+            'field_c': {'apple': 1, 'banana': 3, 'mango': 2},
+            'field_n': [
+                {'apple': 1, 'banana': 2, 'mango': 3},
+                [{'apple': 1, 'banana': 2, 'mango': 3}, {'a': 1, 'b': 2, 'd': 3}],
+                3,
+            ],
+            'field_d': [
+                [[{'apple': 1, 'banana': 2, 'mango': 3}], {'a': 1, 'b': 2, 'd': 3}],
+                3,
+            ],
+            'field_e': {'a': 3, 'b': {'c': 2, 'd': {'apple': 1, 'banana': 2, 'mango': 3}}, 'c': 1},
+        }
+    )
+    assert s.to_json(m, exclude_none=True) == snapshot(
+        b'{"field_123":"test_123","field_b":12,"field_a":"test","field_c":{"mango":2,"banana":3,"apple":1},"field_n":[{"mango":3,"banana":2,"apple":1},[{"mango":3,"banana":2,"apple":1},{"d":3,"b":2,"a":1}],3],"field_d":[[[{"mango":3,"banana":2,"apple":1}],{"d":3,"b":2,"a":1}],3],"field_e":{"c":1,"b":{"c":2,"d":{"mango":3,"banana":2,"apple":1}},"a":3}}'
+    )
+    assert s.to_json(m, exclude_none=True, sort_keys=True) == snapshot(
+        b'{"field_123":"test_123","field_a":"test","field_b":12,"field_c":{"apple":1,"banana":3,"mango":2},"field_n":[{"apple":1,"banana":2,"mango":3},[{"apple":1,"banana":2,"mango":3},{"a":1,"b":2,"d":3}],3],"field_d":[[[{"apple":1,"banana":2,"mango":3}],{"a":1,"b":2,"d":3}],3],"field_e":{"a":3,"b":{"c":2,"d":{"apple":1,"banana":2,"mango":3}},"c":1}}'
+    )
+    assert s.to_python(m, exclude={'field_c'}) == snapshot(
+        {
+            'field_123': b'test_123',
+            'field_a': b'test',
+            'field_b': 12,
+            'field_n': [
+                {'mango': 3, 'banana': 2, 'apple': 1},
+                [{'mango': 3, 'banana': 2, 'apple': 1}, {'d': 3, 'b': 2, 'a': 1}],
+                3,
+            ],
+            'field_d': [
+                [[{'mango': 3, 'banana': 2, 'apple': 1}], {'d': 3, 'b': 2, 'a': 1}],
+                3,
+            ],
+            'field_e': {'c': 1, 'b': {'c': 2, 'd': {'mango': 3, 'banana': 2, 'apple': 1}}, 'a': 3},
+            'field_none': None,
+        }
+    )
+    assert s.to_python(m, exclude={'field_c'}, sort_keys=True) == snapshot(
+        {
+            'field_123': b'test_123',
+            'field_a': b'test',
+            'field_b': 12,
+            'field_n': [
+                {'apple': 1, 'banana': 2, 'mango': 3},
+                [{'apple': 1, 'banana': 2, 'mango': 3}, {'a': 1, 'b': 2, 'd': 3}],
+                3,
+            ],
+            'field_d': [
+                [[{'apple': 1, 'banana': 2, 'mango': 3}], {'a': 1, 'b': 2, 'd': 3}],
+                3,
+            ],
+            'field_e': {'a': 3, 'b': {'c': 2, 'd': {'apple': 1, 'banana': 2, 'mango': 3}}, 'c': 1},
+            'field_none': None,
+        }
+    )
+    assert s.to_json(m, exclude={'field_c'}) == snapshot(
+        b'{"field_123":"test_123","field_b":12,"field_a":"test","field_n":[{"mango":3,"banana":2,"apple":1},[{"mango":3,"banana":2,"apple":1},{"d":3,"b":2,"a":1}],3],"field_d":[[[{"mango":3,"banana":2,"apple":1}],{"d":3,"b":2,"a":1}],3],"field_e":{"c":1,"b":{"c":2,"d":{"mango":3,"banana":2,"apple":1}},"a":3},"field_none":null}'
+    )
+    assert s.to_json(m, exclude={'field_c'}, sort_keys=True) == snapshot(
+        b'{"field_123":"test_123","field_a":"test","field_b":12,"field_n":[{"apple":1,"banana":2,"mango":3},[{"apple":1,"banana":2,"mango":3},{"a":1,"b":2,"d":3}],3],"field_d":[[[{"apple":1,"banana":2,"mango":3}],{"a":1,"b":2,"d":3}],3],"field_e":{"a":3,"b":{"c":2,"d":{"apple":1,"banana":2,"mango":3}},"c":1},"field_none":null}'
+    )
+    assert s.to_python(m, exclude={'field_d': [0]}) == snapshot(
+        {
+            'field_123': b'test_123',
+            'field_a': b'test',
+            'field_b': 12,
+            'field_c': {'mango': 2, 'banana': 3, 'apple': 1},
+            'field_n': [
+                {'mango': 3, 'banana': 2, 'apple': 1},
+                [{'mango': 3, 'banana': 2, 'apple': 1}, {'d': 3, 'b': 2, 'a': 1}],
+                3,
+            ],
+            'field_d': [3],
+            'field_e': {'c': 1, 'b': {'c': 2, 'd': {'mango': 3, 'banana': 2, 'apple': 1}}, 'a': 3},
+            'field_none': None,
+        }
+    )
+    assert s.to_python(m, exclude={'field_d': [0]}, sort_keys=True) == snapshot(
+        {
+            'field_123': b'test_123',
+            'field_a': b'test',
+            'field_b': 12,
+            'field_c': {'apple': 1, 'banana': 3, 'mango': 2},
+            'field_n': [
+                {'apple': 1, 'banana': 2, 'mango': 3},
+                [{'apple': 1, 'banana': 2, 'mango': 3}, {'a': 1, 'b': 2, 'd': 3}],
+                3,
+            ],
+            'field_d': [3],
+            'field_e': {'a': 3, 'b': {'c': 2, 'd': {'apple': 1, 'banana': 2, 'mango': 3}}, 'c': 1},
+            'field_none': None,
+        }
+    )
+    assert s.to_python(m, exclude={'field_d': [0]}, sort_keys=True, mode='json') == snapshot(
+        {
+            'field_123': 'test_123',
+            'field_a': 'test',
+            'field_b': 12,
+            'field_c': {'apple': 1, 'banana': 3, 'mango': 2},
+            'field_n': [
+                {'apple': 1, 'banana': 2, 'mango': 3},
+                [{'apple': 1, 'banana': 2, 'mango': 3}, {'a': 1, 'b': 2, 'd': 3}],
+                3,
+            ],
+            'field_d': [3],
+            'field_e': {'a': 3, 'b': {'c': 2, 'd': {'apple': 1, 'banana': 2, 'mango': 3}}, 'c': 1},
+            'field_none': None,
+        }
+    )
+    assert s.to_json(m, exclude={'field_d': [0]}) == snapshot(
+        b'{"field_123":"test_123","field_b":12,"field_a":"test","field_c":{"mango":2,"banana":3,"apple":1},"field_n":[{"mango":3,"banana":2,"apple":1},[{"mango":3,"banana":2,"apple":1},{"d":3,"b":2,"a":1}],3],"field_d":[3],"field_e":{"c":1,"b":{"c":2,"d":{"mango":3,"banana":2,"apple":1}},"a":3},"field_none":null}'
+    )
+    assert s.to_json(m, exclude={'field_d': [0]}, sort_keys=True) == snapshot(
+        b'{"field_123":"test_123","field_a":"test","field_b":12,"field_c":{"apple":1,"banana":3,"mango":2},"field_n":[{"apple":1,"banana":2,"mango":3},[{"apple":1,"banana":2,"mango":3},{"a":1,"b":2,"d":3}],3],"field_d":[3],"field_e":{"a":3,"b":{"c":2,"d":{"apple":1,"banana":2,"mango":3}},"c":1},"field_none":null}'
+    )
+
+
 def test_extra_config():
     class MyModel:
         # this is not required, but it avoids `__pydantic_fields_set__` being included in `__dict__`
@@ -1224,3 +1463,127 @@ def test_by_alias_and_name_config_interaction(config, runtime, expected) -> None
     )
     s = SchemaSerializer(schema)
     assert s.to_python(Model(1), by_alias=runtime) == expected
+
+
+def test_computed_fields_sort_keys():
+    @dataclasses.dataclass
+    class Model:
+        width: int
+        height: int
+
+        @property
+        def zebra_property(self) -> str:
+            return f'zebra_{self.width}'
+
+        @property
+        def alpha_property(self) -> str:
+            return f'alpha_{self.height}'
+
+        @property
+        def beta_property(self) -> str:
+            return f'beta_{self.width + self.height}'
+
+    s = SchemaSerializer(
+        core_schema.model_schema(
+            Model,
+            core_schema.model_fields_schema(
+                {
+                    'width': core_schema.model_field(core_schema.int_schema()),
+                    'height': core_schema.model_field(core_schema.int_schema()),
+                },
+                computed_fields=[
+                    core_schema.computed_field('zebra_property', core_schema.str_schema()),
+                    core_schema.computed_field('alpha_property', core_schema.str_schema()),
+                    core_schema.computed_field('beta_property', core_schema.str_schema()),
+                ],
+            ),
+        )
+    )
+
+    model = Model(width=3, height=4)
+
+    assert s.to_python(model) == {
+        'width': 3,
+        'height': 4,
+        'zebra_property': 'zebra_3',
+        'alpha_property': 'alpha_4',
+        'beta_property': 'beta_7',
+    }
+
+    assert s.to_python(model, sort_keys=True) == snapshot(
+        {'height': 4, 'width': 3, 'alpha_property': 'alpha_4', 'beta_property': 'beta_7', 'zebra_property': 'zebra_3'}
+    )
+
+    assert s.to_json(model, sort_keys=False) == snapshot(
+        b'{"width":3,"height":4,"zebra_property":"zebra_3","alpha_property":"alpha_4","beta_property":"beta_7"}'
+    )
+
+    assert s.to_json(model, sort_keys=True) == snapshot(
+        b'{"height":4,"width":3,"alpha_property":"alpha_4","beta_property":"beta_7","zebra_property":"zebra_3"}'
+    )
+
+    s = SchemaSerializer(
+        core_schema.model_schema(
+            Model,
+            core_schema.model_fields_schema(
+                {
+                    'width': core_schema.model_field(core_schema.int_schema()),
+                    'height': core_schema.model_field(core_schema.int_schema()),
+                },
+                computed_fields=[
+                    core_schema.computed_field('zebra_property', core_schema.str_schema(), alias='z_zebra_alias'),
+                    core_schema.computed_field('alpha_property', core_schema.str_schema(), alias='a_alpha_alias'),
+                    core_schema.computed_field('beta_property', core_schema.str_schema(), alias='b_beta_alias'),
+                ],
+            ),
+        )
+    )
+
+    assert s.to_python(model, sort_keys=True, by_alias=True) == snapshot(
+        {'height': 4, 'width': 3, 'a_alpha_alias': 'alpha_4', 'b_beta_alias': 'beta_7', 'z_zebra_alias': 'zebra_3'}
+    )
+
+    assert s.to_python(model, sort_keys=True, by_alias=False) == snapshot(
+        {'height': 4, 'width': 3, 'alpha_property': 'alpha_4', 'beta_property': 'beta_7', 'zebra_property': 'zebra_3'}
+    )
+
+    assert s.to_json(model, sort_keys=True, by_alias=True) == snapshot(
+        b'{"height":4,"width":3,"a_alpha_alias":"alpha_4","b_beta_alias":"beta_7","z_zebra_alias":"zebra_3"}'
+    )
+
+    assert s.to_json(model, sort_keys=True, by_alias=False) == snapshot(
+        b'{"height":4,"width":3,"alpha_property":"alpha_4","beta_property":"beta_7","zebra_property":"zebra_3"}'
+    )
+
+    s = SchemaSerializer(
+        core_schema.model_schema(
+            Model,
+            core_schema.model_fields_schema(
+                {
+                    'width': core_schema.model_field(core_schema.int_schema()),
+                    'height': core_schema.model_field(core_schema.int_schema()),
+                },
+                computed_fields=[
+                    core_schema.computed_field('zebra_property', core_schema.str_schema()),
+                    core_schema.computed_field('alpha_property', core_schema.nullable_schema(core_schema.str_schema())),
+                    core_schema.computed_field('beta_property', core_schema.str_schema()),
+                ],
+            ),
+        )
+    )
+
+    assert s.to_python(model, sort_keys=True, exclude_none=True) == snapshot(
+        {'height': 4, 'width': 3, 'alpha_property': 'alpha_4', 'beta_property': 'beta_7', 'zebra_property': 'zebra_3'}
+    )
+
+    assert s.to_python(model, sort_keys=True, exclude_none=False) == snapshot(
+        {'height': 4, 'width': 3, 'alpha_property': 'alpha_4', 'beta_property': 'beta_7', 'zebra_property': 'zebra_3'}
+    )
+
+    assert s.to_json(model, sort_keys=True, exclude_none=True) == snapshot(
+        b'{"height":4,"width":3,"alpha_property":"alpha_4","beta_property":"beta_7","zebra_property":"zebra_3"}'
+    )
+
+    assert s.to_json(model, sort_keys=True, exclude_none=False) == snapshot(
+        b'{"height":4,"width":3,"alpha_property":"alpha_4","beta_property":"beta_7","zebra_property":"zebra_3"}'
+    )

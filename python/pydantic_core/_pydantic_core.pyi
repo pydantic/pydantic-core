@@ -305,6 +305,7 @@ class SchemaSerializer:
         exclude_defaults: bool = False,
         exclude_none: bool = False,
         round_trip: bool = False,
+        sort_keys: bool = False,
         warnings: bool | Literal['none', 'warn', 'error'] = True,
         fallback: Callable[[Any], Any] | None = None,
         serialize_as_any: bool = False,
@@ -325,6 +326,7 @@ class SchemaSerializer:
             exclude_defaults: Whether to exclude fields that are equal to their default value.
             exclude_none: Whether to exclude fields that have a value of `None`.
             round_trip: Whether to enable serialization and validation round-trip support.
+            sort_keys: Whether to sort dictionary keys. If True, all dictionary keys will be sorted alphabetically, including nested dictionaries.
             warnings: How to handle invalid fields. False/"none" ignores them, True/"warn" logs errors,
                 "error" raises a [`PydanticSerializationError`][pydantic_core.PydanticSerializationError].
             fallback: A function to call when an unknown value is encountered,
@@ -352,6 +354,7 @@ class SchemaSerializer:
         exclude_defaults: bool = False,
         exclude_none: bool = False,
         round_trip: bool = False,
+        sort_keys: bool = False,
         warnings: bool | Literal['none', 'warn', 'error'] = True,
         fallback: Callable[[Any], Any] | None = None,
         serialize_as_any: bool = False,
@@ -373,6 +376,7 @@ class SchemaSerializer:
             exclude_defaults: Whether to exclude fields that are equal to their default value.
             exclude_none: Whether to exclude fields that have a value of `None`.
             round_trip: Whether to enable serialization and validation round-trip support.
+            sort_keys: Whether to sort dictionary keys. If True, all dictionary keys will be sorted alphabetically, including nested dictionaries.
             warnings: How to handle invalid fields. False/"none" ignores them, True/"warn" logs errors,
                 "error" raises a [`PydanticSerializationError`][pydantic_core.PydanticSerializationError].
             fallback: A function to call when an unknown value is encountered,
@@ -401,6 +405,7 @@ def to_json(
     by_alias: bool = True,
     exclude_none: bool = False,
     round_trip: bool = False,
+    sort_keys: bool = False,
     timedelta_mode: Literal['iso8601', 'float'] = 'iso8601',
     bytes_mode: Literal['utf8', 'base64', 'hex'] = 'utf8',
     inf_nan_mode: Literal['null', 'constants', 'strings'] = 'constants',
@@ -424,6 +429,7 @@ def to_json(
         by_alias: Whether to use the alias names of fields.
         exclude_none: Whether to exclude fields that have a value of `None`.
         round_trip: Whether to enable serialization and validation round-trip support.
+        sort_keys: Whether to sort dictionary keys. If True, all dictionary keys will be sorted alphabetically, including nested dictionaries.
         timedelta_mode: How to serialize `timedelta` objects, either `'iso8601'` or `'float'`.
         bytes_mode: How to serialize `bytes` objects, either `'utf8'`, `'base64'`, or `'hex'`.
         inf_nan_mode: How to serialize `Infinity`, `-Infinity` and `NaN` values, either `'null'`, `'constants'`, or `'strings'`.
@@ -482,6 +488,7 @@ def to_jsonable_python(
     by_alias: bool = True,
     exclude_none: bool = False,
     round_trip: bool = False,
+    sort_keys: bool = False,
     timedelta_mode: Literal['iso8601', 'float'] = 'iso8601',
     bytes_mode: Literal['utf8', 'base64', 'hex'] = 'utf8',
     inf_nan_mode: Literal['null', 'constants', 'strings'] = 'constants',
@@ -503,6 +510,7 @@ def to_jsonable_python(
         by_alias: Whether to use the alias names of fields.
         exclude_none: Whether to exclude fields that have a value of `None`.
         round_trip: Whether to enable serialization and validation round-trip support.
+        sort_keys: Whether to sort dictionary keys. If True, all dictionary keys will be sorted alphabetically, including nested dictionaries.
         timedelta_mode: How to serialize `timedelta` objects, either `'iso8601'` or `'float'`.
         bytes_mode: How to serialize `bytes` objects, either `'utf8'`, `'base64'`, or `'hex'`.
         inf_nan_mode: How to serialize `Infinity`, `-Infinity` and `NaN` values, either `'null'`, `'constants'`, or `'strings'`.

@@ -83,18 +83,45 @@ impl TypeSerializer for DictSerializer {
         match value.downcast::<PyDict>() {
             Ok(py_dict) => {
                 let value_serializer = self.value_serializer.as_ref();
-
                 let new_dict = PyDict::new(py);
-                for (key, value) in py_dict.iter() {
-                    let op_next = self.filter.key_filter(&key, include, exclude)?;
-                    if let Some((next_include, next_exclude)) = op_next {
-                        let key = match extra.mode {
-                            SerMode::Json => self.key_serializer.json_key(&key, extra)?.into_py_any(py)?,
-                            _ => self.key_serializer.to_python(&key, None, None, extra)?,
-                        };
-                        let value =
-                            value_serializer.to_python(&value, next_include.as_ref(), next_exclude.as_ref(), extra)?;
-                        new_dict.set_item(key, value)?;
+
+                if extra.sort_keys {
+                    let mut items: Vec<(Bound<'_, PyAny>, Bound<'_, PyAny>)> = py_dict.iter().collect();
+                    items.sort_by_cached_key(|(key, _)| key.to_string());
+
+                    for (key, value) in items {
+                        let op_next = self.filter.key_filter(&key, include, exclude)?;
+                        if let Some((next_include, next_exclude)) = op_next {
+                            let key = match extra.mode {
+                                SerMode::Json => self.key_serializer.json_key(&key, extra)?.into_py_any(py)?,
+                                _ => self.key_serializer.to_python(&key, None, None, extra)?,
+                            };
+                            // Let nested serializers handle their own sorting
+                            let value = value_serializer.to_python(
+                                &value,
+                                next_include.as_ref(),
+                                next_exclude.as_ref(),
+                                extra,
+                            )?;
+                            new_dict.set_item(key, value)?;
+                        }
+                    }
+                } else {
+                    for (key, value) in py_dict.iter() {
+                        let op_next = self.filter.key_filter(&key, include, exclude)?;
+                        if let Some((next_include, next_exclude)) = op_next {
+                            let key = match extra.mode {
+                                SerMode::Json => self.key_serializer.json_key(&key, extra)?.into_py_any(py)?,
+                                _ => self.key_serializer.to_python(&key, None, None, extra)?,
+                            };
+                            let value = value_serializer.to_python(
+                                &value,
+                                next_include.as_ref(),
+                                next_exclude.as_ref(),
+                                extra,
+                            )?;
+                            new_dict.set_item(key, value)?;
+                        }
                     }
                 }
                 Ok(new_dict.into())
@@ -124,18 +151,39 @@ impl TypeSerializer for DictSerializer {
                 let key_serializer = self.key_serializer.as_ref();
                 let value_serializer = self.value_serializer.as_ref();
 
-                for (key, value) in py_dict.iter() {
-                    let op_next = self.filter.key_filter(&key, include, exclude).map_err(py_err_se_err)?;
-                    if let Some((next_include, next_exclude)) = op_next {
-                        let key = key_serializer.json_key(&key, extra).map_err(py_err_se_err)?;
-                        let value_serialize = PydanticSerializer::new(
-                            &value,
-                            value_serializer,
-                            next_include.as_ref(),
-                            next_exclude.as_ref(),
-                            extra,
-                        );
-                        map.serialize_entry(&key, &value_serialize)?;
+                if extra.sort_keys {
+                    let mut items: Vec<(Bound<'_, PyAny>, Bound<'_, PyAny>)> = py_dict.iter().collect();
+                    items.sort_by_cached_key(|(key, _)| key.to_string());
+
+                    for (key, value) in items {
+                        let op_next = self.filter.key_filter(&key, include, exclude).map_err(py_err_se_err)?;
+                        if let Some((next_include, next_exclude)) = op_next {
+                            let key = key_serializer.json_key(&key, extra).map_err(py_err_se_err)?;
+                            // Let nested serializers handle their own sorting
+                            let s = PydanticSerializer::new(
+                                &value,
+                                value_serializer,
+                                next_include.as_ref(),
+                                next_exclude.as_ref(),
+                                extra,
+                            );
+                            map.serialize_entry(&key, &s)?;
+                        }
+                    }
+                } else {
+                    for (key, value) in py_dict.iter() {
+                        let op_next = self.filter.key_filter(&key, include, exclude).map_err(py_err_se_err)?;
+                        if let Some((next_include, next_exclude)) = op_next {
+                            let key = key_serializer.json_key(&key, extra).map_err(py_err_se_err)?;
+                            let s = PydanticSerializer::new(
+                                &value,
+                                value_serializer,
+                                next_include.as_ref(),
+                                next_exclude.as_ref(),
+                                extra,
+                            );
+                            map.serialize_entry(&key, &s)?;
+                        }
                     }
                 }
                 map.end()
