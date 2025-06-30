@@ -158,7 +158,7 @@ pub trait Input<'py>: fmt::Debug {
 
     fn validate_iter(&self) -> ValResult<GenericIterator<'static>>;
 
-    fn validate_date(&self, strict: bool) -> ValMatch<EitherDate<'py>>;
+    fn validate_date(&self, strict: bool, mode: TemporalUnitMode) -> ValMatch<EitherDate<'py>>;
 
     fn validate_time(
         &self,

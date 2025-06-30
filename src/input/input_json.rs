@@ -277,9 +277,9 @@ impl<'py, 'data> Input<'py> for JsonValue<'data> {
         }
     }
 
-    fn validate_date(&self, _strict: bool) -> ValResult<ValidationMatch<EitherDate<'py>>> {
+    fn validate_date(&self, _strict: bool, mode:TemporalUnitMode) -> ValResult<ValidationMatch<EitherDate<'py>>> {
         match self {
-            JsonValue::Str(v) => bytes_as_date(self, v.as_bytes()).map(ValidationMatch::strict),
+            JsonValue::Str(v) => bytes_as_date(self, v.as_bytes(), mode).map(ValidationMatch::strict),
             _ => Err(ValError::new(ErrorTypeDefaults::DateType, self)),
         }
     }
@@ -486,8 +486,8 @@ impl<'py> Input<'py> for str {
         Ok(string_to_vec(self).into())
     }
 
-    fn validate_date(&self, _strict: bool) -> ValResult<ValidationMatch<EitherDate<'py>>> {
-        bytes_as_date(self, self.as_bytes()).map(ValidationMatch::lax)
+    fn validate_date(&self, _strict: bool, mode: TemporalUnitMode) -> ValResult<ValidationMatch<EitherDate<'py>>> {
+        bytes_as_date(self, self.as_bytes(), mode).map(ValidationMatch::lax)
     }
 
     fn validate_time(

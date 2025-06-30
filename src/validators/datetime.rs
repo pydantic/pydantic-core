@@ -144,7 +144,7 @@ impl Validator for DateTimeValidator {
 /// In lax mode, if the input is not a datetime, we try parsing the input as a date and add the "00:00:00" time.
 /// Ok(None) means that this is not relevant to datetimes (the input was not a date nor a string)
 fn datetime_from_date<'py>(input: &(impl Input<'py> + ?Sized)) -> Result<Option<EitherDateTime<'py>>, ValError> {
-    let either_date = match input.validate_date(false) {
+    let either_date = match input.validate_date(false, TemporalUnitMode::default()) {
         Ok(val_match) => val_match.into_inner(),
         // if the error was a parsing error, update the error type from DateParsing to DatetimeFromDateParsing
         Err(ValError::LineErrors(mut line_errors)) => {

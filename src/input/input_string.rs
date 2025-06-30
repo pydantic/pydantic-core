@@ -201,9 +201,9 @@ impl<'py> Input<'py> for StringMapping<'py> {
         Err(ValError::new(ErrorTypeDefaults::IterableType, self))
     }
 
-    fn validate_date(&self, _strict: bool) -> ValResult<ValidationMatch<EitherDate<'py>>> {
+    fn validate_date(&self, _strict: bool, mode:TemporalUnitMode) -> ValResult<ValidationMatch<EitherDate<'py>>> {
         match self {
-            Self::String(s) => bytes_as_date(self, py_string_str(s)?.as_bytes()).map(ValidationMatch::strict),
+            Self::String(s) => bytes_as_date(self, py_string_str(s)?.as_bytes(), mode).map(ValidationMatch::strict),
             Self::Mapping(_) => Err(ValError::new(ErrorTypeDefaults::DateType, self)),
         }
     }

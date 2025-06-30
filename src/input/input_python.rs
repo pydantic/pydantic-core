@@ -495,7 +495,7 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
         }
     }
 
-    fn validate_date(&self, strict: bool) -> ValResult<ValidationMatch<EitherDate<'py>>> {
+    fn validate_date(&self, strict: bool, mode: TemporalUnitMode) -> ValResult<ValidationMatch<EitherDate<'py>>> {
         if let Ok(date) = self.downcast_exact::<PyDate>() {
             Ok(ValidationMatch::exact(date.clone().into()))
         } else if self.is_instance_of::<PyDateTime>() {
@@ -516,7 +516,7 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
                 None
             }
         } {
-            bytes_as_date(self, bytes).map(ValidationMatch::lax)
+            bytes_as_date(self, bytes, mode).map(ValidationMatch::lax)
         } else {
             Err(ValError::new(ErrorTypeDefaults::DateType, self))
         }

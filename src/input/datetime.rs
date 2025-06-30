@@ -6,6 +6,7 @@ use pyo3::pyclass::CompareOp;
 use pyo3::types::PyTuple;
 use pyo3::types::{PyDate, PyDateTime, PyDelta, PyDeltaAccess, PyDict, PyTime, PyTzInfo};
 use pyo3::IntoPyObjectExt;
+use speedate::DateConfig;
 use speedate::{
     Date, DateTime, DateTimeConfig, Duration, MicrosecondsPrecisionOverflowBehavior, ParseError, Time, TimeConfig,
 };
@@ -325,8 +326,8 @@ impl<'py> EitherDateTime<'py> {
     }
 }
 
-pub fn bytes_as_date<'py>(input: &(impl Input<'py> + ?Sized), bytes: &[u8]) -> ValResult<EitherDate<'py>> {
-    match Date::parse_bytes(bytes) {
+pub fn bytes_as_date<'py>(input: &(impl Input<'py> + ?Sized), bytes: &[u8], mode: TemporalUnitMode) -> ValResult<EitherDate<'py>> {
+    match Date::parse_bytes_with_config(bytes, &DateConfig::builder().timestamp_unit(mode.into()).build()) {
         Ok(date) => Ok(date.into()),
         Err(err) => Err(ValError::new(
             ErrorType::DateParsing {
