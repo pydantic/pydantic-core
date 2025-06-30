@@ -298,5 +298,3 @@ def test_pandas():
         v.validate_python(one_55)
     with pytest.raises(ValidationError, match=msg):
         v.validate_python(one_55.to_pytimedelta())
-
-

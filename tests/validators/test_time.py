@@ -295,4 +295,3 @@ def test_neg_7200():
 def test_tz_constraint_too_high():
     with pytest.raises(SchemaError, match='OverflowError: Python int too large to convert to C long'):
         SchemaValidator(core_schema.time_schema(tz_constraint=2**64))
-
