@@ -65,8 +65,8 @@ impl From<TemporalUnitMode> for TimestampUnit {
     fn from(value: TemporalUnitMode) -> Self {
         match value {
             TemporalUnitMode::Seconds => TimestampUnit::Second,
-            TemporalUnitMode::Milliseconds  => TimestampUnit::Millisecond,
-            TemporalUnitMode::Infer => TimestampUnit::Infer
+            TemporalUnitMode::Milliseconds => TimestampUnit::Millisecond,
+            TemporalUnitMode::Infer => TimestampUnit::Infer,
         }
     }
 }

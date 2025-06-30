@@ -6,7 +6,6 @@ use pyo3::pyclass::CompareOp;
 use pyo3::types::PyTuple;
 use pyo3::types::{PyDate, PyDateTime, PyDelta, PyDeltaAccess, PyDict, PyTime, PyTzInfo};
 use pyo3::IntoPyObjectExt;
-use speedate::TimestampUnit;
 use speedate::{
     Date, DateTime, DateTimeConfig, Duration, MicrosecondsPrecisionOverflowBehavior, ParseError, Time, TimeConfig,
 };
@@ -366,7 +365,7 @@ pub fn bytes_as_datetime<'py>(
     input: &(impl Input<'py> + ?Sized),
     bytes: &[u8],
     microseconds_overflow_behavior: MicrosecondsPrecisionOverflowBehavior,
-    mode: TemporalUnitMode
+    mode: TemporalUnitMode,
 ) -> ValResult<EitherDateTime<'py>> {
     match DateTime::parse_bytes_with_config(
         bytes,
@@ -375,7 +374,7 @@ pub fn bytes_as_datetime<'py>(
                 microseconds_precision_overflow_behavior: microseconds_overflow_behavior,
                 unix_timestamp_offset: Some(0),
             },
-            timestamp_unit: mode.into()
+            timestamp_unit: mode.into(),
         },
     ) {
         Ok(dt) => Ok(dt.into()),
@@ -393,7 +392,7 @@ pub fn int_as_datetime<'py>(
     input: &(impl Input<'py> + ?Sized),
     timestamp: i64,
     timestamp_microseconds: u32,
-    mode: TemporalUnitMode
+    mode: TemporalUnitMode,
 ) -> ValResult<EitherDateTime<'py>> {
     match DateTime::from_timestamp_with_config(
         timestamp,
@@ -403,7 +402,7 @@ pub fn int_as_datetime<'py>(
                 unix_timestamp_offset: Some(0),
                 ..Default::default()
             },
-            timestamp_unit: mode.into()
+            timestamp_unit: mode.into(),
         },
     ) {
         Ok(dt) => Ok(dt.into()),
@@ -431,7 +430,11 @@ macro_rules! nan_check {
     };
 }
 
-pub fn float_as_datetime<'py>(input: &(impl Input<'py> + ?Sized), timestamp: f64, mode: TemporalUnitMode) -> ValResult<EitherDateTime<'py>> {
+pub fn float_as_datetime<'py>(
+    input: &(impl Input<'py> + ?Sized),
+    timestamp: f64,
+    mode: TemporalUnitMode,
+) -> ValResult<EitherDateTime<'py>> {
     nan_check!(input, timestamp, DatetimeParsing);
     let microseconds = timestamp.fract().abs() * 1_000_000.0;
     // checking for extra digits in microseconds is unreliable with large floats,

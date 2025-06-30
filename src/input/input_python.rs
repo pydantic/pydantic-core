@@ -17,9 +17,9 @@ use crate::errors::{ErrorType, ErrorTypeDefaults, InputValue, LocItem, ValError,
 use crate::tools::{extract_i64, safe_repr};
 use crate::validators::complex::string_to_complex;
 use crate::validators::decimal::{create_decimal, get_decimal_type};
-use crate::validators::{Exactness};
-use crate::validators::ValBytesMode;
+use crate::validators::Exactness;
 use crate::validators::TemporalUnitMode;
+use crate::validators::ValBytesMode;
 use crate::ArgsKwargs;
 
 use super::datetime::{
