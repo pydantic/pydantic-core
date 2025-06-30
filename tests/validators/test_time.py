@@ -295,3 +295,27 @@ def test_neg_7200():
 def test_tz_constraint_too_high():
     with pytest.raises(SchemaError, match='OverflowError: Python int too large to convert to C long'):
         SchemaValidator(core_schema.time_schema(tz_constraint=2**64))
+
+@pytest.mark.parametrize(
+    'val_temporal_unit, input_value, expected',
+    [
+        # 'seconds' mode: treat as seconds since midnight
+        ('seconds', 3661, time(1, 1, 1, tzinfo=timezone.utc)),
+        ('seconds', '3661', time(1, 1, 1, tzinfo=timezone.utc)),
+        ('seconds', 3661.123456, time(1, 1, 1, 123456, tzinfo=timezone.utc)),
+        # 'milliseconds' mode: treat as milliseconds since midnight
+        ('milliseconds', 3661123, time(1, 1, 1, 123000, tzinfo=timezone.utc)),
+        ('milliseconds', '3661123', time(1, 1, 1, 123000, tzinfo=timezone.utc)),
+        ('milliseconds', 3661123.456, time(1, 1, 1, 123456, tzinfo=timezone.utc)),
+        # 'infer' mode: large numbers are ms, small are s
+        ('infer', 3661, time(1, 1, 1, tzinfo=timezone.utc)),
+        ('infer', 3661123, time(1, 1, 1, 123000, tzinfo=timezone.utc)),
+    ],
+)
+def test_val_temporal_unit_time(val_temporal_unit, input_value, expected):
+    v = SchemaValidator(
+        core_schema.time_schema(),
+        config={'val_temporal_unit': val_temporal_unit},
+    )
+    output = v.validate_python(input_value)
+    assert output == expected

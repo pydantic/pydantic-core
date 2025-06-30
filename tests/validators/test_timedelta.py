@@ -298,3 +298,27 @@ def test_pandas():
         v.validate_python(one_55)
     with pytest.raises(ValidationError, match=msg):
         v.validate_python(one_55.to_pytimedelta())
+
+@pytest.mark.parametrize(
+    'val_temporal_unit, input_value, expected',
+    [
+        # 'seconds' mode: treat as seconds
+        ('seconds', 3661, timedelta(hours=1, seconds=1)),
+        ('seconds', '3661', timedelta(hours=1, seconds=1)),
+        ('seconds', 3661.123456, timedelta(hours=1, seconds=1, microseconds=123456)),
+        # 'milliseconds' mode: treat as milliseconds
+        ('milliseconds', 3661123, timedelta(hours=1, seconds=1, microseconds=123000)),
+        ('milliseconds', '3661123', timedelta(hours=1, seconds=1, microseconds=123000)),
+        ('milliseconds', 3661123.456, timedelta(hours=1, seconds=1, microseconds=123456)),
+        # 'infer' mode: large numbers are ms, small are s
+        ('infer', 3661, timedelta(hours=1, seconds=1)),
+        ('infer', 3661123, timedelta(hours=1, seconds=1, microseconds=123000)),
+    ],
+)
+def test_val_temporal_unit_timedelta(val_temporal_unit, input_value, expected):
+    v = SchemaValidator(
+        core_schema.timedelta_schema(),
+        config={'val_temporal_unit': val_temporal_unit},
+    )
+    output = v.validate_python(input_value)
+    assert output == expected
