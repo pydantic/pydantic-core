@@ -525,12 +525,14 @@ def test_tz_cmp() -> None:
         ('seconds', '1654646400', datetime(2022, 6, 8, tzinfo=timezone.utc)),
         ('seconds', 1654646400.123456, datetime(2022, 6, 8, 0, 0, 0, 123456, tzinfo=timezone.utc)),
         # 'milliseconds' mode: treat as milliseconds since epoch
+        ('milliseconds', 1654646400, datetime(1970, 1, 20, 3, 37, 26, 400000, tzinfo=timezone.utc)),
         ('milliseconds', 1654646400123, datetime(2022, 6, 8, 0, 0, 0, 123000, tzinfo=timezone.utc)),
         ('milliseconds', '1654646400123', datetime(2022, 6, 8, 0, 0, 0, 123000, tzinfo=timezone.utc)),
         ('milliseconds', 1654646400123.456, datetime(2022, 6, 8, 0, 0, 0, 123456, tzinfo=timezone.utc)),
         # 'infer' mode: large numbers are ms, small are s
         ('infer', 1654646400, datetime(2022, 6, 8, tzinfo=timezone.utc)),
         ('infer', 1654646400123, datetime(2022, 6, 8, 0, 0, 0, 123000, tzinfo=timezone.utc)),
+        ('infer', 1654646400123.456, datetime(2022, 6, 8, 0, 0, 0, 123456, tzinfo=timezone.utc))
     ],
 )
 def test_val_temporal_unit_datetime(val_temporal_unit, input_value, expected):

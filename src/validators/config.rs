@@ -6,12 +6,12 @@ use crate::errors::ErrorType;
 use crate::input::EitherBytes;
 use crate::serializers::BytesMode;
 use crate::tools::SchemaDict;
-use crate::validators::config::TemporalUnitMode::Seconds;
 use base64::engine::general_purpose::GeneralPurpose;
 use base64::engine::{DecodePaddingMode, GeneralPurposeConfig};
 use base64::{alphabet, DecodeError, Engine};
 use pyo3::types::{PyDict, PyString};
 use pyo3::{intern, prelude::*};
+use speedate::TimestampUnit;
 
 const URL_SAFE_OPTIONAL_PADDING: GeneralPurpose = GeneralPurpose::new(
     &alphabet::URL_SAFE,
@@ -47,12 +47,7 @@ impl FromStr for TemporalUnitMode {
     }
 }
 
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ValTemporalUnit {
-    pub mode: TemporalUnitMode,
-}
-
-impl ValTemporalUnit {
+impl TemporalUnitMode {
     pub fn from_config(config: Option<&Bound<'_, PyDict>>) -> PyResult<Self> {
         let Some(config_dict) = config else {
             return Ok(Self::default());
@@ -62,7 +57,17 @@ impl ValTemporalUnit {
             || Ok(TemporalUnitMode::default()),
             |raw| TemporalUnitMode::from_str(&raw.to_cow()?),
         )?;
-        Ok(Self { mode: temporal_unit })
+        Ok(temporal_unit)
+    }
+}
+
+impl From<TemporalUnitMode> for TimestampUnit {
+    fn from(value: TemporalUnitMode) -> Self {
+        match value {
+            TemporalUnitMode::Seconds => TimestampUnit::Second,
+            TemporalUnitMode::Milliseconds  => TimestampUnit::Millisecond,
+            TemporalUnitMode::Infer => TimestampUnit::Infer
+        }
     }
 }
 

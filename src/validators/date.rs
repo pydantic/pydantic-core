@@ -11,7 +11,7 @@ use crate::input::{EitherDate, Input};
 
 use crate::validators::datetime::{NowConstraint, NowOp};
 
-use super::Exactness;
+use super::{Exactness, TemporalUnitMode};
 use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
 
 #[derive(Debug, Clone)]
@@ -110,7 +110,7 @@ impl Validator for DateValidator {
 ///
 /// Ok(None) means that this is not relevant to dates (the input was not a datetime nor a string)
 fn date_from_datetime<'py>(input: &(impl Input<'py> + ?Sized)) -> Result<Option<EitherDate<'py>>, ValError> {
-    let either_dt = match input.validate_datetime(false, speedate::MicrosecondsPrecisionOverflowBehavior::Truncate) {
+    let either_dt = match input.validate_datetime(false, speedate::MicrosecondsPrecisionOverflowBehavior::Truncate, TemporalUnitMode::default()) {
         Ok(val_match) => val_match.into_inner(),
         // if the error was a parsing error, update the error type from DatetimeParsing to DateFromDatetimeParsing
         // and return it
