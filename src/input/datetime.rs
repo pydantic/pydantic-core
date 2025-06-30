@@ -343,6 +343,7 @@ pub fn bytes_as_time<'py>(
     input: &(impl Input<'py> + ?Sized),
     bytes: &[u8],
     microseconds_overflow_behavior: MicrosecondsPrecisionOverflowBehavior,
+    mode: TemporalUnitMode,
 ) -> ValResult<EitherTime<'py>> {
     match Time::parse_bytes_with_config(
         bytes,
@@ -465,6 +466,7 @@ pub fn int_as_time<'py>(
     input: &(impl Input<'py> + ?Sized),
     timestamp: i64,
     timestamp_microseconds: u32,
+    mode: TemporalUnitMode
 ) -> ValResult<EitherTime<'py>> {
     let time_timestamp: u32 = match timestamp {
         t if t < 0_i64 => {
@@ -500,11 +502,11 @@ pub fn int_as_time<'py>(
     }
 }
 
-pub fn float_as_time<'py>(input: &(impl Input<'py> + ?Sized), timestamp: f64) -> ValResult<EitherTime<'py>> {
+pub fn float_as_time<'py>(input: &(impl Input<'py> + ?Sized), timestamp: f64, mode: TemporalUnitMode) -> ValResult<EitherTime<'py>> {
     nan_check!(input, timestamp, TimeParsing);
     let microseconds = timestamp.fract().abs() * 1_000_000.0;
     // round for same reason as above
-    int_as_time(input, timestamp.floor() as i64, microseconds.round() as u32)
+    int_as_time(input, timestamp.floor() as i64, microseconds.round() as u32, mode)
 }
 
 fn map_timedelta_err(input: impl ToErrorValue, err: ParseError) -> ValError {

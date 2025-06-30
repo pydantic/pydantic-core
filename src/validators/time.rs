@@ -12,6 +12,7 @@ use crate::input::Input;
 
 use super::datetime::extract_microseconds_precision;
 use super::datetime::TZConstraint;
+use super::TemporalUnitMode;
 use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
 
 #[derive(Debug, Clone)]
@@ -19,6 +20,7 @@ pub struct TimeValidator {
     strict: bool,
     constraints: Option<TimeConstraints>,
     microseconds_precision: MicrosecondsPrecisionOverflowBehavior,
+    val_temporal_unit: TemporalUnitMode
 }
 
 impl BuildValidator for TimeValidator {
@@ -33,6 +35,7 @@ impl BuildValidator for TimeValidator {
             strict: is_strict(schema, config)?,
             constraints: TimeConstraints::from_py(schema)?,
             microseconds_precision: extract_microseconds_precision(schema, config)?,
+            val_temporal_unit: TemporalUnitMode::from_config(config)?
         };
         Ok(s.into())
     }
@@ -48,7 +51,7 @@ impl Validator for TimeValidator {
         state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
         let time = input
-            .validate_time(state.strict_or(self.strict), self.microseconds_precision)?
+            .validate_time(state.strict_or(self.strict), self.microseconds_precision, self.val_temporal_unit)?
             .unpack(state);
         if let Some(constraints) = &self.constraints {
             let raw_time = time.as_raw()?;
@@ -88,7 +91,7 @@ impl Validator for TimeValidator {
 
 fn convert_pytime(schema: &Bound<'_, PyDict>, key: &Bound<'_, PyString>) -> PyResult<Option<Time>> {
     match schema.get_item(key)? {
-        Some(value) => match value.validate_time(false, MicrosecondsPrecisionOverflowBehavior::default()) {
+        Some(value) => match value.validate_time(false, MicrosecondsPrecisionOverflowBehavior::default(), TemporalUnitMode::default()) {
             Ok(v) => Ok(Some(v.into_inner().as_raw()?)),
             Err(_) => Err(PyValueError::new_err(format!(
                 "'{key}' must be coercible to a time instance",

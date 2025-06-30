@@ -526,6 +526,7 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
         &self,
         strict: bool,
         microseconds_overflow_behavior: MicrosecondsPrecisionOverflowBehavior,
+        mode: TemporalUnitMode
     ) -> ValResult<ValidationMatch<EitherTime<'py>>> {
         if let Ok(time) = self.downcast_exact::<PyTime>() {
             return Ok(ValidationMatch::exact(time.clone().into()));
@@ -537,15 +538,15 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
             if !strict {
                 return if let Ok(py_str) = self.downcast::<PyString>() {
                     let str = py_string_str(py_str)?;
-                    bytes_as_time(self, str.as_bytes(), microseconds_overflow_behavior)
+                    bytes_as_time(self, str.as_bytes(), microseconds_overflow_behavior,  mode)
                 } else if let Ok(py_bytes) = self.downcast::<PyBytes>() {
-                    bytes_as_time(self, py_bytes.as_bytes(), microseconds_overflow_behavior)
+                    bytes_as_time(self, py_bytes.as_bytes(), microseconds_overflow_behavior, mode)
                 } else if self.is_exact_instance_of::<PyBool>() {
                     Err(ValError::new(ErrorTypeDefaults::TimeType, self))
                 } else if let Some(int) = extract_i64(self) {
-                    int_as_time(self, int, 0)
+                    int_as_time(self, int, 0, mode)
                 } else if let Ok(float) = self.extract::<f64>() {
-                    float_as_time(self, float)
+                    float_as_time(self, float, mode)
                 } else {
                     break 'lax;
                 }

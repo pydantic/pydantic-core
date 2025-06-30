@@ -212,9 +212,10 @@ impl<'py> Input<'py> for StringMapping<'py> {
         &self,
         _strict: bool,
         microseconds_overflow_behavior: MicrosecondsPrecisionOverflowBehavior,
+        mode: TemporalUnitMode
     ) -> ValResult<ValidationMatch<EitherTime<'py>>> {
         match self {
-            Self::String(s) => bytes_as_time(self, py_string_str(s)?.as_bytes(), microseconds_overflow_behavior)
+            Self::String(s) => bytes_as_time(self, py_string_str(s)?.as_bytes(), microseconds_overflow_behavior, mode)
                 .map(ValidationMatch::strict),
             Self::Mapping(_) => Err(ValError::new(ErrorTypeDefaults::TimeType, self)),
         }
