@@ -304,6 +304,7 @@ def test_date_past_future_today():
     assert v.isinstance_python(today - timedelta(days=1)) is False
     assert v.isinstance_python(today + timedelta(days=1)) is True
 
+
 @pytest.mark.parametrize(
     'val_temporal_unit, input_value, expected',
     [

@@ -299,6 +299,7 @@ def test_pandas():
     with pytest.raises(ValidationError, match=msg):
         v.validate_python(one_55.to_pytimedelta())
 
+
 @pytest.mark.parametrize(
     'val_temporal_unit, input_value, expected',
     [

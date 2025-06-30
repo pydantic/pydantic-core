@@ -296,6 +296,7 @@ def test_tz_constraint_too_high():
     with pytest.raises(SchemaError, match='OverflowError: Python int too large to convert to C long'):
         SchemaValidator(core_schema.time_schema(tz_constraint=2**64))
 
+
 @pytest.mark.parametrize(
     'val_temporal_unit, input_value, expected',
     [

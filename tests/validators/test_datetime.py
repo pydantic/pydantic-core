@@ -516,6 +516,7 @@ def test_tz_cmp() -> None:
     assert validated1 > validated2
     assert validated2 < validated1
 
+
 @pytest.mark.parametrize(
     'val_temporal_unit, input_value, expected',
     [

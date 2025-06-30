@@ -13,16 +13,17 @@ use crate::errors::ToErrorValue;
 use crate::errors::{py_err_string, ErrorType, ErrorTypeDefaults, ValError, ValResult};
 use crate::input::{EitherDateTime, Input};
 
-use crate::tools::SchemaDict;
-
 use super::Exactness;
 use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
+use crate::tools::SchemaDict;
+use crate::validators::config::{TemporalUnitMode, ValTemporalUnit};
 
 #[derive(Debug, Clone)]
 pub struct DateTimeValidator {
     strict: bool,
     constraints: Option<DateTimeConstraints>,
     microseconds_precision: speedate::MicrosecondsPrecisionOverflowBehavior,
+    val_temporal_unit: ValTemporalUnit,
 }
 
 pub(crate) fn extract_microseconds_precision(
@@ -51,6 +52,7 @@ impl BuildValidator for DateTimeValidator {
             strict: is_strict(schema, config)?,
             constraints: DateTimeConstraints::from_py(schema)?,
             microseconds_precision: extract_microseconds_precision(schema, config)?,
+            val_temporal_unit: ValTemporalUnit::from_config(config)?,
         }
         .into())
     }
