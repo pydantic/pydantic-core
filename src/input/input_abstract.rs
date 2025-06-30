@@ -164,7 +164,6 @@ pub trait Input<'py>: fmt::Debug {
         &self,
         strict: bool,
         microseconds_overflow_behavior: speedate::MicrosecondsPrecisionOverflowBehavior,
-        mode: TemporalUnitMode
     ) -> ValMatch<EitherTime<'py>>;
 
     fn validate_datetime(

@@ -32,7 +32,7 @@ impl BuildValidator for DateValidator {
         Ok(Self {
             strict: is_strict(schema, config)?,
             constraints: DateConstraints::from_py(schema)?,
-            val_temporal_unit: TemporalUnitMode::from_config(config)?
+            val_temporal_unit: TemporalUnitMode::from_config(config)?,
         }
         .into())
     }
@@ -111,34 +111,34 @@ impl Validator for DateValidator {
 /// "exact date", e.g. has a zero time component.
 ///
 /// Ok(None) means that this is not relevant to dates (the input was not a datetime nor a string)
-fn date_from_datetime<'py>(input: &(impl Input<'py> + ?Sized), mode:TemporalUnitMode) -> Result<Option<EitherDate<'py>>, ValError> {
-    let either_dt = match input.validate_datetime(
-        false,
-        speedate::MicrosecondsPrecisionOverflowBehavior::Truncate,
-        mode,
-    ) {
-        Ok(val_match) => val_match.into_inner(),
-        // if the error was a parsing error, update the error type from DatetimeParsing to DateFromDatetimeParsing
-        // and return it
-        Err(ValError::LineErrors(mut line_errors)) => {
-            if line_errors.iter_mut().fold(false, |has_parsing_error, line_error| {
-                if let ErrorType::DatetimeParsing { error, .. } = &mut line_error.error_type {
-                    line_error.error_type = ErrorType::DateFromDatetimeParsing {
-                        error: std::mem::take(error),
-                        context: None,
-                    };
-                    true
-                } else {
-                    has_parsing_error
+fn date_from_datetime<'py>(
+    input: &(impl Input<'py> + ?Sized),
+    mode: TemporalUnitMode,
+) -> Result<Option<EitherDate<'py>>, ValError> {
+    let either_dt =
+        match input.validate_datetime(false, speedate::MicrosecondsPrecisionOverflowBehavior::Truncate, mode) {
+            Ok(val_match) => val_match.into_inner(),
+            // if the error was a parsing error, update the error type from DatetimeParsing to DateFromDatetimeParsing
+            // and return it
+            Err(ValError::LineErrors(mut line_errors)) => {
+                if line_errors.iter_mut().fold(false, |has_parsing_error, line_error| {
+                    if let ErrorType::DatetimeParsing { error, .. } = &mut line_error.error_type {
+                        line_error.error_type = ErrorType::DateFromDatetimeParsing {
+                            error: std::mem::take(error),
+                            context: None,
+                        };
+                        true
+                    } else {
+                        has_parsing_error
+                    }
+                }) {
+                    return Err(ValError::LineErrors(line_errors));
                 }
-            }) {
-                return Err(ValError::LineErrors(line_errors));
+                return Ok(None);
             }
-            return Ok(None);
-        }
-        // for any other error, don't return it
-        Err(_) => return Ok(None),
-    };
+            // for any other error, don't return it
+            Err(_) => return Ok(None),
+        };
     let dt = either_dt.as_raw()?;
     let zero_time = Time {
         hour: 0,

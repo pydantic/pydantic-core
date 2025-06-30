@@ -277,7 +277,7 @@ impl<'py, 'data> Input<'py> for JsonValue<'data> {
         }
     }
 
-    fn validate_date(&self, _strict: bool, mode:TemporalUnitMode) -> ValResult<ValidationMatch<EitherDate<'py>>> {
+    fn validate_date(&self, _strict: bool, mode: TemporalUnitMode) -> ValResult<ValidationMatch<EitherDate<'py>>> {
         match self {
             JsonValue::Str(v) => bytes_as_date(self, v.as_bytes(), mode).map(ValidationMatch::strict),
             _ => Err(ValError::new(ErrorTypeDefaults::DateType, self)),
@@ -287,14 +287,13 @@ impl<'py, 'data> Input<'py> for JsonValue<'data> {
         &self,
         strict: bool,
         microseconds_overflow_behavior: MicrosecondsPrecisionOverflowBehavior,
-        mode: TemporalUnitMode
     ) -> ValResult<ValidationMatch<EitherTime<'py>>> {
         match self {
             JsonValue::Str(v) => {
-                bytes_as_time(self, v.as_bytes(), microseconds_overflow_behavior, mode).map(ValidationMatch::strict)
+                bytes_as_time(self, v.as_bytes(), microseconds_overflow_behavior).map(ValidationMatch::strict)
             }
-            JsonValue::Int(v) if !strict => int_as_time(self, *v, 0, mode).map(ValidationMatch::lax),
-            JsonValue::Float(v) if !strict => float_as_time(self, *v, mode).map(ValidationMatch::lax),
+            JsonValue::Int(v) if !strict => int_as_time(self, *v, 0).map(ValidationMatch::lax),
+            JsonValue::Float(v) if !strict => float_as_time(self, *v).map(ValidationMatch::lax),
             JsonValue::BigInt(_) if !strict => Err(ValError::new(
                 ErrorType::TimeParsing {
                     error: Cow::Borrowed(
@@ -495,9 +494,8 @@ impl<'py> Input<'py> for str {
         &self,
         _strict: bool,
         microseconds_overflow_behavior: MicrosecondsPrecisionOverflowBehavior,
-        mode: TemporalUnitMode
     ) -> ValResult<ValidationMatch<EitherTime<'py>>> {
-        bytes_as_time(self, self.as_bytes(), microseconds_overflow_behavior, mode).map(ValidationMatch::lax)
+        bytes_as_time(self, self.as_bytes(), microseconds_overflow_behavior).map(ValidationMatch::lax)
     }
 
     fn validate_datetime(
