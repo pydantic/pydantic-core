@@ -36,7 +36,7 @@ classifiers = [
     'Typing :: Typed',
 ]
 dependencies = [
-    'typing-extensions@git+https://github.com/python/typing_extensions',
+    'typing-extensions@git+https://github.com/HexDecimal/typing_extensions@conforming-sentinel',
 ]
 dynamic = ['license', 'readme', 'version']
 

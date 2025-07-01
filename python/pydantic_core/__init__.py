@@ -145,7 +145,7 @@ class MultiHostHost(_TypedDict):
     """The port part of this host, or `None`."""
 
 
-UNSET = Sentinel('UNSET')
+UNSET = Sentinel('UNSET', module_name='pydantic_core')
 """A singleton indicating a field value was not set during validation.
 
 This singleton can be used a default value, as an alternative to `None` when it has
