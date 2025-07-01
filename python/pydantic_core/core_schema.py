@@ -1346,6 +1346,16 @@ def enum_schema(
     )
 
 
+class UnsetSentinelSchema(TypedDict, total=False):
+    type: Required[Literal['unset-sentinel']]
+
+
+def unset_sentinel_schema() -> UnsetSentinelSchema:
+    """Returns a schema for the [`UNSET`][pydantic_core.UNSET] sentinel."""
+
+    return {'type': 'unset-sentinel'}
+
+
 # must match input/parse_json.rs::JsonType::try_from
 JsonType = Literal['null', 'bool', 'int', 'float', 'str', 'list', 'dict']
 

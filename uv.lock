@@ -636,7 +636,7 @@ wasm = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "typing-extensions", git = "https://github.com/python/typing_extensions" }]
+requires-dist = [{ name = "typing-extensions", git = "https://github.com/HexDecimal/typing_extensions?rev=conforming-sentinel" }]
 
 [package.metadata.requires-dev]
 all = [
@@ -956,8 +956,8 @@ wheels = [
 
 [[package]]
 name = "typing-extensions"
-version = "4.13.2"
-source = { git = "https://github.com/python/typing_extensions#479dae13d084c070301aa91265d1af278b181457" }
+version = "4.14.0"
+source = { git = "https://github.com/HexDecimal/typing_extensions?rev=conforming-sentinel#5c0e8a79317478ebfda949c56b011be47a618eb0" }
 
 [[package]]
 name = "typing-inspection"
