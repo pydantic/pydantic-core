@@ -4,10 +4,11 @@ use pyo3::{intern, PyTraverseError, PyVisit};
 use serde::ser::SerializeMap;
 
 use crate::build_tools::py_schema_error_type;
+use crate::common::unset_sentinel::get_unset_sentinel_object;
 use crate::definitions::DefinitionsBuilder;
 use crate::py_gc::PyGcTraverse;
 use crate::serializers::filter::SchemaFilter;
-use crate::serializers::shared::{get_unset_sentinel_object, BuildSerializer, CombinedSerializer, PydanticSerializer};
+use crate::serializers::shared::{BuildSerializer, CombinedSerializer, PydanticSerializer};
 use crate::tools::SchemaDict;
 
 use super::errors::py_err_se_err;
