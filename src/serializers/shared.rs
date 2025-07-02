@@ -34,19 +34,6 @@ pub(crate) trait BuildSerializer: Sized {
     ) -> PyResult<CombinedSerializer>;
 }
 
-static UNSET_SENTINEL_OBJECT: GILOnceCell<Py<PyAny>> = GILOnceCell::new();
-
-pub fn get_unset_sentinel_object(py: Python) -> &Bound<'_, PyAny> {
-    UNSET_SENTINEL_OBJECT
-        .get_or_init(py, || {
-            py.import(intern!(py, "pydantic_core"))
-                .and_then(|core_module| core_module.getattr(intern!(py, "UNSET")))
-                .unwrap()
-                .into()
-        })
-        .bind(py)
-}
-
 /// Build the `CombinedSerializer` enum and implement a `find_serializer` method for it.
 macro_rules! combined_serializer {
     (
@@ -155,6 +142,7 @@ combined_serializer! {
         Union: super::type_serializers::union::UnionSerializer;
         TaggedUnion: super::type_serializers::union::TaggedUnionSerializer;
         Literal: super::type_serializers::literal::LiteralSerializer;
+        UnsetSentinel: super::type_serializers::unset_sentinel::UnsetSentinelSerializer;
         Enum: super::type_serializers::enum_::EnumSerializer;
         Recursive: super::type_serializers::definitions::DefinitionRefSerializer;
         Tuple: super::type_serializers::tuple::TupleSerializer;
@@ -356,6 +344,7 @@ impl PyGcTraverse for CombinedSerializer {
             CombinedSerializer::Union(inner) => inner.py_gc_traverse(visit),
             CombinedSerializer::TaggedUnion(inner) => inner.py_gc_traverse(visit),
             CombinedSerializer::Literal(inner) => inner.py_gc_traverse(visit),
+            CombinedSerializer::UnsetSentinel(inner) => inner.py_gc_traverse(visit),
             CombinedSerializer::Enum(inner) => inner.py_gc_traverse(visit),
             CombinedSerializer::Recursive(inner) => inner.py_gc_traverse(visit),
             CombinedSerializer::Tuple(inner) => inner.py_gc_traverse(visit),

@@ -7,6 +7,7 @@ use ahash::AHashMap;
 use serde::ser::SerializeMap;
 use smallvec::SmallVec;
 
+use crate::common::unset_sentinel::get_unset_sentinel_object;
 use crate::serializers::extra::SerCheck;
 use crate::PydanticSerializationUnexpectedValue;
 
@@ -15,7 +16,7 @@ use super::errors::py_err_se_err;
 use super::extra::Extra;
 use super::filter::SchemaFilter;
 use super::infer::{infer_json_key, infer_serialize, infer_to_python, SerializeInfer};
-use super::shared::{get_unset_sentinel_object, CombinedSerializer, PydanticSerializer, TypeSerializer};
+use super::shared::{CombinedSerializer, PydanticSerializer, TypeSerializer};
 
 /// representation of a field for serialization
 #[derive(Debug)]

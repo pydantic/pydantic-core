@@ -25,6 +25,7 @@ pub mod timedelta;
 pub mod tuple;
 pub mod typed_dict;
 pub mod union;
+pub mod unset_sentinel;
 pub mod url;
 pub mod uuid;
 pub mod with_default;
