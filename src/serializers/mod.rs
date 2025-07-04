@@ -61,6 +61,7 @@ impl SchemaSerializer {
         exclude_defaults: bool,
         exclude_none: bool,
         round_trip: bool,
+        sort_keys: bool,
         rec_guard: &'a SerRecursionState,
         serialize_unknown: bool,
         fallback: Option<&'a Bound<'a, PyAny>>,
@@ -76,6 +77,7 @@ impl SchemaSerializer {
             exclude_defaults,
             exclude_none,
             round_trip,
+            sort_keys,
             &self.config,
             rec_guard,
             serialize_unknown,
@@ -108,8 +110,8 @@ impl SchemaSerializer {
 
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (value, *, mode = None, include = None, exclude = None, by_alias = None,
-        exclude_unset = false, exclude_defaults = false, exclude_none = false, round_trip = false, warnings = WarningsArg::Bool(true),
-        fallback = None, serialize_as_any = false, context = None))]
+        exclude_unset = false, exclude_defaults = false, exclude_none = false, round_trip = false, sort_keys = false,
+        warnings = WarningsArg::Bool(true), fallback = None, serialize_as_any = false, context = None))]
     pub fn to_python(
         &self,
         py: Python,
@@ -122,6 +124,7 @@ impl SchemaSerializer {
         exclude_defaults: bool,
         exclude_none: bool,
         round_trip: bool,
+        sort_keys: bool,
         warnings: WarningsArg,
         fallback: Option<&Bound<'_, PyAny>>,
         serialize_as_any: bool,
@@ -143,6 +146,7 @@ impl SchemaSerializer {
             exclude_defaults,
             exclude_none,
             round_trip,
+            sort_keys,
             &rec_guard,
             false,
             fallback,
@@ -156,7 +160,8 @@ impl SchemaSerializer {
 
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (value, *, indent = None, ensure_ascii = false, include = None, exclude = None, by_alias = None,
-        exclude_unset = false, exclude_defaults = false, exclude_none = false, round_trip = false, warnings = WarningsArg::Bool(true),
+        exclude_unset = false, exclude_defaults = false, exclude_none = false, round_trip = false,
+        sort_keys = false,warnings = WarningsArg::Bool(true),
         fallback = None, serialize_as_any = false, context = None))]
     pub fn to_json(
         &self,
@@ -171,6 +176,7 @@ impl SchemaSerializer {
         exclude_defaults: bool,
         exclude_none: bool,
         round_trip: bool,
+        sort_keys: bool,
         warnings: WarningsArg,
         fallback: Option<&Bound<'_, PyAny>>,
         serialize_as_any: bool,
@@ -191,6 +197,7 @@ impl SchemaSerializer {
             exclude_defaults,
             exclude_none,
             round_trip,
+            sort_keys,
             &rec_guard,
             false,
             fallback,
@@ -241,7 +248,7 @@ impl SchemaSerializer {
 #[allow(clippy::too_many_arguments)]
 #[pyfunction]
 #[pyo3(signature = (value, *, indent = None, ensure_ascii = false, include = None, exclude = None, by_alias = true,
-    exclude_none = false, round_trip = false, timedelta_mode = "iso8601", bytes_mode = "utf8",
+    exclude_none = false, round_trip = false, sort_keys = false, timedelta_mode = "iso8601", bytes_mode = "utf8",
     inf_nan_mode = "constants", serialize_unknown = false, fallback = None, serialize_as_any = false,
     context = None))]
 pub fn to_json(
@@ -254,6 +261,7 @@ pub fn to_json(
     by_alias: bool,
     exclude_none: bool,
     round_trip: bool,
+    sort_keys: bool,
     timedelta_mode: &str,
     bytes_mode: &str,
     inf_nan_mode: &str,
@@ -269,6 +277,7 @@ pub fn to_json(
         Some(by_alias),
         exclude_none,
         round_trip,
+        sort_keys,
         serialize_unknown,
         fallback,
         serialize_as_any,
@@ -292,7 +301,7 @@ pub fn to_json(
 #[allow(clippy::too_many_arguments)]
 #[pyfunction]
 #[pyo3(signature = (value, *, include = None, exclude = None, by_alias = true, exclude_none = false, round_trip = false,
-    timedelta_mode = "iso8601", bytes_mode = "utf8", inf_nan_mode = "constants", serialize_unknown = false, fallback = None,
+    sort_keys = false, timedelta_mode = "iso8601", bytes_mode = "utf8", inf_nan_mode = "constants", serialize_unknown = false, fallback = None,
     serialize_as_any = false, context = None))]
 pub fn to_jsonable_python(
     py: Python,
@@ -302,6 +311,7 @@ pub fn to_jsonable_python(
     by_alias: bool,
     exclude_none: bool,
     round_trip: bool,
+    sort_keys: bool,
     timedelta_mode: &str,
     bytes_mode: &str,
     inf_nan_mode: &str,
@@ -317,6 +327,7 @@ pub fn to_jsonable_python(
         Some(by_alias),
         exclude_none,
         round_trip,
+        sort_keys,
         serialize_unknown,
         fallback,
         serialize_as_any,

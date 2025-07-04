@@ -103,6 +103,7 @@ pub(crate) fn infer_to_python_known(
             extra.exclude_defaults,
             extra.exclude_none,
             extra.round_trip,
+            extra.sort_keys,
             extra.rec_guard,
             extra.serialize_unknown,
             extra.fallback,
@@ -503,6 +504,7 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
                 extra.exclude_defaults,
                 extra.exclude_none,
                 extra.round_trip,
+                extra.sort_keys,
                 extra.rec_guard,
                 extra.serialize_unknown,
                 extra.fallback,
@@ -721,13 +723,27 @@ fn serialize_pairs_python<'py>(
     let new_dict = PyDict::new(py);
     let filter = AnyFilter::new();
 
-    for result in pairs_iter {
-        let (k, v) = result?;
-        let op_next = filter.key_filter(&k, include, exclude)?;
-        if let Some((next_include, next_exclude)) = op_next {
-            let k = key_transform(k)?;
-            let v = infer_to_python(&v, next_include.as_ref(), next_exclude.as_ref(), extra)?;
-            new_dict.set_item(k, v)?;
+    if extra.sort_keys {
+        let mut pairs: Vec<(Bound<'py, PyAny>, Bound<'py, PyAny>)> = pairs_iter.collect::<PyResult<Vec<_>>>()?;
+        pairs.sort_by_cached_key(|(k, _)| k.to_string());
+
+        for (k, v) in pairs {
+            let op_next = filter.key_filter(&k, include, exclude)?;
+            if let Some((next_include, next_exclude)) = op_next {
+                let k = key_transform(k)?;
+                let v = infer_to_python(&v, next_include.as_ref(), next_exclude.as_ref(), extra)?;
+                new_dict.set_item(k, v)?;
+            }
+        }
+    } else {
+        for result in pairs_iter {
+            let (k, v) = result?;
+            let op_next = filter.key_filter(&k, include, exclude)?;
+            if let Some((next_include, next_exclude)) = op_next {
+                let k = key_transform(k)?;
+                let v = infer_to_python(&v, next_include.as_ref(), next_exclude.as_ref(), extra)?;
+                new_dict.set_item(k, v)?;
+            }
         }
     }
     Ok(new_dict.into())
@@ -744,14 +760,29 @@ fn serialize_pairs_json<'py, S: Serializer>(
     let mut map = serializer.serialize_map(Some(iter_size))?;
     let filter = AnyFilter::new();
 
-    for result in pairs_iter {
-        let (key, value) = result.map_err(py_err_se_err)?;
+    if extra.sort_keys {
+        let mut pairs: Vec<(Bound<'py, PyAny>, Bound<'py, PyAny>)> =
+            pairs_iter.collect::<PyResult<Vec<_>>>().map_err(py_err_se_err)?;
+        pairs.sort_by_cached_key(|(k, _)| k.to_string());
 
-        let op_next = filter.key_filter(&key, include, exclude).map_err(py_err_se_err)?;
-        if let Some((next_include, next_exclude)) = op_next {
-            let key = infer_json_key(&key, extra).map_err(py_err_se_err)?;
-            let value_serializer = SerializeInfer::new(&value, next_include.as_ref(), next_exclude.as_ref(), extra);
-            map.serialize_entry(&key, &value_serializer)?;
+        for (key, value) in pairs {
+            let op_next = filter.key_filter(&key, include, exclude).map_err(py_err_se_err)?;
+            if let Some((next_include, next_exclude)) = op_next {
+                let key = infer_json_key(&key, extra).map_err(py_err_se_err)?;
+                let value_serializer = SerializeInfer::new(&value, next_include.as_ref(), next_exclude.as_ref(), extra);
+                map.serialize_entry(&key, &value_serializer)?;
+            }
+        }
+    } else {
+        for result in pairs_iter {
+            let (key, value) = result.map_err(py_err_se_err)?;
+
+            let op_next = filter.key_filter(&key, include, exclude).map_err(py_err_se_err)?;
+            if let Some((next_include, next_exclude)) = op_next {
+                let key = infer_json_key(&key, extra).map_err(py_err_se_err)?;
+                let value_serializer = SerializeInfer::new(&value, next_include.as_ref(), next_exclude.as_ref(), extra);
+                map.serialize_entry(&key, &value_serializer)?;
+            }
         }
     }
     map.end()
