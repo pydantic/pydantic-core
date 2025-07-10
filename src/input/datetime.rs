@@ -442,12 +442,8 @@ pub fn float_as_datetime<'py>(
 ) -> ValResult<EitherDateTime<'py>> {
     nan_check!(input, timestamp, DatetimeParsing);
     let microseconds = match mode {
-        TemporalUnitMode::Seconds => {
-            timestamp.fract().abs() * 1_000_000.0
-        }
-        TemporalUnitMode::Milliseconds => {
-            timestamp.fract().abs() * 1_000.0
-        }
+        TemporalUnitMode::Seconds => timestamp.fract().abs() * 1_000_000.0,
+        TemporalUnitMode::Milliseconds => timestamp.fract().abs() * 1_000.0,
         TemporalUnitMode::Infer => {
             // Use the same watershed from speedate to determine if we treat the float as seconds or milliseconds.
             // TODO: should we expose this from speedate?
