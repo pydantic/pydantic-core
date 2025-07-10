@@ -47,10 +47,9 @@ def test_constraints_schema_validation() -> None:
         (Decimal('1654646400.1234564'), datetime(2022, 6, 8, 0, 0, 0, 123456, tzinfo=timezone.utc)),
         (Decimal('1654646400.1234568'), datetime(2022, 6, 8, 0, 0, 0, 123457, tzinfo=timezone.utc)),
         ('1654646400.1234568', datetime(2022, 6, 8, 0, 0, 0, 123457, tzinfo=timezone.utc)),
-        pytest.param(
+        (
             Decimal('1654646400123.456'),
             datetime(2022, 6, 8, 0, 0, 0, 123456, tzinfo=timezone.utc),
-            marks=pytest.mark.xfail(reason='Currently failing behaviour, probably needs looking at.', strict=True),
         ),
         (253_402_300_800_000, Err('should be a valid datetime, dates after 9999 are not supported as unix timestamps')),
         (
@@ -537,20 +536,18 @@ def test_tz_cmp() -> None:
         ('milliseconds', '1654646400123', datetime(2022, 6, 8, 0, 0, 0, 123000, tzinfo=timezone.utc)),
         ('milliseconds', 8640000000.0, datetime(1970, 4, 11, tzinfo=timezone.utc)),
         ('milliseconds', 92534400000.0, datetime(1972, 12, 7, tzinfo=timezone.utc)),
-        pytest.param(
+        (
             'milliseconds',
             1654646400123.456,
             datetime(2022, 6, 8, 0, 0, 0, 123456, tzinfo=timezone.utc),
-            marks=pytest.mark.xfail(reason='Current behaviour means this fails', strict=True),
         ),
         # 'infer' mode: large numbers are ms, small are s
         ('infer', 1654646400, datetime(2022, 6, 8, tzinfo=timezone.utc)),
         ('infer', 1654646400123, datetime(2022, 6, 8, 0, 0, 0, 123000, tzinfo=timezone.utc)),
-        pytest.param(
+        (
             'infer',
             1654646400123.456,
             datetime(2022, 6, 8, 0, 0, 0, 123456, tzinfo=timezone.utc),
-            marks=pytest.mark.xfail(reason='Current behaviour means this fails', strict=True),
         ),
         ('infer', 8640000000.0, datetime(2243, 10, 17, tzinfo=timezone.utc)),
         ('infer', 92534400000.0, datetime(1972, 12, 7, tzinfo=timezone.utc)),

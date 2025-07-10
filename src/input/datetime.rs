@@ -441,7 +441,25 @@ pub fn float_as_datetime<'py>(
     mode: TemporalUnitMode,
 ) -> ValResult<EitherDateTime<'py>> {
     nan_check!(input, timestamp, DatetimeParsing);
-    let microseconds = timestamp.fract().abs() * 1_000_000.0;
+    let microseconds = match mode {
+        TemporalUnitMode::Seconds => {
+            timestamp.fract().abs() * 1_000_000.0
+        }
+        TemporalUnitMode::Milliseconds => {
+            timestamp.fract().abs() * 1_000.0
+        }
+        TemporalUnitMode::Infer => {
+            // Use the same watershed from speedate to determine if we treat the float as seconds or milliseconds.
+            // TODO: should we expose this from speedate?
+            if timestamp.abs() <= 20_000_000_000.0 {
+                // treat as seconds
+                timestamp.fract().abs() * 1_000_000.0
+            } else {
+                // treat as milliseconds
+                timestamp.fract().abs() * 1_000.0
+            }
+        }
+    };
     // checking for extra digits in microseconds is unreliable with large floats,
     // so we just round to the nearest microsecond
     int_as_datetime(input, timestamp.floor() as i64, microseconds.round() as u32, mode)
