@@ -49,6 +49,7 @@ mod list;
 mod literal;
 mod model;
 mod model_fields;
+mod never;
 mod none;
 mod nullable;
 mod prebuilt;
@@ -620,6 +621,7 @@ fn build_validator_inner(
         definitions::DefinitionRefValidator,
         definitions::DefinitionsValidatorBuilder,
         complex::ComplexValidator,
+        never::NeverValidator,
     )
 }
 
@@ -790,6 +792,7 @@ pub enum CombinedValidator {
     // input dependent
     JsonOrPython(json_or_python::JsonOrPython),
     Complex(complex::ComplexValidator),
+    Never(never::NeverValidator),
     // uses a reference to an existing SchemaValidator to reduce memory usage
     Prebuilt(prebuilt::PrebuiltValidator),
 }
