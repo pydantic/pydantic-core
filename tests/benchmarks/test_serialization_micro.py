@@ -319,7 +319,6 @@ def test_model_exclude_unset_true(benchmark, fs_model_serializer):
         fs_model_serializer.to_python(m, exclude_unset=True)
 
 
-@pytest.mark.benchmark(group='model-list-json')
 def test_model_list_core_json(benchmark):
     s = SchemaSerializer(
         core_schema.model_schema(
@@ -359,6 +358,32 @@ def test_datetime(benchmark):
     def r():
         v.to_python(d, mode='json')
 
+
+@pytest.mark.benchmark(group='model-list-json')
+def test_datetime_seconds(benchmark):
+    v = SchemaSerializer(
+        core_schema.datetime_schema(),
+        config={
+            'ser_json_temporal': 'seconds',
+        },
+    )
+    d = datetime(2022, 12, 2, 12, 13, 14)
+    assert v.to_python(d, mode='json') == 1669983194.0
+
+    @benchmark
+    def r():
+        v.to_python(d, mode='json')
+
+
+@pytest.mark.benchmark(group='model-list-json')
+def test_datetime_milliseconds(benchmark):
+    v = SchemaSerializer(core_schema.datetime_schema(), config={'ser_json_temporal': 'milliseconds'})
+    d = datetime(2022, 12, 2, 12, 13, 14)
+    assert v.to_python(d, mode='json') == 1669983194000.0
+
+    @benchmark
+    def r():
+        v.to_python(d, mode='json')
 
 @pytest.mark.benchmark(group='model-list-json')
 def test_uuid(benchmark):
