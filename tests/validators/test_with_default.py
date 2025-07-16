@@ -818,3 +818,33 @@ def test_validate_default_raises_dataclass(input_value: dict, expected: Any) -> 
         v.validate_python(input_value)
 
     assert exc_info.value.errors(include_url=False, include_context=False) == expected
+
+
+def test_default_factory_not_called_if_existing_error() -> None:
+    class Test:
+        def __init__(self, a: int, b: int):
+            self.a = a
+            self.b = b
+
+    schema = core_schema.model_schema(
+        cls=Test,
+        schema=core_schema.model_fields_schema(
+            computed_fields=[],
+            fields={
+                'a': core_schema.model_field(
+                    schema=core_schema.int_schema(),
+                ),
+                'b': core_schema.model_field(
+                    schema=core_schema.with_default_schema(
+                        schema=core_schema.int_schema(),
+                        default_factory=lambda data: data['a'],
+                        default_factory_takes_data=True,
+                    ),
+                ),
+            },
+        ),
+    )
+
+    v = SchemaValidator(schema)
+    with pytest.raises(ValidationError):
+        v.validate_python({'a': 'not_an_int'})
