@@ -385,6 +385,7 @@ def test_datetime_milliseconds(benchmark):
     def r():
         v.to_python(d, mode='json')
 
+
 @pytest.mark.benchmark(group='model-list-json')
 def test_uuid(benchmark):
     v = SchemaSerializer(core_schema.uuid_schema())
