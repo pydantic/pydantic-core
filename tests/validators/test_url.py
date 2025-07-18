@@ -1,6 +1,6 @@
 import re
 from copy import deepcopy
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
 import pytest
 from dirty_equals import HasRepr, IsInstance
@@ -55,12 +55,15 @@ def url_validator_fixture():
 
 
 SCHEMA_VALIDATOR_MODE = 'SCHEMA_VALIDATOR'
-URL_CLASS_MODE = 'URI_CLASS'
+URL_CLASS_MODE = 'URL_CLASS'
 MULTI_URL_CLASS_MODE = 'MULTI_URL_CLASS'
 
 
 def url_test_case_helper(
-    url: str, expected: Union[Err, str], validator_mode: str, url_validator: Optional[SchemaValidator] = None
+    url: str,
+    expected: Union[Err, str, dict[str, Any]],
+    validator_mode: str,
+    url_validator: Optional[SchemaValidator] = None,
 ):
     if isinstance(expected, Err):
         with pytest.raises(ValidationError) as exc_info:
@@ -83,6 +86,7 @@ def url_test_case_helper(
             output_url = MultiHostUrl(url)
         else:
             raise ValueError(f'Unknown validator mode: {validator_mode}')
+
         assert isinstance(output_url, (Url, MultiHostUrl))
         if isinstance(expected, str):
             assert str(output_url) == expected
@@ -269,6 +273,75 @@ def url_test_case_helper(
 )
 def test_url_cases(url_validator, url, expected, mode):
     url_test_case_helper(url, expected, mode, url_validator)
+
+
+@pytest.fixture(scope='module', name='url_validator_trailing_slash')
+def url_validator_trailing_slash() -> SchemaValidator:
+    return SchemaValidator(core_schema.url_schema(add_trailing_slash=False))
+
+
+@pytest.mark.parametrize(
+    'url,expected',
+    [
+        ('http://example.com', 'http://example.com'),
+        ('http:example.com', 'http://example.com'),
+        ('http://example.com/', 'http://example.com/'),
+        ('http:example.com/', 'http://example.com/'),
+        ('http://example.com/path', 'http://example.com/path'),
+        ('http://example.com/path/', 'http://example.com/path/'),
+        ('http://example.com/path/?x=1', 'http://example.com/path/?x=1'),
+    ],
+)
+def test_trailing_slash(url_validator_trailing_slash: SchemaValidator, url: str, expected: str):
+    url1 = Url(url, add_trailing_slash=False)
+    assert str(url1) == expected
+    assert url1.unicode_string() == expected
+
+    url2 = url_validator_trailing_slash.validate_python(url)
+    assert str(url2) == expected
+    assert url2.unicode_string() == expected
+
+
+@pytest.fixture(scope='module', name='multi_url_validator_trailing_slash')
+def multi_url_validator_trailing_slash() -> SchemaValidator:
+    return SchemaValidator(core_schema.multi_host_url_schema(add_trailing_slash=False))
+
+
+@pytest.mark.parametrize(
+    'url,expected',
+    [
+        ('http://example.com', 'http://example.com'),
+        ('http://example.com/', 'http://example.com/'),
+        ('http://example.com/path', 'http://example.com/path'),
+        ('http://example.com/path/', 'http://example.com/path/'),
+        ('http://example.com,example.org', 'http://example.com,example.org'),
+        ('http://example.com,example.org/', 'http://example.com,example.org/'),
+        ('http://localhost,127.0.0.1', 'http://localhost,127.0.0.1'),
+        ('http://localhost,127.0.0.1/', 'http://localhost,127.0.0.1/'),
+        ('http:localhost,127.0.0.1', 'http://localhost,127.0.0.1'),
+        ('http://localhost,127.0.0.1/path', 'http://localhost,127.0.0.1/path'),
+        ('http://localhost,127.0.0.1/path/', 'http://localhost,127.0.0.1/path/'),
+    ],
+)
+def test_multi_trailing_slash(multi_url_validator_trailing_slash: SchemaValidator, url: str, expected: str):
+    url1 = MultiHostUrl(url, add_trailing_slash=False)
+    assert str(url1) == expected
+    assert url1.unicode_string() == expected
+
+    url2 = multi_url_validator_trailing_slash.validate_python(url)
+    assert str(url2) == expected
+    assert url2.unicode_string() == expected
+
+
+def test_multi_trailing_slash_config():
+    s = SchemaValidator(core_schema.url_schema(), CoreConfig(url_add_trailing_slash=False))
+    url1 = s.validate_python('http://example.com')
+    assert str(url1) == 'http://example.com'
+    assert url1.unicode_string() == 'http://example.com'
+
+    url2 = s.validate_python('http://example.com/')
+    assert str(url2) == 'http://example.com/'
+    assert url2.unicode_string() == 'http://example.com/'
 
 
 @pytest.mark.parametrize(
