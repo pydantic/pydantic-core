@@ -3,6 +3,7 @@ use std::str::from_utf8;
 use pyo3::intern;
 use pyo3::prelude::*;
 
+use pyo3::sync::GILOnceCell;
 use pyo3::types::PyType;
 use pyo3::types::{
     PyBool, PyByteArray, PyBytes, PyComplex, PyDate, PyDateTime, PyDict, PyFloat, PyFrozenSet, PyInt, PyIterator,
@@ -44,6 +45,20 @@ use super::{
     py_string_str, BorrowInput, EitherBytes, EitherFloat, EitherInt, EitherString, EitherTimedelta, GenericIterator,
     Input,
 };
+
+static FRACTION_TYPE: GILOnceCell<Py<PyType>> = GILOnceCell::new();
+
+pub fn get_fraction_type(py: Python) -> &Bound<'_, PyType> {
+    FRACTION_TYPE
+        .get_or_init(py, || {
+            py.import("fractions")
+                .and_then(|fractions_module| fractions_module.getattr("Fraction"))
+                .unwrap()
+                .extract()
+                .unwrap()
+        })
+        .bind(py)
+}
 
 pub(crate) fn downcast_python_input<'py, T: PyTypeCheck>(input: &(impl Input<'py> + ?Sized)) -> Option<&Bound<'py, T>> {
     input.as_python().and_then(|any| any.downcast::<T>().ok())
@@ -269,6 +284,15 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
                     float_as_int(self, self.extract::<f64>()?)
                 } else if let Ok(decimal) = self.validate_decimal(true, self.py()) {
                     decimal_as_int(self, &decimal.into_inner())
+                } else if self.is_instance(get_fraction_type(self.py()))? {
+                    #[cfg(Py_3_11)]
+                    let as_int = self.call_method0("__int__");
+                    #[cfg(not(Py_3_11))]
+                    let as_int = self.call_method0("__trunc__");
+                    match as_int {
+                        Ok(i) => Ok(EitherInt::Py(i.as_any().to_owned())),
+                        Err(_) => break 'lax,
+                    }
                 } else if let Ok(float) = self.extract::<f64>() {
                     float_as_int(self, float)
                 } else if let Some(enum_val) = maybe_as_enum(self) {

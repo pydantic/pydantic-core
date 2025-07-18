@@ -1,6 +1,7 @@
 import json
 import re
 from decimal import Decimal
+from fractions import Fraction
 from typing import Any
 
 import pytest
@@ -93,6 +94,7 @@ def test_constraints_schema_validation() -> None:
         (i64_max, i64_max),
         (i64_max + 1, i64_max + 1),
         (i64_max * 2, i64_max * 2),
+        (Fraction(10_935_244_710_974_505), 10_935_244_710_974_505),  # https://github.com/pydantic/pydantic/issues/12063
         pytest.param(
             12.5,
             Err('Input should be a valid integer, got a number with a fractional part [type=int_from_float'),
