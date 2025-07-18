@@ -1,6 +1,7 @@
 import json
 import re
 from decimal import Decimal
+from fractions import Fraction
 from typing import Any
 
 import pytest
@@ -132,6 +133,7 @@ def test_int_py_and_json(py_and_json: PyAndJson, input_value, expected):
         (-i64_max + 1, -i64_max + 1),
         (i64_max * 2, i64_max * 2),
         (-i64_max * 2, -i64_max * 2),
+        (Fraction(10_935_244_710_974_505), 10_935_244_710_974_505),  # https://github.com/pydantic/pydantic/issues/12063
         pytest.param(
             1.00000000001,
             Err(
