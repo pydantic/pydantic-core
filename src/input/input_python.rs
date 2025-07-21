@@ -285,13 +285,22 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
                 } else if let Ok(decimal) = self.validate_decimal(true, self.py()) {
                     decimal_as_int(self, &decimal.into_inner())
                 } else if self.is_instance(get_fraction_type(self.py()))? {
-                    #[cfg(Py_3_11)]
-                    let as_int = self.call_method0("__int__");
-                    #[cfg(not(Py_3_11))]
-                    let as_int = self.call_method0("__trunc__");
-                    match as_int {
-                        Ok(i) => Ok(EitherInt::Py(i.as_any().to_owned())),
-                        Err(_) => break 'lax,
+                    #[cfg(Py_3_12)]
+                    let is_integer = self.call_method0("is_integer")?.extract::<bool>()?;
+                    #[cfg(not(Py_3_12))]
+                    let is_integer = self.getattr("denominator")?.extract::<i64>().map_or(false, |d| d == 1);
+
+                    if is_integer {
+                        #[cfg(Py_3_11)]
+                        let as_int = self.call_method0("__int__");
+                        #[cfg(not(Py_3_11))]
+                        let as_int = self.call_method0("__trunc__");
+                        match as_int {
+                            Ok(i) => Ok(EitherInt::Py(i.as_any().to_owned())),
+                            Err(_) => break 'lax,
+                        }
+                    } else {
+                        Err(ValError::new(ErrorTypeDefaults::IntFromFloat, self))
                     }
                 } else if let Ok(float) = self.extract::<f64>() {
                     float_as_int(self, float)

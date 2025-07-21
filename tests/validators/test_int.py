@@ -135,12 +135,20 @@ def test_int_py_and_json(py_and_json: PyAndJson, input_value, expected):
         (-i64_max * 2, -i64_max * 2),
         (Fraction(10_935_244_710_974_505), 10_935_244_710_974_505),  # https://github.com/pydantic/pydantic/issues/12063
         pytest.param(
+            Fraction(1, 2),
+            Err(
+                'Input should be a valid integer, got a number with a fractional part '
+                '[type=int_from_float, input_value=Fraction(1, 2), input_type=Fraction]'
+            ),
+            id='fraction-remainder',
+        ),
+        pytest.param(
             1.00000000001,
             Err(
                 'Input should be a valid integer, got a number with a fractional part '
                 '[type=int_from_float, input_value=1.00000000001, input_type=float]'
             ),
-            id='decimal-remainder',
+            id='float-remainder',
         ),
         pytest.param(
             Decimal('1.001'),
