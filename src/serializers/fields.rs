@@ -276,7 +276,8 @@ impl GeneralFieldsSerializer {
                             continue;
                         }
                         if serialization_exclude_if(field.serialization_exclude_if.as_ref(), &value)
-                            .map_err(py_err_se_err)? {
+                            .map_err(py_err_se_err)?
+                        {
                             continue;
                         }
                         let s = PydanticSerializer::new(
