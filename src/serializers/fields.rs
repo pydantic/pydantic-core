@@ -75,7 +75,7 @@ impl SerField {
     }
 }
 
-fn serialization_exclude_if(exclude_if_callable: &Option<Py<PyAny>>, value: &Bound<'_, PyAny>) -> PyResult<bool> {
+fn serialization_exclude_if(exclude_if_callable: Option<&Py<PyAny>>, value: &Bound<'_, PyAny>) -> PyResult<bool> {
     if let Some(exclude_if_callable) = exclude_if_callable {
         let py = value.py();
         let result = exclude_if_callable.call1(py, (value,))?;
@@ -194,7 +194,7 @@ impl GeneralFieldsSerializer {
                         if exclude_default(&value, &field_extra, serializer)? {
                             continue;
                         }
-                        if serialization_exclude_if(&field.serialization_exclude_if, &value)? {
+                        if serialization_exclude_if(field.serialization_exclude_if.as_ref(), &value)? {
                             continue;
                         }
                         let value =
@@ -275,7 +275,8 @@ impl GeneralFieldsSerializer {
                         if exclude_default(&value, &field_extra, serializer).map_err(py_err_se_err)? {
                             continue;
                         }
-                        if serialization_exclude_if(&field.serialization_exclude_if, &value).map_err(py_err_se_err)? {
+                        if serialization_exclude_if(field.serialization_exclude_if.as_ref(), &value)
+                            .map_err(py_err_se_err)? {
                             continue;
                         }
                         let s = PydanticSerializer::new(
