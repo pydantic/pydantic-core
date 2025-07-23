@@ -56,7 +56,8 @@ impl BuildSerializer for DataclassArgsBuilder {
                         .map_err(|e| py_schema_error_type!("Field `{}`:\n  {}", index, e))?;
 
                     let alias = field_info.get_as(intern!(py, "serialization_alias"))?;
-                    let serialization_exclude_if: Option<Py<PyAny>> = field_info.get_as(intern!(py, "serialization_exclude_if"))?;
+                    let serialization_exclude_if: Option<Py<PyAny>> =
+                        field_info.get_as(intern!(py, "serialization_exclude_if"))?;
                     fields.insert(
                         name,
                         SerField::new(

@@ -210,9 +210,13 @@ def test_exclude_if():
             core_schema.model_fields_schema(
                 {
                     'a': core_schema.model_field(core_schema.int_schema(), serialization_exclude_if=lambda x: x > 1),
-                    'b': core_schema.model_field(core_schema.str_schema(), serialization_exclude_if=lambda x: 'foo' in x),
+                    'b': core_schema.model_field(
+                        core_schema.str_schema(), serialization_exclude_if=lambda x: 'foo' in x
+                    ),
                     'c': core_schema.model_field(
-                        core_schema.str_schema(), serialization_exclude=True, serialization_exclude_if=lambda x: 'foo' in x
+                        core_schema.str_schema(),
+                        serialization_exclude=True,
+                        serialization_exclude_if=lambda x: 'foo' in x,
                     ),
                 }
             ),

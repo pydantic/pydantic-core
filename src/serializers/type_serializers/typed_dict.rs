@@ -60,7 +60,8 @@ impl BuildSerializer for TypedDictBuilder {
                 );
             } else {
                 let alias: Option<String> = field_info.get_as(intern!(py, "serialization_alias"))?;
-                let serialization_exclude_if: Option<Py<PyAny>> = field_info.get_as(intern!(py, "serialization_exclude_if"))?;
+                let serialization_exclude_if: Option<Py<PyAny>> =
+                    field_info.get_as(intern!(py, "serialization_exclude_if"))?;
                 let schema = field_info.get_as_req(intern!(py, "schema"))?;
                 let serializer = CombinedSerializer::build(&schema, config, definitions)
                     .map_err(|e| py_schema_error_type!("Field `{}`:\n  {}", key, e))?;
