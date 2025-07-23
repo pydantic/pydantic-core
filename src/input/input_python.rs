@@ -31,7 +31,8 @@ use super::input_abstract::ValMatch;
 use super::return_enums::EitherComplex;
 use super::return_enums::{iterate_attributes, iterate_mapping_items, ValidationMatch};
 use super::shared::{
-    decimal_as_int, float_as_int, get_enum_meta_object, int_as_bool, str_as_bool, str_as_float, str_as_int,
+    decimal_as_int, float_as_int, fraction_as_int, get_enum_meta_object, int_as_bool, str_as_bool, str_as_float,
+    str_as_int,
 };
 use super::Arguments;
 use super::ConsumeIterator;
@@ -285,23 +286,7 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
                 } else if let Ok(decimal) = self.validate_decimal(true, self.py()) {
                     decimal_as_int(self, &decimal.into_inner())
                 } else if self.is_instance(get_fraction_type(self.py()))? {
-                    #[cfg(Py_3_12)]
-                    let is_integer = self.call_method0("is_integer")?.extract::<bool>()?;
-                    #[cfg(not(Py_3_12))]
-                    let is_integer = self.getattr("denominator")?.extract::<i64>().map_or(false, |d| d == 1);
-
-                    if is_integer {
-                        #[cfg(Py_3_11)]
-                        let as_int = self.call_method0("__int__");
-                        #[cfg(not(Py_3_11))]
-                        let as_int = self.call_method0("__trunc__");
-                        match as_int {
-                            Ok(i) => Ok(EitherInt::Py(i.as_any().to_owned())),
-                            Err(_) => break 'lax,
-                        }
-                    } else {
-                        Err(ValError::new(ErrorTypeDefaults::IntFromFloat, self))
-                    }
+                    fraction_as_int(self)
                 } else if let Ok(float) = self.extract::<f64>() {
                     float_as_int(self, float)
                 } else if let Some(enum_val) = maybe_as_enum(self) {
