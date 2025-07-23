@@ -2980,7 +2980,7 @@ def model_field(
     validation_alias: str | list[str | int] | list[list[str | int]] | None = None,
     serialization_alias: str | None = None,
     serialization_exclude: bool | None = None,
-    exclude_if: Callable[[Any], bool] | None = None,
+    serialization_exclude_if: Callable[[Any], bool] | None = None,
     frozen: bool | None = None,
     metadata: dict[str, Any] | None = None,
 ) -> ModelField:
@@ -2998,7 +2998,7 @@ def model_field(
         validation_alias: The alias(es) to use to find the field in the validation data
         serialization_alias: The alias to use as a key when serializing
         serialization_exclude: Whether to exclude the field when serializing
-        exclude_if: Callable that determines whether to exclude a field during serialization based on its value.
+        serialization_exclude_if: A Callable that determines whether to exclude a field during serialization based on its value.
         frozen: Whether the field is frozen
         metadata: Any other information you want to include with the schema, not used by pydantic-core
     """
@@ -3008,7 +3008,7 @@ def model_field(
         validation_alias=validation_alias,
         serialization_alias=serialization_alias,
         serialization_exclude=serialization_exclude,
-        exclude_if=exclude_if,
+        serialization_exclude_if=serialization_exclude_if,
         frozen=frozen,
         metadata=metadata,
     )

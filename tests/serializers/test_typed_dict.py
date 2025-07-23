@@ -93,10 +93,10 @@ def test_include_exclude_schema():
                 '0': core_schema.typed_dict_field(core_schema.int_schema(), serialization_exclude=True),
                 '1': core_schema.typed_dict_field(core_schema.int_schema()),
                 '2': core_schema.typed_dict_field(
-                    core_schema.int_schema(), serialization_exclude=True, exclude_if=lambda x: x < 0
+                    core_schema.int_schema(), serialization_exclude=True, serialization_exclude_if=lambda x: x < 0
                 ),
                 '3': core_schema.typed_dict_field(
-                    core_schema.int_schema(), serialization_exclude=False, exclude_if=lambda x: x < 0
+                    core_schema.int_schema(), serialization_exclude=False, serialization_exclude_if=lambda x: x < 0
                 ),
             }
         )

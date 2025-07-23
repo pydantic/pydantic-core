@@ -46,25 +46,35 @@ impl BuildSerializer for DataclassArgsBuilder {
             let key_py: Py<PyString> = PyString::new(py, &name).into();
             if !field_info.get_as(intern!(py, "init_only"))?.unwrap_or(false) {
                 if field_info.get_as(intern!(py, "serialization_exclude"))? == Some(true) {
-                    fields.insert(name, SerField::new(py, key_py, None, None, true, None));
+                    fields.insert(
+                        name,
+                        SerField::new(py, key_py, None, None, true, serialize_by_alias, None),
+                    );
                 } else {
                     let schema = field_info.get_as_req(intern!(py, "schema"))?;
                     let serializer = CombinedSerializer::build(&schema, config, definitions)
                         .map_err(|e| py_schema_error_type!("Field `{}`:\n  {}", index, e))?;
 
                     let alias = field_info.get_as(intern!(py, "serialization_alias"))?;
-                    let exclude_if: Option<Py<PyAny>> = field_info.get_as(intern!(py, "exclude_if"))?;
+                    let serialization_exclude_if: Option<Py<PyAny>> = field_info.get_as(intern!(py, "serialization_exclude_if"))?;
                     fields.insert(
                         name,
-                        SerField::new(py, key_py, alias, Some(serializer), true, exclude_if),
+                        SerField::new(
+                            py,
+                            key_py,
+                            alias,
+                            Some(serializer),
+                            true,
+                            serialize_by_alias,
+                            serialization_exclude_if,
+                        ),
                     );
                 }
-            };
-
-            let computed_fields = ComputedFields::new(schema, config, definitions)?;
-
-            Ok(GeneralFieldsSerializer::new(fields, fields_mode, None, computed_fields).into())
+            }
         }
+        let computed_fields = ComputedFields::new(schema, config, definitions)?;
+
+        Ok(GeneralFieldsSerializer::new(fields, fields_mode, None, computed_fields).into())
     }
 }
 

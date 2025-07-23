@@ -63,7 +63,7 @@ impl BuildSerializer for ModelFieldsBuilder {
                 );
             } else {
                 let alias: Option<String> = field_info.get_as(intern!(py, "serialization_alias"))?;
-                let exclude_if: Option<Py<PyAny>> = field_info.get_as(intern!(py, "exclude_if"))?;
+                let serialization_exclude_if: Option<Py<PyAny>> = field_info.get_as(intern!(py, "serialization_exclude_if"))?;
                 let schema = field_info.get_as_req(intern!(py, "schema"))?;
                 let serializer = CombinedSerializer::build(&schema, config, definitions)
                     .map_err(|e| py_schema_error_type!("Field `{}`:\n  {}", key, e))?;
@@ -77,7 +77,7 @@ impl BuildSerializer for ModelFieldsBuilder {
                         Some(serializer),
                         true,
                         serialize_by_alias,
-                        exclude_if,
+                        serialization_exclude_if,
                     ),
                 );
             }

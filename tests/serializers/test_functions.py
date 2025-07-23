@@ -518,7 +518,7 @@ def test_function_wrap_model():
             core_schema.typed_dict_schema(
                 {
                     'a': core_schema.typed_dict_field(
-                        core_schema.any_schema(), exclude_if=lambda x: isinstance(x, int) and x >= 2
+                        core_schema.any_schema(), serialization_exclude_if=lambda x: isinstance(x, int) and x >= 2
                     ),
                     'b': core_schema.typed_dict_field(core_schema.any_schema()),
                     'c': core_schema.typed_dict_field(core_schema.any_schema(), serialization_exclude=True),
@@ -569,7 +569,7 @@ def test_function_plain_model():
             MyModel,
             core_schema.typed_dict_schema(
                 {
-                    'a': core_schema.typed_dict_field(core_schema.any_schema(), exclude_if=lambda x: x == 100),
+                    'a': core_schema.typed_dict_field(core_schema.any_schema(), serialization_exclude_if=lambda x: x == 100),
                     'b': core_schema.typed_dict_field(core_schema.any_schema()),
                     'c': core_schema.typed_dict_field(core_schema.any_schema(), serialization_exclude=True),
                 }

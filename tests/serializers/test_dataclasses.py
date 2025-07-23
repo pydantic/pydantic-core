@@ -54,7 +54,7 @@ def test_serialization_exclude():
         core_schema.dataclass_args_schema(
             'Foo',
             [
-                core_schema.dataclass_field(name='a', schema=core_schema.str_schema(), exclude_if=lambda x: x == 'bye'),
+                core_schema.dataclass_field(name='a', schema=core_schema.str_schema(), serialization_exclude_if=lambda x: x == 'bye'),
                 core_schema.dataclass_field(name='b', schema=core_schema.bytes_schema(), serialization_exclude=True),
             ],
         ),
