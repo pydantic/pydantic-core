@@ -4251,6 +4251,7 @@ ErrorType = Literal[
     'value_error',
     'assertion_error',
     'literal_error',
+    'unset_sentinel_error',
     'date_type',
     'date_parsing',
     'date_from_datetime_parsing',
