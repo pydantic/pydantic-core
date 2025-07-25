@@ -47,6 +47,7 @@ mod json_or_python;
 mod lax_or_strict;
 mod list;
 mod literal;
+mod missing_sentinel;
 mod model;
 mod model_fields;
 mod none;
@@ -59,7 +60,6 @@ mod timedelta;
 mod tuple;
 mod typed_dict;
 mod union;
-mod unset_sentinel;
 mod url;
 mod uuid;
 mod validation_state;
@@ -575,8 +575,8 @@ fn build_validator_inner(
         call::CallValidator,
         // literals
         literal::LiteralValidator,
-        // unset sentinel
-        unset_sentinel::UnsetSentinelValidator,
+        // missing sentinel
+        missing_sentinel::MissingSentinelValidator,
         // enums
         enum_::BuildEnumValidator,
         // any
@@ -744,8 +744,8 @@ pub enum CombinedValidator {
     FunctionCall(call::CallValidator),
     // literals
     Literal(literal::LiteralValidator),
-    // Unset sentinel
-    UnsetSentinel(unset_sentinel::UnsetSentinelValidator),
+    // Missing sentinel
+    MissingSentinel(missing_sentinel::MissingSentinelValidator),
     // enums
     IntEnum(enum_::EnumValidator<enum_::IntEnumValidator>),
     StrEnum(enum_::EnumValidator<enum_::StrEnumValidator>),

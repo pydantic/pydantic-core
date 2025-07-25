@@ -145,26 +145,27 @@ class MultiHostHost(_TypedDict):
     """The port part of this host, or `None`."""
 
 
-UNSET = Sentinel('UNSET', module_name='pydantic_core')
-"""A singleton indicating a field value was not set during validation.
+MISSING = Sentinel('MISSING')
+"""A singleton indicating a field value was not provided during validation.
 
 This singleton can be used a default value, as an alternative to `None` when it has
-an explicit meaning. During serialization, any field with `UNSET` as a value is excluded
+an explicit meaning. During serialization, any field with `MISSING` as a value is excluded
 from the output.
 
 Example:
     ```python
     from pydantic import BaseModel
-    from pydantic.experimental.unset import UNSET
+
+    from pydantic_core import MISSING
 
 
     class Configuration(BaseModel):
-        timeout: int | None | UNSET = UNSET
+        timeout: int | None | MISSING = MISSING
 
 
     # configuration defaults, stored somewhere else:
     defaults = {'timeout': 200}
 
     conf = Configuration.model_validate({...})
-    timeout = conf.timeout if timeout.timeout is not UNSET else defaults['timeout']
+    timeout = conf.timeout if timeout.timeout is not MISSING else defaults['timeout']
 """

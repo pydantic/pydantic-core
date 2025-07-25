@@ -3,41 +3,41 @@ use core::fmt::Debug;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use crate::common::unset_sentinel::get_unset_sentinel_object;
+use crate::common::missing_sentinel::get_missing_sentinel_object;
 use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::Input;
 
 use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
 
 #[derive(Debug, Clone)]
-pub struct UnsetSentinelValidator {}
+pub struct MissingSentinelValidator {}
 
-impl BuildValidator for UnsetSentinelValidator {
-    const EXPECTED_TYPE: &'static str = "unset-sentinel";
+impl BuildValidator for MissingSentinelValidator {
+    const EXPECTED_TYPE: &'static str = "missing-sentinel";
 
     fn build(
         _schema: &Bound<'_, PyDict>,
         _config: Option<&Bound<'_, PyDict>>,
         _definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
-        Ok(CombinedValidator::UnsetSentinel(Self {}))
+        Ok(CombinedValidator::MissingSentinel(Self {}))
     }
 }
 
-impl_py_gc_traverse!(UnsetSentinelValidator {});
+impl_py_gc_traverse!(MissingSentinelValidator {});
 
-impl Validator for UnsetSentinelValidator {
+impl Validator for MissingSentinelValidator {
     fn validate<'py>(
         &self,
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         _state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
-        let unset_obj = get_unset_sentinel_object(py);
+        let missing_sentinel = get_missing_sentinel_object(py);
 
         match input.as_python() {
-            Some(v) if v.is(unset_obj) => Ok(v.to_owned().into()),
-            _ => Err(ValError::new(ErrorType::UnsetSentinelError { context: None }, input)),
+            Some(v) if v.is(missing_sentinel) => Ok(v.to_owned().into()),
+            _ => Err(ValError::new(ErrorType::MissingSentinelError { context: None }, input)),
         }
     }
 

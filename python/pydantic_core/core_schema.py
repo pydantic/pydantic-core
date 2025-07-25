@@ -1346,14 +1346,14 @@ def enum_schema(
     )
 
 
-class UnsetSentinelSchema(TypedDict, total=False):
-    type: Required[Literal['unset-sentinel']]
+class MissingSentinelSchema(TypedDict, total=False):
+    type: Required[Literal['missing-sentinel']]
 
 
-def unset_sentinel_schema() -> UnsetSentinelSchema:
-    """Returns a schema for the [`UNSET`][pydantic_core.UNSET] sentinel."""
+def missing_sentinel_schema() -> MissingSentinelSchema:
+    """Returns a schema for the `MISSING` sentinel."""
 
-    return {'type': 'unset-sentinel'}
+    return {'type': 'missing-sentinel'}
 
 
 # must match input/parse_json.rs::JsonType::try_from
@@ -4092,7 +4092,7 @@ if not MYPY:
         DatetimeSchema,
         TimedeltaSchema,
         LiteralSchema,
-        UnsetSentinelSchema,
+        MissingSentinelSchema,
         EnumSchema,
         IsInstanceSchema,
         IsSubclassSchema,
@@ -4151,7 +4151,7 @@ CoreSchemaType = Literal[
     'datetime',
     'timedelta',
     'literal',
-    'unset-sentinel',
+    'missing-sentinel',
     'enum',
     'is-instance',
     'is-subclass',
@@ -4251,7 +4251,7 @@ ErrorType = Literal[
     'value_error',
     'assertion_error',
     'literal_error',
-    'unset_sentinel_error',
+    'missing_sentinel_error',
     'date_type',
     'date_parsing',
     'date_from_datetime_parsing',

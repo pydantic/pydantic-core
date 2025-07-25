@@ -7,7 +7,7 @@ use ahash::AHashMap;
 use serde::ser::SerializeMap;
 use smallvec::SmallVec;
 
-use crate::common::unset_sentinel::get_unset_sentinel_object;
+use crate::common::missing_sentinel::get_missing_sentinel_object;
 use crate::serializers::extra::SerCheck;
 use crate::PydanticSerializationUnexpectedValue;
 
@@ -169,7 +169,7 @@ impl GeneralFieldsSerializer {
     ) -> PyResult<Bound<'py, PyDict>> {
         let output_dict = PyDict::new(py);
         let mut used_req_fields: usize = 0;
-        let unset_obj = get_unset_sentinel_object(py);
+        let missing_sentinel = get_missing_sentinel_object(py);
 
         // NOTE! we maintain the order of the input dict assuming that's right
         for result in main_iter {
@@ -179,7 +179,7 @@ impl GeneralFieldsSerializer {
             if extra.exclude_none && value.is_none() {
                 continue;
             }
-            if value.is(unset_obj) {
+            if value.is(missing_sentinel) {
                 continue;
             }
 
@@ -258,11 +258,11 @@ impl GeneralFieldsSerializer {
 
         for result in main_iter {
             let (key, value) = result.map_err(py_err_se_err)?;
-            let unset_obj = get_unset_sentinel_object(value.py());
+            let missing_sentinel = get_missing_sentinel_object(value.py());
             if extra.exclude_none && value.is_none() {
                 continue;
             }
-            if value.is(unset_obj) {
+            if value.is(missing_sentinel) {
                 continue;
             }
             let key_str = key_str(&key).map_err(py_err_se_err)?;
@@ -356,7 +356,7 @@ impl TypeSerializer for GeneralFieldsSerializer {
         extra: &Extra,
     ) -> PyResult<PyObject> {
         let py = value.py();
-        let unset_obj = get_unset_sentinel_object(py);
+        let missing_sentinel = get_missing_sentinel_object(py);
         // If there is already a model registered (from a dataclass, BaseModel)
         // then do not touch it
         // If there is no model, we (a TypedDict) are the model
@@ -378,7 +378,7 @@ impl TypeSerializer for GeneralFieldsSerializer {
                 if extra.exclude_none && value.is_none() {
                     continue;
                 }
-                if value.is(unset_obj) {
+                if value.is(missing_sentinel) {
                     continue;
                 }
                 if let Some((next_include, next_exclude)) = self.filter.key_filter(&key, include, exclude)? {
@@ -414,7 +414,7 @@ impl TypeSerializer for GeneralFieldsSerializer {
             extra.warnings.on_fallback_ser::<S>(self.get_name(), value, extra)?;
             return infer_serialize(value, serializer, include, exclude, extra);
         };
-        let unset_obj = get_unset_sentinel_object(value.py());
+        let missing_sentinel = get_missing_sentinel_object(value.py());
         // If there is already a model registered (from a dataclass, BaseModel)
         // then do not touch it
         // If there is no model, we (a TypedDict) are the model
@@ -441,7 +441,7 @@ impl TypeSerializer for GeneralFieldsSerializer {
                 if extra.exclude_none && value.is_none() {
                     continue;
                 }
-                if value.is(unset_obj) {
+                if value.is(missing_sentinel) {
                     continue;
                 }
                 let filter = self.filter.key_filter(&key, include, exclude).map_err(py_err_se_err)?;
