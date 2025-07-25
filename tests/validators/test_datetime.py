@@ -44,6 +44,10 @@ def test_constraints_schema_validation() -> None:
         (Decimal('1654646400'), datetime(2022, 6, 8, tzinfo=timezone.utc)),
         ('1654646400', datetime(2022, 6, 8, tzinfo=timezone.utc)),
         (Decimal('1654646400.123456'), datetime(2022, 6, 8, 0, 0, 0, 123456, tzinfo=timezone.utc)),
+        pytest.param(
+            (Decimal('1654646400123.456'), datetime(2022, 6, 8, 0, 0, 0, 123456, tzinfo=timezone.utc),),
+            marks=pytest.mark.xfail(reason="Currently failing behaviour, probably needs looking at.", strict=True),
+        ),
         (Decimal('1654646400.1234564'), datetime(2022, 6, 8, 0, 0, 0, 123456, tzinfo=timezone.utc)),
         (Decimal('1654646400.1234568'), datetime(2022, 6, 8, 0, 0, 0, 123457, tzinfo=timezone.utc)),
         ('1654646400.1234568', datetime(2022, 6, 8, 0, 0, 0, 123457, tzinfo=timezone.utc)),
