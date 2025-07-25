@@ -98,7 +98,6 @@ async function main() {
     FS.mkdir('/test_dir');
     FS.chdir('/test_dir');
     await pyodide.loadPackage(['micropip', 'pytest', 'numpy', 'pygments']);
-    if (pydantic_core_version < '2.0.0') await pyodide.loadPackage(['typing-extensions']);
     await pyodide.runPythonAsync(python_code, {globals: pyodide.toPy({pydantic_core_version, tests_zip})});
     post();
   } catch (err) {
