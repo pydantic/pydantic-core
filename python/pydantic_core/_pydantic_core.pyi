@@ -647,7 +647,7 @@ class ValidationError(ValueError):
         Python constructor for a Validation Error.
 
         The API for constructing validation errors will probably change in the future,
-        hence the static method rather than `__init__`.
+        hence the class method rather than `__init__`.
 
         Arguments:
             title: The title of the error, as used in the heading of `str(validation_error)`
