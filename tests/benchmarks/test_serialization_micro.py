@@ -318,6 +318,7 @@ def test_model_exclude_unset_true(benchmark, fs_model_serializer):
     def r():
         fs_model_serializer.to_python(m, exclude_unset=True)
 
+
 @pytest.mark.benchmark(group='model-list-json')
 def test_model_list_core_json(benchmark):
     s = SchemaSerializer(
@@ -384,6 +385,7 @@ def test_datetime_milliseconds(benchmark):
     @benchmark
     def r():
         v.to_python(d, mode='json')
+
 
 @pytest.mark.benchmark(group='model-list-json')
 def test_uuid(benchmark):
