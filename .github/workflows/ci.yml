@@ -329,8 +329,8 @@ jobs:
       - uses: mymindstorm/setup-emsdk@v14
         with:
           # NOTE!: as per https://github.com/pydantic/pydantic-core/pull/149 this version needs to match the version
-          # in node_modules/pyodide/repodata.json, to get the version, run:
-          # `cat node_modules/pyodide/repodata.json | python -m json.tool | rg platform`
+          # in node_modules/pyodide/pyodide-lock.json, to get the version, run:
+          # `cat node_modules/pyodide/pyodide-lock.json | jq .info.platform`
           version: '3.1.58'
           actions-cache-folder: emsdk-cache
 
@@ -620,6 +620,8 @@ jobs:
               apk update
               apk add python3 py3-pip git curl
             fi
+          env: |
+            UV_NO_PROGRESS: '1'
           run: |
             set -x
             curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -666,6 +668,7 @@ jobs:
 
     permissions:
       id-token: write
+      contents: write
 
     steps:
       - uses: actions/checkout@v4
