@@ -79,6 +79,8 @@ class CoreConfig(TypedDict, total=False):
         validate_by_alias: Whether to use the field's alias when validating against the provided input data. Default is `True`.
         validate_by_name: Whether to use the field's name when validating against the provided input data. Default is `False`. Replacement for `populate_by_name`.
         serialize_by_alias: Whether to serialize by alias. Default is `False`, expected to change to `True` in V3.
+        url_add_trailing_slash: Whether to add an extra trailing slash to some URLs, defaults to `True` for
+            backward compatibility, default will change to `False` in v3 version.
     """
 
     title: str
@@ -119,6 +121,7 @@ class CoreConfig(TypedDict, total=False):
     validate_by_alias: bool  # default: True
     validate_by_name: bool  # default: False
     serialize_by_alias: bool  # default: False
+    url_add_trailing_slash: bool  # default: True
 
 
 IncExCall: TypeAlias = 'set[int | str] | dict[int | str, IncExCall] | None'
@@ -3885,6 +3888,7 @@ class UrlSchema(TypedDict, total=False):
     default_host: str
     default_port: int
     default_path: str
+    add_trailing_slash: bool
     strict: bool
     ref: str
     metadata: dict[str, Any]
@@ -3899,6 +3903,7 @@ def url_schema(
     default_host: str | None = None,
     default_port: int | None = None,
     default_path: str | None = None,
+    add_trailing_slash: bool | None = None,
     strict: bool | None = None,
     ref: str | None = None,
     metadata: dict[str, Any] | None = None,
@@ -3923,6 +3928,8 @@ def url_schema(
         default_host: The default host to use if the URL does not have a host
         default_port: The default port to use if the URL does not have a port
         default_path: The default path to use if the URL does not have a path
+        add_trailing_slash: Whether to add an extra trailing slash to some URLs, defaults to `True` for
+            backward compatibility, default will change to `False` in v3 version.
         strict: Whether to use strict URL parsing
         ref: optional unique identifier of the schema, used to reference the schema in other places
         metadata: Any other information you want to include with the schema, not used by pydantic-core
@@ -3940,6 +3947,7 @@ def url_schema(
         ref=ref,
         metadata=metadata,
         serialization=serialization,
+        add_trailing_slash=add_trailing_slash,
     )
 
 
@@ -3951,6 +3959,7 @@ class MultiHostUrlSchema(TypedDict, total=False):
     default_host: str
     default_port: int
     default_path: str
+    add_trailing_slash: bool
     strict: bool
     ref: str
     metadata: dict[str, Any]
@@ -3965,6 +3974,7 @@ def multi_host_url_schema(
     default_host: str | None = None,
     default_port: int | None = None,
     default_path: str | None = None,
+    add_trailing_slash: bool | None = None,
     strict: bool | None = None,
     ref: str | None = None,
     metadata: dict[str, Any] | None = None,
@@ -3989,6 +3999,8 @@ def multi_host_url_schema(
         default_host: The default host to use if the URL does not have a host
         default_port: The default port to use if the URL does not have a port
         default_path: The default path to use if the URL does not have a path
+        add_trailing_slash: Whether to add an extra trailing slash to some URLs, defaults to `True` for
+            backward compatibility, default will change to `False` in v3 version.
         strict: Whether to use strict URL parsing
         ref: optional unique identifier of the schema, used to reference the schema in other places
         metadata: Any other information you want to include with the schema, not used by pydantic-core
@@ -4002,6 +4014,7 @@ def multi_host_url_schema(
         default_host=default_host,
         default_port=default_port,
         default_path=default_path,
+        add_trailing_slash=add_trailing_slash,
         strict=strict,
         ref=ref,
         metadata=metadata,
