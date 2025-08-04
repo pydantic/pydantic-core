@@ -14,14 +14,9 @@ USE_MATURIN = $(shell [ "$$VIRTUAL_ENV" != "" ] && (which maturin))
 .uv:
 	@uv -V || echo 'Please install uv: https://docs.astral.sh/uv/getting-started/installation/'
 
-.PHONY: .pre-commit  ## Check that pre-commit is installed
-.pre-commit: .uv
-	@uv run pre-commit -V || uv pip install pre-commit
-
 .PHONY: install  ## Install the package, dependencies, and pre-commit for local development
-install: .uv .pre-commit
+install: .uv
 	uv sync --frozen --group all
-	uv pip install pre-commit
 	uv run pre-commit install --install-hooks
 
 .PHONY: rebuild-lockfiles  ## Rebuild lockfiles from scratch, updating all dependencies
