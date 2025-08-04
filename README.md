@@ -73,10 +73,9 @@ except ValidationError as e:
 
 You'll need:
 1. **[Rust](https://rustup.rs/)** - Rust stable (or nightly for coverage)
-2. **[Python 3.9+](https://www.python.org/downloads/)** - Python 3.9 or later
-3. **[uv](https://docs.astral.sh/uv/getting-started/installation/)** - Fast Python package manager
-4. **[git](https://git-scm.com/)** - For version control
-5. **[make](https://www.gnu.org/software/make/)** - For running development commands (or use `nmake` on Windows)
+2. **[uv](https://docs.astral.sh/uv/getting-started/installation/)** - Fast Python package manager (will install Python 3.9+ automatically)
+3. **[git](https://git-scm.com/)** - For version control
+4. **[make](https://www.gnu.org/software/make/)** - For running development commands (or use `nmake` on Windows)
 
 ### Quick Start
 
