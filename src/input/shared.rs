@@ -11,7 +11,7 @@ use crate::errors::{ErrorTypeDefaults, ValError, ValResult};
 use super::{EitherFloat, EitherInt, Input};
 static ENUM_META_OBJECT: GILOnceCell<Py<PyAny>> = GILOnceCell::new();
 
-pub fn get_enum_meta_object(py: Python) -> &Bound<'_, PyAny> {
+pub fn get_enum_meta_object(py: Python<'_>) -> &Bound<'_, PyAny> {
     ENUM_META_OBJECT
         .get_or_init(py, || {
             py.import(intern!(py, "enum"))
@@ -108,7 +108,7 @@ pub fn str_as_float<'py>(input: &(impl Input<'py> + ?Sized), str: &str) -> ValRe
     }
 }
 
-fn clean_int_str(mut s: &str) -> Option<Cow<str>> {
+fn clean_int_str(mut s: &str) -> Option<Cow<'_, str>> {
     let len_before = s.len();
 
     // strip leading and trailing whitespace
@@ -226,4 +226,24 @@ pub fn decimal_as_int<'py>(
         return Err(ValError::new(ErrorTypeDefaults::IntFromFloat, input));
     }
     Ok(EitherInt::Py(numerator))
+}
+
+pub fn fraction_as_int<'py>(input: &Bound<'py, PyAny>) -> ValResult<EitherInt<'py>> {
+    #[cfg(Py_3_12)]
+    let is_integer = input.call_method0("is_integer")?.extract::<bool>()?;
+    #[cfg(not(Py_3_12))]
+    let is_integer = input.getattr("denominator")?.extract::<i64>().map_or(false, |d| d == 1);
+
+    if is_integer {
+        #[cfg(Py_3_11)]
+        let as_int = input.call_method0("__int__");
+        #[cfg(not(Py_3_11))]
+        let as_int = input.call_method0("__trunc__");
+        match as_int {
+            Ok(i) => Ok(EitherInt::Py(i.as_any().to_owned())),
+            Err(_) => Err(ValError::new(ErrorTypeDefaults::IntType, input)),
+        }
+    } else {
+        Err(ValError::new(ErrorTypeDefaults::IntFromFloat, input))
+    }
 }

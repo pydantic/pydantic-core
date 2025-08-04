@@ -18,7 +18,7 @@ use crate::tools::{extract_i64, py_err, py_error_type};
 use super::PydanticCustomError;
 
 #[pyfunction]
-pub fn list_all_errors(py: Python) -> PyResult<Bound<'_, PyList>> {
+pub fn list_all_errors(py: Python<'_>) -> PyResult<Bound<'_, PyList>> {
     let mut errors: Vec<Bound<'_, PyDict>> = Vec::with_capacity(100);
     for error_type in ErrorType::iter() {
         if !matches!(error_type, ErrorType::CustomError { .. }) {
@@ -316,6 +316,8 @@ error_types! {
         expected: {ctx_type: String, ctx_fn: field_from_context},
     },
     // ---------------------
+    // missing sentinel
+    MissingSentinelError {},
     // date errors
     DateType {},
     DateParsing {
@@ -531,6 +533,7 @@ impl ErrorType {
             Self::AssertionError {..} => "Assertion failed, {error}",
             Self::CustomError {..} => "",  // custom errors are handled separately
             Self::LiteralError {..} => "Input should be {expected}",
+            Self::MissingSentinelError { .. } => "Input should be the 'MISSING' sentinel",
             Self::DateType {..} => "Input should be a valid date",
             Self::DateParsing {..} => "Input should be a valid date in the format YYYY-MM-DD, {error}",
             Self::DateFromDatetimeParsing {..} => "Input should be a valid date or datetime, {error}",

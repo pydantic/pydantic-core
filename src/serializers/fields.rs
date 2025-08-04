@@ -7,6 +7,7 @@ use ahash::AHashMap;
 use serde::ser::SerializeMap;
 use smallvec::SmallVec;
 
+use crate::common::missing_sentinel::get_missing_sentinel_object;
 use crate::serializers::extra::SerCheck;
 use crate::PydanticSerializationUnexpectedValue;
 
@@ -15,8 +16,7 @@ use super::errors::py_err_se_err;
 use super::extra::Extra;
 use super::filter::SchemaFilter;
 use super::infer::{infer_json_key, infer_serialize, infer_to_python, SerializeInfer};
-use super::shared::PydanticSerializer;
-use super::shared::{CombinedSerializer, TypeSerializer};
+use super::shared::{CombinedSerializer, PydanticSerializer, TypeSerializer};
 
 /// representation of a field for serialization
 #[derive(Debug)]
@@ -28,6 +28,7 @@ pub(super) struct SerField {
     pub serializer: Option<CombinedSerializer>,
     pub required: bool,
     pub serialize_by_alias: Option<bool>,
+    pub serialization_exclude_if: Option<Py<PyAny>>,
 }
 
 impl_py_gc_traverse!(SerField { serializer });
@@ -40,6 +41,7 @@ impl SerField {
         serializer: Option<CombinedSerializer>,
         required: bool,
         serialize_by_alias: Option<bool>,
+        serialization_exclude_if: Option<Py<PyAny>>,
     ) -> Self {
         let alias_py = alias.as_ref().map(|alias| PyString::new(py, alias.as_str()).into());
         Self {
@@ -49,6 +51,7 @@ impl SerField {
             serializer,
             required,
             serialize_by_alias,
+            serialization_exclude_if,
         }
     }
 
@@ -69,6 +72,18 @@ impl SerField {
         }
         Cow::Borrowed(key_str)
     }
+}
+
+fn serialization_exclude_if(exclude_if_callable: Option<&Py<PyAny>>, value: &Bound<'_, PyAny>) -> PyResult<bool> {
+    if let Some(exclude_if_callable) = exclude_if_callable {
+        let py = value.py();
+        let result = exclude_if_callable.call1(py, (value,))?;
+        let exclude = result.extract::<bool>(py)?;
+        if exclude {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 fn exclude_default(value: &Bound<'_, PyAny>, extra: &Extra, serializer: &CombinedSerializer) -> PyResult<bool> {
@@ -154,6 +169,7 @@ impl GeneralFieldsSerializer {
     ) -> PyResult<Bound<'py, PyDict>> {
         let output_dict = PyDict::new(py);
         let mut used_req_fields: usize = 0;
+        let missing_sentinel = get_missing_sentinel_object(py);
 
         // NOTE! we maintain the order of the input dict assuming that's right
         for result in main_iter {
@@ -163,6 +179,10 @@ impl GeneralFieldsSerializer {
             if extra.exclude_none && value.is_none() {
                 continue;
             }
+            if value.is(missing_sentinel) {
+                continue;
+            }
+
             let field_extra = Extra {
                 field_name: Some(key_str),
                 ..extra
@@ -170,16 +190,16 @@ impl GeneralFieldsSerializer {
             if let Some((next_include, next_exclude)) = self.filter.key_filter(&key, include, exclude)? {
                 if let Some(field) = op_field {
                     if let Some(ref serializer) = field.serializer {
-                        if !exclude_default(&value, &field_extra, serializer)? {
-                            let value = serializer.to_python(
-                                &value,
-                                next_include.as_ref(),
-                                next_exclude.as_ref(),
-                                &field_extra,
-                            )?;
-                            let output_key = field.get_key_py(output_dict.py(), &field_extra);
-                            output_dict.set_item(output_key, value)?;
+                        if exclude_default(&value, &field_extra, serializer)? {
+                            continue;
                         }
+                        if serialization_exclude_if(field.serialization_exclude_if.as_ref(), &value)? {
+                            continue;
+                        }
+                        let value =
+                            serializer.to_python(&value, next_include.as_ref(), next_exclude.as_ref(), &field_extra)?;
+                        let output_key = field.get_key_py(output_dict.py(), &field_extra);
+                        output_dict.set_item(output_key, value)?;
                     }
 
                     if field.required {
@@ -238,7 +258,11 @@ impl GeneralFieldsSerializer {
 
         for result in main_iter {
             let (key, value) = result.map_err(py_err_se_err)?;
+            let missing_sentinel = get_missing_sentinel_object(value.py());
             if extra.exclude_none && value.is_none() {
+                continue;
+            }
+            if value.is(missing_sentinel) {
                 continue;
             }
             let key_str = key_str(&key).map_err(py_err_se_err)?;
@@ -251,17 +275,23 @@ impl GeneralFieldsSerializer {
             if let Some((next_include, next_exclude)) = filter {
                 if let Some(field) = self.fields.get(key_str) {
                     if let Some(ref serializer) = field.serializer {
-                        if !exclude_default(&value, &field_extra, serializer).map_err(py_err_se_err)? {
-                            let s = PydanticSerializer::new(
-                                &value,
-                                serializer,
-                                next_include.as_ref(),
-                                next_exclude.as_ref(),
-                                &field_extra,
-                            );
-                            let output_key = field.get_key_json(key_str, &field_extra);
-                            map.serialize_entry(&output_key, &s)?;
+                        if exclude_default(&value, &field_extra, serializer).map_err(py_err_se_err)? {
+                            continue;
                         }
+                        if serialization_exclude_if(field.serialization_exclude_if.as_ref(), &value)
+                            .map_err(py_err_se_err)?
+                        {
+                            continue;
+                        }
+                        let s = PydanticSerializer::new(
+                            &value,
+                            serializer,
+                            next_include.as_ref(),
+                            next_exclude.as_ref(),
+                            &field_extra,
+                        );
+                        let output_key = field.get_key_json(key_str, &field_extra);
+                        map.serialize_entry(&output_key, &s)?;
                     }
                 } else if self.mode == FieldsMode::TypedDictAllow {
                     let output_key = infer_json_key(&key, &field_extra).map_err(py_err_se_err)?;
@@ -326,6 +356,7 @@ impl TypeSerializer for GeneralFieldsSerializer {
         extra: &Extra,
     ) -> PyResult<PyObject> {
         let py = value.py();
+        let missing_sentinel = get_missing_sentinel_object(py);
         // If there is already a model registered (from a dataclass, BaseModel)
         // then do not touch it
         // If there is no model, we (a TypedDict) are the model
@@ -345,6 +376,9 @@ impl TypeSerializer for GeneralFieldsSerializer {
         if let Some(extra_dict) = extra_dict {
             for (key, value) in extra_dict {
                 if extra.exclude_none && value.is_none() {
+                    continue;
+                }
+                if value.is(missing_sentinel) {
                     continue;
                 }
                 if let Some((next_include, next_exclude)) = self.filter.key_filter(&key, include, exclude)? {
@@ -380,7 +414,7 @@ impl TypeSerializer for GeneralFieldsSerializer {
             extra.warnings.on_fallback_ser::<S>(self.get_name(), value, extra)?;
             return infer_serialize(value, serializer, include, exclude, extra);
         };
-
+        let missing_sentinel = get_missing_sentinel_object(value.py());
         // If there is already a model registered (from a dataclass, BaseModel)
         // then do not touch it
         // If there is no model, we (a TypedDict) are the model
@@ -405,6 +439,9 @@ impl TypeSerializer for GeneralFieldsSerializer {
         if let Some(extra_dict) = extra_dict {
             for (key, value) in extra_dict {
                 if extra.exclude_none && value.is_none() {
+                    continue;
+                }
+                if value.is(missing_sentinel) {
                     continue;
                 }
                 let filter = self.filter.key_filter(&key, include, exclude).map_err(py_err_se_err)?;

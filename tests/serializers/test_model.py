@@ -203,6 +203,36 @@ def test_include_exclude_args(params):
     assert json.loads(s.to_json(value, include=include, exclude=exclude)) == expected
 
 
+def test_exclude_if():
+    s = SchemaSerializer(
+        core_schema.model_schema(
+            BasicModel,
+            core_schema.model_fields_schema(
+                {
+                    'a': core_schema.model_field(core_schema.int_schema(), serialization_exclude_if=lambda x: x > 1),
+                    'b': core_schema.model_field(
+                        core_schema.str_schema(), serialization_exclude_if=lambda x: 'foo' in x
+                    ),
+                    'c': core_schema.model_field(
+                        core_schema.str_schema(),
+                        serialization_exclude=True,
+                        serialization_exclude_if=lambda x: 'foo' in x,
+                    ),
+                }
+            ),
+        )
+    )
+    assert s.to_python(BasicModel(a=0, b='bar', c='bar')) == {'a': 0, 'b': 'bar'}
+    assert s.to_python(BasicModel(a=2, b='bar', c='bar')) == {'b': 'bar'}
+    assert s.to_python(BasicModel(a=0, b='foo', c='bar')) == {'a': 0}
+    assert s.to_python(BasicModel(a=2, b='foo', c='bar')) == {}
+
+    assert s.to_json(BasicModel(a=0, b='bar', c='bar')) == b'{"a":0,"b":"bar"}'
+    assert s.to_json(BasicModel(a=2, b='bar', c='bar')) == b'{"b":"bar"}'
+    assert s.to_json(BasicModel(a=0, b='foo', c='bar')) == b'{"a":0}'
+    assert s.to_json(BasicModel(a=2, b='foo', c='bar')) == b'{}'
+
+
 def test_alias():
     s = SchemaSerializer(
         core_schema.model_schema(
@@ -712,6 +742,34 @@ def test_property_alias():
     assert s.to_python(Model(3, 4), by_alias=True) == {'width': 3, 'height': 4, 'Area': 12, 'volume': 48}
     assert s.to_python(Model(3, 4), mode='json', by_alias=True) == {'width': 3, 'height': 4, 'Area': 12, 'volume': 48}
     assert s.to_json(Model(3, 4), by_alias=True) == b'{"width":3,"height":4,"Area":12,"volume":48}'
+
+
+def test_computed_field_without_fields() -> None:
+    """https://github.com/pydantic/pydantic/issues/5551"""
+
+    # Original test introduced in https://github.com/pydantic/pydantic-core/pull/550
+
+    class A:
+        @property
+        def b(self) -> str:
+            return 'b'
+
+    schema = core_schema.model_schema(
+        cls=A,
+        config={},
+        schema=core_schema.model_fields_schema(
+            fields={},
+            computed_fields=[
+                core_schema.computed_field('b', return_schema=core_schema.any_schema()),
+            ],
+        ),
+    )
+
+    a = A()
+
+    serializer = SchemaSerializer(schema)
+
+    assert serializer.to_json(a) == b'{"b":"b"}'
 
 
 def test_computed_field_exclude_none():

@@ -73,7 +73,7 @@ impl<'py> EitherDate<'py> {
 
     pub fn as_raw(&self) -> PyResult<Date> {
         match self {
-            Self::Raw(date) => Ok(date.clone()),
+            Self::Raw(date) => Ok(*date),
             Self::Py(py_date) => pydate_as_date(py_date),
         }
     }
@@ -131,6 +131,93 @@ impl EitherTimedelta<'_> {
             Self::Raw(timedelta) => Ok(timedelta.clone()),
             Self::PyExact(py_timedelta) => Ok(pytimedelta_exact_as_duration(py_timedelta)),
             Self::PySubclass(py_timedelta) => pytimedelta_subclass_as_duration(py_timedelta),
+        }
+    }
+
+    pub fn total_seconds(&self) -> PyResult<f64> {
+        match self {
+            Self::Raw(timedelta) => {
+                let mut days: i64 = i64::from(timedelta.day);
+                let mut seconds: i64 = i64::from(timedelta.second);
+                let mut microseconds = i64::from(timedelta.microsecond);
+                if !timedelta.positive {
+                    days = -days;
+                    seconds = -seconds;
+                    microseconds = -microseconds;
+                }
+
+                let days_seconds = (86_400 * days) + seconds;
+                if let Some(days_seconds_as_micros) = days_seconds.checked_mul(1_000_000) {
+                    let total_microseconds = days_seconds_as_micros + microseconds;
+                    Ok(total_microseconds as f64 / 1_000_000.0)
+                } else {
+                    // Fall back to floating-point operations if the multiplication overflows
+                    let total_seconds = days_seconds as f64 + microseconds as f64 / 1_000_000.0;
+                    Ok(total_seconds)
+                }
+            }
+            Self::PyExact(py_timedelta) => {
+                let days: i64 = py_timedelta.get_days().into(); // -999999999 to 999999999
+                let seconds: i64 = py_timedelta.get_seconds().into(); // 0 through 86399
+                let microseconds = py_timedelta.get_microseconds(); // 0 through 999999
+                let days_seconds = (86_400 * days) + seconds;
+                if let Some(days_seconds_as_micros) = days_seconds.checked_mul(1_000_000) {
+                    let total_microseconds = days_seconds_as_micros + i64::from(microseconds);
+                    Ok(total_microseconds as f64 / 1_000_000.0)
+                } else {
+                    // Fall back to floating-point operations if the multiplication overflows
+                    let total_seconds = days_seconds as f64 + f64::from(microseconds) / 1_000_000.0;
+                    Ok(total_seconds)
+                }
+            }
+            Self::PySubclass(py_timedelta) => py_timedelta
+                .call_method0(intern!(py_timedelta.py(), "total_seconds"))?
+                .extract(),
+        }
+    }
+
+    pub fn total_milliseconds(&self) -> PyResult<f64> {
+        match self {
+            Self::Raw(timedelta) => {
+                let mut days: i64 = i64::from(timedelta.day);
+                let mut seconds: i64 = i64::from(timedelta.second);
+                let mut microseconds = i64::from(timedelta.microsecond);
+                if !timedelta.positive {
+                    days = -days;
+                    seconds = -seconds;
+                    microseconds = -microseconds;
+                }
+
+                let days_seconds = (86_400 * days) + seconds;
+                if let Some(days_seconds_as_micros) = days_seconds.checked_mul(1_000_000) {
+                    let total_microseconds = days_seconds_as_micros + microseconds;
+                    Ok(total_microseconds as f64 / 1_000.0)
+                } else {
+                    // Fall back to floating-point operations if the multiplication overflows
+                    let total_seconds = days_seconds as f64 + microseconds as f64 / 1_000.0;
+                    Ok(total_seconds)
+                }
+            }
+            Self::PyExact(py_timedelta) => {
+                let days: i64 = py_timedelta.get_days().into(); // -999999999 to 999999999
+                let seconds: i64 = py_timedelta.get_seconds().into(); // 0 through 86399
+                let microseconds = py_timedelta.get_microseconds(); // 0 through 999999
+                let days_seconds = (86_400 * days) + seconds;
+                if let Some(days_seconds_as_micros) = days_seconds.checked_mul(1_000_000) {
+                    let total_microseconds = days_seconds_as_micros + i64::from(microseconds);
+                    Ok(total_microseconds as f64 / 1_000.0)
+                } else {
+                    // Fall back to floating-point operations if the multiplication overflows
+                    let total_milliseconds = days_seconds as f64 * 1_000.0 + f64::from(microseconds) / 1_000.0;
+                    Ok(total_milliseconds)
+                }
+            }
+            Self::PySubclass(py_timedelta) => {
+                let total_seconds: f64 = py_timedelta
+                    .call_method0(intern!(py_timedelta.py(), "total_seconds"))?
+                    .extract()?;
+                Ok(total_seconds / 1000.0)
+            }
         }
     }
 }
@@ -247,7 +334,7 @@ impl<'py> IntoPyObject<'py> for EitherTime<'py> {
 impl EitherTime<'_> {
     pub fn as_raw(&self) -> PyResult<Time> {
         match self {
-            Self::Raw(time) => Ok(time.clone()),
+            Self::Raw(time) => Ok(*time),
             Self::Py(py_time) => pytime_as_time(py_time, None),
         }
     }
@@ -320,7 +407,7 @@ impl<'py> EitherDateTime<'py> {
 
     pub fn as_raw(&self) -> PyResult<DateTime> {
         match self {
-            Self::Raw(dt) => Ok(dt.clone()),
+            Self::Raw(dt) => Ok(*dt),
             Self::Py(py_dt) => pydatetime_as_datetime(py_dt),
         }
     }
@@ -583,6 +670,7 @@ pub struct TzInfo {
 #[pymethods]
 impl TzInfo {
     #[new]
+    #[pyo3(signature = (seconds = 0.0))]
     fn py_new(seconds: f32) -> PyResult<Self> {
         Self::try_from(seconds.trunc() as i32)
     }
