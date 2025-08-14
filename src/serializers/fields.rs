@@ -89,9 +89,7 @@ fn serialization_exclude_if(exclude_if_callable: Option<&Py<PyAny>>, value: &Bou
 fn exclude_default(value: &Bound<'_, PyAny>, extra: &Extra, serializer: &CombinedSerializer) -> PyResult<bool> {
     if extra.exclude_defaults {
         if let Some(default) = serializer.get_default(value.py())? {
-            if value.eq(default)? {
-                return Ok(true);
-            }
+            return Ok(value.eq(default).unwrap_or(false));
         }
     }
     Ok(false)
