@@ -1,6 +1,7 @@
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString, PyType};
+use regex::Regex;
 
 use crate::build_tools::py_schema_err;
 use crate::build_tools::{is_strict, schema_or_config, ExtraBehavior};
@@ -29,8 +30,35 @@ struct TypedDictField {
 impl_py_gc_traverse!(TypedDictField { validator });
 
 #[derive(Debug)]
+enum Pattern {
+    Regex(Regex),
+    Function(PyObject),
+}
+
+impl Pattern {
+    fn matches(&self, key: &str, py: Python<'_>) -> PyResult<bool> {
+        match self {
+            Pattern::Regex(regex) => Ok(regex.is_match(key)),
+            Pattern::Function(func) => {
+                let result = func.call1(py, (key,))?;
+                result.extract::<bool>(py)
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+struct PatternField {
+    discriminator: Pattern,
+    validator: CombinedValidator,
+}
+
+impl_py_gc_traverse!(PatternField { validator });
+
+#[derive(Debug)]
 pub struct TypedDictValidator {
     fields: Vec<TypedDictField>,
+    patterns: Vec<PatternField>,
     extra_behavior: ExtraBehavior,
     extras_validator: Option<Box<CombinedValidator>>,
     strict: bool,
@@ -129,8 +157,48 @@ impl BuildValidator for TypedDictValidator {
                 required,
             });
         }
+
+        // Parse pattern properties
+        let mut patterns: Vec<PatternField> = Vec::new();
+        if let Some(pattern_properties) = schema.get_as::<Bound<'_, PyDict>>(intern!(py, "pattern_properties"))? {
+            for (key, value) in pattern_properties {
+                let field_info = value.downcast::<PyDict>()?;
+
+                let schema = field_info.get_as_req(intern!(py, "schema"))?;
+                let validator = match build_validator(&schema, config, definitions) {
+                    Ok(v) => v,
+                    Err(err) => return py_schema_err!("Pattern \"{}\":\n  {}", key, err),
+                };
+
+                // Determine pattern type: string (regex) or callable (function)
+                let discriminator = if let Ok(pattern_str_obj) = key.downcast::<PyString>() {
+                    // Handle regex pattern (existing logic)
+                    let pattern_str = pattern_str_obj.to_str()?;
+                    let regex = match Regex::new(pattern_str) {
+                        Ok(r) => r,
+                        Err(err) => return py_schema_err!("Invalid regex pattern \"{}\": {}", pattern_str, err),
+                    };
+                    Pattern::Regex(regex)
+                } else if key.is_callable() {
+                    // Handle function pattern (new logic)
+                    Pattern::Function(key.clone().unbind())
+                } else {
+                    return py_schema_err!(
+                        "Pattern key must be string (regex) or callable (function), got: {}",
+                        key.get_type().name()?
+                    );
+                };
+
+                patterns.push(PatternField {
+                    discriminator,
+                    validator,
+                });
+            }
+        }
+
         Ok(Self {
             fields,
+            patterns,
             extra_behavior,
             extras_validator,
             strict,
@@ -145,6 +213,7 @@ impl BuildValidator for TypedDictValidator {
 
 impl_py_gc_traverse!(TypedDictValidator {
     fields,
+    patterns,
     extras_validator
 });
 
@@ -172,9 +241,9 @@ impl Validator for TypedDictValidator {
         let validate_by_name = state.validate_by_name_or(self.validate_by_name);
 
         // we only care about which keys have been used if we're iterating over the object for extra after
-        // the first pass
+        // the first pass, or if we have pattern properties to match
         let mut used_keys: Option<AHashSet<&str>> =
-            if self.extra_behavior == ExtraBehavior::Ignore || dict.is_py_get_attr() {
+            if (self.extra_behavior == ExtraBehavior::Ignore && self.patterns.is_empty()) || dict.is_py_get_attr() {
                 None
             } else {
                 Some(AHashSet::with_capacity(self.fields.len()))
@@ -277,6 +346,7 @@ impl Validator for TypedDictValidator {
                 py: Python<'py>,
                 used_keys: AHashSet<&'a str>,
                 errors: &'a mut Vec<ValLineError>,
+                patterns: &'a Vec<PatternField>,
                 extras_validator: Option<&'a CombinedValidator>,
                 output_dict: &'a Bound<'py, PyDict>,
                 state: &'a mut ValidationState<'s, 'py>,
@@ -317,39 +387,72 @@ impl Validator for TypedDictValidator {
                         }
 
                         let value = value.borrow_input();
-                        // Unknown / extra field
-                        match self.extra_behavior {
-                            ExtraBehavior::Forbid => {
-                                self.errors.push(ValLineError::new_with_loc(
-                                    ErrorTypeDefaults::ExtraForbidden,
-                                    value,
-                                    raw_key.clone(),
-                                ));
-                            }
-                            ExtraBehavior::Ignore => {}
-                            ExtraBehavior::Allow => {
+
+                        // Check if this field matches any pattern
+                        let mut pattern_matched = false;
+                        for pattern_field in self.patterns {
+                            if let Ok(true) = pattern_field.discriminator.matches(cow.as_ref(), self.py) {
+                                pattern_matched = true;
                                 let py_key = either_str.as_py_string(self.py, self.state.cache_str());
-                                if let Some(validator) = self.extras_validator {
-                                    let last_partial = self.partial_last_key.as_ref() == Some(&raw_key.clone().into());
-                                    self.state.allow_partial = match last_partial {
-                                        true => self.allow_partial,
-                                        false => false.into(),
-                                    };
-                                    match validator.validate(self.py, value, self.state) {
-                                        Ok(value) => {
-                                            self.output_dict.set_item(py_key, value)?;
-                                        }
-                                        Err(ValError::LineErrors(line_errors)) => {
-                                            if !last_partial {
-                                                for err in line_errors {
-                                                    self.errors.push(err.with_outer_location(raw_key.clone()));
-                                                }
+                                let last_partial = self.partial_last_key.as_ref() == Some(&raw_key.clone().into());
+                                self.state.allow_partial = match last_partial {
+                                    true => self.allow_partial,
+                                    false => false.into(),
+                                };
+
+                                match pattern_field.validator.validate(self.py, value, self.state) {
+                                    Ok(value) => {
+                                        self.output_dict.set_item(py_key, value)?;
+                                    }
+                                    Err(ValError::LineErrors(line_errors)) => {
+                                        if !last_partial {
+                                            for err in line_errors {
+                                                self.errors.push(err.with_outer_location(raw_key.clone()));
                                             }
                                         }
-                                        Err(err) => return Err(err),
                                     }
-                                } else {
-                                    self.output_dict.set_item(py_key, value.to_object(self.py)?)?;
+                                    Err(err) => return Err(err),
+                                }
+                                break; // Stop after first matching pattern
+                            }
+                        }
+
+                        // If no pattern matched, handle as extra field
+                        if !pattern_matched {
+                            match self.extra_behavior {
+                                ExtraBehavior::Forbid => {
+                                    self.errors.push(ValLineError::new_with_loc(
+                                        ErrorTypeDefaults::ExtraForbidden,
+                                        value,
+                                        raw_key.clone(),
+                                    ));
+                                }
+                                ExtraBehavior::Ignore => {}
+                                ExtraBehavior::Allow => {
+                                    let py_key = either_str.as_py_string(self.py, self.state.cache_str());
+                                    if let Some(validator) = self.extras_validator {
+                                        let last_partial =
+                                            self.partial_last_key.as_ref() == Some(&raw_key.clone().into());
+                                        self.state.allow_partial = match last_partial {
+                                            true => self.allow_partial,
+                                            false => false.into(),
+                                        };
+                                        match validator.validate(self.py, value, self.state) {
+                                            Ok(value) => {
+                                                self.output_dict.set_item(py_key, value)?;
+                                            }
+                                            Err(ValError::LineErrors(line_errors)) => {
+                                                if !last_partial {
+                                                    for err in line_errors {
+                                                        self.errors.push(err.with_outer_location(raw_key.clone()));
+                                                    }
+                                                }
+                                            }
+                                            Err(err) => return Err(err),
+                                        }
+                                    } else {
+                                        self.output_dict.set_item(py_key, value.to_object(self.py)?)?;
+                                    }
                                 }
                             }
                         }
@@ -363,6 +466,7 @@ impl Validator for TypedDictValidator {
                 used_keys,
                 py,
                 errors: &mut errors,
+                patterns: &self.patterns,
                 extras_validator: self.extras_validator.as_deref(),
                 output_dict: &output_dict,
                 state,

@@ -2967,6 +2967,7 @@ def typed_dict_field(
 class TypedDictSchema(TypedDict, total=False):
     type: Required[Literal['typed-dict']]
     fields: Required[dict[str, TypedDictField]]
+    pattern_properties: dict[str | Callable[[str], bool], TypedDictField]
     cls: type[Any]
     cls_name: str
     computed_fields: list[ComputedField]
@@ -2984,6 +2985,7 @@ class TypedDictSchema(TypedDict, total=False):
 def typed_dict_schema(
     fields: dict[str, TypedDictField],
     *,
+    pattern_properties: dict[str | Callable[[str], bool], TypedDictField] | None = None,
     cls: type[Any] | None = None,
     cls_name: str | None = None,
     computed_fields: list[ComputedField] | None = None,
@@ -3016,6 +3018,7 @@ def typed_dict_schema(
 
     Args:
         fields: The fields to use for the typed dict
+        pattern_properties: Pattern-based fields where keys can be regex strings or callable functions that return bool
         cls: The class to use for the typed dict
         cls_name: The name to use in error locations. Falls back to `cls.__name__`, or the validator name if no class
             is provided.
@@ -3031,6 +3034,7 @@ def typed_dict_schema(
     return _dict_not_none(
         type='typed-dict',
         fields=fields,
+        pattern_properties=pattern_properties,
         cls=cls,
         cls_name=cls_name,
         computed_fields=computed_fields,
