@@ -50,8 +50,8 @@ def test_model_class():
 @pytest.mark.parametrize(
     'schema_extra_behavior,validate_fn_extra_kw',
     [
-        ({'extra_behavior': 'allow'}, None),
-        ({'extra_behavior': 'ignore'}, 'allow'),
+        ('allow', None),
+        ('ignore', 'allow'),
     ],
 )
 def test_model_class_extra(schema_extra_behavior: dict[str, Any], validate_fn_extra_kw: Union[ExtraBehavior, None]):
@@ -69,7 +69,7 @@ def test_model_class_extra(schema_extra_behavior: dict[str, Any], validate_fn_ex
                     'field_a': core_schema.model_field(core_schema.str_schema()),
                     'field_b': core_schema.model_field(core_schema.int_schema()),
                 },
-                **schema_extra_behavior,
+                extra_behavior=schema_extra_behavior,
             ),
         )
     )
@@ -85,8 +85,8 @@ def test_model_class_extra(schema_extra_behavior: dict[str, Any], validate_fn_ex
 @pytest.mark.parametrize(
     'schema_extra_behavior,validate_fn_extra_kw',
     [
-        ({'extra_behavior': 'forbid'}, None),
-        ({'extra_behavior': 'ignore'}, 'forbid'),
+        ('forbid', None),
+        ('ignore', 'forbid'),
     ],
 )
 def test_model_class_extra_forbid(
@@ -119,7 +119,7 @@ def test_model_class_extra_forbid(
                     'field_a': core_schema.model_field(core_schema.str_schema()),
                     'field_b': core_schema.model_field(core_schema.int_schema()),
                 },
-                **schema_extra_behavior,
+                extra_behavior=schema_extra_behavior,
             ),
         )
     )

@@ -11,8 +11,8 @@ from ...conftest import PyAndJson
 @pytest.mark.parametrize(
     'schema_extra_behavior,validate_fn_extra_kw',
     [
-        ({'extra_behavior': 'forbid'}, None),
-        ({'extra_behavior': 'ignore'}, 'forbid'),
+        ('forbid', None),
+        ('ignore', 'forbid'),
     ],
 )
 @pytest.mark.parametrize(
@@ -37,7 +37,7 @@ def test_extra_forbid(
                 cs.arguments_v3_parameter(name='a', schema=cs.int_schema()),
                 cs.arguments_v3_parameter(name='b', schema=cs.int_schema(), alias='c'),
             ],
-            **schema_extra_behavior,
+            extra_behavior=schema_extra_behavior,
         ),
     )
 
