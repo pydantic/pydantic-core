@@ -107,7 +107,7 @@ class SchemaValidator:
             input: The Python object to validate.
             strict: Whether to validate the object in strict mode.
                 If `None`, the value of [`CoreConfig.strict`][pydantic_core.core_schema.CoreConfig] is used.
-            extra: The behavior for handling extra fields.
+            extra: Whether to ignore, allow, or forbid extra data during model validation.
                 If `None`, the value of [`CoreConfig.extra_fields_behavior`][pydantic_core.core_schema.CoreConfig] is used.
             from_attributes: Whether to validate objects as inputs to models by extracting attributes.
                 If `None`, the value of [`CoreConfig.from_attributes`][pydantic_core.core_schema.CoreConfig] is used.
@@ -174,7 +174,7 @@ class SchemaValidator:
             input: The JSON data to validate.
             strict: Whether to validate the object in strict mode.
                 If `None`, the value of [`CoreConfig.strict`][pydantic_core.core_schema.CoreConfig] is used.
-            extra: The behavior for handling extra fields.
+            extra: Whether to ignore, allow, or forbid extra data during model validation.
                 If `None`, the value of [`CoreConfig.extra_fields_behavior`][pydantic_core.core_schema.CoreConfig] is used.
             context: The context to use for validation, this is passed to functional validators as
                 [`info.context`][pydantic_core.core_schema.ValidationInfo.context].
@@ -213,7 +213,7 @@ class SchemaValidator:
             input: The input as a string, or bytes/bytearray if `strict=False`.
             strict: Whether to validate the object in strict mode.
                 If `None`, the value of [`CoreConfig.strict`][pydantic_core.core_schema.CoreConfig] is used.
-            extra: The behavior for handling extra fields.
+            extra: Whether to ignore, allow, or forbid extra data during model validation.
                 If `None`, the value of [`CoreConfig.extra_fields_behavior`][pydantic_core.core_schema.CoreConfig] is used.
             context: The context to use for validation, this is passed to functional validators as
                 [`info.context`][pydantic_core.core_schema.ValidationInfo.context].
@@ -252,7 +252,7 @@ class SchemaValidator:
             field_value: The value to assign to the field.
             strict: Whether to validate the object in strict mode.
                 If `None`, the value of [`CoreConfig.strict`][pydantic_core.core_schema.CoreConfig] is used.
-            extra: The behavior for handling extra fields.
+            extra: Whether to ignore, allow, or forbid extra data during model validation.
                 If `None`, the value of [`CoreConfig.extra_fields_behavior`][pydantic_core.core_schema.CoreConfig] is used.
             from_attributes: Whether to validate objects as inputs to models by extracting attributes.
                 If `None`, the value of [`CoreConfig.from_attributes`][pydantic_core.core_schema.CoreConfig] is used.

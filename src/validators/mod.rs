@@ -661,7 +661,7 @@ pub struct Extra<'a, 'py> {
     pub data: Option<Bound<'py, PyDict>>,
     /// whether we're in strict or lax mode
     pub strict: Option<bool>,
-    /// The behavior for handling extra fields
+    /// Whether to ignore, allow, or forbid extra data during model validation
     #[allow(clippy::struct_field_names)]
     pub extra_behavior: Option<ExtraBehavior>,
     /// Validation time setting of `from_attributes`
