@@ -4,7 +4,7 @@ use std::str::FromStr;
 use enum_dispatch::enum_dispatch;
 use jiter::{PartialMode, StringCacheMode};
 
-use pyo3::exceptions::PyTypeError;
+use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::types::{PyAny, PyDict, PyString, PyTuple, PyType};
 use pyo3::{intern, PyTraverseError, PyVisit};
 use pyo3::{prelude::*, IntoPyObjectExt};
@@ -174,7 +174,9 @@ impl SchemaValidator {
         by_alias: Option<bool>,
         by_name: Option<bool>,
     ) -> PyResult<PyObject> {
-        let extra_behavior = extra.map(|e| ExtraBehavior::from_str(e.to_str()?)).transpose()?;
+        let extra_behavior = extra
+            .map(|e| ExtraBehavior::from_str(e.to_str()?).map_err(|err| PyValueError::new_err(err.to_string())))
+            .transpose()?;
 
         #[allow(clippy::used_underscore_items)]
         self._validate(
@@ -207,7 +209,9 @@ impl SchemaValidator {
         by_alias: Option<bool>,
         by_name: Option<bool>,
     ) -> PyResult<bool> {
-        let extra_behavior = extra.map(|e| ExtraBehavior::from_str(e.to_str()?)).transpose()?;
+        let extra_behavior = extra
+            .map(|e| ExtraBehavior::from_str(e.to_str()?).map_err(|err| PyValueError::new_err(err.to_string())))
+            .transpose()?;
 
         #[allow(clippy::used_underscore_items)]
         match self._validate(
@@ -245,7 +249,9 @@ impl SchemaValidator {
         by_alias: Option<bool>,
         by_name: Option<bool>,
     ) -> PyResult<PyObject> {
-        let extra_behavior = extra.map(|e| ExtraBehavior::from_str(e.to_str()?)).transpose()?;
+        let extra_behavior = extra
+            .map(|e| ExtraBehavior::from_str(e.to_str()?).map_err(|err| PyValueError::new_err(err.to_string())))
+            .transpose()?;
 
         let r = match json::validate_json_bytes(input) {
             #[allow(clippy::used_underscore_items)]
@@ -281,7 +287,9 @@ impl SchemaValidator {
     ) -> PyResult<PyObject> {
         let t = InputType::String;
         let string_mapping = StringMapping::new_value(input).map_err(|e| self.prepare_validation_err(py, e, t))?;
-        let extra_behavior = extra.map(|e| ExtraBehavior::from_str(e.to_str()?)).transpose()?;
+        let extra_behavior = extra
+            .map(|e| ExtraBehavior::from_str(e.to_str()?).map_err(|err| PyValueError::new_err(err.to_string())))
+            .transpose()?;
 
         #[allow(clippy::used_underscore_items)]
         match self._validate(
@@ -317,7 +325,9 @@ impl SchemaValidator {
         by_alias: Option<bool>,
         by_name: Option<bool>,
     ) -> PyResult<PyObject> {
-        let extra_behavior = extra.map(|e| ExtraBehavior::from_str(e.to_str()?)).transpose()?;
+        let extra_behavior = extra
+            .map(|e| ExtraBehavior::from_str(e.to_str()?).map_err(|err| PyValueError::new_err(err.to_string())))
+            .transpose()?;
 
         let extra = Extra {
             input_type: InputType::Python,

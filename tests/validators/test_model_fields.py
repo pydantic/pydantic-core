@@ -231,7 +231,7 @@ def test_allow_extra_wrong():
 
 def test_allow_extra_fn_override_wrong():
     v = SchemaValidator(schema=core_schema.model_fields_schema(fields={}))
-    with pytest.raises(SchemaError, match='Invalid extra_behavior: `wrong`'):
+    with pytest.raises(ValueError, match='Invalid extra_behavior: `wrong`'):
         v.validate_python({}, extra='wrong')
 
 
