@@ -7,7 +7,7 @@ use pyo3::exceptions::{PyKeyError, PyTypeError, PyValueError};
 use pyo3::ffi::{self, c_str};
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::sync::GILOnceCell;
+use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyDict, PyList, PyString, PyTuple, PyType};
 use serde::ser::{Error, SerializeMap, SerializeSeq};
 use serde::{Serialize, Serializer};
@@ -198,7 +198,7 @@ impl ValidationError {
     }
 }
 
-static URL_ENV_VAR: GILOnceCell<bool> = GILOnceCell::new();
+static URL_ENV_VAR: PyOnceLock<bool> = PyOnceLock::new();
 
 fn include_url_env(py: Python) -> bool {
     *URL_ENV_VAR.get_or_init(py, || {
@@ -227,7 +227,7 @@ fn include_url_env(py: Python) -> bool {
     })
 }
 
-static URL_PREFIX: GILOnceCell<String> = GILOnceCell::new();
+static URL_PREFIX: PyOnceLock<String> = PyOnceLock::new();
 
 fn get_formated_url(py: Python) -> &'static str {
     let pydantic_version = match get_pydantic_version(py) {

@@ -1,6 +1,6 @@
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::sync::GILOnceCell;
+use pyo3::sync::PyOnceLock;
 use pyo3::types::PyDict;
 use pyo3::types::PyString;
 use pyo3::PyTraverseError;
@@ -15,7 +15,7 @@ use crate::py_gc::PyGcTraverse;
 use crate::tools::SchemaDict;
 use crate::PydanticUndefinedType;
 
-static COPY_DEEPCOPY: GILOnceCell<Py<PyAny>> = GILOnceCell::new();
+static COPY_DEEPCOPY: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
 
 fn get_deepcopy(py: Python) -> PyResult<Py<PyAny>> {
     Ok(py.import("copy")?.getattr("deepcopy")?.unbind())

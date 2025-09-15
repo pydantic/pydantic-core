@@ -2,7 +2,7 @@ use std::str::from_utf8;
 
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::sync::GILOnceCell;
+use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyDict, PyType};
 use uuid::Uuid;
 use uuid::Variant;
@@ -24,7 +24,7 @@ use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, Exactness, Va
 const UUID_INT: &str = "int";
 const UUID_IS_SAFE: &str = "is_safe";
 
-static UUID_TYPE: GILOnceCell<Py<PyType>> = GILOnceCell::new();
+static UUID_TYPE: PyOnceLock<Py<PyType>> = PyOnceLock::new();
 
 fn import_type(py: Python, module: &str, attr: &str) -> PyResult<Py<PyType>> {
     py.import(module)?.getattr(attr)?.extract()

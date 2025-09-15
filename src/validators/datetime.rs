@@ -1,7 +1,7 @@
 use pyo3::exceptions::PyValueError;
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::sync::GILOnceCell;
+use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyDict, PyString};
 use speedate::{DateTime, MicrosecondsPrecisionOverflowBehavior, Time};
 use std::cmp::Ordering;
@@ -257,7 +257,7 @@ pub struct NowConstraint {
     utc_offset: Option<i32>,
 }
 
-static TIME_LOCALTIME: GILOnceCell<Py<PyAny>> = GILOnceCell::new();
+static TIME_LOCALTIME: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
 
 impl NowConstraint {
     /// Get the UTC offset in seconds either from the utc_offset field or by calling `time.localtime().tm_gmtoff`.

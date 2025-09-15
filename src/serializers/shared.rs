@@ -4,7 +4,7 @@ use std::io::{self, Write};
 
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
-use pyo3::sync::GILOnceCell;
+use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyDict, PyString};
 use pyo3::{intern, PyTraverseError, PyVisit};
 
@@ -590,7 +590,7 @@ where
     Ok((fields.iter().filter_map(move |field| next(field).transpose()), fields))
 }
 
-static DC_FIELD_MARKER: GILOnceCell<Py<PyAny>> = GILOnceCell::new();
+static DC_FIELD_MARKER: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
 
 /// needed to match the logic from dataclasses.fields `tuple(f for f in fields.values() if f._field_type is _FIELD)`
 fn get_field_marker(py: Python<'_>) -> PyResult<&Bound<'_, PyAny>> {
