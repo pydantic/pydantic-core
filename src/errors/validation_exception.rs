@@ -32,13 +32,13 @@ use super::{InputValue, ValError};
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub struct ValidationError {
     line_errors: Vec<PyLineError>,
-    title: PyObject,
+    title: Py<PyAny>,
     input_type: InputType,
     hide_input: bool,
 }
 
 impl ValidationError {
-    pub fn new(line_errors: Vec<PyLineError>, title: PyObject, input_type: InputType, hide_input: bool) -> Self {
+    pub fn new(line_errors: Vec<PyLineError>, title: Py<PyAny>, input_type: InputType, hide_input: bool) -> Self {
         Self {
             line_errors,
             title,
@@ -49,7 +49,7 @@ impl ValidationError {
 
     pub fn from_val_error(
         py: Python,
-        title: PyObject,
+        title: Py<PyAny>,
         input_type: InputType,
         error: ValError,
         outer_location: Option<LocItem>,
@@ -257,7 +257,7 @@ impl ValidationError {
 impl ValidationError {
     #[new]
     #[pyo3(signature = (title, line_errors, input_type="python", hide_input=false))]
-    fn py_new(title: PyObject, line_errors: Vec<PyLineError>, input_type: &str, hide_input: bool) -> PyResult<Self> {
+    fn py_new(title: Py<PyAny>, line_errors: Vec<PyLineError>, input_type: &str, hide_input: bool) -> PyResult<Self> {
         Ok(Self {
             line_errors,
             title,
@@ -270,7 +270,7 @@ impl ValidationError {
     #[pyo3(signature = (title, line_errors, input_type="python", hide_input=false))]
     fn from_exception_data<'py>(
         cls: &Bound<'py, PyType>,
-        title: PyObject,
+        title: Py<PyAny>,
         line_errors: Bound<'_, PyList>,
         input_type: &str,
         hide_input: bool,
@@ -287,7 +287,7 @@ impl ValidationError {
     }
 
     #[getter]
-    fn title(&self, py: Python) -> PyObject {
+    fn title(&self, py: Python) -> Py<PyAny> {
         self.title.clone_ref(py)
     }
 
@@ -310,7 +310,7 @@ impl ValidationError {
             // PyList::new takes ExactSizeIterator, so if an error occurs during iteration we
             // fill the list with None before returning the error; the list will then be thrown
             // away safely.
-            self.line_errors.iter().map(|e| -> PyObject {
+            self.line_errors.iter().map(|e| -> Py<PyAny> {
                 if iteration_error.is_some() {
                     return py.None();
                 }
@@ -415,7 +415,7 @@ pub fn pretty_py_line_errors<'a>(
 pub struct PyLineError {
     error_type: ErrorType,
     location: Location,
-    input_value: PyObject,
+    input_value: Py<PyAny>,
 }
 
 impl From<PyLineError> for ValLineError {

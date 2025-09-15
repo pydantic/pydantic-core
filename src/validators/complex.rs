@@ -44,7 +44,7 @@ impl Validator for ComplexValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         let res = input.validate_complex(self.strict, py)?.unpack(state);
         Ok(res.into_pyobject(py)?.into())
     }

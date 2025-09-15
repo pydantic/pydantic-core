@@ -299,10 +299,10 @@ error_types! {
     // ---------------------
     // python errors from functions
     ValueError {
-        error: {ctx_type: Option<PyObject>, ctx_fn: field_from_context}, // Use Option because EnumIter requires Default to be implemented
+        error: {ctx_type: Option<Py<PyAny>>, ctx_fn: field_from_context}, // Use Option because EnumIter requires Default to be implemented
     },
     AssertionError {
-        error: {ctx_type: Option<PyObject>, ctx_fn: field_from_context}, // Use Option because EnumIter requires Default to be implemented
+        error: {ctx_type: Option<Py<PyAny>>, ctx_fn: field_from_context}, // Use Option because EnumIter requires Default to be implemented
     },
     // Note: strum message and serialize are not used here
     CustomError {

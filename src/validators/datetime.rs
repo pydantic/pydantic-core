@@ -66,7 +66,7 @@ impl Validator for DateTimeValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         let strict = state.strict_or(self.strict);
         let datetime = match input.validate_datetime(strict, self.microseconds_precision, self.val_temporal_unit) {
             Ok(val_match) => val_match.unpack(state),
@@ -257,7 +257,7 @@ pub struct NowConstraint {
     utc_offset: Option<i32>,
 }
 
-static TIME_LOCALTIME: GILOnceCell<PyObject> = GILOnceCell::new();
+static TIME_LOCALTIME: GILOnceCell<Py<PyAny>> = GILOnceCell::new();
 
 impl NowConstraint {
     /// Get the UTC offset in seconds either from the utc_offset field or by calling `time.localtime().tm_gmtoff`.

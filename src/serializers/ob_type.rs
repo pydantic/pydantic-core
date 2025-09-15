@@ -22,7 +22,7 @@ pub struct ObTypeLookup {
     list: usize,
     dict: usize,
     // other numeric types
-    decimal_object: PyObject,
+    decimal_object: Py<PyAny>,
     // other string types
     bytes: usize,
     bytearray: usize,
@@ -39,15 +39,15 @@ pub struct ObTypeLookup {
     url: usize,
     multi_host_url: usize,
     // enum type
-    enum_object: PyObject,
+    enum_object: Py<PyAny>,
     // generator
-    generator_object: PyObject,
+    generator_object: Py<PyAny>,
     // path
-    path_object: PyObject,
+    path_object: Py<PyAny>,
     // pattern
-    pattern_object: PyObject,
+    pattern_object: Py<PyAny>,
     // uuid type
-    uuid_object: PyObject,
+    uuid_object: Py<PyAny>,
     complex: usize,
 }
 
