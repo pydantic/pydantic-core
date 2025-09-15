@@ -51,10 +51,6 @@ hex = "0.4.3"
 name = "_pydantic_core"
 crate-type = ["cdylib", "rlib"]
 
-[features]
-# must be enabled when building with `cargo build`, maturin enables this automatically
-extension-module = ["pyo3/extension-module"]
-
 [profile.release]
 lto = "fat"
 codegen-units = 1
