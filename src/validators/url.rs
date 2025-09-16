@@ -4,20 +4,22 @@ use std::str::Chars;
 
 use pyo3::intern;
 use pyo3::prelude::*;
+use pyo3::sync::GILOnceCell;
 use pyo3::types::{PyDict, PyList};
 
 use ahash::AHashSet;
 use pyo3::IntoPyObjectExt;
 use url::{ParseError, SyntaxViolation, Url};
 
+use crate::build_tools::schema_or_config;
 use crate::build_tools::{is_strict, py_schema_err};
-use crate::errors::ToErrorValue;
 use crate::errors::{ErrorType, ErrorTypeDefaults, ValError, ValResult};
 use crate::input::downcast_python_input;
 use crate::input::Input;
 use crate::input::ValidationMatch;
 use crate::tools::SchemaDict;
 use crate::url::{scheme_is_special, PyMultiHostUrl, PyUrl};
+use crate::SchemaValidator;
 
 use super::literal::expected_repr_name;
 use super::Exactness;
@@ -35,6 +37,17 @@ pub struct UrlValidator {
     default_port: Option<u16>,
     default_path: Option<String>,
     name: String,
+    preserve_empty_path: bool,
+}
+
+fn get_preserve_empty_path(schema: &Bound<'_, PyDict>, config: Option<&Bound<'_, PyDict>>) -> PyResult<bool> {
+    schema_or_config(
+        schema,
+        config,
+        intern!(schema.py(), "preserve_empty_path"),
+        intern!(schema.py(), "url_preserve_empty_path"),
+    )
+    .map(|v| v.unwrap_or(false))
 }
 
 impl BuildValidator for UrlValidator {
@@ -56,6 +69,7 @@ impl BuildValidator for UrlValidator {
             default_path: schema.get_as(intern!(schema.py(), "default_path"))?,
             allowed_schemes,
             name,
+            preserve_empty_path: get_preserve_empty_path(schema, config)?,
         }
         .into())
     }
@@ -70,7 +84,7 @@ impl Validator for UrlValidator {
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
-        let mut either_url = self.get_url(input, state.strict_or(self.strict))?;
+        let mut either_url = self.get_url(py, input, state.strict_or(self.strict))?;
 
         if let Some((ref allowed_schemes, ref expected_schemes_repr)) = self.allowed_schemes {
             if !allowed_schemes.contains(either_url.url().scheme()) {
@@ -107,22 +121,33 @@ impl Validator for UrlValidator {
 }
 
 impl UrlValidator {
-    fn get_url<'py>(&self, input: &(impl Input<'py> + ?Sized), strict: bool) -> ValResult<EitherUrl<'py>> {
+    fn get_url<'py>(
+        &self,
+        py: Python<'py>,
+        input: &(impl Input<'py> + ?Sized),
+        strict: bool,
+    ) -> ValResult<EitherUrl<'py>> {
         if let Some(py_url) = downcast_python_input::<PyUrl>(input) {
             // we don't need to worry about whether the url was parsed in strict mode before,
             // even if it was, any syntax errors would have been fixed by the first validation
             self.check_length(input, py_url.get().url().as_str())?;
-            Ok(EitherUrl::Py(py_url.clone()))
-        } else if let Some(multi_host_url) = downcast_python_input::<PyMultiHostUrl>(input) {
-            let url_str = multi_host_url.get().__str__();
+            return Ok(EitherUrl::Py(py_url.clone()));
+        }
+
+        if let Some(multi_host_url) = downcast_python_input::<PyMultiHostUrl>(input) {
+            let url_str = multi_host_url.get().__str__(py);
             self.check_length(input, &url_str)?;
-            parse_url(&url_str, input, strict).map(EitherUrl::Rust)
+            let url = parse_url(&url_str, input, strict)?;
+            let serialize_path_as_empty = need_to_preserve_empty_path(&url, &url_str, self.preserve_empty_path);
+            return Ok(EitherUrl::Rust(PyUrl::new(url, serialize_path_as_empty)));
         } else if let Ok(either_str) = input.validate_str(strict, false).map(ValidationMatch::into_inner) {
             let cow = either_str.as_cow()?;
             let url_str = cow.as_ref();
 
             self.check_length(input, url_str)?;
-            parse_url(url_str, input, strict).map(EitherUrl::Rust)
+            let url = parse_url(url_str, input, strict)?;
+            let serialize_path_as_empty = need_to_preserve_empty_path(&url, url_str, self.preserve_empty_path);
+            return Ok(EitherUrl::Rust(PyUrl::new(url, serialize_path_as_empty)));
         } else {
             Err(ValError::new(ErrorTypeDefaults::UrlType, input))
         }
@@ -146,7 +171,7 @@ impl UrlValidator {
 
 enum EitherUrl<'py> {
     Py(Bound<'py, PyUrl>),
-    Rust(Url),
+    Rust(PyUrl),
 }
 
 impl<'py> IntoPyObject<'py> for EitherUrl<'py> {
@@ -157,7 +182,7 @@ impl<'py> IntoPyObject<'py> for EitherUrl<'py> {
     fn into_pyobject(self, py: Python<'py>) -> PyResult<Self::Output> {
         match self {
             EitherUrl::Py(py_url) => Ok(py_url),
-            EitherUrl::Rust(rust_url) => Bound::new(py, PyUrl::new(rust_url)),
+            EitherUrl::Rust(rust_url) => Bound::new(py, rust_url),
         }
     }
 }
@@ -166,17 +191,17 @@ impl CopyFromPyUrl for EitherUrl<'_> {
     fn url(&self) -> &Url {
         match self {
             EitherUrl::Py(py_url) => py_url.get().url(),
-            EitherUrl::Rust(rust_url) => rust_url,
+            EitherUrl::Rust(rust_url) => rust_url.url(),
         }
     }
 
     fn url_mut(&mut self) -> &mut Url {
         if let EitherUrl::Py(py_url) = self {
-            *self = EitherUrl::Rust(py_url.get().url().clone());
+            *self = EitherUrl::Rust(py_url.get().clone());
         }
         match self {
             EitherUrl::Py(_) => unreachable!(),
-            EitherUrl::Rust(rust_url) => rust_url,
+            EitherUrl::Rust(rust_url) => rust_url.url_mut(),
         }
     }
 }
@@ -191,6 +216,7 @@ pub struct MultiHostUrlValidator {
     default_port: Option<u16>,
     default_path: Option<String>,
     name: String,
+    preserve_empty_path: bool,
 }
 
 impl BuildValidator for MultiHostUrlValidator {
@@ -218,6 +244,7 @@ impl BuildValidator for MultiHostUrlValidator {
             default_port: schema.get_as(intern!(schema.py(), "default_port"))?,
             default_path: schema.get_as(intern!(schema.py(), "default_path"))?,
             name,
+            preserve_empty_path: get_preserve_empty_path(schema, config)?,
         }
         .into())
     }
@@ -232,7 +259,7 @@ impl Validator for MultiHostUrlValidator {
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<PyObject> {
-        let mut multi_url = self.get_url(input, state.strict_or(self.strict))?;
+        let mut multi_url = self.get_url(py, input, state.strict_or(self.strict))?;
 
         if let Some((ref allowed_schemes, ref expected_schemes_repr)) = self.allowed_schemes {
             if !allowed_schemes.contains(multi_url.url().scheme()) {
@@ -268,16 +295,21 @@ impl Validator for MultiHostUrlValidator {
 }
 
 impl MultiHostUrlValidator {
-    fn get_url<'py>(&self, input: &(impl Input<'py> + ?Sized), strict: bool) -> ValResult<EitherMultiHostUrl<'py>> {
+    fn get_url<'py>(
+        &self,
+        py: Python<'py>,
+        input: &(impl Input<'py> + ?Sized),
+        strict: bool,
+    ) -> ValResult<EitherMultiHostUrl<'py>> {
         // we don't need to worry about whether the url was parsed in strict mode before,
         // even if it was, any syntax errors would have been fixed by the first validation
         if let Some(multi_url) = downcast_python_input::<PyMultiHostUrl>(input) {
-            self.check_length(input, || multi_url.get().__str__().len())?;
+            self.check_length(input, || multi_url.get().__str__(py).len())?;
             Ok(EitherMultiHostUrl::Py(multi_url.clone()))
         } else if let Some(py_url) = downcast_python_input::<PyUrl>(input) {
             self.check_length(input, || py_url.get().url().as_str().len())?;
             Ok(EitherMultiHostUrl::Rust(PyMultiHostUrl::new(
-                py_url.get().url().clone(),
+                py_url.get().clone(),
                 None,
             )))
         } else if let Ok(either_str) = input.validate_str(strict, false).map(ValidationMatch::into_inner) {
@@ -445,7 +477,8 @@ fn parse_multihost_url<'py>(
 
     if hosts.is_empty() {
         // if there's no one host (e.g. no `,`), we allow it to be empty to allow for default hosts
-        Ok(PyMultiHostUrl::new(ref_url, None))
+        // FIXME set serialize_path_as_empty correctly here
+        Ok(PyMultiHostUrl::new(PyUrl::new(ref_url, false), None))
     } else {
         // with more than one host, none of them can be empty
         if !ref_url.has_host() {
@@ -463,11 +496,12 @@ fn parse_multihost_url<'py>(
             return parsing_err!(ParseError::EmptyHost);
         }
 
-        Ok(PyMultiHostUrl::new(ref_url, Some(extra_urls)))
+        // FIXME set serialize_path_as_empty correctly here
+        Ok(PyMultiHostUrl::new(PyUrl::new(ref_url, false), Some(extra_urls)))
     }
 }
 
-fn parse_url(url_str: &str, input: impl ToErrorValue, strict: bool) -> ValResult<Url> {
+fn parse_url<'py>(url_str: &str, input: &(impl Input<'py> + ?Sized), strict: bool) -> ValResult<Url> {
     if url_str.is_empty() {
         return Err(ValError::new(
             ErrorType::UrlParsing {
@@ -478,45 +512,21 @@ fn parse_url(url_str: &str, input: impl ToErrorValue, strict: bool) -> ValResult
         ));
     }
 
-    // if we're in strict mode, we collect consider a syntax violation as an error
-    if strict {
-        // we could build a vec of syntax violations and return them all, but that seems like overkill
-        // and unlike other parser style validators
-        let vios: RefCell<Option<SyntaxViolation>> = RefCell::new(None);
-        let r = Url::options()
-            .syntax_violation_callback(Some(&|v| {
-                match v {
-                    // telling users offer about credentials in URLs doesn't really make sense in this context
-                    SyntaxViolation::EmbeddedCredentials => (),
-                    _ => *vios.borrow_mut() = Some(v),
-                }
-            }))
-            .parse(url_str);
+    // we could build a vec of syntax violations and return them all, but that seems like overkill
+    // and unlike other parser style validators
+    let vios = RefCell::new(None);
 
-        match r {
-            Ok(url) => {
-                if let Some(vio) = vios.into_inner() {
-                    Err(ValError::new(
-                        ErrorType::UrlSyntaxViolation {
-                            error: vio.description().into(),
-                            context: None,
-                        },
-                        input,
-                    ))
-                } else {
-                    Ok(url)
-                }
+    let url = Url::options()
+        // if we're in strict mode, we collect consider a syntax violation as an error
+        .syntax_violation_callback(strict.then_some(&|v| {
+            match v {
+                // telling users offer about credentials in URLs doesn't really make sense in this context
+                SyntaxViolation::EmbeddedCredentials => (),
+                _ => *vios.borrow_mut() = Some(v),
             }
-            Err(e) => Err(ValError::new(
-                ErrorType::UrlParsing {
-                    error: e.to_string(),
-                    context: None,
-                },
-                input,
-            )),
-        }
-    } else {
-        Url::parse(url_str).map_err(move |e| {
+        }))
+        .parse(url_str)
+        .map_err(|e| {
             ValError::new(
                 ErrorType::UrlParsing {
                     error: e.to_string(),
@@ -524,8 +534,57 @@ fn parse_url(url_str: &str, input: impl ToErrorValue, strict: bool) -> ValResult
                 },
                 input,
             )
-        })
+        })?;
+
+    if let Some(vio) = vios.into_inner() {
+        return Err(ValError::new(
+            ErrorType::UrlSyntaxViolation {
+                error: vio.description().into(),
+                context: None,
+            },
+            input,
+        ));
     }
+
+    Ok(url)
+}
+
+/// Check if the path got normalized to `/` and the original string had an empty path
+fn need_to_preserve_empty_path(url: &Url, url_str: &str, preserve_empty_path: bool) -> bool {
+    dbg!(url.path(), url_str, preserve_empty_path);
+    if !preserve_empty_path {
+        return false;
+    }
+
+    if url.path() != "/" {
+        // was definitely not the case
+        return false;
+    }
+
+    if !dbg!(scheme_is_special(url.scheme())) {
+        // non-special schemes don't normalize the path
+        return false;
+    }
+
+    // find the scheme marker in the original input
+    let (_, input_without_scheme) = url_str.split_once(':').expect("url has a scheme");
+
+    // strip any leading / (which would be part of the authority marker), URL will normalize any
+    // number of them even if there should only be two
+    let input_without_scheme = input_without_scheme.trim_start_matches('/');
+
+    // Now find the start of the path, which is either the first /, ?, or #, or the end of the
+    // string
+    for c in input_without_scheme.chars() {
+        match c {
+            '/' => return false,      // found the start of the path, and it's not empty
+            '?' | '#' => return true, // found the start of the query or fragment, so path is empty
+            _ => (),
+        }
+    }
+
+    // reached the end of the string without finding a path, so it's empty
+    true
 }
 
 /// check host_required and substitute `default_host`, `default_port` & `default_path` if they aren't set

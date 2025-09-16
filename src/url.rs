@@ -2,11 +2,12 @@ use std::collections::hash_map::DefaultHasher;
 use std::fmt;
 use std::fmt::Formatter;
 use std::hash::{Hash, Hasher};
+use std::sync::OnceLock;
 
 use idna::punycode::decode_to_string;
 use pyo3::exceptions::PyValueError;
 use pyo3::pyclass::CompareOp;
-use pyo3::sync::GILOnceCell;
+use pyo3::sync::{GILOnceCell, OnceLockExt};
 use pyo3::types::{PyDict, PyType};
 use pyo3::{intern, prelude::*, IntoPyObjectExt};
 use url::Url;
@@ -17,35 +18,70 @@ use crate::SchemaValidator;
 static SCHEMA_DEFINITION_URL: GILOnceCell<SchemaValidator> = GILOnceCell::new();
 
 #[pyclass(name = "Url", module = "pydantic_core._pydantic_core", subclass, frozen)]
-#[derive(Clone, Hash)]
+#[derive(Clone)]
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub struct PyUrl {
     lib_url: Url,
+    /// Whether to serialize the path as empty when it is `/`. The `url` crate always normalizes an empty path to `/`,
+    /// but users may want to preserve the empty path when round-tripping.
+    serialize_path_as_empty: bool,
+    /// Cache for the serialized representation where this diverges from `lib_url.as_str()`
+    /// (i.e. when trailing slash was added to the empty path, but user didn't want that)
+    serialized: OnceLock<String>,
+}
+
+impl Hash for PyUrl {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.lib_url.hash(state);
+        self.serialize_path_as_empty.hash(state);
+        // no need to hash `serialized` as it's derived from the other two fields
+    }
 }
 
 impl PyUrl {
-    pub fn new(lib_url: Url) -> Self {
-        Self { lib_url }
+    pub fn new(lib_url: Url, serialize_path_as_empty: bool) -> Self {
+        Self {
+            lib_url,
+            serialize_path_as_empty,
+            serialized: OnceLock::new(),
+        }
     }
 
     pub fn url(&self) -> &Url {
         &self.lib_url
     }
-}
 
-fn build_schema_validator(py: Python, schema_type: &str) -> SchemaValidator {
-    let schema = PyDict::new(py);
-    schema.set_item("type", schema_type).unwrap();
-    SchemaValidator::py_new(py, &schema, None).unwrap()
+    pub fn url_mut(&mut self) -> &mut Url {
+        &mut self.lib_url
+    }
+
+    pub fn serialized(&self, py: Python<'_>) -> &str {
+        if self.serialize_path_as_empty {
+            self.serialized
+                .get_or_init_py_attached(py, || serialize_url_without_path_slash(&self.lib_url))
+        } else {
+            self.lib_url.as_str()
+        }
+    }
 }
 
 #[pymethods]
 impl PyUrl {
     #[new]
-    pub fn py_new(py: Python, url: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let schema_obj = SCHEMA_DEFINITION_URL
-            .get_or_init(py, || build_schema_validator(py, "url"))
-            .validate_python(py, url, None, None, None, None, None, false.into(), None, None)?;
+    #[pyo3(signature = (url, *, preserve_empty_path=false))]
+    pub fn py_new(py: Python, url: &Bound<'_, PyAny>, preserve_empty_path: bool) -> PyResult<Self> {
+        let schema_obj = get_schema_validator(py, false, preserve_empty_path)?.validate_python(
+            py,
+            url,
+            None,
+            None,
+            None,
+            None,
+            None,
+            false.into(),
+            None,
+            None,
+        )?;
         schema_obj.extract(py)
     }
 
@@ -117,12 +153,12 @@ impl PyUrl {
         unicode_url(&self.lib_url)
     }
 
-    pub fn __str__(&self) -> &str {
-        self.lib_url.as_str()
+    pub fn __str__(&self, py: Python<'_>) -> &str {
+        dbg!(self.serialized(py))
     }
 
-    pub fn __repr__(&self) -> String {
-        format!("Url('{}')", self.lib_url)
+    pub fn __repr__(&self, py: Python<'_>) -> String {
+        format!("Url('{}')", self.serialized(py))
     }
 
     fn __richcmp__(&self, other: &Self, op: CompareOp) -> PyResult<bool> {
@@ -151,8 +187,8 @@ impl PyUrl {
         self.clone().into_py_any(py)
     }
 
-    fn __getnewargs__(&self) -> (&str,) {
-        (self.__str__(),)
+    fn __getnewargs__(&self, py: Python<'_>) -> (&str,) {
+        (self.__str__(py),)
     }
 
     #[classmethod]
@@ -201,11 +237,8 @@ pub struct PyMultiHostUrl {
 }
 
 impl PyMultiHostUrl {
-    pub fn new(ref_url: Url, extra_urls: Option<Vec<Url>>) -> Self {
-        Self {
-            ref_url: PyUrl::new(ref_url),
-            extra_urls,
-        }
+    pub fn new(ref_url: PyUrl, extra_urls: Option<Vec<Url>>) -> Self {
+        Self { ref_url, extra_urls }
     }
 
     pub fn lib_url(&self) -> &Url {
@@ -222,10 +255,20 @@ static SCHEMA_DEFINITION_MULTI_HOST_URL: GILOnceCell<SchemaValidator> = GILOnceC
 #[pymethods]
 impl PyMultiHostUrl {
     #[new]
-    pub fn py_new(py: Python, url: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let schema_obj = SCHEMA_DEFINITION_MULTI_HOST_URL
-            .get_or_init(py, || build_schema_validator(py, "multi-host-url"))
-            .validate_python(py, url, None, None, None, None, None, false.into(), None, None)?;
+    #[pyo3(signature = (url, *, preserve_empty_path=false))]
+    pub fn py_new(py: Python, url: &Bound<'_, PyAny>, preserve_empty_path: bool) -> PyResult<Self> {
+        let schema_obj = get_schema_validator(py, true, preserve_empty_path)?.validate_python(
+            py,
+            url,
+            None,
+            None,
+            None,
+            None,
+            None,
+            false.into(),
+            None,
+            None,
+        )?;
         schema_obj.extract(py)
     }
 
@@ -297,7 +340,7 @@ impl PyMultiHostUrl {
         }
     }
 
-    pub fn __str__(&self) -> String {
+    pub fn __str__(&self, py: Python<'_>) -> String {
         if let Some(extra_urls) = &self.extra_urls {
             let scheme = self.ref_url.lib_url.scheme();
             let host_offset = scheme.len() + 3;
@@ -321,12 +364,12 @@ impl PyMultiHostUrl {
             full_url.insert_str(host_offset, &hosts);
             full_url
         } else {
-            self.ref_url.__str__().to_string()
+            self.ref_url.__str__(py).to_string()
         }
     }
 
-    pub fn __repr__(&self) -> String {
-        format!("MultiHostUrl('{}')", self.__str__())
+    pub fn __repr__(&self, py: Python<'_>) -> String {
+        format!("MultiHostUrl('{}')", self.__str__(py))
     }
 
     fn __richcmp__(&self, other: &Self, op: CompareOp) -> PyResult<bool> {
@@ -354,8 +397,8 @@ impl PyMultiHostUrl {
         self.clone().into_py_any(py)
     }
 
-    fn __getnewargs__(&self) -> (String,) {
-        (self.__str__(),)
+    fn __getnewargs__(&self, py: Python<'_>) -> (String,) {
+        (self.__str__(py),)
     }
 
     #[classmethod]
@@ -516,4 +559,57 @@ fn is_punnycode_domain(lib_url: &Url, domain: &str) -> bool {
 // based on https://github.com/servo/rust-url/blob/1c1e406874b3d2aa6f36c5d2f3a5c2ea74af9efb/url/src/parser.rs#L161-L167
 pub fn scheme_is_special(scheme: &str) -> bool {
     matches!(scheme, "http" | "https" | "ws" | "wss" | "ftp" | "file")
+}
+
+fn serialize_url_without_path_slash(url: &Url) -> String {
+    // use pointer arithmetic to find the pieces we need to build the string
+    let s = url.as_str();
+    let path = url.path();
+    assert_eq!(
+        path, "/",
+        "`serialize_path_as_empty` expected to be set only when path is '/'"
+    );
+
+    assert!(
+        // Safety for the below: `s` and `path` should be from the same text slice, so
+        // we can pull out the slices of `s` that don't include `path`.
+        s.as_ptr() <= path.as_ptr() && unsafe { s.as_ptr().add(s.len()) } >= unsafe { path.as_ptr().add(path.len()) }
+    );
+
+    let prefix_len = path.as_ptr() as usize - s.as_ptr() as usize;
+    let suffix_len = s.len() - (prefix_len + path.len());
+
+    // Safety: prefix is the slice of `s` leading to `path`, protected by the assert above.
+    let prefix = unsafe { std::str::from_utf8_unchecked(std::slice::from_raw_parts(s.as_ptr(), prefix_len)) };
+    // Safety: suffix is the slice of `s` after `path`, protected by the assert above.
+    let suffix =
+        unsafe { std::str::from_utf8_unchecked(std::slice::from_raw_parts(path.as_ptr().add(path.len()), suffix_len)) };
+
+    format!("{prefix}{suffix}")
+}
+
+static SCHEMA_URL_SINGLE_TRUE: GILOnceCell<SchemaValidator> = GILOnceCell::new();
+static SCHEMA_URL_SINGLE_FALSE: GILOnceCell<SchemaValidator> = GILOnceCell::new();
+static SCHEMA_URL_MULTI_TRUE: GILOnceCell<SchemaValidator> = GILOnceCell::new();
+static SCHEMA_URL_MULTI_FALSE: GILOnceCell<SchemaValidator> = GILOnceCell::new();
+
+macro_rules! make_schema_val {
+    ($py:ident, $schema_type:literal, $preserve_empty_path:literal) => {{
+        let schema = PyDict::new($py);
+        schema.set_item(intern!($py, "type"), intern!($py, $schema_type))?;
+        // preserve_empty_path defaults to false, so only set it if true
+        if $preserve_empty_path {
+            schema.set_item(intern!($py, "preserve_empty_path"), true)?;
+        }
+        SchemaValidator::py_new($py, &schema, None)
+    }};
+}
+
+fn get_schema_validator(py: Python<'_>, multi_host: bool, preserve_empty_path: bool) -> PyResult<&SchemaValidator> {
+    match (multi_host, preserve_empty_path) {
+        (false, true) => SCHEMA_URL_SINGLE_TRUE.get_or_try_init(py, || make_schema_val!(py, "url", true)),
+        (false, false) => SCHEMA_URL_SINGLE_FALSE.get_or_try_init(py, || make_schema_val!(py, "url", false)),
+        (true, true) => SCHEMA_URL_MULTI_TRUE.get_or_try_init(py, || make_schema_val!(py, "multi-host-url", true)),
+        (true, false) => SCHEMA_URL_MULTI_FALSE.get_or_try_init(py, || make_schema_val!(py, "multi-host-url", false)),
+    }
 }
