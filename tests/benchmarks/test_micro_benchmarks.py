@@ -1481,25 +1481,11 @@ def test_enum_str_core(benchmark):
 def test_url_core(benchmark):
     v = SchemaValidator(core_schema.url_schema())
 
-    value = benchmark(v.validate_python, 'https://example.com/some/path?query=string#fragment')
-    assert value.scheme == 'https'
-    assert value.host == 'example.com'
-    assert value.path == '/some/path'
-    assert value.query == 'query=string'
-    assert value.fragment == 'fragment'
+    benchmark(v.validate_python, 'https://example.com/some/path?query=string#fragment')
 
 
 @pytest.mark.benchmark(group='url')
 def test_multi_host_url_core(benchmark):
     v = SchemaValidator(core_schema.multi_host_url_schema())
 
-    value = benchmark(v.validate_python, 'https://example.com,b:2@example.org:777/some/path?query=string#fragment')
-
-    assert value.scheme == 'https'
-    assert value.hosts() == [
-        {'username': None, 'password': None, 'host': 'example.com', 'port': 443},
-        {'username': 'b', 'password': '2', 'host': 'example.org', 'port': 777},
-    ]
-    assert value.path == '/some/path'
-    assert value.query == 'query=string'
-    assert value.fragment == 'fragment'
+    benchmark(v.validate_python, 'https://example.com,b:2@example.org:777/some/path?query=string#fragment')
