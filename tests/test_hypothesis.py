@@ -117,14 +117,20 @@ def test_definition_cycles(definition_schema, data):
     try:
         assert definition_schema.validate_python(data) == data
     except ValidationError as exc:
-        assert exc.errors(include_url=False) == [
-            {
-                'type': 'recursion_loop',
-                'loc': IsTuple(length=(1, None)),
-                'msg': 'Recursion error - cyclic reference detected',
-                'input': AnyThing(),
-            }
-        ]
+        errors = exc.errors(include_url=False)
+
+        # 1st error-line should be the 'recursion-loop' error
+        assert errors[0] == {
+            'type': 'recursion_loop',
+            'loc': IsTuple(length=(1, None)),
+            'msg': 'Recursion error - cyclic reference detected',
+            'input': AnyThing(),
+        }
+
+        # There is one 'none-required' error per sub-branch location
+        assert all(e['type'] == 'none_required' for e in errors[1:])
+        nb_sub_branch_locs = len(data) - 1
+        assert nb_sub_branch_locs == len(errors[:1])
 
 
 def test_definition_broken(definition_schema):
