@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::hash_map::DefaultHasher;
 use std::fmt;
 use std::fmt::Formatter;
@@ -15,16 +16,14 @@ use url::Url;
 use crate::tools::SchemaDict;
 use crate::SchemaValidator;
 
-static SCHEMA_DEFINITION_URL: GILOnceCell<SchemaValidator> = GILOnceCell::new();
-
 #[pyclass(name = "Url", module = "pydantic_core._pydantic_core", subclass, frozen)]
 #[derive(Clone)]
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub struct PyUrl {
     lib_url: Url,
-    /// Whether to serialize the path as empty when it is `/`. The `url` crate always normalizes an empty path to `/`,
+    /// Override to treat the path as empty when it is `/`. The `url` crate always normalizes an empty path to `/`,
     /// but users may want to preserve the empty path when round-tripping.
-    serialize_path_as_empty: bool,
+    path_is_empty: bool,
     /// Cache for the serialized representation where this diverges from `lib_url.as_str()`
     /// (i.e. when trailing slash was added to the empty path, but user didn't want that)
     serialized: OnceLock<String>,
@@ -33,16 +32,16 @@ pub struct PyUrl {
 impl Hash for PyUrl {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.lib_url.hash(state);
-        self.serialize_path_as_empty.hash(state);
+        self.path_is_empty.hash(state);
         // no need to hash `serialized` as it's derived from the other two fields
     }
 }
 
 impl PyUrl {
-    pub fn new(lib_url: Url, serialize_path_as_empty: bool) -> Self {
+    pub fn new(lib_url: Url, path_is_empty: bool) -> Self {
         Self {
             lib_url,
-            serialize_path_as_empty,
+            path_is_empty,
             serialized: OnceLock::new(),
         }
     }
@@ -55,8 +54,8 @@ impl PyUrl {
         &mut self.lib_url
     }
 
-    pub fn serialized(&self, py: Python<'_>) -> &str {
-        if self.serialize_path_as_empty {
+    fn serialized(&self, py: Python<'_>) -> &str {
+        if self.path_is_empty {
             self.serialized
                 .get_or_init_py_attached(py, || serialize_url_without_path_slash(&self.lib_url))
         } else {
@@ -125,6 +124,7 @@ impl PyUrl {
     pub fn path(&self) -> Option<&str> {
         match self.lib_url.path() {
             "" => None,
+            "/" if self.path_is_empty => None,
             path => Some(path),
         }
     }
@@ -149,12 +149,12 @@ impl PyUrl {
     }
 
     // string representation of the URL, with punycode decoded when appropriate
-    pub fn unicode_string(&self) -> String {
-        unicode_url(&self.lib_url)
+    pub fn unicode_string(&self, py: Python<'_>) -> Cow<'_, str> {
+        unicode_url(self.serialized(py), &self.lib_url)
     }
 
     pub fn __str__(&self, py: Python<'_>) -> &str {
-        dbg!(self.serialized(py))
+        self.serialized(py)
     }
 
     pub fn __repr__(&self, py: Python<'_>) -> String {
@@ -250,8 +250,6 @@ impl PyMultiHostUrl {
     }
 }
 
-static SCHEMA_DEFINITION_MULTI_HOST_URL: GILOnceCell<SchemaValidator> = GILOnceCell::new();
-
 #[pymethods]
 impl PyMultiHostUrl {
     #[new]
@@ -312,12 +310,12 @@ impl PyMultiHostUrl {
     }
 
     // string representation of the URL, with punycode decoded when appropriate
-    pub fn unicode_string(&self) -> String {
+    pub fn unicode_string(&self, py: Python<'_>) -> Cow<'_, str> {
         if let Some(extra_urls) = &self.extra_urls {
             let scheme = self.ref_url.lib_url.scheme();
             let host_offset = scheme.len() + 3;
 
-            let mut full_url = self.ref_url.unicode_string();
+            let mut full_url = self.ref_url.unicode_string(py).into_owned();
             full_url.insert(host_offset, ',');
 
             // special urls will have had a trailing slash added, non-special urls will not
@@ -328,15 +326,15 @@ impl PyMultiHostUrl {
             let hosts = extra_urls
                 .iter()
                 .map(|url| {
-                    let str = unicode_url(url);
+                    let str = unicode_url(url.as_str(), url);
                     str[host_offset..str.len() - sub].to_string()
                 })
                 .collect::<Vec<String>>()
                 .join(",");
             full_url.insert_str(host_offset, &hosts);
-            full_url
+            Cow::Owned(full_url)
         } else {
-            self.ref_url.unicode_string()
+            self.ref_url.unicode_string(py)
         }
     }
 
@@ -345,7 +343,7 @@ impl PyMultiHostUrl {
             let scheme = self.ref_url.lib_url.scheme();
             let host_offset = scheme.len() + 3;
 
-            let mut full_url = self.ref_url.lib_url.to_string();
+            let mut full_url = self.ref_url.serialized(py).to_string();
             full_url.insert(host_offset, ',');
 
             // special urls will have had a trailing slash added, non-special urls will not
@@ -372,14 +370,14 @@ impl PyMultiHostUrl {
         format!("MultiHostUrl('{}')", self.__str__(py))
     }
 
-    fn __richcmp__(&self, other: &Self, op: CompareOp) -> PyResult<bool> {
+    fn __richcmp__(&self, other: &Self, op: CompareOp, py: Python<'_>) -> PyResult<bool> {
         match op {
-            CompareOp::Lt => Ok(self.unicode_string() < other.unicode_string()),
-            CompareOp::Le => Ok(self.unicode_string() <= other.unicode_string()),
-            CompareOp::Eq => Ok(self.unicode_string() == other.unicode_string()),
-            CompareOp::Ne => Ok(self.unicode_string() != other.unicode_string()),
-            CompareOp::Gt => Ok(self.unicode_string() > other.unicode_string()),
-            CompareOp::Ge => Ok(self.unicode_string() >= other.unicode_string()),
+            CompareOp::Lt => Ok(self.unicode_string(py) < other.unicode_string(py)),
+            CompareOp::Le => Ok(self.unicode_string(py) <= other.unicode_string(py)),
+            CompareOp::Eq => Ok(self.unicode_string(py) == other.unicode_string(py)),
+            CompareOp::Ne => Ok(self.unicode_string(py) != other.unicode_string(py)),
+            CompareOp::Gt => Ok(self.unicode_string(py) > other.unicode_string(py)),
+            CompareOp::Ge => Ok(self.unicode_string(py) >= other.unicode_string(py)),
         }
     }
 
@@ -520,19 +518,18 @@ fn host_to_dict<'a>(py: Python<'a>, lib_url: &Url) -> PyResult<Bound<'a, PyDict>
     Ok(dict)
 }
 
-fn unicode_url(lib_url: &Url) -> String {
-    let mut s = lib_url.to_string();
-
+fn unicode_url<'s>(serialized: &'s str, lib_url: &Url) -> Cow<'s, str> {
     match lib_url.host() {
         Some(url::Host::Domain(domain)) if is_punnycode_domain(lib_url, domain) => {
+            let mut s = serialized.to_string();
             if let Some(decoded) = decode_punycode(domain) {
                 // replace the range containing the punycode domain with the decoded domain
                 let start = lib_url.scheme().len() + 3;
                 s.replace_range(start..start + domain.len(), &decoded);
             }
-            s
+            Cow::Owned(s)
         }
-        _ => s,
+        _ => Cow::Borrowed(serialized),
     }
 }
 
@@ -565,10 +562,7 @@ fn serialize_url_without_path_slash(url: &Url) -> String {
     // use pointer arithmetic to find the pieces we need to build the string
     let s = url.as_str();
     let path = url.path();
-    assert_eq!(
-        path, "/",
-        "`serialize_path_as_empty` expected to be set only when path is '/'"
-    );
+    assert_eq!(path, "/", "`path_is_empty` expected to be set only when path is '/'");
 
     assert!(
         // Safety for the below: `s` and `path` should be from the same text slice, so

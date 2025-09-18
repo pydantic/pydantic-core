@@ -1,10 +1,10 @@
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::iter::Peekable;
 use std::str::Chars;
 
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::sync::GILOnceCell;
 use pyo3::types::{PyDict, PyList};
 
 use ahash::AHashSet;
@@ -19,7 +19,6 @@ use crate::input::Input;
 use crate::input::ValidationMatch;
 use crate::tools::SchemaDict;
 use crate::url::{scheme_is_special, PyMultiHostUrl, PyUrl};
-use crate::SchemaValidator;
 
 use super::literal::expected_repr_name;
 use super::Exactness;
@@ -130,27 +129,25 @@ impl UrlValidator {
         if let Some(py_url) = downcast_python_input::<PyUrl>(input) {
             // we don't need to worry about whether the url was parsed in strict mode before,
             // even if it was, any syntax errors would have been fixed by the first validation
-            self.check_length(input, py_url.get().url().as_str())?;
+            self.check_length(input, py_url.get().__str__(py))?;
             return Ok(EitherUrl::Py(py_url.clone()));
         }
 
-        if let Some(multi_host_url) = downcast_python_input::<PyMultiHostUrl>(input) {
-            let url_str = multi_host_url.get().__str__(py);
-            self.check_length(input, &url_str)?;
-            let url = parse_url(&url_str, input, strict)?;
-            let serialize_path_as_empty = need_to_preserve_empty_path(&url, &url_str, self.preserve_empty_path);
-            return Ok(EitherUrl::Rust(PyUrl::new(url, serialize_path_as_empty)));
+        let either_str_owned;
+        let url_str = if let Some(multi_host_url) = downcast_python_input::<PyMultiHostUrl>(input) {
+            Cow::Owned(multi_host_url.get().__str__(py))
         } else if let Ok(either_str) = input.validate_str(strict, false).map(ValidationMatch::into_inner) {
-            let cow = either_str.as_cow()?;
-            let url_str = cow.as_ref();
-
-            self.check_length(input, url_str)?;
-            let url = parse_url(url_str, input, strict)?;
-            let serialize_path_as_empty = need_to_preserve_empty_path(&url, url_str, self.preserve_empty_path);
-            return Ok(EitherUrl::Rust(PyUrl::new(url, serialize_path_as_empty)));
+            either_str_owned = either_str; // to extend the lifetime outside the if let
+            either_str_owned.as_cow()?
         } else {
-            Err(ValError::new(ErrorTypeDefaults::UrlType, input))
-        }
+            return Err(ValError::new(ErrorTypeDefaults::UrlType, input));
+        };
+
+        let url_str = url_str.as_ref();
+        self.check_length(input, url_str)?;
+        let url = parse_url(url_str, input, strict)?;
+        let path_is_empty = need_to_preserve_empty_path(&url, url_str, self.preserve_empty_path);
+        Ok(EitherUrl::Rust(PyUrl::new(url, path_is_empty)))
     }
 
     fn check_length<'py>(&self, input: &(impl Input<'py> + ?Sized), url_str: &str) -> ValResult<()> {
@@ -307,7 +304,7 @@ impl MultiHostUrlValidator {
             self.check_length(input, || multi_url.get().__str__(py).len())?;
             Ok(EitherMultiHostUrl::Py(multi_url.clone()))
         } else if let Some(py_url) = downcast_python_input::<PyUrl>(input) {
-            self.check_length(input, || py_url.get().url().as_str().len())?;
+            self.check_length(input, || py_url.get().__str__(py).len())?;
             Ok(EitherMultiHostUrl::Rust(PyMultiHostUrl::new(
                 py_url.get().clone(),
                 None,
@@ -318,7 +315,7 @@ impl MultiHostUrlValidator {
 
             self.check_length(input, || url_str.len())?;
 
-            parse_multihost_url(url_str, input, strict).map(EitherMultiHostUrl::Rust)
+            parse_multihost_url(url_str, input, strict, self.preserve_empty_path).map(EitherMultiHostUrl::Rust)
         } else {
             Err(ValError::new(ErrorTypeDefaults::UrlType, input))
         }
@@ -384,6 +381,7 @@ fn parse_multihost_url<'py>(
     url_str: &str,
     input: &(impl Input<'py> + ?Sized),
     strict: bool,
+    preserve_empty_path: bool,
 ) -> ValResult<PyMultiHostUrl> {
     macro_rules! parsing_err {
         ($parse_error:expr) => {
@@ -474,14 +472,16 @@ fn parse_multihost_url<'py>(
 
     let reconstructed_url = format!("{prefix}{}", &url_str[start..]);
     let ref_url = parse_url(&reconstructed_url, input, strict)?;
+    let path_is_empty = need_to_preserve_empty_path(&ref_url, &reconstructed_url, preserve_empty_path);
+
+    let ref_url = PyUrl::new(ref_url, path_is_empty);
 
     if hosts.is_empty() {
         // if there's no one host (e.g. no `,`), we allow it to be empty to allow for default hosts
-        // FIXME set serialize_path_as_empty correctly here
-        Ok(PyMultiHostUrl::new(PyUrl::new(ref_url, false), None))
+        Ok(PyMultiHostUrl::new(ref_url, None))
     } else {
         // with more than one host, none of them can be empty
-        if !ref_url.has_host() {
+        if !ref_url.url().has_host() {
             return parsing_err!(ParseError::EmptyHost);
         }
         let extra_urls: Vec<Url> = hosts
@@ -496,8 +496,7 @@ fn parse_multihost_url<'py>(
             return parsing_err!(ParseError::EmptyHost);
         }
 
-        // FIXME set serialize_path_as_empty correctly here
-        Ok(PyMultiHostUrl::new(PyUrl::new(ref_url, false), Some(extra_urls)))
+        Ok(PyMultiHostUrl::new(ref_url, Some(extra_urls)))
     }
 }
 
@@ -551,7 +550,6 @@ fn parse_url<'py>(url_str: &str, input: &(impl Input<'py> + ?Sized), strict: boo
 
 /// Check if the path got normalized to `/` and the original string had an empty path
 fn need_to_preserve_empty_path(url: &Url, url_str: &str, preserve_empty_path: bool) -> bool {
-    dbg!(url.path(), url_str, preserve_empty_path);
     if !preserve_empty_path {
         return false;
     }
@@ -561,7 +559,7 @@ fn need_to_preserve_empty_path(url: &Url, url_str: &str, preserve_empty_path: bo
         return false;
     }
 
-    if !dbg!(scheme_is_special(url.scheme())) {
+    if !scheme_is_special(url.scheme()) {
         // non-special schemes don't normalize the path
         return false;
     }
