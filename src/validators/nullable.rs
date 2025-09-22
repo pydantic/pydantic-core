@@ -8,6 +8,7 @@ use crate::tools::SchemaDict;
 
 use super::ValidationState;
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, Validator};
+use crate::errors::{ErrorType, ValError, ValLineError};
 
 #[derive(Debug)]
 pub struct NullableValidator {
@@ -41,7 +42,17 @@ impl Validator for NullableValidator {
     ) -> ValResult<Py<PyAny>> {
         match input.is_none() {
             true => Ok(py.None()),
-            false => self.validator.validate(py, input, state),
+            false => {
+                let val_res = self.validator.validate(py, input, state);
+                match val_res {
+                    Ok(obj) => Ok(obj),
+                    Err(ValError::LineErrors(mut lines)) => {
+                        lines.push(ValLineError::new(ErrorType::NoneRequired { context: None }, input));
+                        Err(ValError::from(lines))
+                    }
+                    Err(err) => Err(err),
+                }
+            }
         }
     }
 

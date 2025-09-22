@@ -326,7 +326,13 @@ def test_recursion_branch():
             'loc': ('branch',),
             'msg': 'Recursion error - cyclic reference detected',
             'input': {'name': 'recursive', 'branch': IsPartialDict(name='recursive')},
-        }
+        },
+        {
+            'type': 'none_required',
+            'loc': ('branch',),
+            'msg': 'Input should be None',
+            'input': {'name': 'recursive', 'branch': IsPartialDict(name='recursive')},
+        },
     ]
 
 
@@ -375,7 +381,13 @@ def test_recursion_branch_from_attributes():
             'loc': ('branch',),
             'msg': 'Recursion error - cyclic reference detected',
             'input': HasAttributes(name='root', branch=AnyThing()),
-        }
+        },
+        {
+            'type': 'none_required',
+            'loc': ('branch',),
+            'msg': 'Input should be None',
+            'input': HasAttributes(name='root', branch=AnyThing()),
+        },
     ]
 
 
@@ -476,9 +488,27 @@ def test_multiple_tuple_recursion(multiple_tuple_schema: SchemaValidator):
             'input': [1, IsList(length=2)],
         },
         {
+            'type': 'none_required',
+            'loc': ('f1', 1),
+            'msg': 'Input should be None',
+            'input': [1, IsList(length=2)],
+        },
+        {
             'type': 'recursion_loop',
             'loc': ('f2', 1),
             'msg': 'Recursion error - cyclic reference detected',
+            'input': [1, IsList(length=2)],
+        },
+        {
+            'type': 'none_required',
+            'loc': ('f2', 1),
+            'msg': 'Input should be None',
+            'input': [1, IsList(length=2)],
+        },
+        {
+            'type': 'none_required',
+            'loc': ('f2',),
+            'msg': 'Input should be None',
             'input': [1, IsList(length=2)],
         },
     ]
@@ -498,9 +528,27 @@ def test_multiple_tuple_recursion_once(multiple_tuple_schema: SchemaValidator):
             'input': [1, IsList(length=2)],
         },
         {
+            'type': 'none_required',
+            'loc': ('f1', 1),
+            'msg': 'Input should be None',
+            'input': [1, IsList(length=2)],
+        },
+        {
             'type': 'recursion_loop',
             'loc': ('f2', 1),
             'msg': 'Recursion error - cyclic reference detected',
+            'input': [1, IsList(length=2)],
+        },
+        {
+            'type': 'none_required',
+            'loc': ('f2', 1),
+            'msg': 'Input should be None',
+            'input': [1, IsList(length=2)],
+        },
+        {
+            'type': 'none_required',
+            'loc': ('f2',),
+            'msg': 'Input should be None',
             'input': [1, IsList(length=2)],
         },
     ]
@@ -539,7 +587,13 @@ def test_definition_wrap():
             'loc': (1,),
             'msg': 'Recursion error - cyclic reference detected',
             'input': IsList(positions={0: 1}, length=2),
-        }
+        },
+        {
+            'type': 'none_required',
+            'loc': (1,),
+            'msg': 'Input should be None',
+            'input': IsList(positions={0: 1}, length=2),
+        },
     ]
 
 
@@ -927,7 +981,19 @@ def test_cyclic_data() -> None:
             'loc': ('b', 'a'),
             'msg': 'Recursion error - cyclic reference detected',
             'input': cyclic_data,
-        }
+        },
+        {
+            'type': 'none_required',
+            'loc': ('b', 'a'),
+            'msg': 'Input should be None',
+            'input': cyclic_data,
+        },
+        {
+            'type': 'none_required',
+            'loc': ('b',),
+            'msg': 'Input should be None',
+            'input': cyclic_data['b'],
+        },
     ]
 
 
@@ -977,7 +1043,25 @@ def test_cyclic_data_threeway() -> None:
             'loc': ('b', 'c', 'a'),
             'msg': 'Recursion error - cyclic reference detected',
             'input': cyclic_data,
-        }
+        },
+        {
+            'type': 'none_required',
+            'loc': ('b', 'c', 'a'),
+            'msg': 'Input should be None',
+            'input': cyclic_data,
+        },
+        {
+            'type': 'none_required',
+            'loc': ('b', 'c'),
+            'msg': 'Input should be None',
+            'input': cyclic_data['b']['c'],
+        },
+        {
+            'type': 'none_required',
+            'loc': ('b',),
+            'msg': 'Input should be None',
+            'input': cyclic_data['b'],
+        },
     ]
 
 
@@ -1052,6 +1136,12 @@ def test_complex_recursive_type() -> None:
             'input': datetime.date(1992, 12, 11),
         },
         {
+            'type': 'none_required',
+            'loc': ('dict[str,...]', 'a'),
+            'msg': 'Input should be None',
+            'input': datetime.date(1992, 12, 11),
+        },
+        {
             'type': 'string_type',
             'loc': ('str',),
             'msg': 'Input should be a valid string',
@@ -1073,6 +1163,12 @@ def test_complex_recursive_type() -> None:
             'type': 'bool_type',
             'loc': ('bool',),
             'msg': 'Input should be a valid boolean',
+            'input': {'a': datetime.date(1992, 12, 11)},
+        },
+        {
+            'type': 'none_required',
+            'loc': (),
+            'msg': 'Input should be None',
             'input': {'a': datetime.date(1992, 12, 11)},
         },
     ]

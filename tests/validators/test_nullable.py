@@ -21,7 +21,13 @@ def test_nullable():
             'loc': (),
             'msg': 'Input should be a valid integer, unable to parse string as an integer',
             'input': 'hello',
-        }
+        },
+        {
+            'type': 'none_required',
+            'loc': (),
+            'msg': 'Input should be None',
+            'input': 'hello',
+        },
     ]
 
 
