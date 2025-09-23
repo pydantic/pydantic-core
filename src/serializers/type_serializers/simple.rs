@@ -1,5 +1,6 @@
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
+use pyo3::IntoPyObjectExt;
 
 use std::borrow::Cow;
 
@@ -41,7 +42,7 @@ impl TypeSerializer for NoneSerializer {
         include: Option<&Bound<'_, PyAny>>,
         exclude: Option<&Bound<'_, PyAny>>,
         extra: &Extra,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<Py<PyAny>> {
         let py = value.py();
         match extra.ob_type_lookup.is_type(value, ObType::None) {
             IsType::Exact => Ok(py.None()),
@@ -117,17 +118,14 @@ macro_rules! build_simple_serializer {
                 include: Option<&Bound<'_, PyAny>>,
                 exclude: Option<&Bound<'_, PyAny>>,
                 extra: &Extra,
-            ) -> PyResult<PyObject> {
+            ) -> PyResult<Py<PyAny>> {
                 let py = value.py();
                 match extra.ob_type_lookup.is_type(value, $ob_type) {
                     IsType::Exact => Ok(value.clone().unbind()),
                     IsType::Subclass => match extra.check {
-                        SerCheck::Strict => Err(PydanticSerializationUnexpectedValue::new_err(None)),
+                        SerCheck::Strict => Err(PydanticSerializationUnexpectedValue::new_from_msg(None).to_py_err()),
                         SerCheck::Lax | SerCheck::None => match extra.mode {
-                            SerMode::Json => {
-                                let rust_value = value.extract::<$rust_type>()?;
-                                Ok(rust_value.to_object(py))
-                            }
+                            SerMode::Json => value.extract::<$rust_type>()?.into_py_any(py),
                             _ => infer_to_python(value, include, exclude, extra),
                         },
                     },

@@ -9,7 +9,7 @@ use crate::lookup_key::{LookupKey, LookupPath};
 use crate::tools::safe_repr;
 use crate::validators::complex::string_to_complex;
 use crate::validators::decimal::create_decimal;
-use crate::validators::ValBytesMode;
+use crate::validators::{TemporalUnitMode, ValBytesMode};
 
 use super::datetime::{
     bytes_as_date, bytes_as_datetime, bytes_as_time, bytes_as_timedelta, EitherDate, EitherDateTime, EitherTime,
@@ -22,19 +22,10 @@ use super::{
     KeywordArgs, ValidatedDict, ValidationMatch,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, IntoPyObject, IntoPyObjectRef)]
 pub enum StringMapping<'py> {
     String(Bound<'py, PyString>),
     Mapping(Bound<'py, PyDict>),
-}
-
-impl ToPyObject for StringMapping<'_> {
-    fn to_object(&self, py: Python<'_>) -> PyObject {
-        match self {
-            Self::String(s) => s.to_object(py),
-            Self::Mapping(d) => d.to_object(py),
-        }
-    }
 }
 
 impl<'py> StringMapping<'py> {
@@ -72,6 +63,11 @@ impl From<StringMapping<'_>> for LocItem {
 }
 
 impl<'py> Input<'py> for StringMapping<'py> {
+    #[inline]
+    fn py_converter(&self) -> impl IntoPyObject<'py> + '_ {
+        self
+    }
+
     fn as_error_value(&self) -> InputValue {
         match self {
             Self::String(s) => s.as_error_value(),
@@ -89,6 +85,11 @@ impl<'py> Input<'py> for StringMapping<'py> {
         Self: 'a;
 
     fn validate_args(&self) -> ValResult<StringMappingDict<'py>> {
+        // do we want to support this?
+        Err(ValError::new(ErrorTypeDefaults::ArgumentsType, self))
+    }
+
+    fn validate_args_v3(&self) -> ValResult<Self::Arguments<'_>> {
         // do we want to support this?
         Err(ValError::new(ErrorTypeDefaults::ArgumentsType, self))
     }
@@ -200,9 +201,9 @@ impl<'py> Input<'py> for StringMapping<'py> {
         Err(ValError::new(ErrorTypeDefaults::IterableType, self))
     }
 
-    fn validate_date(&self, _strict: bool) -> ValResult<ValidationMatch<EitherDate<'py>>> {
+    fn validate_date(&self, _strict: bool, mode: TemporalUnitMode) -> ValResult<ValidationMatch<EitherDate<'py>>> {
         match self {
-            Self::String(s) => bytes_as_date(self, py_string_str(s)?.as_bytes()).map(ValidationMatch::strict),
+            Self::String(s) => bytes_as_date(self, py_string_str(s)?.as_bytes(), mode).map(ValidationMatch::strict),
             Self::Mapping(_) => Err(ValError::new(ErrorTypeDefaults::DateType, self)),
         }
     }
@@ -223,10 +224,13 @@ impl<'py> Input<'py> for StringMapping<'py> {
         &self,
         _strict: bool,
         microseconds_overflow_behavior: MicrosecondsPrecisionOverflowBehavior,
+        mode: TemporalUnitMode,
     ) -> ValResult<ValidationMatch<EitherDateTime<'py>>> {
         match self {
-            Self::String(s) => bytes_as_datetime(self, py_string_str(s)?.as_bytes(), microseconds_overflow_behavior)
-                .map(ValidationMatch::strict),
+            Self::String(s) => {
+                bytes_as_datetime(self, py_string_str(s)?.as_bytes(), microseconds_overflow_behavior, mode)
+                    .map(ValidationMatch::strict)
+            }
             Self::Mapping(_) => Err(ValError::new(ErrorTypeDefaults::DatetimeType, self)),
         }
     }

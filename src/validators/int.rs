@@ -1,15 +1,32 @@
 use num_bigint::BigInt;
+use pyo3::exceptions::PyValueError;
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::types::{PyDict, PyString};
 use pyo3::IntoPyObjectExt;
 
 use crate::build_tools::is_strict;
 use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::{Input, Int};
-use crate::tools::SchemaDict;
 
 use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
+
+fn validate_as_int(schema: &Bound<'_, PyDict>, key: &Bound<'_, PyString>) -> PyResult<Option<Int>> {
+    match schema.get_item(key)? {
+        Some(value) => match value.validate_int(false) {
+            Ok(v) => match v.into_inner().as_int() {
+                Ok(v) => Ok(Some(v)),
+                Err(_) => Err(PyValueError::new_err(format!(
+                    "'{key}' must be coercible to an integer"
+                ))),
+            },
+            Err(_) => Err(PyValueError::new_err(format!(
+                "'{key}' must be coercible to an integer"
+            ))),
+        },
+        None => Ok(None),
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct IntValidator {
@@ -49,7 +66,7 @@ impl Validator for IntValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         input
             .validate_int(state.strict_or(self.strict))
             .and_then(|val_match| Ok(val_match.unpack(state).into_py_any(py)?))
@@ -70,6 +87,21 @@ pub struct ConstrainedIntValidator {
     gt: Option<Int>,
 }
 
+impl ConstrainedIntValidator {
+    fn build(schema: &Bound<'_, PyDict>, config: Option<&Bound<'_, PyDict>>) -> PyResult<CombinedValidator> {
+        let py = schema.py();
+        Ok(Self {
+            strict: is_strict(schema, config)?,
+            multiple_of: validate_as_int(schema, intern!(py, "multiple_of"))?,
+            le: validate_as_int(schema, intern!(py, "le"))?,
+            lt: validate_as_int(schema, intern!(py, "lt"))?,
+            ge: validate_as_int(schema, intern!(py, "ge"))?,
+            gt: validate_as_int(schema, intern!(py, "gt"))?,
+        }
+        .into())
+    }
+}
+
 impl_py_gc_traverse!(ConstrainedIntValidator {});
 
 impl Validator for ConstrainedIntValidator {
@@ -78,7 +110,7 @@ impl Validator for ConstrainedIntValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         let either_int = input.validate_int(state.strict_or(self.strict))?.unpack(state);
         let int_value = either_int.as_int()?;
 
@@ -140,22 +172,7 @@ impl Validator for ConstrainedIntValidator {
         Ok(either_int.into_py_any(py)?)
     }
 
-    fn get_name(&self) -> &str {
+    fn get_name(&self) -> &'static str {
         "constrained-int"
-    }
-}
-
-impl ConstrainedIntValidator {
-    fn build(schema: &Bound<'_, PyDict>, config: Option<&Bound<'_, PyDict>>) -> PyResult<CombinedValidator> {
-        let py = schema.py();
-        Ok(Self {
-            strict: is_strict(schema, config)?,
-            multiple_of: schema.get_as(intern!(py, "multiple_of"))?,
-            le: schema.get_as(intern!(py, "le"))?,
-            lt: schema.get_as(intern!(py, "lt"))?,
-            ge: schema.get_as(intern!(py, "ge"))?,
-            gt: schema.get_as(intern!(py, "gt"))?,
-        }
-        .into())
     }
 }

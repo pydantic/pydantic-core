@@ -1,5 +1,6 @@
 use std::error::Error;
 use std::fmt;
+use std::str::FromStr;
 
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
@@ -93,8 +94,12 @@ impl SchemaError {
                     Ok(errors) => errors,
                     Err(err) => return err,
                 };
-                let validation_error =
-                    ValidationError::new(line_errors, "Schema".to_object(py), InputType::Python, false);
+                let validation_error = ValidationError::new(
+                    line_errors,
+                    PyString::new(py, "Schema").into(),
+                    InputType::Python,
+                    false,
+                );
                 let schema_error = SchemaError(SchemaErrorEnum::ValidationError(validation_error));
                 match Py::new(py, schema_error) {
                     Ok(err) => PyErr::from_value(err.into_bound(py).into_any()),
@@ -172,7 +177,7 @@ macro_rules! py_schema_err {
 pub(crate) use py_schema_err;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub(crate) enum ExtraBehavior {
+pub enum ExtraBehavior {
     Allow,
     Forbid,
     Ignore,
@@ -193,12 +198,22 @@ impl ExtraBehavior {
         )?
         .flatten();
         let res = match extra_behavior.as_ref().map(|s| s.to_str()).transpose()? {
-            Some("allow") => Self::Allow,
-            Some("ignore") => Self::Ignore,
-            Some("forbid") => Self::Forbid,
-            Some(v) => return py_schema_err!("Invalid extra_behavior: `{}`", v),
+            Some(s) => Self::from_str(s)?,
             None => default,
         };
         Ok(res)
+    }
+}
+
+impl FromStr for ExtraBehavior {
+    type Err = PyErr;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "allow" => Ok(Self::Allow),
+            "forbid" => Ok(Self::Forbid),
+            "ignore" => Ok(Self::Ignore),
+            s => py_schema_err!("Invalid extra_behavior: `{}`", s),
+        }
     }
 }

@@ -2,7 +2,7 @@ use std::ptr::null_mut;
 
 use pyo3::exceptions::PyTypeError;
 use pyo3::types::{PyDict, PySet, PyString, PyTuple, PyType};
-use pyo3::{ffi, IntoPyObjectExt};
+use pyo3::{ffi, BoundObject, IntoPyObjectExt};
 use pyo3::{intern, prelude::*};
 
 use super::function::convert_err;
@@ -60,7 +60,7 @@ pub struct ModelValidator {
     frozen: bool,
     custom_init: bool,
     root_model: bool,
-    undefined: PyObject,
+    undefined: Py<PyAny>,
     name: String,
 }
 
@@ -100,7 +100,7 @@ impl BuildValidator for ModelValidator {
             frozen: schema.get_as(intern!(py, "frozen"))?.unwrap_or(false),
             custom_init: schema.get_as(intern!(py, "custom_init"))?.unwrap_or(false),
             root_model: schema.get_as(intern!(py, "root_model"))?.unwrap_or(false),
-            undefined: PydanticUndefinedType::new(py).to_object(py),
+            undefined: PydanticUndefinedType::new(py).into_any(),
             // Get the class's `__name__`, not using `class.qualname()`
             name,
         }
@@ -120,7 +120,7 @@ impl Validator for ModelValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         if let Some(self_instance) = state.extra().self_instance {
             // in the case that self_instance is Some, we're calling validation from within `BaseModel.__init__`
             return self.validate_init(py, self_instance, input, state);
@@ -140,8 +140,8 @@ impl Validator for ModelValidator {
                     // if the model has a generic origin, we allow input data to be instances of the generic origin rather than the class,
                     // as cases like isinstance(SomeModel[Int], SomeModel[Any]) fail the isinstance check, but are valid, we just have to enforce
                     // that the data is revalidated, hence we set force_revalidate to true
-                    if generic_origin_class.is_some() {
-                        match input_as_python_instance(input, generic_origin_class.unwrap()) {
+                    if let Some(generic_origin) = generic_origin_class {
+                        match input_as_python_instance(input, generic_origin) {
                             Some(x) => (Some(x), true),
                             None => (None, false),
                         }
@@ -172,7 +172,7 @@ impl Validator for ModelValidator {
                     self.validate_construct(py, &inner_input, Some(&fields_set), state)
                 }
             } else {
-                Ok(input.to_object(py))
+                Ok(input.to_object(py)?.unbind())
             }
         } else {
             // Having to construct a new model is not an exact match
@@ -188,7 +188,7 @@ impl Validator for ModelValidator {
         field_name: &str,
         field_value: &Bound<'py, PyAny>,
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         if self.frozen {
             return Err(ValError::new(ErrorTypeDefaults::FrozenInstance, field_value));
         } else if self.root_model {
@@ -202,6 +202,7 @@ impl Validator for ModelValidator {
                     field_name.to_string(),
                 ))
             } else {
+                let state = &mut state.rebind_extra(|extra| extra.field_name = Some(PyString::new(py, ROOT_FIELD)));
                 let output = self.validator.validate(py, field_value, state)?;
 
                 force_setattr(py, model, intern!(py, ROOT_FIELD), output)?;
@@ -233,13 +234,8 @@ impl Validator for ModelValidator {
             }
         }
 
-        force_setattr(py, model, intern!(py, DUNDER_DICT), validated_dict.to_object(py))?;
-        force_setattr(
-            py,
-            model,
-            intern!(py, DUNDER_MODEL_EXTRA_KEY),
-            validated_extra.to_object(py),
-        )?;
+        force_setattr(py, model, intern!(py, DUNDER_DICT), validated_dict)?;
+        force_setattr(py, model, intern!(py, DUNDER_MODEL_EXTRA_KEY), validated_extra)?;
         Ok(model.into_py_any(py)?)
     }
 
@@ -256,13 +252,15 @@ impl ModelValidator {
         self_instance: &Bound<'py, PyAny>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         // we need to set `self_instance` to None for nested validators as we don't want to operate on self_instance
         // anymore
         let state = &mut state.rebind_extra(|extra| extra.self_instance = None);
-        let output = self.validator.validate(py, input, state)?;
 
         if self.root_model {
+            let state = &mut state.rebind_extra(|extra| extra.field_name = Some(PyString::new(py, ROOT_FIELD)));
+            let output = self.validator.validate(py, input, state)?;
+
             let fields_set = if input.as_python().is_some_and(|py_input| py_input.is(&self.undefined)) {
                 PySet::empty(py)?
             } else {
@@ -271,6 +269,8 @@ impl ModelValidator {
             force_setattr(py, self_instance, intern!(py, DUNDER_FIELDS_SET_KEY), &fields_set)?;
             force_setattr(py, self_instance, intern!(py, ROOT_FIELD), &output)?;
         } else {
+            let output = self.validator.validate(py, input, state)?;
+
             let (model_dict, model_extra, fields_set): (Bound<PyAny>, Bound<PyAny>, Bound<PyAny>) =
                 output.extract(py)?;
             set_model_attrs(self_instance, &model_dict, &model_extra, &fields_set)?;
@@ -284,7 +284,7 @@ impl ModelValidator {
         input: &(impl Input<'py> + ?Sized),
         existing_fields_set: Option<&Bound<'_, PyAny>>,
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         if self.custom_init {
             // If we wanted, we could introspect the __init__ signature, and store the
             // keyword arguments and types, and create a validator for them.
@@ -299,11 +299,12 @@ impl ModelValidator {
             }
         }
 
-        let output = self.validator.validate(py, input, state)?;
-
         let instance = create_class(self.class.bind(py))?;
 
         if self.root_model {
+            let state = &mut state.rebind_extra(|extra| extra.field_name = Some(PyString::new(py, ROOT_FIELD)));
+            let output = self.validator.validate(py, input, state)?;
+
             let fields_set = if input.as_python().is_some_and(|py_input| py_input.is(&self.undefined)) {
                 PySet::empty(py)?
             } else {
@@ -312,6 +313,8 @@ impl ModelValidator {
             force_setattr(py, &instance, intern!(py, DUNDER_FIELDS_SET_KEY), &fields_set)?;
             force_setattr(py, &instance, intern!(py, ROOT_FIELD), output)?;
         } else {
+            let output = self.validator.validate(py, input, state)?;
+
             let (model_dict, model_extra, val_fields_set): (Bound<PyAny>, Bound<PyAny>, Bound<PyAny>) =
                 output.extract(py)?;
             let fields_set = existing_fields_set.unwrap_or(&val_fields_set);
@@ -326,7 +329,7 @@ impl ModelValidator {
         instance: Bound<'_, PyAny>,
         input: &(impl Input<'py> + ?Sized),
         extra: &Extra,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         if let Some(ref post_init) = self.post_init {
             instance
                 .call_method1(post_init.bind(py), (extra.context,))
@@ -371,13 +374,13 @@ fn set_model_attrs(
     Ok(())
 }
 
-pub(super) fn force_setattr<N, V>(py: Python<'_>, obj: &Bound<'_, PyAny>, attr_name: N, value: V) -> PyResult<()>
+pub(super) fn force_setattr<'py, N, V>(py: Python<'py>, obj: &Bound<'py, PyAny>, attr_name: N, value: V) -> PyResult<()>
 where
-    N: ToPyObject,
-    V: ToPyObject,
+    N: IntoPyObject<'py>,
+    V: IntoPyObject<'py>,
 {
-    let attr_name = attr_name.to_object(py);
-    let value = value.to_object(py);
+    let attr_name = attr_name.into_pyobject_or_pyerr(py)?;
+    let value = value.into_pyobject_or_pyerr(py)?;
     unsafe {
         py_error_on_minusone(
             py,

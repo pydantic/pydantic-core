@@ -1,6 +1,6 @@
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use pyo3::sync::GILOnceCell;
+use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyComplex, PyDict, PyString, PyType};
 
 use crate::build_tools::is_strict;
@@ -9,11 +9,11 @@ use crate::input::Input;
 
 use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
 
-static COMPLEX_TYPE: GILOnceCell<Py<PyType>> = GILOnceCell::new();
+static COMPLEX_TYPE: PyOnceLock<Py<PyType>> = PyOnceLock::new();
 
-pub fn get_complex_type(py: Python) -> &Bound<'_, PyType> {
+pub fn get_complex_type(py: Python<'_>) -> &Bound<'_, PyType> {
     COMPLEX_TYPE
-        .get_or_init(py, || py.get_type_bound::<PyComplex>().into())
+        .get_or_init(py, || py.get_type::<PyComplex>().into())
         .bind(py)
 }
 
@@ -44,12 +44,12 @@ impl Validator for ComplexValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         let res = input.validate_complex(self.strict, py)?.unpack(state);
         Ok(res.into_pyobject(py)?.into())
     }
 
-    fn get_name(&self) -> &str {
+    fn get_name(&self) -> &'static str {
         "complex"
     }
 }

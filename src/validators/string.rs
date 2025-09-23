@@ -47,7 +47,7 @@ impl Validator for StrValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         input
             .validate_str(state.strict_or(self.strict), self.coerce_numbers_to_str)
             .and_then(|val_match| {
@@ -84,7 +84,7 @@ impl Validator for StrConstrainedValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         let either_str = input
             .validate_str(state.strict_or(self.strict), self.coerce_numbers_to_str)?
             .unpack(state);
@@ -147,7 +147,7 @@ impl Validator for StrConstrainedValidator {
         Ok(py_string.into_py_any(py)?)
     }
 
-    fn get_name(&self) -> &str {
+    fn get_name(&self) -> &'static str {
         "constrained-str"
     }
 }
@@ -226,7 +226,7 @@ struct Pattern {
 #[derive(Debug, Clone)]
 enum RegexEngine {
     RustRegex(Regex),
-    PythonRe(PyObject),
+    PythonRe(Py<PyAny>),
 }
 
 impl RegexEngine {
@@ -260,7 +260,7 @@ impl Pattern {
             // so that any flags, etc. are preserved
             Ok(Self {
                 pattern: pattern_str,
-                engine: RegexEngine::PythonRe(pattern.to_object(py)),
+                engine: RegexEngine::PythonRe(pattern.unbind()),
             })
         } else {
             let engine = match engine {

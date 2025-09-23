@@ -5,12 +5,13 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyString, PyTuple};
 
 use ahash::AHashSet;
+use pyo3::IntoPyObjectExt;
 
 use crate::build_tools::py_schema_err;
 use crate::build_tools::{schema_or_config_same, ExtraBehavior};
 use crate::errors::{ErrorTypeDefaults, ValError, ValLineError, ValResult};
 use crate::input::{Arguments, BorrowInput, Input, KeywordArgs, PositionalArgs, ValidationMatch};
-use crate::lookup_key::LookupKey;
+use crate::lookup_key::LookupKeyCollection;
 use crate::tools::SchemaDict;
 
 use super::validation_state::ValidationState;
@@ -41,9 +42,10 @@ impl FromStr for VarKwargsMode {
 struct Parameter {
     positional: bool,
     name: String,
-    kw_lookup_key: Option<LookupKey>,
     kwarg_key: Option<Py<PyString>>,
     validator: CombinedValidator,
+    lookup_key_collection: LookupKeyCollection,
+    mode: String,
 }
 
 #[derive(Debug)]
@@ -55,6 +57,8 @@ pub struct ArgumentsValidator {
     var_kwargs_validator: Option<Box<CombinedValidator>>,
     loc_by_alias: bool,
     extra: ExtraBehavior,
+    validate_by_alias: Option<bool>,
+    validate_by_name: Option<bool>,
 }
 
 impl BuildValidator for ArgumentsValidator {
@@ -66,8 +70,6 @@ impl BuildValidator for ArgumentsValidator {
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
-
-        let populate_by_name = schema_or_config_same(schema, config, intern!(py, "populate_by_name"))?.unwrap_or(false);
 
         let arguments_schema: Bound<'_, PyList> = schema.get_as_req(intern!(py, "arguments_schema"))?;
         let mut parameters: Vec<Parameter> = Vec::with_capacity(arguments_schema.len());
@@ -96,18 +98,11 @@ impl BuildValidator for ArgumentsValidator {
                 had_keyword_only = true;
             }
 
-            let mut kw_lookup_key = None;
-            let mut kwarg_key = None;
-            if mode == "keyword_only" || mode == "positional_or_keyword" {
-                kw_lookup_key = match arg.get_item(intern!(py, "alias"))? {
-                    Some(alias) => {
-                        let alt_alias = if populate_by_name { Some(name.as_str()) } else { None };
-                        Some(LookupKey::from_py(py, &alias, alt_alias)?)
-                    }
-                    None => Some(LookupKey::from_string(py, &name)),
-                };
-                kwarg_key = Some(py_name.unbind());
-            }
+            let kwarg_key = if matches!(mode, "keyword_only" | "positional_or_keyword") {
+                Some(py_name.unbind())
+            } else {
+                None
+            };
 
             let schema = arg.get_as_req(intern!(py, "schema"))?;
 
@@ -131,12 +126,17 @@ impl BuildValidator for ArgumentsValidator {
             } else if has_default {
                 had_default_arg = true;
             }
+
+            let validation_alias = arg.get_item(intern!(py, "alias"))?;
+            let lookup_key_collection = LookupKeyCollection::new(py, validation_alias, name.as_str())?;
+
             parameters.push(Parameter {
                 positional,
                 name,
-                kw_lookup_key,
                 kwarg_key,
                 validator,
+                lookup_key_collection,
+                mode: mode.to_string(),
             });
         }
 
@@ -167,6 +167,8 @@ impl BuildValidator for ArgumentsValidator {
             var_kwargs_validator,
             loc_by_alias: config.get_as(intern!(py, "loc_by_alias"))?.unwrap_or(true),
             extra: ExtraBehavior::from_schema_or_config(py, schema, config, ExtraBehavior::Forbid)?,
+            validate_by_alias: schema_or_config_same(schema, config, intern!(py, "validate_by_alias"))?,
+            validate_by_name: schema_or_config_same(schema, config, intern!(py, "validate_by_name"))?,
         }
         .into())
     }
@@ -186,16 +188,19 @@ impl Validator for ArgumentsValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         // this validator does not yet support partial validation, disable it to avoid incorrect results
         state.allow_partial = false.into();
 
         let args = input.validate_args()?;
 
-        let mut output_args: Vec<PyObject> = Vec::with_capacity(self.positional_params_count);
+        let mut output_args: Vec<Py<PyAny>> = Vec::with_capacity(self.positional_params_count);
         let output_kwargs = PyDict::new(py);
         let mut errors: Vec<ValLineError> = Vec::new();
         let mut used_kwargs: AHashSet<&str> = AHashSet::with_capacity(self.parameters.len());
+
+        let validate_by_alias = state.validate_by_alias_or(self.validate_by_alias);
+        let validate_by_name = state.validate_by_name_or(self.validate_by_name);
 
         // go through arguments getting the value from args or kwargs and validating it
         for (index, parameter) in self.parameters.iter().enumerate() {
@@ -206,14 +211,26 @@ impl Validator for ArgumentsValidator {
                 }
             }
             let mut kw_value = None;
+            let mut kw_lookup_key = None;
+            if matches!(parameter.mode.as_str(), "keyword_only" | "positional_or_keyword") {
+                kw_lookup_key = Some(
+                    parameter
+                        .lookup_key_collection
+                        .select(validate_by_alias, validate_by_name)?,
+                );
+            }
+
             if let Some(kwargs) = args.kwargs() {
-                if let Some(ref lookup_key) = parameter.kw_lookup_key {
+                if let Some(lookup_key) = kw_lookup_key {
                     if let Some((lookup_path, value)) = kwargs.get_item(lookup_key)? {
                         used_kwargs.insert(lookup_path.first_key());
                         kw_value = Some((lookup_path, value));
                     }
                 }
             }
+
+            let state =
+                &mut state.rebind_extra(|extra| extra.field_name = Some(PyString::new(py, parameter.name.as_str())));
 
             match (pos_value, kw_value) {
                 (Some(_), Some((_, kw_value))) => {
@@ -253,7 +270,7 @@ impl Validator for ArgumentsValidator {
                         } else {
                             output_args.push(value);
                         }
-                    } else if let Some(ref lookup_key) = parameter.kw_lookup_key {
+                    } else if let Some(lookup_key) = kw_lookup_key {
                         let error_type = if parameter.positional {
                             ErrorTypeDefaults::MissingArgument
                         } else {
@@ -266,7 +283,7 @@ impl Validator for ArgumentsValidator {
                             input,
                             index,
                         ));
-                    };
+                    }
                 }
             }
         }
@@ -347,8 +364,10 @@ impl Validator for ArgumentsValidator {
                             },
                             VarKwargsMode::UnpackedTypedDict => {
                                 // Save to the remaining kwargs, we will validate as a single dict:
-                                remaining_kwargs
-                                    .set_item(either_str.as_py_string(py, state.cache_str()), value.to_object(py))?;
+                                remaining_kwargs.set_item(
+                                    either_str.as_py_string(py, state.cache_str()),
+                                    value.borrow_input().to_object(py)?,
+                                )?;
                             }
                         }
                     }
@@ -377,7 +396,7 @@ impl Validator for ArgumentsValidator {
         if !errors.is_empty() {
             Err(ValError::LineErrors(errors))
         } else {
-            Ok((PyTuple::new(py, output_args)?, output_kwargs).to_object(py))
+            Ok((PyTuple::new(py, output_args)?, output_kwargs).into_py_any(py)?)
         }
     }
 

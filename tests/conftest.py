@@ -1,26 +1,33 @@
 from __future__ import annotations as _annotations
 
 import functools
+import gc
 import importlib.util
 import json
 import os
 import re
+import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Type
+from time import sleep, time
+from typing import Any, Callable, Literal
 
 import hypothesis
 import pytest
-from typing_extensions import Literal
 
-from pydantic_core import ArgsKwargs, SchemaValidator, ValidationError, validate_core_schema
-from pydantic_core.core_schema import CoreConfig
+from pydantic_core import ArgsKwargs, CoreSchema, SchemaValidator, ValidationError
+from pydantic_core.core_schema import CoreConfig, ExtraBehavior
 
-__all__ = 'Err', 'PyAndJson', 'plain_repr', 'infinite_generator'
+__all__ = 'Err', 'PyAndJson', 'assert_gc', 'is_free_threaded', 'plain_repr', 'infinite_generator'
 
 hypothesis.settings.register_profile('fast', max_examples=2)
 hypothesis.settings.register_profile('slow', max_examples=1_000)
 hypothesis.settings.load_profile(os.getenv('HYPOTHESIS_PROFILE', 'fast'))
+
+try:
+    is_free_threaded = not sys._is_gil_enabled()
+except AttributeError:
+    is_free_threaded = False
 
 
 def plain_repr(obj):
@@ -51,9 +58,13 @@ def json_default(obj):
 
 class PyAndJsonValidator:
     def __init__(
-        self, schema, config: CoreConfig | None = None, *, validator_type: Literal['json', 'python'] | None = None
+        self,
+        schema: CoreSchema,
+        config: CoreConfig | None = None,
+        *,
+        validator_type: Literal['json', 'python'] | None = None,
     ):
-        self.validator = SchemaValidator(validate_core_schema(schema), config)
+        self.validator = SchemaValidator(schema, config)
         self.validator_type = validator_type
 
     def validate_python(self, py_input, strict: bool | None = None, context: Any = None):
@@ -62,14 +73,19 @@ class PyAndJsonValidator:
     def validate_json(self, json_str: str, strict: bool | None = None, context: Any = None):
         return self.validator.validate_json(json_str, strict=strict, context=context)
 
-    def validate_test(self, py_input, strict: bool | None = None, context: Any = None):
+    def validate_test(
+        self, py_input, strict: bool | None = None, context: Any = None, extra: ExtraBehavior | None = None
+    ):
         if self.validator_type == 'json':
             return self.validator.validate_json(
-                json.dumps(py_input, default=json_default), strict=strict, context=context
+                json.dumps(py_input, default=json_default),
+                strict=strict,
+                extra=extra,
+                context=context,
             )
         else:
             assert self.validator_type == 'python', self.validator_type
-            return self.validator.validate_python(py_input, strict=strict, context=context)
+            return self.validator.validate_python(py_input, strict=strict, context=context, extra=extra)
 
     def isinstance_test(self, py_input, strict: bool | None = None, context: Any = None):
         if self.validator_type == 'json':
@@ -83,7 +99,7 @@ class PyAndJsonValidator:
             return self.validator.isinstance_python(py_input, strict=strict, context=context)
 
 
-PyAndJson = Type[PyAndJsonValidator]
+PyAndJson = type[PyAndJsonValidator]
 
 
 @pytest.fixture(params=['python', 'json'])
@@ -128,7 +144,7 @@ def tmp_work_path(tmp_path: Path):
 
 @pytest.fixture
 def import_execute(request, tmp_work_path: Path):
-    def _import_execute(source: str, *, custom_module_name: 'str | None' = None):
+    def _import_execute(source: str, *, custom_module_name: str | None = None):
         module_name = custom_module_name or request.node.name
 
         module_path = tmp_work_path / f'{module_name}.py'
@@ -161,3 +177,20 @@ def infinite_generator():
     while True:
         yield i
         i += 1
+
+
+def assert_gc(test: Callable[[], bool], timeout: float = 10) -> None:
+    """Helper to retry garbage collection until the test passes or timeout is
+    reached.
+
+    This is useful on free-threading where the GC collect call finishes before
+    all cleanup is done.
+    """
+    start = now = time()
+    while now - start < timeout:
+        if test():
+            return
+        gc.collect()
+        sleep(0.1)
+        now = time()
+    raise AssertionError('Timeout waiting for GC')

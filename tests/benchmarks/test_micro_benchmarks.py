@@ -9,7 +9,7 @@ import sys
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from enum import Enum
-from typing import Any, List
+from typing import Any
 from uuid import UUID
 
 import pytest
@@ -18,6 +18,7 @@ from dirty_equals import IsStr
 import pydantic_core
 from pydantic_core import (
     ArgsKwargs,
+    CoreConfig,
     PydanticCustomError,
     PydanticKnownError,
     SchemaValidator,
@@ -43,26 +44,23 @@ class TestBenchmarkSimpleModel:
             __slots__ = '__dict__', '__pydantic_fields_set__', '__pydantic_extra__', '__pydantic_private__'
 
         return SchemaValidator(
-            {
-                'type': 'model',
-                'cls': CoreModel,
-                'schema': {
-                    'type': 'model-fields',
-                    'fields': {
-                        'name': {'type': 'model-field', 'schema': {'type': 'str'}},
-                        'age': {'type': 'model-field', 'schema': {'type': 'int'}},
-                        'friends': {'type': 'model-field', 'schema': {'type': 'list', 'items_schema': {'type': 'int'}}},
-                        'settings': {
-                            'type': 'model-field',
-                            'schema': {
-                                'type': 'dict',
-                                'keys_schema': {'type': 'str'},
-                                'values_schema': {'type': 'float'},
-                            },
-                        },
-                    },
-                },
-            }
+            schema=core_schema.model_schema(
+                cls=CoreModel,
+                schema=core_schema.model_fields_schema(
+                    fields={
+                        'name': core_schema.model_field(schema=core_schema.str_schema()),
+                        'age': core_schema.model_field(schema=core_schema.int_schema()),
+                        'friends': core_schema.model_field(
+                            schema=core_schema.list_schema(items_schema=core_schema.int_schema())
+                        ),
+                        'settings': core_schema.model_field(
+                            schema=core_schema.dict_schema(
+                                keys_schema=core_schema.str_schema(), values_schema=core_schema.float_schema()
+                            )
+                        ),
+                    }
+                ),
+            )
         )
 
     data = {'name': 'John', 'age': 42, 'friends': list(range(200)), 'settings': {f'v_{i}': i / 2.0 for i in range(50)}}
@@ -88,15 +86,13 @@ class TestModelLarge:
             __slots__ = '__dict__', '__pydantic_fields_set__', '__pydantic_extra__', '__pydantic_private__'
 
         return SchemaValidator(
-            {
-                'type': 'model',
-                'cls': CoreModel,
-                'schema': {
-                    'type': 'model-fields',
-                    'extra_behavior': 'allow',
-                    'fields': {f'field_{i}': {'type': 'model-field', 'schema': {'type': 'int'}} for i in range(100)},
-                },
-            }
+            schema=core_schema.model_schema(
+                cls=CoreModel,
+                schema=core_schema.model_fields_schema(
+                    extra_behavior='allow',
+                    fields={f'field_{i}': {'type': 'model-field', 'schema': {'type': 'int'}} for i in range(100)},
+                ),
+            )
         )
 
     data = {f'field_{99 - i}': i for i in range(100)}
@@ -127,7 +123,7 @@ bool_cases = [True, False, 0, 1, '0', '1', 'true', 'false', 'True', 'False']
 
 @pytest.mark.benchmark(group='bool')
 def test_bool_core(benchmark):
-    schema_validator = SchemaValidator({'type': 'bool'})
+    schema_validator = SchemaValidator(core_schema.bool_schema())
 
     @benchmark
     def t():
@@ -161,17 +157,15 @@ def test_small_class_core_model(benchmark):
         age: int
 
     model_schema_validator = SchemaValidator(
-        {
-            'type': 'model',
-            'cls': MyCoreModel,
-            'schema': {
-                'type': 'model-fields',
-                'fields': {
-                    'name': {'type': 'model-field', 'schema': {'type': 'str'}},
-                    'age': {'type': 'model-field', 'schema': {'type': 'int'}},
-                },
-            },
-        }
+        core_schema.model_schema(
+            cls=MyCoreModel,
+            schema=core_schema.model_fields_schema(
+                fields={
+                    'name': core_schema.model_field(schema=core_schema.str_schema()),
+                    'age': core_schema.model_field(schema=core_schema.int_schema()),
+                }
+            ),
+        )
     )
     benchmark(model_schema_validator.validate_python, small_class_data)
 
@@ -325,16 +319,14 @@ def test_definition_model_core(definition_model_data, benchmark):
     benchmark(v.validate_python, definition_model_data)
 
 
-@pytest.mark.benchmark(group='List[TypedDict]')
+@pytest.mark.benchmark(group='list[TypedDict]')
 def test_list_of_dict_models_core(benchmark):
     v = SchemaValidator(
-        {
-            'type': 'list',
-            'items_schema': {
-                'type': 'typed-dict',
-                'fields': {'width': {'type': 'typed-dict-field', 'schema': {'type': 'int'}}},
-            },
-        }
+        core_schema.list_schema(
+            items_schema=core_schema.typed_dict_schema(
+                fields={'width': core_schema.typed_dict_field(schema=core_schema.int_schema())}
+            )
+        )
     )
 
     data = [{'width': i} for i in range(100)]
@@ -344,9 +336,9 @@ def test_list_of_dict_models_core(benchmark):
 list_of_ints_data = ([i for i in range(1000)], [str(i) for i in range(1000)])
 
 
-@pytest.mark.benchmark(group='List[int]')
+@pytest.mark.benchmark(group='list[int]')
 def test_list_of_ints_core_py(benchmark):
-    v = SchemaValidator({'type': 'list', 'items_schema': {'type': 'int'}})
+    v = SchemaValidator(core_schema.list_schema(items_schema=core_schema.int_schema()))
 
     @benchmark
     def t():
@@ -354,9 +346,9 @@ def test_list_of_ints_core_py(benchmark):
         v.validate_python(list_of_ints_data[1])
 
 
-@pytest.mark.benchmark(group='List[int] JSON')
+@pytest.mark.benchmark(group='list[int] JSON')
 def test_list_of_ints_core_json(benchmark):
-    v = SchemaValidator({'type': 'list', 'items_schema': {'type': 'int'}})
+    v = SchemaValidator(core_schema.list_schema(items_schema=core_schema.int_schema()))
 
     json_data = [json.dumps(d) for d in list_of_ints_data]
 
@@ -386,15 +378,15 @@ def test_list_of_strs_json_cached(benchmark):
 
 @pytest.mark.benchmark(group='list[str]')
 def test_list_of_strs_json_uncached(benchmark):
-    v = SchemaValidator(core_schema.list_schema(core_schema.str_schema()), {'cache_strings': False})
+    v = SchemaValidator(core_schema.list_schema(core_schema.str_schema()), config=CoreConfig(cache_strings=False))
 
     json_data = json.dumps(list_of_strs_data)
     benchmark(v.validate_json, json_data)
 
 
-@pytest.mark.benchmark(group='List[Any]')
+@pytest.mark.benchmark(group='list[Any]')
 def test_list_of_any_core_py(benchmark):
-    v = SchemaValidator({'type': 'list'})
+    v = SchemaValidator(core_schema.list_schema())
 
     @benchmark
     def t():
@@ -408,7 +400,7 @@ set_of_ints_duplicates = ([i for i in range(100)] * 10, [str(i) for i in range(1
 
 @pytest.mark.benchmark(group='Set[int]')
 def test_set_of_ints_core(benchmark):
-    v = SchemaValidator({'type': 'set', 'items_schema': {'type': 'int'}})
+    v = SchemaValidator(core_schema.set_schema(items_schema=core_schema.int_schema()))
 
     @benchmark
     def t():
@@ -418,7 +410,7 @@ def test_set_of_ints_core(benchmark):
 
 @pytest.mark.benchmark(group='Set[int]')
 def test_set_of_ints_core_duplicates(benchmark):
-    v = SchemaValidator({'type': 'set', 'items_schema': {'type': 'int'}})
+    v = SchemaValidator(core_schema.set_schema(items_schema=core_schema.int_schema()))
 
     @benchmark
     def t():
@@ -428,7 +420,7 @@ def test_set_of_ints_core_duplicates(benchmark):
 
 @pytest.mark.benchmark(group='Set[int]')
 def test_set_of_ints_core_length(benchmark):
-    v = SchemaValidator({'type': 'set', 'items_schema': {'type': 'int'}, 'max_length': 2000})
+    v = SchemaValidator(core_schema.set_schema(items_schema=core_schema.int_schema(), max_length=2000))
 
     @benchmark
     def t():
@@ -438,7 +430,7 @@ def test_set_of_ints_core_length(benchmark):
 
 @pytest.mark.benchmark(group='Set[int] JSON')
 def test_set_of_ints_core_json(benchmark):
-    v = SchemaValidator({'type': 'set', 'items_schema': {'type': 'int'}})
+    v = SchemaValidator(core_schema.set_schema(items_schema=core_schema.int_schema()))
 
     json_data = [json.dumps(list(d)) for d in set_of_ints_data]
 
@@ -450,7 +442,7 @@ def test_set_of_ints_core_json(benchmark):
 
 @pytest.mark.benchmark(group='Set[int] JSON')
 def test_set_of_ints_core_json_duplicates(benchmark):
-    v = SchemaValidator({'type': 'set', 'items_schema': {'type': 'int'}})
+    v = SchemaValidator(core_schema.set_schema(items_schema=core_schema.int_schema()))
 
     json_data = [json.dumps(list(d)) for d in set_of_ints_duplicates]
 
@@ -466,14 +458,14 @@ frozenset_of_ints_duplicates = [i for i in range(100)] * 10
 
 @pytest.mark.benchmark(group='FrozenSet[int]')
 def test_frozenset_of_ints_core(benchmark):
-    v = SchemaValidator({'type': 'frozenset', 'items_schema': {'type': 'int'}})
+    v = SchemaValidator(core_schema.frozenset_schema(items_schema=core_schema.int_schema()))
 
     benchmark(v.validate_python, frozenset_of_ints)
 
 
 @pytest.mark.benchmark(group='FrozenSet[int]')
 def test_frozenset_of_ints_duplicates_core(benchmark):
-    v = SchemaValidator({'type': 'frozenset', 'items_schema': {'type': 'int'}})
+    v = SchemaValidator(core_schema.frozenset_schema(items_schema=core_schema.int_schema()))
 
     benchmark(v.validate_python, frozenset_of_ints_duplicates)
 
@@ -481,9 +473,11 @@ def test_frozenset_of_ints_duplicates_core(benchmark):
 dict_of_ints_data = ({str(i): i for i in range(1000)}, {str(i): str(i) for i in range(1000)})
 
 
-@pytest.mark.benchmark(group='Dict[str, int]')
+@pytest.mark.benchmark(group='dict[str, int]')
 def test_dict_of_ints_core(benchmark):
-    v = SchemaValidator({'type': 'dict', 'keys_schema': {'type': 'str'}, 'values_schema': {'type': 'int'}})
+    v = SchemaValidator(
+        core_schema.dict_schema(keys_schema=core_schema.str_schema(), values_schema=core_schema.int_schema())
+    )
 
     @benchmark
     def t():
@@ -491,9 +485,9 @@ def test_dict_of_ints_core(benchmark):
         v.validate_python(dict_of_ints_data[1])
 
 
-@pytest.mark.benchmark(group='Dict[any, any]')
+@pytest.mark.benchmark(group='dict[any, any]')
 def test_dict_of_any_core(benchmark):
-    v = SchemaValidator({'type': 'dict'})
+    v = SchemaValidator(core_schema.dict_schema())
 
     @benchmark
     def t():
@@ -501,9 +495,11 @@ def test_dict_of_any_core(benchmark):
         v.validate_python(dict_of_ints_data[1])
 
 
-@pytest.mark.benchmark(group='Dict[str, int] JSON')
+@pytest.mark.benchmark(group='dict[str, int] JSON')
 def test_dict_of_ints_core_json(benchmark):
-    v = SchemaValidator({'type': 'dict', 'keys_schema': {'type': 'str'}, 'values_schema': {'type': 'int'}})
+    v = SchemaValidator(
+        core_schema.dict_schema(keys_schema=core_schema.str_schema(), values_schema=core_schema.int_schema())
+    )
 
     json_data = [json.dumps(d) for d in dict_of_ints_data]
 
@@ -516,7 +512,7 @@ def test_dict_of_ints_core_json(benchmark):
 many_models_data = [{'age': i} for i in range(1000)]
 
 
-@pytest.mark.benchmark(group='List[DictSimpleMode]')
+@pytest.mark.benchmark(group='list[DictSimpleMode]')
 def test_many_models_core_dict(benchmark):
     model_schema = {
         'type': 'list',
@@ -529,23 +525,20 @@ def test_many_models_core_dict(benchmark):
     benchmark(v.validate_python, many_models_data)
 
 
-@pytest.mark.benchmark(group='List[SimpleMode]')
+@pytest.mark.benchmark(group='list[SimpleMode]')
 def test_many_models_core_model(benchmark):
     class MyCoreModel:
         __slots__ = '__dict__', '__pydantic_fields_set__', '__pydantic_extra__', '__pydantic_private__'
 
     v = SchemaValidator(
-        {
-            'type': 'list',
-            'items_schema': {
-                'type': 'model',
-                'cls': MyCoreModel,
-                'schema': {
-                    'type': 'model-fields',
-                    'fields': {'age': {'type': 'model-field', 'schema': {'type': 'int'}}},
-                },
-            },
-        }
+        core_schema.list_schema(
+            items_schema=core_schema.model_schema(
+                cls=MyCoreModel,
+                schema=core_schema.model_fields_schema(
+                    fields={'age': core_schema.model_field(schema=core_schema.int_schema())}
+                ),
+            )
+        )
     )
     benchmark(v.validate_python, many_models_data)
 
@@ -553,9 +546,11 @@ def test_many_models_core_model(benchmark):
 list_of_nullable_data = [None if i % 2 else i for i in range(1000)]
 
 
-@pytest.mark.benchmark(group='List[Nullable[int]]')
+@pytest.mark.benchmark(group='list[Nullable[int]]')
 def test_list_of_nullable_core(benchmark):
-    v = SchemaValidator({'type': 'list', 'items_schema': {'type': 'nullable', 'schema': {'type': 'int'}}})
+    v = SchemaValidator(
+        core_schema.list_schema(items_schema=core_schema.nullable_schema(schema=core_schema.int_schema()))
+    )
 
     benchmark(v.validate_python, list_of_nullable_data)
 
@@ -565,7 +560,7 @@ some_bytes = b'0' * 1000
 
 @pytest.mark.benchmark(group='bytes')
 def test_bytes_core(benchmark):
-    v = SchemaValidator({'type': 'bytes'})
+    v = SchemaValidator(core_schema.bytes_schema())
 
     benchmark(v.validate_python, some_bytes)
 
@@ -577,14 +572,12 @@ class TestBenchmarkDateTime:
             __slots__ = '__dict__', '__pydantic_fields_set__', '__pydantic_extra__', '__pydantic_private__'
 
         return SchemaValidator(
-            {
-                'type': 'model',
-                'cls': CoreModel,
-                'schema': {
-                    'type': 'model-fields',
-                    'fields': {'dt': {'type': 'model-field', 'schema': {'type': 'datetime'}}},
-                },
-            }
+            schema=core_schema.model_schema(
+                cls=CoreModel,
+                schema=core_schema.model_fields_schema(
+                    fields={'dt': core_schema.model_field(schema=core_schema.datetime_schema())}
+                ),
+            )
         )
 
     @pytest.fixture(scope='class')
@@ -613,25 +606,25 @@ class TestBenchmarkDateTime:
 
     @pytest.mark.benchmark(group='datetime datetime')
     def test_core_raw(self, benchmark, datetime_raw):
-        v = SchemaValidator({'type': 'datetime'})
+        v = SchemaValidator(core_schema.datetime_schema())
 
         benchmark(v.validate_python, datetime_raw)
 
     @pytest.mark.benchmark(group='datetime str')
     def test_core_str(self, benchmark, datetime_str):
-        v = SchemaValidator({'type': 'datetime'})
+        v = SchemaValidator(core_schema.datetime_schema())
 
         benchmark(v.validate_python, datetime_str)
 
     @pytest.mark.benchmark(group='datetime future')
     def test_core_future(self, benchmark, datetime_raw):
-        v = SchemaValidator({'type': 'datetime', 'gt': datetime.now()})
+        v = SchemaValidator(core_schema.datetime_schema(gt=datetime.now()))
 
         benchmark(v.validate_python, datetime_raw)
 
     @pytest.mark.benchmark(group='datetime future')
     def test_core_future_str(self, benchmark, datetime_str):
-        v = SchemaValidator({'type': 'datetime', 'gt': datetime.now()})
+        v = SchemaValidator(core_schema.datetime_schema(gt=datetime.now()))
 
         benchmark(v.validate_python, datetime_str)
 
@@ -639,7 +632,7 @@ class TestBenchmarkDateTime:
 class TestBenchmarkDateX:
     @pytest.fixture(scope='class')
     def validator(self):
-        return SchemaValidator({'type': 'date'})
+        return SchemaValidator(core_schema.date_schema())
 
     @pytest.mark.benchmark(group='date from date')
     def test_date_from_date(self, benchmark, validator):
@@ -659,13 +652,13 @@ class TestBenchmarkDateX:
 
     @pytest.mark.benchmark(group='date future')
     def test_core_future(self, benchmark):
-        v = SchemaValidator({'type': 'date', 'gt': date.today()})
+        v = SchemaValidator(core_schema.date_schema(gt=date.today()))
 
         benchmark(v.validate_python, date(2932, 1, 1))
 
     @pytest.mark.benchmark(group='date future')
     def test_core_future_str(self, benchmark):
-        v = SchemaValidator({'type': 'date', 'gt': date.today()})
+        v = SchemaValidator(core_schema.date_schema(gt=date.today()))
 
         benchmark(v.validate_python, str(date(2932, 1, 1)))
 
@@ -673,27 +666,39 @@ class TestBenchmarkDateX:
 class TestBenchmarkUnion:
     @pytest.mark.benchmark(group='smart-union')
     def test_smart_union_core(self, benchmark):
-        v = SchemaValidator({'type': 'union', 'choices': [{'type': 'bool'}, {'type': 'int'}, {'type': 'str'}]})
+        v = SchemaValidator(
+            schema=core_schema.union_schema(
+                choices=[core_schema.bool_schema(), core_schema.int_schema(), core_schema.str_schema()]
+            )
+        )
 
         benchmark(v.validate_python, 1)
 
     @pytest.mark.benchmark(group='smart-union-coerce')
     def test_smart_union_coerce_core(self, benchmark):
-        v = SchemaValidator({'type': 'union', 'choices': [{'type': 'bool'}, {'type': 'str'}]})
+        v = SchemaValidator(
+            schema=core_schema.union_schema(choices=[core_schema.bool_schema(), core_schema.str_schema()])
+        )
 
         benchmark(v.validate_python, 1)  # will be True
 
     @pytest.mark.benchmark(group='strict-union')
     def test_strict_union_core(self, benchmark):
         v = SchemaValidator(
-            {'type': 'union', 'strict': True, 'choices': [{'type': 'bool'}, {'type': 'int'}, {'type': 'str'}]}
+            schema=core_schema.union_schema(
+                choices=[core_schema.bool_schema(), core_schema.int_schema(), core_schema.str_schema()]
+            ),
+            config=CoreConfig(strict=True),
         )
 
         benchmark(v.validate_python, 1)
 
     @pytest.mark.benchmark(group='strict-union-error')
     def test_strict_union_error_core(self, benchmark):
-        v = SchemaValidator({'type': 'union', 'strict': True, 'choices': [{'type': 'bool'}, {'type': 'str'}]})
+        v = SchemaValidator(
+            schema=core_schema.union_schema(choices=[core_schema.bool_schema(), core_schema.str_schema()]),
+            config=CoreConfig(strict=True),
+        )
 
         def validate_with_expected_error():
             try:
@@ -712,19 +717,17 @@ class TestBenchmarkUUID:
             __slots__ = '__dict__', '__pydantic_fields_set__', '__pydantic_extra__', '__pydantic_private__'
 
         return SchemaValidator(
-            {
-                'type': 'model',
-                'cls': CoreModel,
-                'schema': {
-                    'type': 'model-fields',
-                    'fields': {'u': {'type': 'model-field', 'schema': {'type': 'uuid'}}},
-                },
-            }
+            schema=core_schema.model_schema(
+                cls=CoreModel,
+                schema=core_schema.model_fields_schema(
+                    fields={'u': core_schema.model_field(schema=core_schema.uuid_schema())}
+                ),
+            )
         )
 
     @pytest.fixture(scope='class')
     def validator(self):
-        return SchemaValidator({'type': 'uuid'})
+        return SchemaValidator(core_schema.uuid_schema())
 
     @pytest.fixture(scope='class')
     def pydantic_validator(self):
@@ -802,13 +805,13 @@ class TestBenchmarkUUID:
 
     @pytest.mark.benchmark(group='uuid uuid')
     def test_core_raw(self, benchmark, uuid_raw):
-        v = SchemaValidator({'type': 'uuid'})
+        v = SchemaValidator(core_schema.uuid_schema())
 
         benchmark(v.validate_python, uuid_raw)
 
     @pytest.mark.benchmark(group='uuid str')
     def test_core_str(self, benchmark, uuid_str):
-        v = SchemaValidator({'type': 'uuid'})
+        v = SchemaValidator(core_schema.uuid_schema())
 
         benchmark(v.validate_python, uuid_str)
 
@@ -874,10 +877,15 @@ def test_raise_error_custom(benchmark):
 @pytest.mark.benchmark(group='tuple')
 def test_positional_tuple(benchmark):
     v = SchemaValidator(
-        {
-            'type': 'tuple',
-            'items_schema': [{'type': 'int'}, {'type': 'int'}, {'type': 'int'}, {'type': 'int'}, {'type': 'int'}],
-        }
+        core_schema.tuple_schema(
+            items_schema=[
+                core_schema.int_schema(),
+                core_schema.int_schema(),
+                core_schema.int_schema(),
+                core_schema.int_schema(),
+                core_schema.int_schema(),
+            ]
+        )
     )
     assert v.validate_python((1, 2, 3, '4', 5)) == (1, 2, 3, 4, 5)
 
@@ -886,7 +894,7 @@ def test_positional_tuple(benchmark):
 
 @pytest.mark.benchmark(group='tuple')
 def test_variable_tuple(benchmark):
-    v = SchemaValidator({'type': 'tuple', 'items_schema': [{'type': 'int'}], 'variadic_item_index': 0})
+    v = SchemaValidator(core_schema.tuple_schema(items_schema=[core_schema.int_schema()], variadic_item_index=0))
     assert v.validate_python((1, 2, 3, '4', 5)) == (1, 2, 3, 4, 5)
 
     benchmark(v.validate_python, (1, 2, 3, '4', 5))
@@ -894,7 +902,7 @@ def test_variable_tuple(benchmark):
 
 @pytest.mark.benchmark(group='tuple-many')
 def test_tuple_many_variable(benchmark):
-    v = SchemaValidator({'type': 'tuple', 'items_schema': [{'type': 'int'}], 'variadic_item_index': 0})
+    v = SchemaValidator(core_schema.tuple_schema(items_schema=[core_schema.int_schema()], variadic_item_index=0))
     assert v.validate_python(list(range(10))) == tuple(range(10))
 
     benchmark(v.validate_python, list(range(10)))
@@ -902,7 +910,7 @@ def test_tuple_many_variable(benchmark):
 
 @pytest.mark.benchmark(group='tuple-many')
 def test_tuple_many_positional(benchmark):
-    v = SchemaValidator({'type': 'tuple', 'items_schema': [{'type': 'int'}], 'variadic_item_index': 0})
+    v = SchemaValidator(core_schema.tuple_schema(items_schema=[core_schema.int_schema()], variadic_item_index=0))
     assert v.validate_python(list(range(10))) == tuple(range(10))
 
     benchmark(v.validate_python, list(range(10)))
@@ -911,16 +919,15 @@ def test_tuple_many_positional(benchmark):
 @pytest.mark.benchmark(group='arguments')
 def test_arguments(benchmark):
     v = SchemaValidator(
-        {
-            'type': 'arguments',
-            'arguments_schema': [
-                {'name': 'args1', 'mode': 'positional_only', 'schema': {'type': 'int'}},
-                {'name': 'args2', 'mode': 'positional_only', 'schema': {'type': 'str'}},
-                {'name': 'a', 'mode': 'positional_or_keyword', 'schema': {'type': 'bool'}},
-                {'name': 'b', 'mode': 'keyword_only', 'schema': {'type': 'str'}},
-                {'name': 'c', 'mode': 'keyword_only', 'schema': {'type': 'int'}},
-            ],
-        }
+        core_schema.arguments_schema(
+            arguments=[
+                {'name': 'args1', 'mode': 'positional_only', 'schema': core_schema.int_schema()},
+                {'name': 'args2', 'mode': 'positional_only', 'schema': core_schema.str_schema()},
+                {'name': 'a', 'mode': 'positional_or_keyword', 'schema': core_schema.bool_schema()},
+                {'name': 'b', 'mode': 'keyword_only', 'schema': core_schema.str_schema()},
+                {'name': 'c', 'mode': 'keyword_only', 'schema': core_schema.int_schema()},
+            ]
+        )
     )
     assert v.validate_python(ArgsKwargs((1, 'a', 'true'), {'b': 'bb', 'c': 3})) == ((1, 'a', True), {'b': 'bb', 'c': 3})
 
@@ -930,15 +937,13 @@ def test_arguments(benchmark):
 @pytest.mark.benchmark(group='defaults')
 def test_with_default(benchmark):
     v = SchemaValidator(
-        {
-            'type': 'typed-dict',
-            'fields': {
-                'name': {
-                    'type': 'typed-dict-field',
-                    'schema': {'type': 'default', 'schema': {'type': 'str'}, 'default': 'John'},
-                }
-            },
-        }
+        core_schema.typed_dict_schema(
+            fields={
+                'name': core_schema.typed_dict_field(
+                    schema=core_schema.with_default_schema(schema=core_schema.str_schema(), default='John')
+                )
+            }
+        )
     )
     assert v.validate_python({'name': 'Foo'}) == {'name': 'Foo'}
     assert v.validate_python({}) == {'name': 'John'}
@@ -952,10 +957,9 @@ def test_with_default(benchmark):
 @pytest.mark.benchmark(group='chain')
 def test_chain_list(benchmark):
     validator = SchemaValidator(
-        {
-            'type': 'chain',
-            'steps': [{'type': 'str'}, core_schema.with_info_plain_validator_function(lambda v, info: Decimal(v))],
-        }
+        core_schema.chain_schema(
+            steps=[core_schema.str_schema(), core_schema.with_info_plain_validator_function(lambda v, info: Decimal(v))]
+        )
     )
     assert validator.validate_python('42.42') == Decimal('42.42')
 
@@ -967,7 +971,7 @@ def test_chain_function(benchmark):
     validator = SchemaValidator(
         {
             'type': 'function-after',
-            'schema': {'type': 'str'},
+            'schema': core_schema.str_schema(),
             'function': {'type': 'with-info', 'function': lambda v, info: Decimal(v)},
         }
     )
@@ -979,14 +983,13 @@ def test_chain_function(benchmark):
 @pytest.mark.benchmark(group='chain-functions')
 def test_chain_two_functions(benchmark):
     validator = SchemaValidator(
-        {
-            'type': 'chain',
-            'steps': [
-                {'type': 'str'},
+        core_schema.chain_schema(
+            steps=[
+                core_schema.str_schema(),
                 core_schema.with_info_plain_validator_function(lambda v, info: Decimal(v)),
                 core_schema.with_info_plain_validator_function(lambda v, info: v * 2),
-            ],
-        }
+            ]
+        )
     )
     assert validator.validate_python('42.42') == Decimal('84.84')
 
@@ -1000,7 +1003,7 @@ def test_chain_nested_functions(benchmark):
             'type': 'function-after',
             'schema': {
                 'type': 'function-after',
-                'schema': {'type': 'str'},
+                'schema': core_schema.str_schema(),
                 'function': {'type': 'with-info', 'function': lambda v, info: Decimal(v)},
             },
             'function': {'type': 'with-info', 'function': lambda v, info: v * 2},
@@ -1221,7 +1224,7 @@ LARGE_STR_PREFIX = 'a' * 50
 )
 @pytest.mark.parametrize('py_or_json', ['python', 'json'])
 def test_validate_literal(
-    benchmark: Any, allowed_values: List[Any], input: Any, expected_val_res: Any, py_or_json: str
+    benchmark: Any, allowed_values: list[Any], input: Any, expected_val_res: Any, py_or_json: str
 ) -> None:
     validator = SchemaValidator(core_schema.literal_schema(expected=allowed_values))
 
@@ -1242,7 +1245,7 @@ def test_validate_literal(
 def test_core_root_model(benchmark):
     class MyModel:
         __slots__ = '__dict__', '__pydantic_fields_set__', '__pydantic_extra__', '__pydantic_private__'
-        root: List[int]
+        root: list[int]
 
     v = SchemaValidator(
         core_schema.model_schema(MyModel, core_schema.list_schema(core_schema.int_schema()), root_model=True)
@@ -1345,7 +1348,7 @@ def test_field_function_validator(benchmark) -> None:
     limit = pydantic_core._pydantic_core._recursion_limit - 3
 
     for _ in range(limit):
-        schema = core_schema.with_info_after_validator_function(f, schema, field_name='x')
+        schema = core_schema.with_info_after_validator_function(f, schema)
 
     schema = core_schema.typed_dict_schema({'x': core_schema.typed_dict_field(schema)})
 
@@ -1359,7 +1362,7 @@ def test_field_function_validator(benchmark) -> None:
 class TestBenchmarkDecimal:
     @pytest.fixture(scope='class')
     def validator(self):
-        return SchemaValidator({'type': 'decimal'})
+        return SchemaValidator(core_schema.decimal_schema())
 
     @pytest.fixture(scope='class')
     def pydantic_validator(self):
@@ -1472,3 +1475,17 @@ def test_enum_str_core(benchmark):
     assert v.validate_python('apple') is FooStr.a
 
     benchmark(v.validate_python, 'apple')
+
+
+@pytest.mark.benchmark(group='url')
+def test_url_core(benchmark):
+    v = SchemaValidator(core_schema.url_schema())
+
+    benchmark(v.validate_python, 'https://example.com/some/path?query=string#fragment')
+
+
+@pytest.mark.benchmark(group='url')
+def test_multi_host_url_core(benchmark):
+    v = SchemaValidator(core_schema.multi_host_url_schema())
+
+    benchmark(v.validate_python, 'https://example.com,b:2@example.org:777/some/path?query=string#fragment')

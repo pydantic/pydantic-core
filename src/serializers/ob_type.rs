@@ -1,5 +1,5 @@
 use pyo3::prelude::*;
-use pyo3::sync::GILOnceCell;
+use pyo3::sync::PyOnceLock;
 use pyo3::types::{
     PyBool, PyByteArray, PyBytes, PyComplex, PyDate, PyDateTime, PyDelta, PyDict, PyFloat, PyFrozenSet, PyInt,
     PyIterator, PyList, PyNone, PySet, PyString, PyTime, PyTuple, PyType,
@@ -22,7 +22,7 @@ pub struct ObTypeLookup {
     list: usize,
     dict: usize,
     // other numeric types
-    decimal_object: PyObject,
+    decimal_object: Py<PyAny>,
     // other string types
     bytes: usize,
     bytearray: usize,
@@ -39,19 +39,19 @@ pub struct ObTypeLookup {
     url: usize,
     multi_host_url: usize,
     // enum type
-    enum_object: PyObject,
+    enum_object: Py<PyAny>,
     // generator
-    generator_object: PyObject,
+    generator_object: Py<PyAny>,
     // path
-    path_object: PyObject,
+    path_object: Py<PyAny>,
     // pattern
-    pattern_object: PyObject,
+    pattern_object: Py<PyAny>,
     // uuid type
-    uuid_object: PyObject,
+    uuid_object: Py<PyAny>,
     complex: usize,
 }
 
-static TYPE_LOOKUP: GILOnceCell<ObTypeLookup> = GILOnceCell::new();
+static TYPE_LOOKUP: PyOnceLock<ObTypeLookup> = PyOnceLock::new();
 
 #[derive(Debug)]
 pub enum IsType {
@@ -69,7 +69,7 @@ impl ObTypeLookup {
             float: PyFloat::type_object_raw(py) as usize,
             list: PyList::type_object_raw(py) as usize,
             dict: PyDict::type_object_raw(py) as usize,
-            decimal_object: py.import("decimal").unwrap().getattr("Decimal").unwrap().to_object(py),
+            decimal_object: py.import("decimal").unwrap().getattr("Decimal").unwrap().unbind(),
             string: PyString::type_object_raw(py) as usize,
             bytes: PyBytes::type_object_raw(py) as usize,
             bytearray: PyByteArray::type_object_raw(py) as usize,
@@ -82,16 +82,11 @@ impl ObTypeLookup {
             timedelta: PyDelta::type_object_raw(py) as usize,
             url: PyUrl::type_object_raw(py) as usize,
             multi_host_url: PyMultiHostUrl::type_object_raw(py) as usize,
-            enum_object: py.import("enum").unwrap().getattr("Enum").unwrap().to_object(py),
-            generator_object: py
-                .import("types")
-                .unwrap()
-                .getattr("GeneratorType")
-                .unwrap()
-                .to_object(py),
-            path_object: py.import("pathlib").unwrap().getattr("Path").unwrap().to_object(py),
-            pattern_object: py.import("re").unwrap().getattr("Pattern").unwrap().to_object(py),
-            uuid_object: py.import("uuid").unwrap().getattr("UUID").unwrap().to_object(py),
+            enum_object: py.import("enum").unwrap().getattr("Enum").unwrap().unbind(),
+            generator_object: py.import("types").unwrap().getattr("GeneratorType").unwrap().unbind(),
+            path_object: py.import("pathlib").unwrap().getattr("Path").unwrap().unbind(),
+            pattern_object: py.import("re").unwrap().getattr("Pattern").unwrap().unbind(),
+            uuid_object: py.import("uuid").unwrap().getattr("UUID").unwrap().unbind(),
             complex: PyComplex::type_object_raw(py) as usize,
         }
     }

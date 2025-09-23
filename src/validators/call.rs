@@ -14,7 +14,7 @@ use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuild
 
 #[derive(Debug)]
 pub struct CallValidator {
-    function: PyObject,
+    function: Py<PyAny>,
     arguments_validator: Box<CombinedValidator>,
     return_validator: Option<Box<CombinedValidator>>,
     name: String,
@@ -59,7 +59,7 @@ impl BuildValidator for CallValidator {
         let name = format!("{}[{function_name}]", Self::EXPECTED_TYPE);
 
         Ok(Self {
-            function: function.to_object(py),
+            function: function.unbind(),
             arguments_validator,
             return_validator,
             name,
@@ -80,7 +80,7 @@ impl Validator for CallValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         let args = self.arguments_validator.validate(py, input, state)?.into_bound(py);
 
         let return_value = if let Ok((args, kwargs)) = args.extract::<(Bound<PyTuple>, Bound<PyDict>)>() {
@@ -97,7 +97,7 @@ impl Validator for CallValidator {
                 .validate(py, return_value.bind(py), state)
                 .map_err(|e| e.with_outer_location("return"))
         } else {
-            Ok(return_value.to_object(py))
+            Ok(return_value)
         }
     }
 

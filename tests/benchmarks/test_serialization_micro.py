@@ -349,11 +349,38 @@ def test_model_list_core_json(benchmark):
         s.to_json(m_big)
 
 
-@pytest.mark.benchmark(group='model-list-json')
+@pytest.mark.benchmark(group='temporal')
 def test_datetime(benchmark):
     v = SchemaSerializer(core_schema.datetime_schema())
     d = datetime(2022, 12, 2, 12, 13, 14)
     assert v.to_python(d, mode='json') == '2022-12-02T12:13:14'
+
+    @benchmark
+    def r():
+        v.to_python(d, mode='json')
+
+
+@pytest.mark.benchmark(group='temporal')
+def test_datetime_seconds(benchmark):
+    v = SchemaSerializer(
+        core_schema.datetime_schema(),
+        config={
+            'ser_json_temporal': 'seconds',
+        },
+    )
+    d = datetime(2022, 12, 2, 12, 13, 14)
+    assert v.to_python(d, mode='json') == 1669983194.0
+
+    @benchmark
+    def r():
+        v.to_python(d, mode='json')
+
+
+@pytest.mark.benchmark(group='temporal')
+def test_datetime_milliseconds(benchmark):
+    v = SchemaSerializer(core_schema.datetime_schema(), config={'ser_json_temporal': 'milliseconds'})
+    d = datetime(2022, 12, 2, 12, 13, 14)
+    assert v.to_python(d, mode='json') == 1669983194000.0
 
     @benchmark
     def r():
@@ -455,3 +482,25 @@ def test_dataclass_serialization_json(benchmark):
 def test_dataclass_to_json(benchmark):
     dc = Foo(a='hello', b=b'more', c=123, d=1.23)
     benchmark(to_json, dc)
+
+
+@pytest.mark.benchmark(group='function')
+def test_function_wrap_python(benchmark):
+    def f(value, serializer, _info):
+        return f'result={serializer(len(value))}'
+
+    s = SchemaSerializer(
+        core_schema.int_schema(serialization=core_schema.wrap_serializer_function_ser_schema(f, info_arg=True))
+    )
+    benchmark(s.to_python, 'foo')
+
+
+@pytest.mark.benchmark(group='function')
+def test_function_wrap_json(benchmark):
+    def f(value, serializer, _info):
+        return f'result={serializer(len(value))}'
+
+    s = SchemaSerializer(
+        core_schema.int_schema(serialization=core_schema.wrap_serializer_function_ser_schema(f, info_arg=True))
+    )
+    benchmark(s.to_json, 'foo')

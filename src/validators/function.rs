@@ -82,8 +82,8 @@ macro_rules! impl_build {
 #[derive(Debug)]
 pub struct FunctionBeforeValidator {
     validator: Box<CombinedValidator>,
-    func: PyObject,
-    config: PyObject,
+    func: Py<PyAny>,
+    config: Py<PyAny>,
     name: String,
     field_name: Option<Py<PyString>>,
     info_arg: bool,
@@ -94,16 +94,22 @@ impl_build!(FunctionBeforeValidator, "function-before");
 impl FunctionBeforeValidator {
     fn _validate<'s, 'py>(
         &'s self,
-        call: impl FnOnce(Bound<'py, PyAny>, &mut ValidationState<'_, 'py>) -> ValResult<PyObject>,
+        call: impl FnOnce(Bound<'py, PyAny>, &mut ValidationState<'_, 'py>) -> ValResult<Py<PyAny>>,
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &'s mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         let r = if self.info_arg {
-            let info = ValidationInfo::new(py, state.extra(), &self.config, self.field_name.clone());
-            self.func.call1(py, (input.to_object(py), info))
+            let field_name = state
+                .extra()
+                .field_name
+                .clone()
+                .map(Bound::unbind)
+                .or_else(|| self.field_name.clone());
+            let info = ValidationInfo::new(py, state.extra(), &self.config, field_name);
+            self.func.call1(py, (input.to_object(py)?, info))
         } else {
-            self.func.call1(py, (input.to_object(py),))
+            self.func.call1(py, (input.to_object(py)?,))
         };
         let value = r.map_err(|e| convert_err(py, e, input))?;
         call(value.into_bound(py), state)
@@ -122,7 +128,7 @@ impl Validator for FunctionBeforeValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         let validate = |v, s: &mut ValidationState<'_, 'py>| self.validator.validate(py, &v, s);
         #[allow(clippy::used_underscore_items)]
         self._validate(validate, py, input, state)
@@ -134,7 +140,7 @@ impl Validator for FunctionBeforeValidator {
         field_name: &str,
         field_value: &Bound<'py, PyAny>,
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         let validate = move |v, s: &mut ValidationState<'_, 'py>| {
             self.validator.validate_assignment(py, &v, field_name, field_value, s)
         };
@@ -150,8 +156,8 @@ impl Validator for FunctionBeforeValidator {
 #[derive(Debug)]
 pub struct FunctionAfterValidator {
     validator: Box<CombinedValidator>,
-    func: PyObject,
-    config: PyObject,
+    func: Py<PyAny>,
+    config: Py<PyAny>,
     name: String,
     field_name: Option<Py<PyString>>,
     info_arg: bool,
@@ -162,17 +168,23 @@ impl_build!(FunctionAfterValidator, "function-after");
 impl FunctionAfterValidator {
     fn _validate<'py, I: Input<'py> + ?Sized>(
         &self,
-        call: impl FnOnce(&I, &mut ValidationState<'_, 'py>) -> ValResult<PyObject>,
+        call: impl FnOnce(&I, &mut ValidationState<'_, 'py>) -> ValResult<Py<PyAny>>,
         py: Python<'py>,
         input: &I,
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         let v = call(input, state)?;
         let r = if self.info_arg {
-            let info = ValidationInfo::new(py, state.extra(), &self.config, self.field_name.clone());
-            self.func.call1(py, (v.to_object(py), info))
+            let field_name = state
+                .extra()
+                .field_name
+                .clone()
+                .map(Bound::unbind)
+                .or_else(|| self.field_name.clone());
+            let info = ValidationInfo::new(py, state.extra(), &self.config, field_name);
+            self.func.call1(py, (v, info))
         } else {
-            self.func.call1(py, (v.to_object(py),))
+            self.func.call1(py, (v,))
         };
         r.map_err(|e| convert_err(py, e, input))
     }
@@ -190,7 +202,7 @@ impl Validator for FunctionAfterValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         let validate = |v: &_, s: &mut ValidationState<'_, 'py>| self.validator.validate(py, v, s);
         #[allow(clippy::used_underscore_items)]
         self._validate(validate, py, input, state)
@@ -202,7 +214,7 @@ impl Validator for FunctionAfterValidator {
         field_name: &str,
         field_value: &Bound<'py, PyAny>,
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         let validate = move |v: &Bound<'py, PyAny>, s: &mut ValidationState<'_, 'py>| {
             self.validator.validate_assignment(py, v, field_name, field_value, s)
         };
@@ -217,8 +229,8 @@ impl Validator for FunctionAfterValidator {
 
 #[derive(Debug, Clone)]
 pub struct FunctionPlainValidator {
-    func: PyObject,
-    config: PyObject,
+    func: Py<PyAny>,
+    config: Py<PyAny>,
     name: String,
     field_name: Option<Py<PyString>>,
     info_arg: bool,
@@ -256,12 +268,18 @@ impl Validator for FunctionPlainValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         let r = if self.info_arg {
-            let info = ValidationInfo::new(py, state.extra(), &self.config, self.field_name.clone());
-            self.func.call1(py, (input.to_object(py), info))
+            let field_name = state
+                .extra()
+                .field_name
+                .clone()
+                .map(Bound::unbind)
+                .or_else(|| self.field_name.clone());
+            let info = ValidationInfo::new(py, state.extra(), &self.config, field_name);
+            self.func.call1(py, (input.to_object(py)?, info))
         } else {
-            self.func.call1(py, (input.to_object(py),))
+            self.func.call1(py, (input.to_object(py)?,))
         };
         r.map_err(|e| convert_err(py, e, input))
     }
@@ -274,8 +292,8 @@ impl Validator for FunctionPlainValidator {
 #[derive(Debug)]
 pub struct FunctionWrapValidator {
     validator: Arc<CombinedValidator>,
-    func: PyObject,
-    config: PyObject,
+    func: Py<PyAny>,
+    config: Py<PyAny>,
     name: String,
     field_name: Option<Py<PyString>>,
     info_arg: bool,
@@ -320,12 +338,18 @@ impl FunctionWrapValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         let r = if self.info_arg {
-            let info = ValidationInfo::new(py, state.extra(), &self.config, self.field_name.clone());
-            self.func.call1(py, (input.to_object(py), handler, info))
+            let field_name = state
+                .extra()
+                .field_name
+                .clone()
+                .map(Bound::unbind)
+                .or_else(|| self.field_name.clone());
+            let info = ValidationInfo::new(py, state.extra(), &self.config, field_name);
+            self.func.call1(py, (input.to_object(py)?, handler, info))
         } else {
-            self.func.call1(py, (input.to_object(py), handler))
+            self.func.call1(py, (input.to_object(py)?, handler))
         };
         r.map_err(|e| convert_err(py, e, input))
     }
@@ -343,7 +367,7 @@ impl Validator for FunctionWrapValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         let handler = ValidatorCallable {
             validator: InternalValidator::new(
                 "ValidatorCallable",
@@ -356,7 +380,9 @@ impl Validator for FunctionWrapValidator {
         let handler = Bound::new(py, handler)?;
         #[allow(clippy::used_underscore_items)]
         let result = self._validate(handler.as_any(), py, input, state);
-        state.exactness = handler.borrow_mut().validator.exactness;
+        let handler = handler.borrow();
+        state.exactness = handler.validator.exactness;
+        state.fields_set_count = handler.validator.fields_set_count;
         result
     }
 
@@ -367,7 +393,7 @@ impl Validator for FunctionWrapValidator {
         field_name: &str,
         field_value: &Bound<'py, PyAny>,
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         let handler = AssignmentValidatorCallable {
             validator: InternalValidator::new(
                 "AssignmentValidatorCallable",
@@ -377,7 +403,7 @@ impl Validator for FunctionWrapValidator {
                 self.validation_error_cause,
             ),
             updated_field_name: field_name.to_string(),
-            updated_field_value: field_value.to_object(py),
+            updated_field_value: field_value.clone().into(),
         };
         #[allow(clippy::used_underscore_items)]
         self._validate(Bound::new(py, handler)?.as_any(), py, obj, state)
@@ -402,7 +428,7 @@ impl ValidatorCallable {
         py: Python,
         input_value: &Bound<'_, PyAny>,
         outer_location: Option<&Bound<'_, PyAny>>,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<Py<PyAny>> {
         let outer_location = outer_location.map(Into::into);
         self.validator.validate(py, input_value, outer_location)
     }
@@ -436,7 +462,7 @@ impl AssignmentValidatorCallable {
         py: Python,
         input_value: &Bound<'_, PyAny>,
         outer_location: Option<&Bound<'_, PyAny>>,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<Py<PyAny>> {
         let outer_location = outer_location.map(Into::into);
         self.validator.validate_assignment(
             py,
@@ -501,15 +527,15 @@ pub fn convert_err(py: Python<'_>, err: PyErr, input: impl ToErrorValue) -> ValE
 
 #[pyclass(module = "pydantic_core._pydantic_core", get_all)]
 pub struct ValidationInfo {
-    config: PyObject,
-    context: Option<PyObject>,
+    config: Py<PyAny>,
+    context: Option<Py<PyAny>>,
     data: Option<Py<PyDict>>,
     field_name: Option<Py<PyString>>,
     mode: InputType,
 }
 
 impl ValidationInfo {
-    fn new(py: Python, extra: &Extra, config: &PyObject, field_name: Option<Py<PyString>>) -> Self {
+    fn new(py: Python, extra: &Extra, config: &Py<PyAny>, field_name: Option<Py<PyString>>) -> Self {
         Self {
             config: config.clone_ref(py),
             context: extra.context.map(|ctx| ctx.clone().into()),

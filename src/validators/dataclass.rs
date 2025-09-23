@@ -4,6 +4,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyString, PyTuple, PyType};
 
 use ahash::AHashSet;
+use pyo3::IntoPyObjectExt;
 
 use crate::build_tools::py_schema_err;
 use crate::build_tools::{is_strict, schema_or_config_same, ExtraBehavior};
@@ -11,7 +12,7 @@ use crate::errors::{ErrorType, ErrorTypeDefaults, ValError, ValLineError, ValRes
 use crate::input::{
     input_as_python_instance, Arguments, BorrowInput, Input, InputType, KeywordArgs, PositionalArgs, ValidationMatch,
 };
-use crate::lookup_key::LookupKey;
+use crate::lookup_key::LookupKeyCollection;
 use crate::tools::SchemaDict;
 use crate::validators::function::convert_err;
 
@@ -23,10 +24,10 @@ use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuild
 struct Field {
     kw_only: bool,
     name: String,
-    py_name: Py<PyString>,
+    name_py: Py<PyString>,
     init: bool,
     init_only: bool,
-    lookup_key: LookupKey,
+    lookup_key_collection: LookupKeyCollection,
     validator: CombinedValidator,
     frozen: bool,
 }
@@ -41,6 +42,8 @@ pub struct DataclassArgsValidator {
     extra_behavior: ExtraBehavior,
     extras_validator: Option<Box<CombinedValidator>>,
     loc_by_alias: bool,
+    validate_by_alias: Option<bool>,
+    validate_by_name: Option<bool>,
 }
 
 impl BuildValidator for DataclassArgsValidator {
@@ -52,8 +55,6 @@ impl BuildValidator for DataclassArgsValidator {
         definitions: &mut DefinitionsBuilder<CombinedValidator>,
     ) -> PyResult<CombinedValidator> {
         let py = schema.py();
-
-        let populate_by_name = schema_or_config_same(schema, config, intern!(py, "populate_by_name"))?.unwrap_or(false);
 
         let extra_behavior = ExtraBehavior::from_schema_or_config(py, schema, config, ExtraBehavior::Ignore)?;
 
@@ -71,16 +72,8 @@ impl BuildValidator for DataclassArgsValidator {
         for field in fields_schema {
             let field = field.downcast::<PyDict>()?;
 
-            let py_name: Bound<'_, PyString> = field.get_as_req(intern!(py, "name"))?;
-            let name: String = py_name.extract()?;
-
-            let lookup_key = match field.get_item(intern!(py, "validation_alias"))? {
-                Some(alias) => {
-                    let alt_alias = if populate_by_name { Some(name.as_str()) } else { None };
-                    LookupKey::from_py(py, &alias, alt_alias)?
-                }
-                None => LookupKey::from_string(py, &name),
-            };
+            let name_py: Bound<'_, PyString> = field.get_as_req(intern!(py, "name"))?;
+            let name: String = name_py.extract()?;
 
             let schema = field.get_as_req(intern!(py, "schema"))?;
 
@@ -100,11 +93,14 @@ impl BuildValidator for DataclassArgsValidator {
                 positional_count += 1;
             }
 
+            let validation_alias = field.get_item(intern!(py, "validation_alias"))?;
+            let lookup_key_collection = LookupKeyCollection::new(py, validation_alias, name.as_str())?;
+
             fields.push(Field {
                 kw_only,
                 name,
-                py_name: py_name.into(),
-                lookup_key,
+                name_py: name_py.into(),
+                lookup_key_collection,
                 validator,
                 init: field.get_as(intern!(py, "init"))?.unwrap_or(true),
                 init_only: field.get_as(intern!(py, "init_only"))?.unwrap_or(false),
@@ -129,6 +125,8 @@ impl BuildValidator for DataclassArgsValidator {
             extra_behavior,
             extras_validator,
             loc_by_alias: config.get_as(intern!(py, "loc_by_alias"))?.unwrap_or(true),
+            validate_by_alias: config.get_as(intern!(py, "validate_by_alias"))?,
+            validate_by_name: config.get_as(intern!(py, "validate_by_name"))?,
         }
         .into())
     }
@@ -144,7 +142,7 @@ impl Validator for DataclassArgsValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         // this validator does not yet support partial validation, disable it to avoid incorrect results
         state.allow_partial = false.into();
 
@@ -157,17 +155,22 @@ impl Validator for DataclassArgsValidator {
         let mut used_keys: AHashSet<&str> = AHashSet::with_capacity(self.fields.len());
 
         let state = &mut state.rebind_extra(|extra| extra.data = Some(output_dict.clone()));
+        let extra_behavior = state.extra_behavior_or(self.extra_behavior);
+
+        let validate_by_alias = state.validate_by_alias_or(self.validate_by_alias);
+        let validate_by_name = state.validate_by_name_or(self.validate_by_name);
+
         let mut fields_set_count: usize = 0;
 
         macro_rules! set_item {
             ($field:ident, $value:expr) => {{
-                let py_name = $field.py_name.bind(py);
+                let name_py = $field.name_py.bind(py);
                 if $field.init_only {
                     if let Some(ref mut init_only_args) = init_only_args {
                         init_only_args.push($value);
                     }
                 } else {
-                    output_dict.set_item(py_name, $value)?;
+                    output_dict.set_item(name_py, $value)?;
                 }
             }};
         }
@@ -188,9 +191,9 @@ impl Validator for DataclassArgsValidator {
                     // We could try to "fix" this in the future if desired.
                     Err(ValError::LineErrors(line_errors)) => errors.extend(line_errors),
                     Err(err) => return Err(err),
-                };
+                }
                 continue;
-            };
+            }
 
             let mut pos_value = None;
             if let Some(args) = args.args() {
@@ -199,14 +202,20 @@ impl Validator for DataclassArgsValidator {
                 }
             }
 
+            let lookup_key = field
+                .lookup_key_collection
+                .select(validate_by_alias, validate_by_name)?;
+
             let mut kw_value = None;
             if let Some(kwargs) = args.kwargs() {
-                if let Some((lookup_path, value)) = kwargs.get_item(&field.lookup_key)? {
+                if let Some((lookup_path, value)) = kwargs.get_item(lookup_key)? {
                     used_keys.insert(lookup_path.first_key());
                     kw_value = Some((lookup_path, value));
                 }
             }
             let kw_value = kw_value.as_ref().map(|(path, value)| (path, value.borrow_input()));
+
+            let state = &mut state.rebind_extra(|extra| extra.field_name = Some(field.name_py.bind(py).clone()));
 
             match (pos_value, kw_value) {
                 // found both positional and keyword arguments, error
@@ -252,14 +261,14 @@ impl Validator for DataclassArgsValidator {
                         }
                         Ok(None) => {
                             // This means there was no default value
-                            errors.push(field.lookup_key.error(
+                            errors.push(lookup_key.error(
                                 ErrorTypeDefaults::Missing,
                                 input,
                                 self.loc_by_alias,
                                 &field.name,
                             ));
                         }
-                        Err(ValError::Omit) => continue,
+                        Err(ValError::Omit) => {}
                         Err(ValError::LineErrors(line_errors)) => {
                             for err in line_errors {
                                 // Note: this will always use the field name even if there is an alias
@@ -300,7 +309,7 @@ impl Validator for DataclassArgsValidator {
                         Ok(either_str) => {
                             if !used_keys.contains(either_str.as_cow()?.as_ref()) {
                                 // Unknown / extra field
-                                match self.extra_behavior {
+                                match extra_behavior {
                                     ExtraBehavior::Forbid => {
                                         errors.push(ValLineError::new_with_loc(
                                             ErrorTypeDefaults::UnexpectedKeywordArgument,
@@ -328,7 +337,7 @@ impl Validator for DataclassArgsValidator {
                                         } else {
                                             output_dict.set_item(
                                                 either_str.as_py_string(py, state.cache_str()),
-                                                value.to_object(py),
+                                                value.borrow_input().to_object(py)?,
                                             )?;
                                         }
                                     }
@@ -353,9 +362,9 @@ impl Validator for DataclassArgsValidator {
 
         if errors.is_empty() {
             if let Some(init_only_args) = init_only_args {
-                Ok((output_dict, PyTuple::new(py, init_only_args)?).to_object(py))
+                Ok((output_dict, PyTuple::new(py, init_only_args)?).into_py_any(py)?)
             } else {
-                Ok((output_dict, py.None()).to_object(py))
+                Ok((output_dict, py.None()).into_py_any(py)?)
             }
         } else {
             Err(ValError::LineErrors(errors))
@@ -369,16 +378,17 @@ impl Validator for DataclassArgsValidator {
         field_name: &str,
         field_value: &Bound<'py, PyAny>,
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         let dict = obj.downcast::<PyDict>()?;
+        let extra_behavior = state.extra_behavior_or(self.extra_behavior);
 
-        let ok = |output: PyObject| {
+        let ok = |output: Py<PyAny>| {
             dict.set_item(field_name, output)?;
             // The second return value represents `init_only_args`
             // which doesn't make much sense in this context but we need to put something there
             // so that function validators that sit between DataclassValidator and DataclassArgsValidator
             // always get called the same shape of data.
-            Ok(PyTuple::new(py, vec![dict.to_object(py), py.None()])?.into())
+            Ok(PyTuple::new(py, [Some(dict), None])?.into())
         };
 
         if let Some(field) = self.fields.iter().find(|f| f.name == field_name) {
@@ -393,16 +403,17 @@ impl Validator for DataclassArgsValidator {
             let data_dict = dict.copy()?;
             if let Err(err) = data_dict.del_item(field_name) {
                 // KeyError is fine here as the field might not be in the dict
-                if !err.get_type(py).is(&PyType::new::<PyKeyError>(py)) {
+                if !err.get_type(py).is(PyType::new::<PyKeyError>(py)) {
                     return Err(err.into());
                 }
             }
 
-            match field.validator.validate(
-                py,
-                field_value,
-                &mut state.rebind_extra(|extra| extra.data = Some(data_dict.clone())),
-            ) {
+            let state = &mut state.rebind_extra(|extra| {
+                extra.data = Some(data_dict.clone());
+                extra.field_name = Some(field.name_py.bind(py).clone());
+            });
+
+            match field.validator.validate(py, field_value, state) {
                 Ok(output) => ok(output),
                 Err(ValError::LineErrors(line_errors)) => {
                     let errors = line_errors
@@ -417,10 +428,10 @@ impl Validator for DataclassArgsValidator {
             // Handle extra (unknown) field
             // We partially use the extra_behavior for initialization / validation
             // to determine how to handle assignment
-            match self.extra_behavior {
+            match extra_behavior {
                 // For dataclasses we allow assigning unknown fields
                 // to match stdlib dataclass behavior
-                ExtraBehavior::Allow => ok(field_value.to_object(py)),
+                ExtraBehavior::Allow => ok(field_value.clone().unbind()),
                 _ => Err(ValError::new_with_loc(
                     ErrorType::NoSuchAttribute {
                         attribute: field_name.to_string(),
@@ -516,7 +527,7 @@ impl Validator for DataclassValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         if let Some(self_instance) = state.extra().self_instance {
             // in the case that self_instance is Some, we're calling validation from within `BaseModel.__init__`
             return self.validate_init(py, self_instance, input, state);
@@ -533,8 +544,8 @@ impl Validator for DataclassValidator {
                     // if the model has a generic origin, we allow input data to be instances of the generic origin rather than the class,
                     // as cases like isinstance(SomeModel[Int], SomeModel[Any]) fail the isinstance check, but are valid, we just have to enforce
                     // that the data is revalidated, hence we set force_revalidate to true
-                    if generic_origin_class.is_some() {
-                        match input_as_python_instance(input, generic_origin_class.unwrap()) {
+                    if let Some(generic_origin) = generic_origin_class {
+                        match input_as_python_instance(input, generic_origin) {
                             Some(x) => (Some(x), true),
                             None => (None, false),
                         }
@@ -552,7 +563,7 @@ impl Validator for DataclassValidator {
                 self.set_dict_call(py, &dc, val_output, input)?;
                 Ok(dc.into())
             } else {
-                Ok(input.to_object(py))
+                Ok(input.to_object(py)?.unbind())
             }
         } else if state.strict_or(self.strict) && state.extra().input_type == InputType::Python {
             Err(ValError::new(
@@ -578,7 +589,7 @@ impl Validator for DataclassValidator {
         field_name: &str,
         field_value: &Bound<'py, PyAny>,
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         if self.frozen {
             return Err(ValError::new(ErrorTypeDefaults::FrozenInstance, field_value));
         }
@@ -602,7 +613,7 @@ impl Validator for DataclassValidator {
             force_setattr(py, obj, intern!(py, "__dict__"), dc_dict)?;
         }
 
-        Ok(obj.to_object(py))
+        Ok(obj.clone().unbind())
     }
 
     fn get_name(&self) -> &str {
@@ -618,7 +629,7 @@ impl DataclassValidator {
         self_instance: &Bound<'_, PyAny>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         // we need to set `self_instance` to None for nested validators as we don't want to operate on the self_instance
         // instance anymore
         let state = &mut state.rebind_extra(|extra| extra.self_instance = None);
@@ -643,7 +654,7 @@ impl DataclassValidator {
         &self,
         py: Python<'py>,
         dc: &Bound<'_, PyAny>,
-        val_output: PyObject,
+        val_output: Py<PyAny>,
         input: &(impl Input<'py> + ?Sized),
     ) -> ValResult<()> {
         let (dc_dict, post_init_kwargs): (Bound<'_, PyAny>, Bound<'_, PyAny>) = val_output.extract(py)?;
@@ -662,7 +673,7 @@ impl DataclassValidator {
                 dc.call_method0(post_init)
             } else {
                 let args = post_init_kwargs.downcast::<PyTuple>()?;
-                dc.call_method1(post_init, args)
+                dc.call_method1(post_init, args.clone()) // FIXME should not need clone here
             };
             r.map_err(|e| convert_err(py, e, input))?;
         }

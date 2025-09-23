@@ -70,7 +70,7 @@ impl Validator for FloatValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         let either_float = input.validate_float(state.strict_or(self.strict))?.unpack(state);
         if !self.allow_inf_nan && !either_float.as_f64().is_finite() {
             return Err(ValError::new(ErrorTypeDefaults::FiniteNumber, input));
@@ -102,16 +102,17 @@ impl Validator for ConstrainedFloatValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         let either_float = input.validate_float(state.strict_or(self.strict))?.unpack(state);
         let float: f64 = either_float.as_f64();
         if !self.allow_inf_nan && !float.is_finite() {
             return Err(ValError::new(ErrorTypeDefaults::FiniteNumber, input));
         }
         if let Some(multiple_of) = self.multiple_of {
-            let rem = float % multiple_of;
-            let threshold = float.abs() / 1e9;
-            if rem.abs() > threshold && (rem - multiple_of).abs() > threshold {
+            let tolerance = 1e-9;
+            let rounded_div = (float / multiple_of).round();
+            let diff = (float - (rounded_div * multiple_of)).abs();
+            if diff > tolerance {
                 return Err(ValError::new(
                     ErrorType::MultipleOf {
                         multiple_of: multiple_of.into(),
@@ -168,7 +169,7 @@ impl Validator for ConstrainedFloatValidator {
         Ok(either_float.into_py_any(py)?)
     }
 
-    fn get_name(&self) -> &str {
+    fn get_name(&self) -> &'static str {
         "constrained-float"
     }
 }

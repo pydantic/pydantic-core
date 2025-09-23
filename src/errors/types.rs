@@ -3,9 +3,9 @@ use std::borrow::Cow;
 use std::fmt;
 
 use pyo3::exceptions::{PyKeyError, PyTypeError};
-use pyo3::sync::GILOnceCell;
+use pyo3::prelude::*;
+use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyDict, PyList};
-use pyo3::{prelude::*, IntoPyObjectExt};
 
 use ahash::AHashMap;
 use num_bigint::BigInt;
@@ -18,7 +18,7 @@ use crate::tools::{extract_i64, py_err, py_error_type};
 use super::PydanticCustomError;
 
 #[pyfunction]
-pub fn list_all_errors(py: Python) -> PyResult<Bound<'_, PyList>> {
+pub fn list_all_errors(py: Python<'_>) -> PyResult<Bound<'_, PyList>> {
     let mut errors: Vec<Bound<'_, PyDict>> = Vec::with_capacity(100);
     for error_type in ErrorType::iter() {
         if !matches!(error_type, ErrorType::CustomError { .. }) {
@@ -124,7 +124,7 @@ macro_rules! error_types {
                     $(
                         Self::$item { context, $($key,)* } => {
                             $(
-                                dict.set_item::<&str, Py<PyAny>>(stringify!($key), $key.to_object(py))?;
+                                dict.set_item(stringify!($key), $key)?;
                             )*
                             if let Some(ctx) = context {
                                 dict.update(ctx.bind(py).downcast::<PyMapping>()?)?;
@@ -268,6 +268,7 @@ error_types! {
     // ---------------------
     // set errors
     SetType {},
+    SetItemNotHashable {},
     // ---------------------
     // bool errors
     BoolType {},
@@ -298,10 +299,10 @@ error_types! {
     // ---------------------
     // python errors from functions
     ValueError {
-        error: {ctx_type: Option<PyObject>, ctx_fn: field_from_context}, // Use Option because EnumIter requires Default to be implemented
+        error: {ctx_type: Option<Py<PyAny>>, ctx_fn: field_from_context}, // Use Option because EnumIter requires Default to be implemented
     },
     AssertionError {
-        error: {ctx_type: Option<PyObject>, ctx_fn: field_from_context}, // Use Option because EnumIter requires Default to be implemented
+        error: {ctx_type: Option<Py<PyAny>>, ctx_fn: field_from_context}, // Use Option because EnumIter requires Default to be implemented
     },
     // Note: strum message and serialize are not used here
     CustomError {
@@ -315,6 +316,8 @@ error_types! {
         expected: {ctx_type: String, ctx_fn: field_from_context},
     },
     // ---------------------
+    // missing sentinel
+    MissingSentinelError {},
     // date errors
     DateType {},
     DateParsing {
@@ -462,7 +465,7 @@ fn plural_s<T: From<u8> + PartialEq>(value: T) -> &'static str {
     }
 }
 
-static ERROR_TYPE_LOOKUP: GILOnceCell<AHashMap<String, ErrorType>> = GILOnceCell::new();
+static ERROR_TYPE_LOOKUP: PyOnceLock<AHashMap<String, ErrorType>> = PyOnceLock::new();
 
 impl ErrorType {
     pub fn new_custom_error(py: Python, custom_error: PydanticCustomError) -> Self {
@@ -513,6 +516,7 @@ impl ErrorType {
             Self::ListType {..} => "Input should be a valid list",
             Self::TupleType {..} => "Input should be a valid tuple",
             Self::SetType {..} => "Input should be a valid set",
+            Self::SetItemNotHashable {..} => "Set items should be hashable",
             Self::BoolType {..} => "Input should be a valid boolean",
             Self::BoolParsing {..} => "Input should be a valid boolean, unable to interpret input",
             Self::IntType {..} => "Input should be a valid integer",
@@ -529,6 +533,7 @@ impl ErrorType {
             Self::AssertionError {..} => "Assertion failed, {error}",
             Self::CustomError {..} => "",  // custom errors are handled separately
             Self::LiteralError {..} => "Input should be {expected}",
+            Self::MissingSentinelError { .. } => "Input should be the 'MISSING' sentinel",
             Self::DateType {..} => "Input should be a valid date",
             Self::DateParsing {..} => "Input should be a valid date in the format YYYY-MM-DD, {error}",
             Self::DateFromDatetimeParsing {..} => "Input should be a valid date or datetime, {error}",
@@ -822,10 +827,5 @@ impl fmt::Display for Number {
             Self::BigInt(i) => write!(f, "{i}"),
             Self::String(s) => write!(f, "{s}"),
         }
-    }
-}
-impl ToPyObject for Number {
-    fn to_object(&self, py: Python<'_>) -> PyObject {
-        self.into_py_any(py).unwrap()
     }
 }

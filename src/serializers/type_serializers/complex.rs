@@ -30,7 +30,7 @@ impl TypeSerializer for ComplexSerializer {
         include: Option<&Bound<'_, PyAny>>,
         exclude: Option<&Bound<'_, PyAny>>,
         extra: &Extra,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<Py<PyAny>> {
         let py = value.py();
         match value.downcast::<PyComplex>() {
             Ok(py_complex) => match extra.mode {
@@ -68,7 +68,7 @@ impl TypeSerializer for ComplexSerializer {
         }
     }
 
-    fn get_name(&self) -> &str {
+    fn get_name(&self) -> &'static str {
         "complex"
     }
 }

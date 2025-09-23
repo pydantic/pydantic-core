@@ -1,13 +1,15 @@
 import collections.abc
 import re
 from collections import deque
+from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Any, Dict, Iterator, List, Union
+from typing import Any, Union
 
 import pytest
 from dirty_equals import Contains, HasRepr, IsInstance, IsList, IsStr
 
 from pydantic_core import SchemaValidator, ValidationError, core_schema
+from pydantic_core import core_schema as cs
 
 from ..conftest import Err, PyAndJson, infinite_generator
 
@@ -32,7 +34,7 @@ def test_list_py_or_json(py_and_json: PyAndJson, input_value, expected):
 
 
 def test_list_strict():
-    v = SchemaValidator({'type': 'list', 'items_schema': {'type': 'int'}, 'strict': True})
+    v = SchemaValidator(cs.list_schema(items_schema=cs.int_schema(), strict=True))
     assert v.validate_python([1, 2, '33']) == [1, 2, 33]
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python((1, 2, '33'))
@@ -42,7 +44,7 @@ def test_list_strict():
 
 
 def test_list_no_copy():
-    v = SchemaValidator({'type': 'list'})
+    v = SchemaValidator(cs.list_schema())
     assert v.validate_python([1, 2, 3]) is not [1, 2, 3]  # noqa: F632
 
 
@@ -70,8 +72,9 @@ def gen_ints():
     ],
     ids=repr,
 )
+@pytest.mark.thread_unsafe  # generators in parameters not compatible with pytest-run-parallel, https://github.com/Quansight-Labs/pytest-run-parallel/issues/14
 def test_list_int(input_value, expected):
-    v = SchemaValidator({'type': 'list', 'items_schema': {'type': 'int'}})
+    v = SchemaValidator(cs.list_schema(items_schema=cs.int_schema()))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
@@ -80,7 +83,7 @@ def test_list_int(input_value, expected):
 
 
 def test_list_json():
-    v = SchemaValidator({'type': 'list', 'items_schema': {'type': 'int'}})
+    v = SchemaValidator(cs.list_schema(items_schema=cs.int_schema()))
     assert v.validate_json('[1, "2", 3]') == [1, 2, 3]
 
     with pytest.raises(ValidationError) as exc_info:
@@ -105,7 +108,7 @@ def test_list_json():
     ],
 )
 def test_list_any(input_value, expected):
-    v = SchemaValidator({'type': 'list'})
+    v = SchemaValidator(cs.list_schema())
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
@@ -125,7 +128,7 @@ def test_list_any(input_value, expected):
     ],
 )
 def test_list_error(input_value, index):
-    v = SchemaValidator({'type': 'list', 'items_schema': {'type': 'int'}})
+    v = SchemaValidator(cs.list_schema(items_schema=cs.int_schema()))
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python(input_value)
     assert exc_info.value.errors(include_url=False) == [
@@ -169,8 +172,9 @@ def test_list_error(input_value, index):
         ),
     ],
 )
-def test_list_length_constraints(kwargs: Dict[str, Any], input_value, expected):
-    v = SchemaValidator({'type': 'list', **kwargs})
+@pytest.mark.thread_unsafe  # generators in parameters not compatible with pytest-run-parallel, https://github.com/Quansight-Labs/pytest-run-parallel/issues/14
+def test_list_length_constraints(kwargs: dict[str, Any], input_value, expected):
+    v = SchemaValidator(cs.list_schema(**kwargs))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
@@ -188,11 +192,7 @@ def test_list_length_constraints(kwargs: Dict[str, Any], input_value, expected):
 )
 def test_list_length_constraints_omit(input_value, expected):
     v = SchemaValidator(
-        {
-            'type': 'list',
-            'items_schema': {'type': 'default', 'schema': {'type': 'int'}, 'on_error': 'omit'},
-            'max_length': 4,
-        }
+        cs.list_schema(items_schema=cs.with_default_schema(schema=cs.int_schema(), on_error='omit'), max_length=4)
     )
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
@@ -202,7 +202,7 @@ def test_list_length_constraints_omit(input_value, expected):
 
 
 def test_length_ctx():
-    v = SchemaValidator({'type': 'list', 'min_length': 2, 'max_length': 3})
+    v = SchemaValidator(cs.list_schema(min_length=2, max_length=3))
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python([1])
     # insert_assert(exc_info.value.errors(include_url=False))
@@ -235,7 +235,7 @@ def test_list_function():
     def f(input_value, info):
         return input_value * 2
 
-    v = SchemaValidator({'type': 'list', 'items_schema': core_schema.with_info_plain_validator_function(f)})
+    v = SchemaValidator(cs.list_schema(items_schema=core_schema.with_info_plain_validator_function(f)))
 
     assert v.validate_python([1, 2, 3]) == [2, 4, 6]
 
@@ -244,7 +244,7 @@ def test_list_function_val_error():
     def f(input_value, info):
         raise ValueError(f'error {input_value}')
 
-    v = SchemaValidator({'type': 'list', 'items_schema': core_schema.with_info_plain_validator_function(f)})
+    v = SchemaValidator(cs.list_schema(items_schema=core_schema.with_info_plain_validator_function(f)))
 
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python([1, 2])
@@ -270,7 +270,7 @@ def test_list_function_internal_error():
     def f(input_value, info):
         raise RuntimeError(f'error {input_value}')
 
-    v = SchemaValidator({'type': 'list', 'items_schema': core_schema.with_info_plain_validator_function(f)})
+    v = SchemaValidator(cs.list_schema(items_schema=core_schema.with_info_plain_validator_function(f)))
 
     with pytest.raises(RuntimeError, match='^error 1$') as exc_info:
         v.validate_python([1, 2])
@@ -285,7 +285,7 @@ def test_generator_error():
             raise RuntimeError('error')
         yield 3
 
-    v = SchemaValidator({'type': 'list', 'items_schema': {'type': 'int'}})
+    v = SchemaValidator(cs.list_schema(items_schema=cs.int_schema()))
     assert v.validate_python(gen(False)) == [1, 2, 3]
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python(gen(True))
@@ -319,7 +319,7 @@ def test_generator_error():
     ],
 )
 def test_list_from_dict_items(input_value, items_schema, expected):
-    v = SchemaValidator({'type': 'list', 'items_schema': items_schema})
+    v = SchemaValidator(cs.list_schema(items_schema=items_schema))
     output = v.validate_python(input_value)
     assert isinstance(output, list)
     assert output == expected
@@ -347,7 +347,7 @@ def test_bad_iter(items_schema):
             else:
                 raise RuntimeError('broken')
 
-    v = SchemaValidator({'type': 'list', 'items_schema': {'type': items_schema}})
+    v = SchemaValidator(cs.list_schema(items_schema={'type': items_schema}))
     assert v.validate_python(BadIter(True)) == [1]
     with pytest.raises(ValidationError) as exc_info:
         v.validate_python(BadIter(False))
@@ -443,7 +443,7 @@ def test_list_fail_fast(fail_fast, expected):
 
 
 class MySequence(collections.abc.Sequence):
-    def __init__(self, data: List[Any]):
+    def __init__(self, data: list[Any]):
         self._data = data
 
     def __getitem__(self, index: int) -> Any:
@@ -457,7 +457,7 @@ class MySequence(collections.abc.Sequence):
 
 
 class MyMapping(collections.abc.Mapping):
-    def __init__(self, data: Dict[Any, Any]) -> None:
+    def __init__(self, data: dict[Any, Any]) -> None:
         self._data = data
 
     def __getitem__(self, key: Any) -> Any:
@@ -480,7 +480,7 @@ class ListInputTestCase:
     strict: Union[bool, None] = None
 
 
-LAX_MODE_INPUTS: List[Any] = [
+LAX_MODE_INPUTS: list[Any] = [
     (1, 2, 3),
     frozenset((1, 2, 3)),
     {1, 2, 3},
@@ -510,6 +510,7 @@ LAX_MODE_INPUTS: List[Any] = [
     ],
     ids=repr,
 )
+@pytest.mark.thread_unsafe  # generators in parameters not compatible with pytest-run-parallel, https://github.com/Quansight-Labs/pytest-run-parallel/issues/14
 def test_list_allowed_inputs_python(testcase: ListInputTestCase):
     v = SchemaValidator(core_schema.list_schema(core_schema.int_schema(), strict=testcase.strict))
     if isinstance(testcase.output, Err):

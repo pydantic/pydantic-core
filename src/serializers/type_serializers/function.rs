@@ -74,7 +74,7 @@ impl BuildSerializer for FunctionPlainSerializerBuilder {
 
 #[derive(Debug)]
 pub struct FunctionPlainSerializer {
-    func: PyObject,
+    func: Py<PyAny>,
     name: String,
     function_name: String,
     return_serializer: Box<CombinedSerializer>,
@@ -147,7 +147,7 @@ impl FunctionPlainSerializer {
         include: Option<&Bound<'_, PyAny>>,
         exclude: Option<&Bound<'_, PyAny>>,
         extra: &Extra,
-    ) -> PyResult<(bool, PyObject)> {
+    ) -> PyResult<(bool, Py<PyAny>)> {
         let py = value.py();
         if self.when_used.should_use(value, extra) {
             let v = if self.is_field_serializer {
@@ -183,7 +183,7 @@ impl FunctionPlainSerializer {
     fn retry_with_lax_check(&self) -> bool {
         self.fallback_serializer
             .as_ref()
-            .map_or(false, |f| f.retry_with_lax_check())
+            .is_some_and(|f| f.retry_with_lax_check())
             || self.return_serializer.retry_with_lax_check()
     }
 }
@@ -194,7 +194,7 @@ fn on_error(py: Python, err: PyErr, function_name: &str, extra: &Extra) -> PyRes
         if extra.check.enabled() {
             Err(err)
         } else {
-            extra.warnings.custom_warning(ser_err.__repr__());
+            extra.warnings.register_warning(ser_err);
             Ok(())
         }
     } else if let Ok(err) = exception.extract::<PydanticSerializationError>() {
@@ -217,7 +217,7 @@ macro_rules! function_type_serializer {
                 include: Option<&Bound<'_, PyAny>>,
                 exclude: Option<&Bound<'_, PyAny>>,
                 extra: &Extra,
-            ) -> PyResult<PyObject> {
+            ) -> PyResult<Py<PyAny>> {
                 let py = value.py();
                 match self.call(value, include, exclude, extra) {
                     // None for include/exclude here, as filtering should be done
@@ -329,7 +329,7 @@ impl BuildSerializer for FunctionWrapSerializerBuilder {
 #[derive(Debug)]
 pub struct FunctionWrapSerializer {
     serializer: Arc<CombinedSerializer>,
-    func: PyObject,
+    func: Py<PyAny>,
     name: String,
     function_name: String,
     return_serializer: Arc<CombinedSerializer>,
@@ -390,7 +390,7 @@ impl FunctionWrapSerializer {
         include: Option<&Bound<'_, PyAny>>,
         exclude: Option<&Bound<'_, PyAny>>,
         extra: &Extra,
-    ) -> PyResult<(bool, PyObject)> {
+    ) -> PyResult<(bool, Py<PyAny>)> {
         let py = value.py();
         if self.when_used.should_use(value, extra) {
             let serialize = SerializationCallable::new(&self.serializer, include, exclude, extra);
@@ -440,8 +440,8 @@ pub(crate) struct SerializationCallable {
     serializer: Arc<CombinedSerializer>,
     extra_owned: ExtraOwned,
     filter: AnyFilter,
-    include: Option<PyObject>,
-    exclude: Option<PyObject>,
+    include: Option<Py<PyAny>>,
+    exclude: Option<Py<PyAny>>,
 }
 
 impl SerializationCallable {
@@ -496,7 +496,11 @@ impl SerializationCallable {
         py: Python,
         value: &Bound<'_, PyAny>,
         index_key: Option<&Bound<'_, PyAny>>,
-    ) -> PyResult<Option<PyObject>> {
+    ) -> PyResult<Option<Py<PyAny>>> {
+        // NB wrap serializers have strong coupling to their inner type,
+        // so use to_python_no_infer so that type inference can't apply
+        // at this layer
+
         let include = self.include.as_ref().map(|o| o.bind(py));
         let exclude = self.exclude.as_ref().map(|o| o.bind(py));
         let extra = self.extra_owned.to_extra(py);
@@ -508,16 +512,16 @@ impl SerializationCallable {
                 self.filter.key_filter(index_key, include, exclude)?
             };
             if let Some((next_include, next_exclude)) = filter {
-                let v = self
-                    .serializer
-                    .to_python(value, next_include.as_ref(), next_exclude.as_ref(), &extra)?;
+                let v =
+                    self.serializer
+                        .to_python_no_infer(value, next_include.as_ref(), next_exclude.as_ref(), &extra)?;
                 extra.warnings.final_check(py)?;
                 Ok(Some(v))
             } else {
                 Err(PydanticOmit::new_err())
             }
         } else {
-            let v = self.serializer.to_python(value, include, exclude, &extra)?;
+            let v = self.serializer.to_python_no_infer(value, include, exclude, &extra)?;
             extra.warnings.final_check(py)?;
             Ok(Some(v))
         }
@@ -539,20 +543,23 @@ impl SerializationCallable {
 #[cfg_attr(debug_assertions, derive(Debug))]
 struct SerializationInfo {
     #[pyo3(get)]
-    include: Option<PyObject>,
+    include: Option<Py<PyAny>>,
     #[pyo3(get)]
-    exclude: Option<PyObject>,
+    exclude: Option<Py<PyAny>>,
     #[pyo3(get)]
-    context: Option<PyObject>,
+    context: Option<Py<PyAny>>,
+    #[pyo3(get, name = "mode")]
     _mode: SerMode,
     #[pyo3(get)]
-    by_alias: bool,
+    by_alias: Option<bool>,
     #[pyo3(get)]
     exclude_unset: bool,
     #[pyo3(get)]
     exclude_defaults: bool,
     #[pyo3(get)]
     exclude_none: bool,
+    #[pyo3(get)]
+    exclude_computed_fields: bool,
     #[pyo3(get)]
     round_trip: bool,
     field_name: Option<String>,
@@ -578,9 +585,10 @@ impl SerializationInfo {
                     exclude_unset: extra.exclude_unset,
                     exclude_defaults: extra.exclude_defaults,
                     exclude_none: extra.exclude_none,
+                    exclude_computed_fields: extra.exclude_none,
                     round_trip: extra.round_trip,
                     field_name: Some(field_name.to_string()),
-                    serialize_as_any: extra.duck_typing_ser_mode.to_bool(),
+                    serialize_as_any: extra.serialize_as_any,
                 }),
                 _ => Err(PyRuntimeError::new_err(
                     "Model field context expected for field serialization info but no model field was found",
@@ -596,9 +604,10 @@ impl SerializationInfo {
                 exclude_unset: extra.exclude_unset,
                 exclude_defaults: extra.exclude_defaults,
                 exclude_none: extra.exclude_none,
+                exclude_computed_fields: extra.exclude_computed_fields,
                 round_trip: extra.round_trip,
                 field_name: None,
-                serialize_as_any: extra.duck_typing_ser_mode.to_bool(),
+                serialize_as_any: extra.serialize_as_any,
             })
         }
     }
@@ -625,11 +634,6 @@ impl SerializationInfo {
 
 #[pymethods]
 impl SerializationInfo {
-    #[getter]
-    fn mode(&self, py: Python) -> PyObject {
-        self._mode.to_object(py)
-    }
-
     fn mode_is_json(&self) -> bool {
         self._mode.is_json()
     }
@@ -646,11 +650,12 @@ impl SerializationInfo {
         if let Some(ref context) = self.context {
             d.set_item("context", context)?;
         }
-        d.set_item("mode", self.mode(py))?;
+        d.set_item("mode", &self._mode)?;
         d.set_item("by_alias", self.by_alias)?;
         d.set_item("exclude_unset", self.exclude_unset)?;
         d.set_item("exclude_defaults", self.exclude_defaults)?;
         d.set_item("exclude_none", self.exclude_none)?;
+        d.set_item("exclude_computed_fields", self.exclude_computed_fields)?;
         d.set_item("round_trip", self.round_trip)?;
         d.set_item("serialize_as_any", self.serialize_as_any)?;
         Ok(d)
@@ -658,7 +663,7 @@ impl SerializationInfo {
 
     fn __repr__(&self, py: Python) -> PyResult<String> {
         Ok(format!(
-            "SerializationInfo(include={}, exclude={}, context={}, mode='{}', by_alias={}, exclude_unset={}, exclude_defaults={}, exclude_none={}, round_trip={}, serialize_as_any={})",
+            "SerializationInfo(include={}, exclude={}, context={}, mode='{}', by_alias={}, exclude_unset={}, exclude_defaults={}, exclude_none={}, exclude_computed_fields={}, round_trip={}, serialize_as_any={})",
             match self.include {
                 Some(ref include) => include.bind(py).repr()?.to_str()?.to_owned(),
                 None => "None".to_owned(),
@@ -672,10 +677,11 @@ impl SerializationInfo {
                 None => "None".to_owned(),
             },
             self._mode,
-            py_bool(self.by_alias),
+            py_bool(self.by_alias.unwrap_or(false)),
             py_bool(self.exclude_unset),
             py_bool(self.exclude_defaults),
             py_bool(self.exclude_none),
+            py_bool(self.exclude_computed_fields),
             py_bool(self.round_trip),
             py_bool(self.serialize_as_any),
         ))

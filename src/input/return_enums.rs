@@ -11,7 +11,6 @@ use pyo3::exceptions::PyTypeError;
 use pyo3::ffi;
 use pyo3::intern;
 use pyo3::prelude::*;
-#[cfg(not(PyPy))]
 use pyo3::types::PyFunction;
 use pyo3::types::{PyBytes, PyComplex, PyFloat, PyFrozenSet, PyIterator, PyMapping, PySet, PyString};
 
@@ -127,8 +126,8 @@ pub(crate) fn validate_iter_to_vec<'py>(
     validator: &CombinedValidator,
     state: &mut ValidationState<'_, 'py>,
     fail_fast: bool,
-) -> ValResult<Vec<PyObject>> {
-    let mut output: Vec<PyObject> = Vec::with_capacity(capacity);
+) -> ValResult<Vec<Py<PyAny>>> {
+    let mut output: Vec<Py<PyAny>> = Vec::with_capacity(capacity);
     let mut errors: Vec<ValLineError> = Vec::new();
     let allow_partial = state.allow_partial;
 
@@ -165,13 +164,13 @@ pub(crate) fn validate_iter_to_vec<'py>(
 }
 
 pub trait BuildSet {
-    fn build_add(&self, item: PyObject) -> PyResult<()>;
+    fn build_add(&self, item: Py<PyAny>) -> PyResult<()>;
 
     fn build_len(&self) -> usize;
 }
 
 impl BuildSet for Bound<'_, PySet> {
-    fn build_add(&self, item: PyObject) -> PyResult<()> {
+    fn build_add(&self, item: Py<PyAny>) -> PyResult<()> {
         self.add(item)
     }
 
@@ -181,16 +180,35 @@ impl BuildSet for Bound<'_, PySet> {
 }
 
 impl BuildSet for Bound<'_, PyFrozenSet> {
-    fn build_add(&self, item: PyObject) -> PyResult<()> {
+    fn build_add(&self, item: Py<PyAny>) -> PyResult<()> {
         py_error_on_minusone(self.py(), unsafe {
             // Safety: self.as_ptr() the _only_ pointer to the `frozenset`, and it's allowed
             // to mutate this via the C API when nothing else can refer to it.
-            ffi::PySet_Add(self.as_ptr(), item.to_object(self.py()).as_ptr())
+            ffi::PySet_Add(self.as_ptr(), item.as_ptr())
         })
     }
 
     fn build_len(&self) -> usize {
         self.len()
+    }
+}
+
+fn validate_add<'py>(
+    py: Python<'py>,
+    set: &impl BuildSet,
+    item: impl BorrowInput<'py>,
+    state: &mut ValidationState<'_, 'py>,
+    validator: &CombinedValidator,
+) -> ValResult<()> {
+    let validated_item = validator.validate(py, item.borrow_input(), state)?;
+    match set.build_add(validated_item) {
+        Ok(()) => Ok(()),
+        Err(err) => {
+            if err.matches(py, py.get_type::<PyTypeError>())? {
+                return Err(ValError::new(ErrorTypeDefaults::SetItemNotHashable, item));
+            }
+            Err(err)?
+        }
     }
 }
 
@@ -216,9 +234,8 @@ pub(crate) fn validate_iter_to_set<'py>(
             false => PartialMode::Off,
         };
         let item = item_result.map_err(|e| any_next_error!(py, e, input, index))?;
-        match validator.validate(py, item.borrow_input(), state) {
-            Ok(item) => {
-                set.build_add(item)?;
+        match validate_add(py, set, item, state, validator) {
+            Ok(()) => {
                 if let Some(max_length) = max_length {
                     if set.build_len() > max_length {
                         return Err(ValError::new(
@@ -261,12 +278,12 @@ pub(crate) fn no_validator_iter_to_vec<'py>(
     input: &(impl Input<'py> + ?Sized),
     iter: impl Iterator<Item = PyResult<impl BorrowInput<'py>>>,
     mut max_length_check: MaxLengthCheck<'_, impl Input<'py> + ?Sized>,
-) -> ValResult<Vec<PyObject>> {
+) -> ValResult<Vec<Py<PyAny>>> {
     iter.enumerate()
         .map(|(index, result)| {
             let v = result.map_err(|e| any_next_error!(py, e, input, index))?;
             max_length_check.incr()?;
-            Ok(v.borrow_input().to_object(py))
+            Ok(v.borrow_input().to_object(py)?.unbind())
         })
         .collect()
 }
@@ -330,15 +347,7 @@ pub(crate) fn iterate_attributes<'a, 'py>(
                 // the PyFunction::is_type_of(attr) catches `staticmethod`, but also any other function,
                 // I think that's better than including static methods in the yielded attributes,
                 // if someone really wants fields, they can use an explicit field, or a function to modify input
-                #[cfg(not(PyPy))]
                 if !is_bound && !attr.is_instance_of::<PyFunction>() {
-                    return Some(Ok((name, attr)));
-                }
-                // MASSIVE HACK! PyFunction doesn't exist for PyPy,
-                // is_instance_of::<PyFunction> crashes with a null pointer, hence this hack, see
-                // https://github.com/pydantic/pydantic-core/pull/161#discussion_r917257635
-                #[cfg(PyPy)]
-                if !is_bound && attr.get_type().to_string() != "<class 'function'>" {
                     return Some(Ok((name, attr)));
                 }
             }
@@ -382,7 +391,7 @@ impl From<&Bound<'_, PyAny>> for GenericIterator<'_> {
     fn from(obj: &Bound<'_, PyAny>) -> Self {
         let py_iter = GenericPyIterator {
             obj: obj.clone().into(),
-            iter: obj.iter().unwrap().into(),
+            iter: obj.try_iter().unwrap().into(),
             index: 0,
         };
         Self::PyIterator(py_iter)
@@ -391,7 +400,7 @@ impl From<&Bound<'_, PyAny>> for GenericIterator<'_> {
 
 #[derive(Debug, Clone)]
 pub struct GenericPyIterator {
-    obj: PyObject,
+    obj: Py<PyAny>,
     iter: Py<PyIterator>,
     index: usize,
 }
@@ -465,7 +474,7 @@ pub enum EitherString<'a> {
 }
 
 impl<'a> EitherString<'a> {
-    pub fn as_cow(&self) -> ValResult<Cow<str>> {
+    pub fn as_cow(&self) -> ValResult<Cow<'_, str>> {
         match self {
             Self::Cow(data) => Ok(data.clone()),
             Self::Py(py_str) => Ok(Cow::Borrowed(py_string_str(py_str)?)),
@@ -702,15 +711,6 @@ impl FromPyObject<'_> for Int {
         match extract_int(obj) {
             Some(i) => Ok(i),
             None => py_err!(PyTypeError; "Expected int, got {}", obj.get_type()),
-        }
-    }
-}
-
-impl ToPyObject for Int {
-    fn to_object(&self, py: Python<'_>) -> PyObject {
-        match self {
-            Self::I64(i) => i.to_object(py),
-            Self::Big(big_i) => big_i.to_object(py),
         }
     }
 }

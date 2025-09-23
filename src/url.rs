@@ -6,7 +6,7 @@ use std::hash::{Hash, Hasher};
 use idna::punycode::decode_to_string;
 use pyo3::exceptions::PyValueError;
 use pyo3::pyclass::CompareOp;
-use pyo3::sync::GILOnceCell;
+use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyDict, PyType};
 use pyo3::{intern, prelude::*, IntoPyObjectExt};
 use url::Url;
@@ -14,7 +14,7 @@ use url::Url;
 use crate::tools::SchemaDict;
 use crate::SchemaValidator;
 
-static SCHEMA_DEFINITION_URL: GILOnceCell<SchemaValidator> = GILOnceCell::new();
+static SCHEMA_DEFINITION_URL: PyOnceLock<SchemaValidator> = PyOnceLock::new();
 
 #[pyclass(name = "Url", module = "pydantic_core._pydantic_core", subclass, frozen)]
 #[derive(Clone, Hash)]
@@ -45,7 +45,7 @@ impl PyUrl {
     pub fn py_new(py: Python, url: &Bound<'_, PyAny>) -> PyResult<Self> {
         let schema_obj = SCHEMA_DEFINITION_URL
             .get_or_init(py, || build_schema_validator(py, "url"))
-            .validate_python(py, url, None, None, None, None, false.into())?;
+            .validate_python(py, url, None, None, None, None, None, false.into(), None, None)?;
         schema_obj.extract(py)
     }
 
@@ -217,7 +217,7 @@ impl PyMultiHostUrl {
     }
 }
 
-static SCHEMA_DEFINITION_MULTI_HOST_URL: GILOnceCell<SchemaValidator> = GILOnceCell::new();
+static SCHEMA_DEFINITION_MULTI_HOST_URL: PyOnceLock<SchemaValidator> = PyOnceLock::new();
 
 #[pymethods]
 impl PyMultiHostUrl {
@@ -225,7 +225,7 @@ impl PyMultiHostUrl {
     pub fn py_new(py: Python, url: &Bound<'_, PyAny>) -> PyResult<Self> {
         let schema_obj = SCHEMA_DEFINITION_MULTI_HOST_URL
             .get_or_init(py, || build_schema_validator(py, "multi-host-url"))
-            .validate_python(py, url, None, None, None, None, false.into())?;
+            .validate_python(py, url, None, None, None, None, None, false.into(), None, None)?;
         schema_obj.extract(py)
     }
 
@@ -271,16 +271,16 @@ impl PyMultiHostUrl {
     // string representation of the URL, with punycode decoded when appropriate
     pub fn unicode_string(&self) -> String {
         if let Some(extra_urls) = &self.extra_urls {
-            let schema = self.ref_url.lib_url.scheme();
-            let host_offset = schema.len() + 3;
+            let scheme = self.ref_url.lib_url.scheme();
+            let host_offset = scheme.len() + 3;
 
             let mut full_url = self.ref_url.unicode_string();
             full_url.insert(host_offset, ',');
 
             // special urls will have had a trailing slash added, non-special urls will not
-            // hence we need to remove the last char if the schema is special
+            // hence we need to remove the last char if the scheme is special
             #[allow(clippy::bool_to_int_with_if)]
-            let sub = if schema_is_special(schema) { 1 } else { 0 };
+            let sub = if scheme_is_special(scheme) { 1 } else { 0 };
 
             let hosts = extra_urls
                 .iter()
@@ -299,16 +299,16 @@ impl PyMultiHostUrl {
 
     pub fn __str__(&self) -> String {
         if let Some(extra_urls) = &self.extra_urls {
-            let schema = self.ref_url.lib_url.scheme();
-            let host_offset = schema.len() + 3;
+            let scheme = self.ref_url.lib_url.scheme();
+            let host_offset = scheme.len() + 3;
 
             let mut full_url = self.ref_url.lib_url.to_string();
             full_url.insert(host_offset, ',');
 
             // special urls will have had a trailing slash added, non-special urls will not
-            // hence we need to remove the last char if the schema is special
+            // hence we need to remove the last char if the scheme is special
             #[allow(clippy::bool_to_int_with_if)]
-            let sub = if schema_is_special(schema) { 1 } else { 0 };
+            let sub = if scheme_is_special(scheme) { 1 } else { 0 };
 
             let hosts = extra_urls
                 .iter()
@@ -392,7 +392,7 @@ impl PyMultiHostUrl {
                     multi_url.push_str(&single_host.to_string());
                     if index != hosts.len() - 1 {
                         multi_url.push(',');
-                    };
+                    }
                 }
                 multi_url
             } else if host.is_some() {
@@ -400,7 +400,7 @@ impl PyMultiHostUrl {
                     username: username.map(Into::into),
                     password: password.map(Into::into),
                     host: host.map(Into::into),
-                    port: port.map(Into::into),
+                    port,
                 };
                 format!("{scheme}://{url_host}")
             } else {
@@ -456,7 +456,7 @@ impl fmt::Display for UrlHostParts {
             (None, Some(password)) => write!(f, ":{password}@")?,
             (Some(username), Some(password)) => write!(f, "{username}:{password}@")?,
             (None, None) => {}
-        };
+        }
         if let Some(host) = &self.host {
             write!(f, "{host}")?;
         }
@@ -469,13 +469,7 @@ impl fmt::Display for UrlHostParts {
 
 fn host_to_dict<'a>(py: Python<'a>, lib_url: &Url) -> PyResult<Bound<'a, PyDict>> {
     let dict = PyDict::new(py);
-    dict.set_item(
-        "username",
-        match lib_url.username() {
-            "" => py.None(),
-            user => user.to_object(py),
-        },
-    )?;
+    dict.set_item("username", Some(lib_url.username()).filter(|s| !s.is_empty()))?;
     dict.set_item("password", lib_url.password())?;
     dict.set_item("host", lib_url.host_str())?;
     dict.set_item("port", lib_url.port_or_known_default())?;
@@ -516,10 +510,10 @@ fn decode_punycode(domain: &str) -> Option<String> {
 static PUNYCODE_PREFIX: &str = "xn--";
 
 fn is_punnycode_domain(lib_url: &Url, domain: &str) -> bool {
-    schema_is_special(lib_url.scheme()) && domain.split('.').any(|part| part.starts_with(PUNYCODE_PREFIX))
+    scheme_is_special(lib_url.scheme()) && domain.split('.').any(|part| part.starts_with(PUNYCODE_PREFIX))
 }
 
 // based on https://github.com/servo/rust-url/blob/1c1e406874b3d2aa6f36c5d2f3a5c2ea74af9efb/url/src/parser.rs#L161-L167
-pub fn schema_is_special(schema: &str) -> bool {
-    matches!(schema, "http" | "https" | "ws" | "wss" | "ftp" | "file")
+pub fn scheme_is_special(scheme: &str) -> bool {
+    matches!(scheme, "http" | "https" | "ws" | "wss" | "ftp" | "file")
 }
