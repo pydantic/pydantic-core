@@ -42,7 +42,7 @@ pub fn list_all_errors(py: Python<'_>) -> PyResult<Bound<'_, PyList>> {
     PyList::new(py, errors)
 }
 
-fn field_from_context<'py, T: FromPyObject<'py>>(
+fn field_from_context<'py, T: FromPyObjectOwned<'py>>(
     context: Option<&Bound<'py, PyDict>>,
     field_name: &str,
     enum_name: &str,
@@ -56,7 +56,7 @@ fn field_from_context<'py, T: FromPyObject<'py>>(
         .map_err(|_| py_error_type!(PyTypeError; "{}: '{}' context value must be a {}", enum_name, field_name, type_name_fn()))
 }
 
-fn cow_field_from_context<'py, T: FromPyObject<'py>, B: ToOwned<Owned = T> + ?Sized + 'static>(
+fn cow_field_from_context<'py, T: FromPyObjectOwned<'py>, B: ToOwned<Owned = T> + ?Sized + 'static>(
     context: Option<&Bound<'py, PyDict>>,
     field_name: &str,
     enum_name: &str,
@@ -809,9 +809,11 @@ impl From<Int> for Number {
     }
 }
 
-impl FromPyObject<'_> for Number {
-    fn extract_bound(obj: &Bound<'_, PyAny>) -> PyResult<Self> {
-        if let Some(int) = extract_i64(obj) {
+impl FromPyObject<'_, '_> for Number {
+    type Error = PyErr;
+
+    fn extract(obj: Borrowed<'_, '_, PyAny>) -> PyResult<Self> {
+        if let Some(int) = extract_i64(&obj) {
             Ok(Number::Int(int))
         } else if let Ok(float) = obj.extract::<f64>() {
             Ok(Number::Float(float))

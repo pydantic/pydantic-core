@@ -103,7 +103,7 @@ impl PyUrl {
                 };
                 ValidationError::from_val_error(py, name, InputType::Python, e, None, false, false)
             })?
-            .downcast_bound::<Self>(py)?
+            .cast_bound::<Self>(py)?
             .get()
             .clone(); // FIXME: avoid the clone, would need to make `validate` be aware of what URL subclass to create
         Ok(url_obj)
@@ -308,7 +308,7 @@ impl PyMultiHostUrl {
                 };
                 ValidationError::from_val_error(py, name, InputType::Python, e, None, false, false)
             })?
-            .downcast_bound::<Self>(py)?
+            .cast_bound::<Self>(py)?
             .get()
             .clone(); // FIXME: avoid the clone, would need to make `validate` be aware of what URL subclass to create
         Ok(url_obj)
@@ -521,8 +521,10 @@ impl UrlHostParts {
     }
 }
 
-impl FromPyObject<'_> for UrlHostParts {
-    fn extract_bound(ob: &Bound<'_, PyAny>) -> PyResult<Self> {
+impl FromPyObject<'_, '_> for UrlHostParts {
+    type Error = PyErr;
+
+    fn extract(ob: Borrowed<'_, '_, PyAny>) -> PyResult<Self> {
         let py = ob.py();
         let dict = ob.downcast::<PyDict>()?;
         Ok(UrlHostParts {

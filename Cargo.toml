@@ -105,3 +105,8 @@ too_many_lines = "allow"
 unnecessary_wraps = "allow"
 unused_self = "allow"
 used_underscore_binding = "allow"
+
+[patch.crates-io]
+pyo3 = { git = "https://github.com/pyo3/pyo3.git" }
+pyo3-build-config = { git = "https://github.com/pyo3/pyo3.git" }
+jiter = { git = "https://github.com/pydantic/jiter.git", branch = "dh/pyo3-0.27" }
