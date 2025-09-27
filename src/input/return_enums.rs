@@ -706,9 +706,11 @@ impl Rem for &Int {
     }
 }
 
-impl FromPyObject<'_> for Int {
-    fn extract_bound(obj: &Bound<'_, PyAny>) -> PyResult<Self> {
-        match extract_int(obj) {
+impl FromPyObject<'_, '_> for Int {
+    type Error = PyErr;
+
+    fn extract(obj: Borrowed<'_, '_, PyAny>) -> PyResult<Self> {
+        match extract_int(&obj) {
             Some(i) => Ok(i),
             None => py_err!(PyTypeError; "Expected int, got {}", obj.get_type()),
         }
