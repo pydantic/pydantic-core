@@ -46,7 +46,7 @@ impl PyUrl {
         let schema_obj = SCHEMA_DEFINITION_URL
             .get_or_init(py, || build_schema_validator(py, "url"))
             .validate_python(py, url, None, None, None, None, None, false.into(), None, None)?;
-        schema_obj.extract(py)
+        schema_obj.extract(py).map_err(Into::into)
     }
 
     #[getter]
@@ -226,7 +226,7 @@ impl PyMultiHostUrl {
         let schema_obj = SCHEMA_DEFINITION_MULTI_HOST_URL
             .get_or_init(py, || build_schema_validator(py, "multi-host-url"))
             .validate_python(py, url, None, None, None, None, None, false.into(), None, None)?;
-        schema_obj.extract(py)
+        schema_obj.extract(py).map_err(Into::into)
     }
 
     #[getter]
@@ -436,8 +436,10 @@ impl UrlHostParts {
     }
 }
 
-impl FromPyObject<'_> for UrlHostParts {
-    fn extract_bound(ob: &Bound<'_, PyAny>) -> PyResult<Self> {
+impl FromPyObject<'_, '_> for UrlHostParts {
+    type Error = PyErr;
+
+    fn extract(ob: Borrowed<'_, '_, PyAny>) -> PyResult<Self> {
         let py = ob.py();
         let dict = ob.downcast::<PyDict>()?;
         Ok(UrlHostParts {
