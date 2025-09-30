@@ -255,3 +255,34 @@ def test_json_dict_complex_key():
     assert v.validate_json('{"1+2j": 2, "infj": 4}') == {complex(1, 2): 2, complex(0, float('inf')): 4}
     with pytest.raises(ValidationError, match='Input should be a valid complex string'):
         v.validate_json('{"1+2j": 2, "": 4}') == {complex(1, 2): 2, complex(0, float('inf')): 4}
+
+
+...
+def test_ordered_dict_key_order_preservation():
+    # GH 12273
+    v = SchemaValidator(cs.dict_schema(keys_schema=cs.str_schema(), values_schema=cs.int_schema()))
+
+    # Test case from original issue
+    foo = OrderedDict({"a": 1, "b": 2})
+    foo.move_to_end("a")
+
+    result = v.validate_python(foo)
+    assert list(result.keys()) == list(foo.keys()) == ['b', 'a']
+    assert result == {'b': 2, 'a': 1}
+
+    # Test with more complex reordering
+    foo2 = OrderedDict({"x": 1, "y": 2, "z": 3})
+    foo2.move_to_end("x")
+
+    result2 = v.validate_python(foo2)
+    assert list(result2.keys()) == list(foo2.keys()) == ['y', 'z', 'x']
+    assert result2 == {'y': 2, 'z': 3, 'x': 1}
+
+    # Test popitem and re-insertion
+    foo3 = OrderedDict({"p": 1, "q": 2})
+    item = foo3.popitem(last=False)
+    foo3[item[0]] = item[1]
+
+    result3 = v.validate_python(foo3)
+    assert list(result3.keys()) == list(foo3.keys()) == ['q', 'p']
+    assert result3 == {'q': 2, 'p': 1}
