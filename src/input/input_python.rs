@@ -62,16 +62,21 @@ fn get_ordered_dict_type(py: Python<'_>) -> &Bound<'_, PyType> {
         .bind(py)
 }
 
-// Lazy helper that only initializes OrderedDict type when actually needed
+// Ultra-fast OrderedDict detection with multiple optimization layers
 fn check_if_ordered_dict(obj: &Bound<'_, PyAny>) -> bool {
-    // Quick type name check first - avoid Python import if possible
+    // FASTEST PATH: Check if it's exact PyDict first - skip everything for regular dicts
+    if obj.is_exact_instance_of::<PyDict>() {
+        return false; // Regular dict - absolutely not OrderedDict
+    }
+
+    // FAST PATH: Quick type name check - avoid Python import if possible
     if let Ok(type_name) = obj.get_type().name() {
         if type_name.to_string() != "OrderedDict" {
-            return false; // Fast path for non-OrderedDict objects
+            return false; // Not OrderedDict based on name
         }
     }
 
-    // Only now do we need the expensive type lookup
+    // SLOW PATH: Only for actual OrderedDict objects - expensive type lookup
     let ordered_dict_type = get_ordered_dict_type(obj.py());
     obj.is_instance(ordered_dict_type).unwrap_or(false)
 }
@@ -427,7 +432,6 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
     }
 
     fn lax_dict<'a>(&'a self) -> ValResult<GenericPyMapping<'a, 'py>> {
-        // Optimized: Only check for OrderedDict when needed
         if check_if_ordered_dict(self) {
             // OrderedDict is a subclass of dict, but we want to treat it as a mapping to preserve order
             if let Ok(mapping) = self.downcast::<PyMapping>() {
