@@ -13,28 +13,12 @@ from ..conftest import Err, PyAndJson
 
 
 def test_dict(py_and_json: PyAndJson):
-    v = py_and_json(
-        {
-            'type': 'dict',
-            'keys_schema': {'type': 'int'},
-            'values_schema': {'type': 'int'},
-        }
-    )
+    v = py_and_json({'type': 'dict', 'keys_schema': {'type': 'int'}, 'values_schema': {'type': 'int'}})
     assert v.validate_test({'1': 2, '3': 4}) == {1: 2, 3: 4}
-    v = py_and_json(
-        {
-            'type': 'dict',
-            'strict': True,
-            'keys_schema': {'type': 'int'},
-            'values_schema': {'type': 'int'},
-        }
-    )
+    v = py_and_json({'type': 'dict', 'strict': True, 'keys_schema': {'type': 'int'}, 'values_schema': {'type': 'int'}})
     assert v.validate_test({'1': 2, '3': 4}) == {1: 2, 3: 4}
     assert v.validate_test({}) == {}
-    with pytest.raises(
-        ValidationError,
-        match=re.escape('[type=dict_type, input_value=[], input_type=list]'),
-    ):
+    with pytest.raises(ValidationError, match=re.escape('[type=dict_type, input_value=[], input_type=list]')):
         v.validate_test([])
 
 
@@ -44,22 +28,13 @@ def test_dict(py_and_json: PyAndJson):
         ({'1': b'1', '2': b'2'}, {'1': '1', '2': '2'}),
         (OrderedDict(a=b'1', b='2'), {'a': '1', 'b': '2'}),
         ({}, {}),
-        (
-            'foobar',
-            Err("Input should be a valid dictionary [type=dict_type, input_value='foobar', input_type=str]"),
-        ),
+        ('foobar', Err("Input should be a valid dictionary [type=dict_type, input_value='foobar', input_type=str]")),
         ([], Err('Input should be a valid dictionary [type=dict_type,')),
         ([('x', 'y')], Err('Input should be a valid dictionary [type=dict_type,')),
-        (
-            [('x', 'y'), ('z', 'z')],
-            Err('Input should be a valid dictionary [type=dict_type,'),
-        ),
+        ([('x', 'y'), ('z', 'z')], Err('Input should be a valid dictionary [type=dict_type,')),
         ((), Err('Input should be a valid dictionary [type=dict_type,')),
         ((('x', 'y'),), Err('Input should be a valid dictionary [type=dict_type,')),
-        (
-            (type('Foobar', (), {'x': 1})()),
-            Err('Input should be a valid dictionary [type=dict_type,'),
-        ),
+        ((type('Foobar', (), {'x': 1})()), Err('Input should be a valid dictionary [type=dict_type,')),
     ],
     ids=repr,
 )
@@ -125,11 +100,7 @@ def test_dict_error_key_other():
 def test_dict_any_value():
     v = SchemaValidator(cs.dict_schema(keys_schema=cs.str_schema()))
     v = SchemaValidator(cs.dict_schema(keys_schema=cs.str_schema()))
-    assert v.validate_python({'1': 1, '2': 'a', '3': None}) == {
-        '1': 1,
-        '2': 'a',
-        '3': None,
-    }
+    assert v.validate_python({'1': 1, '2': 'a', '3': None}) == {'1': 1, '2': 'a', '3': None}
 
 
 def test_mapping():
@@ -273,27 +244,17 @@ def test_dict_complex_key():
 
     v = SchemaValidator(cs.dict_schema(keys_schema=cs.complex_schema(), values_schema=cs.str_schema()))
     with pytest.raises(
-        ValidationError,
-        match='Input should be a valid python complex object, a number, or a valid complex string',
+        ValidationError, match='Input should be a valid python complex object, a number, or a valid complex string'
     ):
         v.validate_python({'1+2ja': b'1'})
 
 
 def test_json_dict_complex_key():
     v = SchemaValidator(cs.dict_schema(keys_schema=cs.complex_schema(), values_schema=cs.int_schema()))
-    assert v.validate_json('{"1+2j": 2, "-3": 4}') == {
-        complex(1, 2): 2,
-        complex(-3, 0): 4,
-    }
-    assert v.validate_json('{"1+2j": 2, "infj": 4}') == {
-        complex(1, 2): 2,
-        complex(0, float('inf')): 4,
-    }
+    assert v.validate_json('{"1+2j": 2, "-3": 4}') == {complex(1, 2): 2, complex(-3, 0): 4}
+    assert v.validate_json('{"1+2j": 2, "infj": 4}') == {complex(1, 2): 2, complex(0, float('inf')): 4}
     with pytest.raises(ValidationError, match='Input should be a valid complex string'):
-        v.validate_json('{"1+2j": 2, "": 4}') == {
-            complex(1, 2): 2,
-            complex(0, float('inf')): 4,
-        }
+        v.validate_json('{"1+2j": 2, "": 4}') == {complex(1, 2): 2, complex(0, float('inf')): 4}
 
 
 def test_ordered_dict_key_order_preservation():
