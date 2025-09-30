@@ -257,6 +257,63 @@ def test_json_dict_complex_key():
         v.validate_json('{"1+2j": 2, "": 4}') == {complex(1, 2): 2, complex(0, float('inf')): 4}
 
 
+@pytest.mark.parametrize(
+    ('fail_fast', 'expected'),
+    [
+        pytest.param(
+            True,
+            [
+                {
+                    'type': 'int_parsing',
+                    'loc': ('a', '[key]'),
+                    'msg': 'Input should be a valid integer, unable to parse string as an integer',
+                    'input': 'a',
+                },
+            ],
+            id='fail_fast',
+        ),
+        pytest.param(
+            False,
+            [
+                {
+                    'type': 'int_parsing',
+                    'loc': ('a', '[key]'),
+                    'msg': 'Input should be a valid integer, unable to parse string as an integer',
+                    'input': 'a',
+                },
+                {
+                    'type': 'int_parsing',
+                    'loc': ('a',),
+                    'msg': 'Input should be a valid integer, unable to parse string as an integer',
+                    'input': 'b',
+                },
+                {
+                    'type': 'int_parsing',
+                    'loc': ('c', '[key]'),
+                    'msg': 'Input should be a valid integer, unable to parse string as an integer',
+                    'input': 'c',
+                },
+                {
+                    'type': 'int_parsing',
+                    'loc': ('c',),
+                    'msg': 'Input should be a valid integer, unable to parse string as an integer',
+                    'input': 'd',
+                },
+            ],
+            id='not_fail_fast',
+        ),
+    ],
+)
+def test_dict_fail_fast(fail_fast, expected):
+    v = SchemaValidator(
+        {'type': 'dict', 'keys_schema': {'type': 'int'}, 'values_schema': {'type': 'int'}, 'fail_fast': fail_fast}
+    )
+
+    with pytest.raises(ValidationError) as exc_info:
+        v.validate_python({'a': 'b', 'c': 'd'})
+
+    assert exc_info.value.errors(include_url=False) == expected
+
 def test_ordered_dict_key_order_preservation():
     # GH 12273
     v = SchemaValidator(cs.dict_schema(keys_schema=cs.str_schema(), values_schema=cs.int_schema()))
