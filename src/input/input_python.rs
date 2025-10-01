@@ -434,8 +434,8 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
     }
 
     fn lax_dict<'a>(&'a self) -> ValResult<GenericPyMapping<'a, 'py>> {
-        if self.is_instance_of::<PyDict>() || self.is_instance_of::<PyMapping>() {
-            Ok(GenericPyMapping::Mapping(self.downcast::<PyMapping>()?))
+        if let Ok(mapping) = self.downcast::<PyMapping>() {
+            Ok(GenericPyMapping::Mapping(mapping))
         } else {
             Err(ValError::new(ErrorTypeDefaults::DictType, self))
         }
