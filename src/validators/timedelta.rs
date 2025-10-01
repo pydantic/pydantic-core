@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use pyo3::exceptions::PyValueError;
 use pyo3::intern;
 use pyo3::prelude::*;
@@ -44,8 +46,8 @@ impl BuildValidator for TimeDeltaValidator {
     fn build(
         schema: &Bound<'_, PyDict>,
         config: Option<&Bound<'_, PyDict>>,
-        _definitions: &mut DefinitionsBuilder<CombinedValidator>,
-    ) -> PyResult<CombinedValidator> {
+        _definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
+    ) -> PyResult<Arc<CombinedValidator>> {
         let py = schema.py();
         let constraints = TimedeltaConstraints {
             le: get_constraint(schema, intern!(py, "le"))?,
@@ -54,7 +56,7 @@ impl BuildValidator for TimeDeltaValidator {
             gt: get_constraint(schema, intern!(py, "gt"))?,
         };
 
-        Ok(Self {
+        Ok(CombinedValidator::Timedelta(Self {
             strict: is_strict(schema, config)?,
             constraints: (constraints.le.is_some()
                 || constraints.lt.is_some()
@@ -62,7 +64,7 @@ impl BuildValidator for TimeDeltaValidator {
                 || constraints.gt.is_some())
             .then_some(constraints),
             microseconds_precision: extract_microseconds_precision(schema, config)?,
-        }
+        })
         .into())
     }
 }
@@ -75,7 +77,7 @@ impl Validator for TimeDeltaValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         let timedelta = input
             .validate_timedelta(state.strict_or(self.strict), self.microseconds_precision)?
             .unpack(state);

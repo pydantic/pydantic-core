@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 use std::iter::Peekable;
 use std::str::Chars;
+use std::sync::Arc;
 
 use pyo3::intern;
 use pyo3::prelude::*;
@@ -12,6 +13,7 @@ use pyo3::IntoPyObjectExt;
 use url::{ParseError, SyntaxViolation, Url};
 
 use crate::build_tools::schema_or_config;
+use crate::build_tools::LazyLock;
 use crate::build_tools::{is_strict, py_schema_err};
 use crate::errors::{ErrorType, ErrorTypeDefaults, ValError, ValResult};
 use crate::input::downcast_python_input;
@@ -39,6 +41,62 @@ pub struct UrlValidator {
     preserve_empty_path: bool,
 }
 
+static SIMPLE_URL_VALIDATOR: LazyLock<Arc<CombinedValidator>> = LazyLock::new(|| {
+    Arc::new(CombinedValidator::Url(UrlValidator {
+        strict: false,
+        max_length: None,
+        allowed_schemes: None,
+        host_required: false,
+        default_host: None,
+        default_port: None,
+        default_path: None,
+        name: "url".to_string(),
+        preserve_empty_path: false,
+    }))
+});
+
+static SIMPLE_URL_VALIDATOR_STRICT: LazyLock<Arc<CombinedValidator>> = LazyLock::new(|| {
+    Arc::new(CombinedValidator::Url(UrlValidator {
+        strict: true,
+        max_length: None,
+        allowed_schemes: None,
+        host_required: false,
+        default_host: None,
+        default_port: None,
+        default_path: None,
+        name: "url".to_string(),
+        preserve_empty_path: false,
+    }))
+});
+
+static SIMPLE_URL_VALIDATOR_PRESERVE_EMPTY_PATH: LazyLock<Arc<CombinedValidator>> = LazyLock::new(|| {
+    Arc::new(CombinedValidator::Url(UrlValidator {
+        strict: false,
+        max_length: None,
+        allowed_schemes: None,
+        host_required: false,
+        default_host: None,
+        default_port: None,
+        default_path: None,
+        name: "url".to_string(),
+        preserve_empty_path: true,
+    }))
+});
+
+static SIMPLE_URL_VALIDATOR_STRICT_PRESERVE_EMPTY_PATH: LazyLock<Arc<CombinedValidator>> = LazyLock::new(|| {
+    Arc::new(CombinedValidator::Url(UrlValidator {
+        strict: true,
+        max_length: None,
+        allowed_schemes: None,
+        host_required: false,
+        default_host: None,
+        default_port: None,
+        default_path: None,
+        name: "url".to_string(),
+        preserve_empty_path: true,
+    }))
+});
+
 fn get_preserve_empty_path(schema: &Bound<'_, PyDict>, config: Option<&Bound<'_, PyDict>>) -> PyResult<bool> {
     schema_or_config(
         schema,
@@ -55,11 +113,11 @@ impl BuildValidator for UrlValidator {
     fn build(
         schema: &Bound<'_, PyDict>,
         config: Option<&Bound<'_, PyDict>>,
-        _definitions: &mut DefinitionsBuilder<CombinedValidator>,
-    ) -> PyResult<CombinedValidator> {
+        _definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
+    ) -> PyResult<Arc<CombinedValidator>> {
         let (allowed_schemes, name) = get_allowed_schemes(schema, Self::EXPECTED_TYPE)?;
 
-        Ok(Self {
+        let validator = Self {
             strict: is_strict(schema, config)?,
             max_length: schema.get_as(intern!(schema.py(), "max_length"))?,
             host_required: schema.get_as(intern!(schema.py(), "host_required"))?.unwrap_or(false),
@@ -69,8 +127,20 @@ impl BuildValidator for UrlValidator {
             allowed_schemes,
             name,
             preserve_empty_path: get_preserve_empty_path(schema, config)?,
+        };
+
+        // if no defaults, the prebuilt simple validator will do
+        if validator.max_length.is_none()
+            && validator.allowed_schemes.is_none()
+            && !validator.host_required
+            && validator.default_host.is_none()
+            && validator.default_port.is_none()
+            && validator.default_path.is_none()
+        {
+            return Ok(UrlValidator::get_simple(validator.strict, validator.preserve_empty_path).clone());
         }
-        .into())
+
+        Ok(CombinedValidator::Url(validator).into())
     }
 }
 
@@ -82,7 +152,7 @@ impl Validator for UrlValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         let mut either_url = self.get_url(py, input, state.strict_or(self.strict))?;
 
         if let Some((ref allowed_schemes, ref expected_schemes_repr)) = self.allowed_schemes {
@@ -120,6 +190,15 @@ impl Validator for UrlValidator {
 }
 
 impl UrlValidator {
+    pub(crate) fn get_simple(strict: bool, preserve_empty_path: bool) -> &'static Arc<CombinedValidator> {
+        match (strict, preserve_empty_path) {
+            (false, false) => &SIMPLE_URL_VALIDATOR,
+            (true, false) => &SIMPLE_URL_VALIDATOR_STRICT,
+            (false, true) => &SIMPLE_URL_VALIDATOR_PRESERVE_EMPTY_PATH,
+            (true, true) => &SIMPLE_URL_VALIDATOR_STRICT_PRESERVE_EMPTY_PATH,
+        }
+    }
+
     fn get_url<'py>(
         &self,
         py: Python<'py>,
@@ -216,14 +295,71 @@ pub struct MultiHostUrlValidator {
     preserve_empty_path: bool,
 }
 
+static SIMPLE_MULTI_HOST_URL_VALIDATOR: LazyLock<Arc<CombinedValidator>> = LazyLock::new(|| {
+    Arc::new(CombinedValidator::MultiHostUrl(MultiHostUrlValidator {
+        strict: false,
+        max_length: None,
+        allowed_schemes: None,
+        host_required: false,
+        default_host: None,
+        default_port: None,
+        default_path: None,
+        name: "multi-host-url".to_string(),
+        preserve_empty_path: false,
+    }))
+});
+
+static SIMPLE_MULTI_HOST_URL_VALIDATOR_STRICT: LazyLock<Arc<CombinedValidator>> = LazyLock::new(|| {
+    Arc::new(CombinedValidator::MultiHostUrl(MultiHostUrlValidator {
+        strict: true,
+        max_length: None,
+        allowed_schemes: None,
+        host_required: false,
+        default_host: None,
+        default_port: None,
+        default_path: None,
+        name: "multi-host-url".to_string(),
+        preserve_empty_path: false,
+    }))
+});
+
+static SIMPLE_MULTI_HOST_URL_VALIDATOR_PRESERVE_EMPTY_PATH: LazyLock<Arc<CombinedValidator>> = LazyLock::new(|| {
+    Arc::new(CombinedValidator::MultiHostUrl(MultiHostUrlValidator {
+        strict: false,
+        max_length: None,
+        allowed_schemes: None,
+        host_required: false,
+        default_host: None,
+        default_port: None,
+        default_path: None,
+        name: "multi-host-url".to_string(),
+        preserve_empty_path: true,
+    }))
+});
+
+static SIMPLE_MULTI_HOST_URL_VALIDATOR_STRICT_PRESERVE_EMPTY_PATH: LazyLock<Arc<CombinedValidator>> =
+    LazyLock::new(|| {
+        Arc::new(CombinedValidator::MultiHostUrl(MultiHostUrlValidator {
+            strict: true,
+            max_length: None,
+            allowed_schemes: None,
+            host_required: false,
+            default_host: None,
+            default_port: None,
+            default_path: None,
+            name: "multi-host-url".to_string(),
+            preserve_empty_path: true,
+        }))
+    });
+
 impl BuildValidator for MultiHostUrlValidator {
     const EXPECTED_TYPE: &'static str = "multi-host-url";
 
     fn build(
         schema: &Bound<'_, PyDict>,
         config: Option<&Bound<'_, PyDict>>,
-        _definitions: &mut DefinitionsBuilder<CombinedValidator>,
-    ) -> PyResult<CombinedValidator> {
+        _definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
+    ) -> PyResult<Arc<CombinedValidator>> {
         let (allowed_schemes, name) = get_allowed_schemes(schema, Self::EXPECTED_TYPE)?;
 
         let default_host: Option<String> = schema.get_as(intern!(schema.py(), "default_host"))?;
@@ -232,7 +368,8 @@ impl BuildValidator for MultiHostUrlValidator {
                 return py_schema_err!("default_host cannot contain a comma, see pydantic-core#326");
             }
         }
-        Ok(Self {
+
+        let validator = Self {
             strict: is_strict(schema, config)?,
             max_length: schema.get_as(intern!(schema.py(), "max_length"))?,
             allowed_schemes,
@@ -242,8 +379,19 @@ impl BuildValidator for MultiHostUrlValidator {
             default_path: schema.get_as(intern!(schema.py(), "default_path"))?,
             name,
             preserve_empty_path: get_preserve_empty_path(schema, config)?,
+        };
+
+        if validator.max_length.is_none()
+            && validator.allowed_schemes.is_none()
+            && !validator.host_required
+            && validator.default_host.is_none()
+            && validator.default_port.is_none()
+            && validator.default_path.is_none()
+        {
+            return Ok(MultiHostUrlValidator::get_simple(validator.strict, validator.preserve_empty_path).clone());
         }
-        .into())
+
+        Ok(CombinedValidator::MultiHostUrl(validator).into())
     }
 }
 
@@ -255,7 +403,7 @@ impl Validator for MultiHostUrlValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         let mut multi_url = self.get_url(py, input, state.strict_or(self.strict))?;
 
         if let Some((ref allowed_schemes, ref expected_schemes_repr)) = self.allowed_schemes {
@@ -292,6 +440,15 @@ impl Validator for MultiHostUrlValidator {
 }
 
 impl MultiHostUrlValidator {
+    pub(crate) fn get_simple(strict: bool, preserve_empty_path: bool) -> &'static Arc<CombinedValidator> {
+        match (strict, preserve_empty_path) {
+            (false, false) => &SIMPLE_MULTI_HOST_URL_VALIDATOR,
+            (true, false) => &SIMPLE_MULTI_HOST_URL_VALIDATOR_STRICT,
+            (false, true) => &SIMPLE_MULTI_HOST_URL_VALIDATOR_PRESERVE_EMPTY_PATH,
+            (true, true) => &SIMPLE_MULTI_HOST_URL_VALIDATOR_STRICT_PRESERVE_EMPTY_PATH,
+        }
+    }
+
     fn get_url<'py>(
         &self,
         py: Python<'py>,

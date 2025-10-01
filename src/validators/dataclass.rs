@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use pyo3::exceptions::PyKeyError;
 use pyo3::intern;
 use pyo3::prelude::*;
@@ -28,7 +30,7 @@ struct Field {
     init: bool,
     init_only: bool,
     lookup_key_collection: LookupKeyCollection,
-    validator: CombinedValidator,
+    validator: Arc<CombinedValidator>,
     frozen: bool,
 }
 
@@ -40,7 +42,7 @@ pub struct DataclassArgsValidator {
     dataclass_name: String,
     validator_name: String,
     extra_behavior: ExtraBehavior,
-    extras_validator: Option<Box<CombinedValidator>>,
+    extras_validator: Option<Arc<CombinedValidator>>,
     loc_by_alias: bool,
     validate_by_alias: Option<bool>,
     validate_by_name: Option<bool>,
@@ -52,14 +54,14 @@ impl BuildValidator for DataclassArgsValidator {
     fn build(
         schema: &Bound<'_, PyDict>,
         config: Option<&Bound<'_, PyDict>>,
-        definitions: &mut DefinitionsBuilder<CombinedValidator>,
-    ) -> PyResult<CombinedValidator> {
+        definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
+    ) -> PyResult<Arc<CombinedValidator>> {
         let py = schema.py();
 
         let extra_behavior = ExtraBehavior::from_schema_or_config(py, schema, config, ExtraBehavior::Ignore)?;
 
         let extras_validator = match (schema.get_item(intern!(py, "extras_schema"))?, &extra_behavior) {
-            (Some(v), ExtraBehavior::Allow) => Some(Box::new(build_validator(&v, config, definitions)?)),
+            (Some(v), ExtraBehavior::Allow) => Some(build_validator(&v, config, definitions)?),
             (Some(_), _) => return py_schema_err!("extras_schema can only be used if extra_behavior=allow"),
             (_, _) => None,
         };
@@ -82,7 +84,7 @@ impl BuildValidator for DataclassArgsValidator {
                 Err(err) => return py_schema_err!("Field '{}':\n  {}", name, err),
             };
 
-            if let CombinedValidator::WithDefault(ref v) = validator {
+            if let CombinedValidator::WithDefault(v) = validator.as_ref() {
                 if v.omit_on_error() {
                     return py_schema_err!("Field `{}`: omit_on_error cannot be used with arguments", name);
                 }
@@ -116,7 +118,7 @@ impl BuildValidator for DataclassArgsValidator {
         let dataclass_name: String = schema.get_as_req(intern!(py, "dataclass_name"))?;
         let validator_name = format!("dataclass-args[{dataclass_name}]");
 
-        Ok(Self {
+        Ok(CombinedValidator::DataclassArgs(Self {
             fields,
             positional_count,
             init_only_count,
@@ -127,7 +129,7 @@ impl BuildValidator for DataclassArgsValidator {
             loc_by_alias: config.get_as(intern!(py, "loc_by_alias"))?.unwrap_or(true),
             validate_by_alias: config.get_as(intern!(py, "validate_by_alias"))?,
             validate_by_name: config.get_as(intern!(py, "validate_by_name"))?,
-        }
+        })
         .into())
     }
 }
@@ -142,7 +144,7 @@ impl Validator for DataclassArgsValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         // this validator does not yet support partial validation, disable it to avoid incorrect results
         state.allow_partial = false.into();
 
@@ -378,11 +380,11 @@ impl Validator for DataclassArgsValidator {
         field_name: &str,
         field_value: &Bound<'py, PyAny>,
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         let dict = obj.downcast::<PyDict>()?;
         let extra_behavior = state.extra_behavior_or(self.extra_behavior);
 
-        let ok = |output: PyObject| {
+        let ok = |output: Py<PyAny>| {
             dict.set_item(field_name, output)?;
             // The second return value represents `init_only_args`
             // which doesn't make much sense in this context but we need to put something there
@@ -452,7 +454,7 @@ impl Validator for DataclassArgsValidator {
 #[derive(Debug)]
 pub struct DataclassValidator {
     strict: bool,
-    validator: Box<CombinedValidator>,
+    validator: Arc<CombinedValidator>,
     class: Py<PyType>,
     generic_origin: Option<Py<PyType>>,
     fields: Vec<Py<PyString>>,
@@ -469,8 +471,8 @@ impl BuildValidator for DataclassValidator {
     fn build(
         schema: &Bound<'_, PyDict>,
         _config: Option<&Bound<'_, PyDict>>,
-        definitions: &mut DefinitionsBuilder<CombinedValidator>,
-    ) -> PyResult<CombinedValidator> {
+        definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
+    ) -> PyResult<Arc<CombinedValidator>> {
         let py = schema.py();
 
         // dataclasses ignore the parent config and always use the config from this dataclasses
@@ -494,9 +496,9 @@ impl BuildValidator for DataclassValidator {
 
         let fields = schema.get_as_req(intern!(py, "fields"))?;
 
-        Ok(Self {
+        Ok(CombinedValidator::Dataclass(Self {
             strict: is_strict(schema, config)?,
-            validator: Box::new(validator),
+            validator,
             class: class.into(),
             generic_origin: generic_origin.map(std::convert::Into::into),
             fields,
@@ -510,7 +512,7 @@ impl BuildValidator for DataclassValidator {
             name,
             frozen: schema.get_as(intern!(py, "frozen"))?.unwrap_or(false),
             slots: schema.get_as(intern!(py, "slots"))?.unwrap_or(false),
-        }
+        })
         .into())
     }
 }
@@ -527,7 +529,7 @@ impl Validator for DataclassValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         if let Some(self_instance) = state.extra().self_instance {
             // in the case that self_instance is Some, we're calling validation from within `BaseModel.__init__`
             return self.validate_init(py, self_instance, input, state);
@@ -589,7 +591,7 @@ impl Validator for DataclassValidator {
         field_name: &str,
         field_value: &Bound<'py, PyAny>,
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         if self.frozen {
             return Err(ValError::new(ErrorTypeDefaults::FrozenInstance, field_value));
         }
@@ -629,7 +631,7 @@ impl DataclassValidator {
         self_instance: &Bound<'_, PyAny>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         // we need to set `self_instance` to None for nested validators as we don't want to operate on the self_instance
         // instance anymore
         let state = &mut state.rebind_extra(|extra| extra.self_instance = None);
@@ -654,7 +656,7 @@ impl DataclassValidator {
         &self,
         py: Python<'py>,
         dc: &Bound<'_, PyAny>,
-        val_output: PyObject,
+        val_output: Py<PyAny>,
         input: &(impl Input<'py> + ?Sized),
     ) -> ValResult<()> {
         let (dc_dict, post_init_kwargs): (Bound<'_, PyAny>, Bound<'_, PyAny>) = val_output.extract(py)?;

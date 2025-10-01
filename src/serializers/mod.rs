@@ -1,5 +1,6 @@
 use std::fmt::Debug;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyTuple, PyType};
@@ -39,8 +40,8 @@ pub enum WarningsArg {
 #[pyclass(module = "pydantic_core._pydantic_core", frozen)]
 #[derive(Debug)]
 pub struct SchemaSerializer {
-    serializer: CombinedSerializer,
-    definitions: Definitions<CombinedSerializer>,
+    serializer: Arc<CombinedSerializer>,
+    definitions: Definitions<Arc<CombinedSerializer>>,
     expected_json_size: AtomicUsize,
     config: SerializationConfig,
     // References to the Python schema and config objects are saved to enable
@@ -129,7 +130,7 @@ impl SchemaSerializer {
         fallback: Option<&Bound<'_, PyAny>>,
         serialize_as_any: bool,
         context: Option<&Bound<'_, PyAny>>,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<Py<PyAny>> {
         let mode: SerMode = mode.into();
         let warnings_mode = match warnings {
             WarningsArg::Bool(b) => b.into(),
@@ -180,7 +181,7 @@ impl SchemaSerializer {
         fallback: Option<&Bound<'_, PyAny>>,
         serialize_as_any: bool,
         context: Option<&Bound<'_, PyAny>>,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<Py<PyAny>> {
         let warnings_mode = match warnings {
             WarningsArg::Bool(b) => b.into(),
             WarningsArg::Literal(mode) => mode,
@@ -268,7 +269,7 @@ pub fn to_json(
     fallback: Option<&Bound<'_, PyAny>>,
     serialize_as_any: bool,
     context: Option<&Bound<'_, PyAny>>,
-) -> PyResult<PyObject> {
+) -> PyResult<Py<PyAny>> {
     let state = SerializationState::new(timedelta_mode, temporal_mode, bytes_mode, inf_nan_mode)?;
     let extra = state.extra(
         py,
@@ -317,7 +318,7 @@ pub fn to_jsonable_python(
     fallback: Option<&Bound<'_, PyAny>>,
     serialize_as_any: bool,
     context: Option<&Bound<'_, PyAny>>,
-) -> PyResult<PyObject> {
+) -> PyResult<Py<PyAny>> {
     let state = SerializationState::new(timedelta_mode, temporal_mode, bytes_mode, inf_nan_mode)?;
     let extra = state.extra(
         py,

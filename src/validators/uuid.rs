@@ -1,8 +1,9 @@
 use std::str::from_utf8;
+use std::sync::Arc;
 
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::sync::GILOnceCell;
+use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyDict, PyType};
 use uuid::Uuid;
 use uuid::Variant;
@@ -24,7 +25,7 @@ use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, Exactness, Va
 const UUID_INT: &str = "int";
 const UUID_IS_SAFE: &str = "is_safe";
 
-static UUID_TYPE: GILOnceCell<Py<PyType>> = GILOnceCell::new();
+static UUID_TYPE: PyOnceLock<Py<PyType>> = PyOnceLock::new();
 
 fn import_type(py: Python, module: &str, attr: &str) -> PyResult<Py<PyType>> {
     py.import(module)?.getattr(attr)?.extract()
@@ -80,15 +81,15 @@ impl BuildValidator for UuidValidator {
     fn build(
         schema: &Bound<'_, PyDict>,
         config: Option<&Bound<'_, PyDict>>,
-        _definitions: &mut DefinitionsBuilder<CombinedValidator>,
-    ) -> PyResult<CombinedValidator> {
+        _definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
+    ) -> PyResult<Arc<CombinedValidator>> {
         let py = schema.py();
         // Note(lig): let's keep this conversion through the Version enum just for the sake of validation
         let version = schema.get_as::<u8>(intern!(py, "version"))?.map(Version::from);
-        Ok(Self {
+        Ok(CombinedValidator::Uuid(Self {
             strict: is_strict(schema, config)?,
             version: version.map(usize::from),
-        }
+        })
         .into())
     }
 }
@@ -101,7 +102,7 @@ impl Validator for UuidValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         let class = get_uuid_type(py)?;
         if let Some(py_input) = input_as_python_instance(input, class) {
             if let Some(expected_version) = self.version {
@@ -226,7 +227,7 @@ impl UuidValidator {
     ///
     /// This implementation does not use the Python `__init__` function to speed up the process,
     /// as the `__init__` function in the Python `uuid` module performs extensive checks.
-    fn create_py_uuid(&self, py_type: &Bound<'_, PyType>, uuid: &Uuid) -> ValResult<PyObject> {
+    fn create_py_uuid(&self, py_type: &Bound<'_, PyType>, uuid: &Uuid) -> ValResult<Py<PyAny>> {
         let py = py_type.py();
         let dc = create_class(py_type)?;
         let int = uuid.as_u128();

@@ -126,8 +126,8 @@ pub(crate) fn validate_iter_to_vec<'py>(
     validator: &CombinedValidator,
     state: &mut ValidationState<'_, 'py>,
     fail_fast: bool,
-) -> ValResult<Vec<PyObject>> {
-    let mut output: Vec<PyObject> = Vec::with_capacity(capacity);
+) -> ValResult<Vec<Py<PyAny>>> {
+    let mut output: Vec<Py<PyAny>> = Vec::with_capacity(capacity);
     let mut errors: Vec<ValLineError> = Vec::new();
     let allow_partial = state.allow_partial;
 
@@ -164,13 +164,13 @@ pub(crate) fn validate_iter_to_vec<'py>(
 }
 
 pub trait BuildSet {
-    fn build_add(&self, item: PyObject) -> PyResult<()>;
+    fn build_add(&self, item: Py<PyAny>) -> PyResult<()>;
 
     fn build_len(&self) -> usize;
 }
 
 impl BuildSet for Bound<'_, PySet> {
-    fn build_add(&self, item: PyObject) -> PyResult<()> {
+    fn build_add(&self, item: Py<PyAny>) -> PyResult<()> {
         self.add(item)
     }
 
@@ -180,7 +180,7 @@ impl BuildSet for Bound<'_, PySet> {
 }
 
 impl BuildSet for Bound<'_, PyFrozenSet> {
-    fn build_add(&self, item: PyObject) -> PyResult<()> {
+    fn build_add(&self, item: Py<PyAny>) -> PyResult<()> {
         py_error_on_minusone(self.py(), unsafe {
             // Safety: self.as_ptr() the _only_ pointer to the `frozenset`, and it's allowed
             // to mutate this via the C API when nothing else can refer to it.
@@ -278,7 +278,7 @@ pub(crate) fn no_validator_iter_to_vec<'py>(
     input: &(impl Input<'py> + ?Sized),
     iter: impl Iterator<Item = PyResult<impl BorrowInput<'py>>>,
     mut max_length_check: MaxLengthCheck<'_, impl Input<'py> + ?Sized>,
-) -> ValResult<Vec<PyObject>> {
+) -> ValResult<Vec<Py<PyAny>>> {
     iter.enumerate()
         .map(|(index, result)| {
             let v = result.map_err(|e| any_next_error!(py, e, input, index))?;
@@ -400,7 +400,7 @@ impl From<&Bound<'_, PyAny>> for GenericIterator<'_> {
 
 #[derive(Debug, Clone)]
 pub struct GenericPyIterator {
-    obj: PyObject,
+    obj: Py<PyAny>,
     iter: Py<PyIterator>,
     index: usize,
 }
@@ -468,20 +468,20 @@ impl<'data> GenericJsonIterator<'data> {
 }
 
 #[cfg_attr(debug_assertions, derive(Debug))]
-pub enum EitherString<'a> {
+pub enum EitherString<'a, 'py> {
     Cow(Cow<'a, str>),
-    Py(Bound<'a, PyString>),
+    Py(Bound<'py, PyString>),
 }
 
-impl<'a> EitherString<'a> {
+impl<'py> EitherString<'_, 'py> {
     pub fn as_cow(&self) -> ValResult<Cow<'_, str>> {
         match self {
-            Self::Cow(data) => Ok(data.clone()),
+            Self::Cow(data) => Ok(Cow::Borrowed(data)),
             Self::Py(py_str) => Ok(Cow::Borrowed(py_string_str(py_str)?)),
         }
     }
 
-    pub fn as_py_string(&'a self, py: Python<'a>, cache_str: StringCacheMode) -> Bound<'a, PyString> {
+    pub fn as_py_string(&self, py: Python<'py>, cache_str: StringCacheMode) -> Bound<'py, PyString> {
         match self {
             Self::Cow(cow) => new_py_string(py, cow.as_ref(), cache_str),
             Self::Py(py_string) => py_string.clone(),
@@ -489,20 +489,20 @@ impl<'a> EitherString<'a> {
     }
 }
 
-impl<'a> From<&'a str> for EitherString<'a> {
+impl<'a> From<&'a str> for EitherString<'a, '_> {
     fn from(data: &'a str) -> Self {
         Self::Cow(Cow::Borrowed(data))
     }
 }
 
-impl From<String> for EitherString<'_> {
+impl From<String> for EitherString<'_, '_> {
     fn from(data: String) -> Self {
         Self::Cow(Cow::Owned(data))
     }
 }
 
-impl<'a> From<Bound<'a, PyString>> for EitherString<'a> {
-    fn from(date: Bound<'a, PyString>) -> Self {
+impl<'py> From<Bound<'py, PyString>> for EitherString<'_, 'py> {
+    fn from(date: Bound<'py, PyString>) -> Self {
         Self::Py(date)
     }
 }

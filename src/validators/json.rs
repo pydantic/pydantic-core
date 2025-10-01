@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -14,7 +16,7 @@ use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuild
 
 #[derive(Debug)]
 pub struct JsonValidator {
-    validator: Option<Box<CombinedValidator>>,
+    validator: Option<Arc<CombinedValidator>>,
     name: String,
 }
 
@@ -24,14 +26,14 @@ impl BuildValidator for JsonValidator {
     fn build(
         schema: &Bound<'_, PyDict>,
         config: Option<&Bound<'_, PyDict>>,
-        definitions: &mut DefinitionsBuilder<CombinedValidator>,
-    ) -> PyResult<CombinedValidator> {
+        definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
+    ) -> PyResult<Arc<CombinedValidator>> {
         let validator = match schema.get_as(intern!(schema.py(), "schema"))? {
             Some(schema) => {
                 let validator = build_validator(&schema, config, definitions)?;
-                match validator {
+                match validator.as_ref() {
                     CombinedValidator::Any(_) => None,
-                    _ => Some(Box::new(validator)),
+                    _ => Some(validator),
                 }
             }
             None => None,
@@ -41,7 +43,7 @@ impl BuildValidator for JsonValidator {
             Self::EXPECTED_TYPE,
             validator.as_ref().map_or("any", |v| v.get_name())
         );
-        Ok(Self { validator, name }.into())
+        Ok(CombinedValidator::Json(Self { validator, name }).into())
     }
 }
 
@@ -53,7 +55,7 @@ impl Validator for JsonValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         let v_match = validate_json_bytes(input)?;
         let json_either_bytes = v_match.unpack(state);
         let json_bytes = json_either_bytes.as_slice();

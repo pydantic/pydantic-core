@@ -1,5 +1,6 @@
 use std::fmt::Debug;
 use std::str::FromStr;
+use std::sync::Arc;
 
 use enum_dispatch::enum_dispatch;
 use jiter::{PartialMode, StringCacheMode};
@@ -61,7 +62,7 @@ mod timedelta;
 mod tuple;
 mod typed_dict;
 mod union;
-mod url;
+pub(crate) mod url;
 mod uuid;
 mod validation_state;
 mod with_default;
@@ -72,11 +73,11 @@ pub use with_default::DefaultType;
 #[pyclass(module = "pydantic_core._pydantic_core", name = "Some")]
 pub struct PySome {
     #[pyo3(get)]
-    value: PyObject,
+    value: Py<PyAny>,
 }
 
 impl PySome {
-    fn new(value: PyObject) -> Self {
+    fn new(value: Py<PyAny>) -> Self {
         Self { value }
     }
 }
@@ -88,7 +89,7 @@ impl PySome {
     }
 
     #[new]
-    pub fn py_new(value: PyObject) -> Self {
+    pub fn py_new(value: Py<PyAny>) -> Self {
         Self { value }
     }
 
@@ -107,14 +108,14 @@ impl PySome {
 #[pyclass(module = "pydantic_core._pydantic_core", frozen)]
 #[derive(Debug)]
 pub struct SchemaValidator {
-    validator: CombinedValidator,
-    definitions: Definitions<CombinedValidator>,
+    validator: Arc<CombinedValidator>,
+    definitions: Definitions<Arc<CombinedValidator>>,
     // References to the Python schema and config objects are saved to enable
     // reconstructing the object for cloudpickle support (see `__reduce__`).
     py_schema: Py<PyAny>,
     py_config: Option<Py<PyDict>>,
     #[pyo3(get)]
-    title: PyObject,
+    title: Py<PyAny>,
     hide_input_in_errors: bool,
     validation_error_cause: bool,
     cache_str: StringCacheMode,
@@ -173,7 +174,7 @@ impl SchemaValidator {
         allow_partial: PartialMode,
         by_alias: Option<bool>,
         by_name: Option<bool>,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<Py<PyAny>> {
         let extra_behavior = extra
             .map(|e| ExtraBehavior::from_str(e.to_str()?).map_err(|err| PyValueError::new_err(err.to_string())))
             .transpose()?;
@@ -248,7 +249,7 @@ impl SchemaValidator {
         allow_partial: PartialMode,
         by_alias: Option<bool>,
         by_name: Option<bool>,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<Py<PyAny>> {
         let extra_behavior = extra
             .map(|e| ExtraBehavior::from_str(e.to_str()?).map_err(|err| PyValueError::new_err(err.to_string())))
             .transpose()?;
@@ -284,7 +285,7 @@ impl SchemaValidator {
         allow_partial: PartialMode,
         by_alias: Option<bool>,
         by_name: Option<bool>,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<Py<PyAny>> {
         let t = InputType::String;
         let string_mapping = StringMapping::new_value(input).map_err(|e| self.prepare_validation_err(py, e, t))?;
         let extra_behavior = extra
@@ -324,7 +325,7 @@ impl SchemaValidator {
         context: Option<&Bound<'_, PyAny>>,
         by_alias: Option<bool>,
         by_name: Option<bool>,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<Py<PyAny>> {
         let extra_behavior = extra
             .map(|e| ExtraBehavior::from_str(e.to_str()?).map_err(|err| PyValueError::new_err(err.to_string())))
             .transpose()?;
@@ -356,7 +357,7 @@ impl SchemaValidator {
         py: Python,
         strict: Option<bool>,
         context: Option<&Bound<'_, PyAny>>,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<Py<PyAny>> {
         let extra = Extra {
             input_type: InputType::Python,
             data: None,
@@ -426,7 +427,7 @@ impl SchemaValidator {
         allow_partial: PartialMode,
         by_alias: Option<bool>,
         by_name: Option<bool>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         let mut recursion_guard = RecursionState::default();
         let mut state = ValidationState::new(
             Extra::new(
@@ -459,7 +460,7 @@ impl SchemaValidator {
         allow_partial: PartialMode,
         by_alias: Option<bool>,
         by_name: Option<bool>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         let json_value = jiter::JsonValue::parse_with_config(json_data, true, allow_partial)
             .map_err(|e| json::map_json_err(input, e, json_data))?;
         #[allow(clippy::used_underscore_items)]
@@ -499,8 +500,8 @@ pub trait BuildValidator: Sized {
     fn build(
         schema: &Bound<'_, PyDict>,
         config: Option<&Bound<'_, PyDict>>,
-        definitions: &mut DefinitionsBuilder<CombinedValidator>,
-    ) -> PyResult<CombinedValidator>;
+        definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
+    ) -> PyResult<Arc<CombinedValidator>>;
 }
 
 /// Logic to create a particular validator, called in the `validator_match` macro, then in turn by `build_validator`
@@ -508,8 +509,8 @@ fn build_specific_validator<T: BuildValidator>(
     val_type: &str,
     schema_dict: &Bound<'_, PyDict>,
     config: Option<&Bound<'_, PyDict>>,
-    definitions: &mut DefinitionsBuilder<CombinedValidator>,
-) -> PyResult<CombinedValidator> {
+    definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
+) -> PyResult<Arc<CombinedValidator>> {
     T::build(schema_dict, config, definitions)
         .map_err(|err| py_schema_error_type!("Error building \"{}\" validator:\n  {}", val_type, err))
 }
@@ -532,25 +533,25 @@ macro_rules! validator_match {
 pub fn build_validator_base(
     schema: &Bound<'_, PyAny>,
     config: Option<&Bound<'_, PyDict>>,
-    definitions: &mut DefinitionsBuilder<CombinedValidator>,
-) -> PyResult<CombinedValidator> {
+    definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
+) -> PyResult<Arc<CombinedValidator>> {
     build_validator_inner(schema, config, definitions, false)
 }
 
 pub fn build_validator(
     schema: &Bound<'_, PyAny>,
     config: Option<&Bound<'_, PyDict>>,
-    definitions: &mut DefinitionsBuilder<CombinedValidator>,
-) -> PyResult<CombinedValidator> {
+    definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
+) -> PyResult<Arc<CombinedValidator>> {
     build_validator_inner(schema, config, definitions, true)
 }
 
 fn build_validator_inner(
     schema: &Bound<'_, PyAny>,
     config: Option<&Bound<'_, PyDict>>,
-    definitions: &mut DefinitionsBuilder<CombinedValidator>,
+    definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
     use_prebuilt: bool,
-) -> PyResult<CombinedValidator> {
+) -> PyResult<Arc<CombinedValidator>> {
     let dict = schema.downcast::<PyDict>()?;
     let py = schema.py();
     let type_: Bound<'_, PyString> = dict.get_as_req(intern!(py, "type"))?;
@@ -559,7 +560,7 @@ fn build_validator_inner(
     if use_prebuilt {
         // if we have a SchemaValidator on the type already, use it
         if let Ok(Some(prebuilt_validator)) = prebuilt::PrebuiltValidator::try_get_from_schema(type_, dict) {
-            return Ok(prebuilt_validator);
+            return Ok(Arc::new(prebuilt_validator));
         }
     }
 
@@ -850,7 +851,7 @@ pub trait Validator: Send + Sync + Debug {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject>;
+    ) -> ValResult<Py<PyAny>>;
 
     /// Get a default value, currently only used by `WithDefaultValidator`
     fn default_value<'py>(
@@ -858,7 +859,7 @@ pub trait Validator: Send + Sync + Debug {
         _py: Python<'py>,
         _outer_loc: Option<impl Into<LocItem>>,
         _state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<Option<PyObject>> {
+    ) -> ValResult<Option<Py<PyAny>>> {
         Ok(None)
     }
 
@@ -871,7 +872,7 @@ pub trait Validator: Send + Sync + Debug {
         _field_name: &str,
         _field_value: &Bound<'py, PyAny>,
         _state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         let py_err = PyTypeError::new_err(format!("validate_assignment is not supported for {}", self.get_name()));
         Err(py_err.into())
     }

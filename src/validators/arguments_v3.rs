@@ -1,4 +1,5 @@
 use std::str::FromStr;
+use std::sync::Arc;
 
 use pyo3::intern;
 use pyo3::prelude::*;
@@ -52,7 +53,7 @@ struct Parameter {
     name: String,
     mode: ParameterMode,
     lookup_key_collection: LookupKeyCollection,
-    validator: CombinedValidator,
+    validator: Arc<CombinedValidator>,
 }
 
 impl Parameter {
@@ -80,8 +81,8 @@ impl BuildValidator for ArgumentsV3Validator {
     fn build(
         schema: &Bound<'_, PyDict>,
         config: Option<&Bound<'_, PyDict>>,
-        definitions: &mut DefinitionsBuilder<CombinedValidator>,
-    ) -> PyResult<CombinedValidator> {
+        definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
+    ) -> PyResult<Arc<CombinedValidator>> {
         let py = schema.py();
 
         let arguments_schema: Bound<'_, PyList> = schema.get_as_req(intern!(py, "arguments_schema"))?;
@@ -167,8 +168,8 @@ impl BuildValidator for ArgumentsV3Validator {
                 Err(err) => return py_schema_err!("Parameter '{}':\n  {}", name, err),
             };
 
-            let has_default = match validator {
-                CombinedValidator::WithDefault(ref v) => {
+            let has_default = match validator.as_ref() {
+                CombinedValidator::WithDefault(v) => {
                     if v.omit_on_error() {
                         return py_schema_err!("Parameter '{}': omit_on_error cannot be used with arguments", name);
                     }
@@ -204,14 +205,14 @@ impl BuildValidator for ArgumentsV3Validator {
             })
             .count();
 
-        Ok(Self {
+        Ok(CombinedValidator::ArgumentsV3(Self {
             parameters,
             positional_params_count,
             loc_by_alias: config.get_as(intern!(py, "loc_by_alias"))?.unwrap_or(true),
             extra: ExtraBehavior::from_schema_or_config(py, schema, config, ExtraBehavior::Forbid)?,
             validate_by_alias: schema_or_config_same(schema, config, intern!(py, "validate_by_alias"))?,
             validate_by_name: schema_or_config_same(schema, config, intern!(py, "validate_by_name"))?,
-        }
+        })
         .into())
     }
 }
@@ -234,8 +235,8 @@ impl ArgumentsV3Validator {
         original_input: &(impl Input<'py> + ?Sized),
         mapping: impl ValidatedDict<'py>,
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
-        let mut output_args: Vec<PyObject> = Vec::with_capacity(self.positional_params_count);
+    ) -> ValResult<Py<PyAny>> {
+        let mut output_args: Vec<Py<PyAny>> = Vec::with_capacity(self.positional_params_count);
         let output_kwargs = PyDict::new(py);
         let mut errors: Vec<ValLineError> = Vec::new();
 
@@ -518,8 +519,8 @@ impl ArgumentsV3Validator {
         original_input: &(impl Input<'py> + ?Sized),
         args_kwargs: impl Arguments<'py>,
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
-        let mut output_args: Vec<PyObject> = Vec::with_capacity(self.positional_params_count);
+    ) -> ValResult<Py<PyAny>> {
+        let mut output_args: Vec<Py<PyAny>> = Vec::with_capacity(self.positional_params_count);
         let output_kwargs = PyDict::new(py);
         let mut errors: Vec<ValLineError> = Vec::new();
         let mut used_kwargs: AHashSet<&str> = AHashSet::with_capacity(self.parameters.len());
@@ -764,7 +765,7 @@ impl Validator for ArgumentsV3Validator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         // this validator does not yet support partial validation, disable it to avoid incorrect results
         state.allow_partial = false.into();
 

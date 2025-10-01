@@ -1,6 +1,9 @@
+use std::sync::Arc;
+
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
+use crate::build_tools::LazyLock;
 use crate::errors::{ErrorTypeDefaults, ValError, ValResult};
 use crate::input::Input;
 
@@ -10,15 +13,17 @@ use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationSta
 #[derive(Debug, Clone)]
 pub struct CallableValidator;
 
+static CALLABLE_VALIDATOR: LazyLock<Arc<CombinedValidator>> = LazyLock::new(|| Arc::new(CallableValidator.into()));
+
 impl BuildValidator for CallableValidator {
     const EXPECTED_TYPE: &'static str = "callable";
 
     fn build(
         _schema: &Bound<'_, PyDict>,
         _config: Option<&Bound<'_, PyDict>>,
-        _definitions: &mut DefinitionsBuilder<CombinedValidator>,
-    ) -> PyResult<CombinedValidator> {
-        Ok(Self.into())
+        _definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
+    ) -> PyResult<Arc<CombinedValidator>> {
+        Ok(CALLABLE_VALIDATOR.clone())
     }
 }
 
@@ -30,7 +35,7 @@ impl Validator for CallableValidator {
         _py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         state.floor_exactness(Exactness::Lax);
         if let Some(py_input) = input.as_python() {
             if py_input.is_callable() {

@@ -1,10 +1,11 @@
 use pyo3::exceptions::PyValueError;
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::sync::GILOnceCell;
+use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyDict, PyString};
 use speedate::{DateTime, MicrosecondsPrecisionOverflowBehavior, Time};
 use std::cmp::Ordering;
+use std::sync::Arc;
 use strum::EnumMessage;
 
 use crate::build_tools::{is_strict, py_schema_error_type};
@@ -46,14 +47,14 @@ impl BuildValidator for DateTimeValidator {
     fn build(
         schema: &Bound<'_, PyDict>,
         config: Option<&Bound<'_, PyDict>>,
-        _definitions: &mut DefinitionsBuilder<CombinedValidator>,
-    ) -> PyResult<CombinedValidator> {
-        Ok(Self {
+        _definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
+    ) -> PyResult<Arc<CombinedValidator>> {
+        Ok(CombinedValidator::Datetime(Self {
             strict: is_strict(schema, config)?,
             constraints: DateTimeConstraints::from_py(schema)?,
             microseconds_precision: extract_microseconds_precision(schema, config)?,
             val_temporal_unit: TemporalUnitMode::from_config(config)?,
-        }
+        })
         .into())
     }
 }
@@ -66,7 +67,7 @@ impl Validator for DateTimeValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         let strict = state.strict_or(self.strict);
         let datetime = match input.validate_datetime(strict, self.microseconds_precision, self.val_temporal_unit) {
             Ok(val_match) => val_match.unpack(state),
@@ -257,7 +258,7 @@ pub struct NowConstraint {
     utc_offset: Option<i32>,
 }
 
-static TIME_LOCALTIME: GILOnceCell<PyObject> = GILOnceCell::new();
+static TIME_LOCALTIME: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
 
 impl NowConstraint {
     /// Get the UTC offset in seconds either from the utc_offset field or by calling `time.localtime().tm_gmtoff`.

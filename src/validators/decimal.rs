@@ -1,6 +1,8 @@
+use std::sync::Arc;
+
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::intern;
-use pyo3::sync::GILOnceCell;
+use pyo3::sync::PyOnceLock;
 use pyo3::types::{IntoPyDict, PyDict, PyString, PyTuple, PyType};
 use pyo3::{prelude::*, PyTypeInfo};
 
@@ -14,7 +16,7 @@ use crate::tools::SchemaDict;
 
 use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
 
-static DECIMAL_TYPE: GILOnceCell<Py<PyType>> = GILOnceCell::new();
+static DECIMAL_TYPE: PyOnceLock<Py<PyType>> = PyOnceLock::new();
 
 pub fn get_decimal_type(py: Python<'_>) -> &Bound<'_, PyType> {
     DECIMAL_TYPE
@@ -63,8 +65,8 @@ impl BuildValidator for DecimalValidator {
     fn build(
         schema: &Bound<'_, PyDict>,
         config: Option<&Bound<'_, PyDict>>,
-        _definitions: &mut DefinitionsBuilder<CombinedValidator>,
-    ) -> PyResult<CombinedValidator> {
+        _definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
+    ) -> PyResult<Arc<CombinedValidator>> {
         let py = schema.py();
 
         let allow_inf_nan = schema_or_config_same(schema, config, intern!(py, "allow_inf_nan"))?.unwrap_or(false);
@@ -76,7 +78,7 @@ impl BuildValidator for DecimalValidator {
             ));
         }
 
-        Ok(Self {
+        Ok(CombinedValidator::Decimal(Self {
             strict: is_strict(schema, config)?,
             allow_inf_nan,
             check_digits: decimal_places.is_some() || max_digits.is_some(),
@@ -87,7 +89,7 @@ impl BuildValidator for DecimalValidator {
             ge: validate_as_decimal(py, schema, intern!(py, "ge"))?,
             gt: validate_as_decimal(py, schema, intern!(py, "gt"))?,
             max_digits,
-        }
+        })
         .into())
     }
 }
@@ -139,7 +141,7 @@ impl Validator for DecimalValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         let decimal = input.validate_decimal(state.strict_or(self.strict), py)?.unpack(state);
 
         if !self.allow_inf_nan || self.check_digits {

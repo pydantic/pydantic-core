@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use pyo3::exceptions::PyValueError;
 use pyo3::intern;
 use pyo3::prelude::*;
@@ -27,13 +29,13 @@ impl BuildValidator for DateValidator {
     fn build(
         schema: &Bound<'_, PyDict>,
         config: Option<&Bound<'_, PyDict>>,
-        _definitions: &mut DefinitionsBuilder<CombinedValidator>,
-    ) -> PyResult<CombinedValidator> {
-        Ok(Self {
+        _definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
+    ) -> PyResult<Arc<CombinedValidator>> {
+        Ok(CombinedValidator::Date(Self {
             strict: is_strict(schema, config)?,
             constraints: DateConstraints::from_py(schema)?,
             val_temporal_unit: TemporalUnitMode::from_config(config)?,
-        }
+        })
         .into())
     }
 }
@@ -46,7 +48,7 @@ impl Validator for DateValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         let strict = state.strict_or(self.strict);
         let date = match input.validate_date(strict, self.val_temporal_unit) {
             Ok(val_match) => val_match.unpack(state),

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::PyString;
@@ -21,8 +23,8 @@ impl BuildValidator for DefinitionsValidatorBuilder {
     fn build(
         schema: &Bound<'_, PyDict>,
         config: Option<&Bound<'_, PyDict>>,
-        definitions: &mut DefinitionsBuilder<CombinedValidator>,
-    ) -> PyResult<CombinedValidator> {
+        definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
+    ) -> PyResult<Arc<CombinedValidator>> {
         let py = schema.py();
 
         let schema_definitions: Bound<'_, PyList> = schema.get_as_req(intern!(py, "definitions"))?;
@@ -42,11 +44,11 @@ impl BuildValidator for DefinitionsValidatorBuilder {
 
 #[derive(Debug, Clone)]
 pub struct DefinitionRefValidator {
-    definition: DefinitionRef<CombinedValidator>,
+    definition: DefinitionRef<Arc<CombinedValidator>>,
 }
 
 impl DefinitionRefValidator {
-    pub fn new(definition: DefinitionRef<CombinedValidator>) -> Self {
+    pub fn new(definition: DefinitionRef<Arc<CombinedValidator>>) -> Self {
         Self { definition }
     }
 }
@@ -57,12 +59,12 @@ impl BuildValidator for DefinitionRefValidator {
     fn build(
         schema: &Bound<'_, PyDict>,
         _config: Option<&Bound<'_, PyDict>>,
-        definitions: &mut DefinitionsBuilder<CombinedValidator>,
-    ) -> PyResult<CombinedValidator> {
+        definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
+    ) -> PyResult<Arc<CombinedValidator>> {
         let schema_ref: Bound<'_, PyString> = schema.get_as_req(intern!(schema.py(), "schema_ref"))?;
 
         let definition = definitions.get_definition(schema_ref.to_str()?);
-        Ok(Self::new(definition).into())
+        Ok(CombinedValidator::DefinitionRef(Self::new(definition)).into())
     }
 }
 
@@ -74,7 +76,7 @@ impl Validator for DefinitionRefValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         // this validator does not yet support partial validation, disable it to avoid incorrect results
         state.allow_partial = false.into();
 
@@ -97,7 +99,7 @@ impl Validator for DefinitionRefValidator {
         _py: Python<'py>,
         _outer_loc: Option<impl Into<crate::errors::LocItem>>,
         _state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<Option<PyObject>> {
+    ) -> ValResult<Option<Py<PyAny>>> {
         self.definition.read(|validator| {
             let validator = validator.unwrap();
             validator.default_value(_py, _outer_loc, _state)
@@ -111,7 +113,7 @@ impl Validator for DefinitionRefValidator {
         field_name: &str,
         field_value: &Bound<'py, PyAny>,
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         self.definition.read(|validator| {
             let validator = validator.unwrap();
             let Ok(mut guard) = RecursionGuard::new(state, py_identity(obj), self.definition.id()) else {

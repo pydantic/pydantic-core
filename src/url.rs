@@ -6,15 +6,20 @@ use std::hash::{Hash, Hasher};
 use std::sync::OnceLock;
 
 use idna::punycode::decode_to_string;
+use jiter::{PartialMode, StringCacheMode};
 use pyo3::exceptions::PyValueError;
 use pyo3::pyclass::CompareOp;
-use pyo3::sync::{GILOnceCell, OnceLockExt};
+use pyo3::sync::OnceLockExt;
 use pyo3::types::{PyDict, PyType};
 use pyo3::{intern, prelude::*, IntoPyObjectExt};
 use url::Url;
 
+use crate::input::InputType;
+use crate::recursion_guard::RecursionState;
 use crate::tools::SchemaDict;
-use crate::SchemaValidator;
+use crate::validators::url::{MultiHostUrlValidator, UrlValidator};
+use crate::validators::{Extra, ValidationState, Validator};
+use crate::ValidationError;
 
 #[pyclass(name = "Url", module = "pydantic_core._pydantic_core", subclass, frozen)]
 #[derive(Clone)]
@@ -69,19 +74,38 @@ impl PyUrl {
     #[new]
     #[pyo3(signature = (url, *, preserve_empty_path=false))]
     pub fn py_new(py: Python, url: &Bound<'_, PyAny>, preserve_empty_path: bool) -> PyResult<Self> {
-        let schema_obj = get_schema_validator(py, false, preserve_empty_path)?.validate_python(
-            py,
-            url,
-            None,
-            None,
-            None,
-            None,
-            None,
-            false.into(),
-            None,
-            None,
-        )?;
-        schema_obj.extract(py)
+        let validator = UrlValidator::get_simple(false, preserve_empty_path);
+        let url_obj = validator
+            .validate(
+                py,
+                url,
+                &mut ValidationState::new(
+                    Extra::new(
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        InputType::Python,
+                        StringCacheMode::None,
+                        None,
+                        None,
+                    ),
+                    &mut RecursionState::default(),
+                    PartialMode::Off,
+                ),
+            )
+            .map_err(|e| {
+                let name = match validator.get_name().into_py_any(py) {
+                    Ok(name) => name,
+                    Err(e) => return e,
+                };
+                ValidationError::from_val_error(py, name, InputType::Python, e, None, false, false)
+            })?
+            .downcast_bound::<Self>(py)?
+            .get()
+            .clone(); // FIXME: avoid the clone, would need to make `validate` be aware of what URL subclass to create
+        Ok(url_obj)
     }
 
     #[getter]
@@ -255,19 +279,38 @@ impl PyMultiHostUrl {
     #[new]
     #[pyo3(signature = (url, *, preserve_empty_path=false))]
     pub fn py_new(py: Python, url: &Bound<'_, PyAny>, preserve_empty_path: bool) -> PyResult<Self> {
-        let schema_obj = get_schema_validator(py, true, preserve_empty_path)?.validate_python(
-            py,
-            url,
-            None,
-            None,
-            None,
-            None,
-            None,
-            false.into(),
-            None,
-            None,
-        )?;
-        schema_obj.extract(py)
+        let validator = MultiHostUrlValidator::get_simple(false, preserve_empty_path);
+        let url_obj = validator
+            .validate(
+                py,
+                url,
+                &mut ValidationState::new(
+                    Extra::new(
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        InputType::Python,
+                        StringCacheMode::None,
+                        None,
+                        None,
+                    ),
+                    &mut RecursionState::default(),
+                    PartialMode::Off,
+                ),
+            )
+            .map_err(|e| {
+                let name = match validator.get_name().into_py_any(py) {
+                    Ok(name) => name,
+                    Err(e) => return e,
+                };
+                ValidationError::from_val_error(py, name, InputType::Python, e, None, false, false)
+            })?
+            .downcast_bound::<Self>(py)?
+            .get()
+            .clone(); // FIXME: avoid the clone, would need to make `validate` be aware of what URL subclass to create
+        Ok(url_obj)
     }
 
     #[getter]
@@ -580,30 +623,4 @@ fn serialize_url_without_path_slash(url: &Url) -> String {
         unsafe { std::str::from_utf8_unchecked(std::slice::from_raw_parts(path.as_ptr().add(path.len()), suffix_len)) };
 
     format!("{prefix}{suffix}")
-}
-
-static SCHEMA_URL_SINGLE_TRUE: GILOnceCell<SchemaValidator> = GILOnceCell::new();
-static SCHEMA_URL_SINGLE_FALSE: GILOnceCell<SchemaValidator> = GILOnceCell::new();
-static SCHEMA_URL_MULTI_TRUE: GILOnceCell<SchemaValidator> = GILOnceCell::new();
-static SCHEMA_URL_MULTI_FALSE: GILOnceCell<SchemaValidator> = GILOnceCell::new();
-
-macro_rules! make_schema_val {
-    ($py:ident, $schema_type:literal, $preserve_empty_path:literal) => {{
-        let schema = PyDict::new($py);
-        schema.set_item(intern!($py, "type"), intern!($py, $schema_type))?;
-        // preserve_empty_path defaults to false, so only set it if true
-        if $preserve_empty_path {
-            schema.set_item(intern!($py, "preserve_empty_path"), true)?;
-        }
-        SchemaValidator::py_new($py, &schema, None)
-    }};
-}
-
-fn get_schema_validator(py: Python<'_>, multi_host: bool, preserve_empty_path: bool) -> PyResult<&SchemaValidator> {
-    match (multi_host, preserve_empty_path) {
-        (false, true) => SCHEMA_URL_SINGLE_TRUE.get_or_try_init(py, || make_schema_val!(py, "url", true)),
-        (false, false) => SCHEMA_URL_SINGLE_FALSE.get_or_try_init(py, || make_schema_val!(py, "url", false)),
-        (true, true) => SCHEMA_URL_MULTI_TRUE.get_or_try_init(py, || make_schema_val!(py, "multi-host-url", true)),
-        (true, false) => SCHEMA_URL_MULTI_FALSE.get_or_try_init(py, || make_schema_val!(py, "multi-host-url", false)),
-    }
 }

@@ -1,6 +1,8 @@
+use std::sync::Arc;
+
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::sync::GILOnceCell;
+use pyo3::sync::PyOnceLock;
 use pyo3::types::PyDict;
 use pyo3::types::PyString;
 use pyo3::PyTraverseError;
@@ -15,17 +17,17 @@ use crate::py_gc::PyGcTraverse;
 use crate::tools::SchemaDict;
 use crate::PydanticUndefinedType;
 
-static COPY_DEEPCOPY: GILOnceCell<PyObject> = GILOnceCell::new();
+static COPY_DEEPCOPY: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
 
-fn get_deepcopy(py: Python) -> PyResult<PyObject> {
+fn get_deepcopy(py: Python) -> PyResult<Py<PyAny>> {
     Ok(py.import("copy")?.getattr("deepcopy")?.unbind())
 }
 
 #[derive(Debug, Clone)]
 pub enum DefaultType {
     None,
-    Default(PyObject),
-    DefaultFactory(PyObject, bool),
+    Default(Py<PyAny>),
+    DefaultFactory(Py<PyAny>, bool),
 }
 
 impl DefaultType {
@@ -47,7 +49,7 @@ impl DefaultType {
         }
     }
 
-    pub fn default_value(&self, py: Python, validated_data: Option<&Bound<PyDict>>) -> PyResult<Option<PyObject>> {
+    pub fn default_value(&self, py: Python, validated_data: Option<&Bound<PyDict>>) -> PyResult<Option<Py<PyAny>>> {
         match self {
             Self::Default(ref default) => Ok(Some(default.clone_ref(py))),
             Self::DefaultFactory(ref default_factory, ref takes_data) => {
@@ -88,11 +90,11 @@ enum OnError {
 pub struct WithDefaultValidator {
     default: DefaultType,
     on_error: OnError,
-    validator: Box<CombinedValidator>,
+    validator: Arc<CombinedValidator>,
     validate_default: bool,
     copy_default: bool,
     name: String,
-    undefined: PyObject,
+    undefined: Py<PyAny>,
 }
 
 impl BuildValidator for WithDefaultValidator {
@@ -101,8 +103,8 @@ impl BuildValidator for WithDefaultValidator {
     fn build(
         schema: &Bound<'_, PyDict>,
         config: Option<&Bound<'_, PyDict>>,
-        definitions: &mut DefinitionsBuilder<CombinedValidator>,
-    ) -> PyResult<CombinedValidator> {
+        definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
+    ) -> PyResult<Arc<CombinedValidator>> {
         let py = schema.py();
         let default = DefaultType::new(schema)?;
         let on_error = match schema
@@ -125,7 +127,7 @@ impl BuildValidator for WithDefaultValidator {
         };
 
         let sub_schema = schema.get_as_req(intern!(schema.py(), "schema"))?;
-        let validator = Box::new(build_validator(&sub_schema, config, definitions)?);
+        let validator = build_validator(&sub_schema, config, definitions)?;
 
         let copy_default = if let DefaultType::Default(default_obj) = &default {
             default_obj.bind(py).hash().is_err()
@@ -135,7 +137,7 @@ impl BuildValidator for WithDefaultValidator {
 
         let name = format!("{}[{}]", Self::EXPECTED_TYPE, validator.get_name());
 
-        Ok(Self {
+        Ok(CombinedValidator::WithDefault(Self {
             default,
             on_error,
             validator,
@@ -143,7 +145,7 @@ impl BuildValidator for WithDefaultValidator {
             copy_default,
             name,
             undefined: PydanticUndefinedType::new(py).into_any(),
-        }
+        })
         .into())
     }
 }
@@ -156,7 +158,7 @@ impl Validator for WithDefaultValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         if input.as_python().is_some_and(|py_input| py_input.is(&self.undefined)) {
             Ok(self.default_value(py, None::<usize>, state)?.unwrap())
         } else {
@@ -179,7 +181,7 @@ impl Validator for WithDefaultValidator {
         py: Python<'py>,
         outer_loc: Option<impl Into<LocItem>>,
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<Option<PyObject>> {
+    ) -> ValResult<Option<Py<PyAny>>> {
         match self.default.default_value(py, state.extra().data.as_ref())? {
             Some(stored_dft) => {
                 let dft: Py<PyAny> = if self.copy_default {

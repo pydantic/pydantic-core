@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::sync::Arc;
 
 use pyo3::prelude::*;
 use pyo3::types::{PyDate, PyDateTime, PyDict, PyTime};
@@ -101,10 +102,10 @@ macro_rules! build_temporal_serializer {
             fn build(
                 _schema: &Bound<'_, PyDict>,
                 config: Option<&Bound<'_, PyDict>>,
-                _definitions: &mut DefinitionsBuilder<CombinedSerializer>,
-            ) -> PyResult<CombinedSerializer> {
+                _definitions: &mut DefinitionsBuilder<Arc<CombinedSerializer>>,
+            ) -> PyResult<Arc<CombinedSerializer>> {
                 let temporal_mode = TemporalMode::from_config(config)?;
-                Ok(Self { temporal_mode }.into())
+                Ok(Arc::new(Self { temporal_mode }.into()))
             }
         }
 
@@ -117,7 +118,7 @@ macro_rules! build_temporal_serializer {
                 include: Option<&Bound<'_, PyAny>>,
                 exclude: Option<&Bound<'_, PyAny>>,
                 extra: &Extra,
-            ) -> PyResult<PyObject> {
+            ) -> PyResult<Py<PyAny>> {
                 match extra.mode {
                     SerMode::Json => match $downcast(value) {
                         Ok(py_value) => Ok(self.temporal_mode.$to_json(value.py(), py_value)?),

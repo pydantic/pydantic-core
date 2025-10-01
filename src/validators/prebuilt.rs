@@ -18,7 +18,7 @@ impl PrebuiltValidator {
         get_prebuilt(type_, schema, "__pydantic_validator__", |py_any| {
             let schema_validator = py_any.extract::<Py<SchemaValidator>>()?;
             if matches!(
-                schema_validator.get().validator,
+                schema_validator.get().validator.as_ref(),
                 CombinedValidator::FunctionWrap(_) | CombinedValidator::FunctionAfter(_)
             ) {
                 return Ok(None);
@@ -36,7 +36,7 @@ impl Validator for PrebuiltValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         self.schema_validator.get().validator.validate(py, input, state)
     }
 

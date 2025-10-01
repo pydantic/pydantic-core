@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use pyo3::exceptions::PyKeyError;
 use pyo3::intern;
 use pyo3::prelude::*;
@@ -22,7 +24,7 @@ struct Field {
     name: String,
     lookup_key_collection: LookupKeyCollection,
     name_py: Py<PyString>,
-    validator: CombinedValidator,
+    validator: Arc<CombinedValidator>,
     frozen: bool,
 }
 
@@ -33,8 +35,8 @@ pub struct ModelFieldsValidator {
     fields: Vec<Field>,
     model_name: String,
     extra_behavior: ExtraBehavior,
-    extras_validator: Option<Box<CombinedValidator>>,
-    extras_keys_validator: Option<Box<CombinedValidator>>,
+    extras_validator: Option<Arc<CombinedValidator>>,
+    extras_keys_validator: Option<Arc<CombinedValidator>>,
     strict: bool,
     from_attributes: bool,
     loc_by_alias: bool,
@@ -48,8 +50,8 @@ impl BuildValidator for ModelFieldsValidator {
     fn build(
         schema: &Bound<'_, PyDict>,
         config: Option<&Bound<'_, PyDict>>,
-        definitions: &mut DefinitionsBuilder<CombinedValidator>,
-    ) -> PyResult<CombinedValidator> {
+        definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
+    ) -> PyResult<Arc<CombinedValidator>> {
         let py = schema.py();
 
         let strict = is_strict(schema, config)?;
@@ -59,12 +61,12 @@ impl BuildValidator for ModelFieldsValidator {
         let extra_behavior = ExtraBehavior::from_schema_or_config(py, schema, config, ExtraBehavior::Ignore)?;
 
         let extras_validator = match (schema.get_item(intern!(py, "extras_schema"))?, &extra_behavior) {
-            (Some(v), ExtraBehavior::Allow) => Some(Box::new(build_validator(&v, config, definitions)?)),
+            (Some(v), ExtraBehavior::Allow) => Some(build_validator(&v, config, definitions)?),
             (Some(_), _) => return py_schema_err!("extras_schema can only be used if extra_behavior=allow"),
             (_, _) => None,
         };
         let extras_keys_validator = match (schema.get_item(intern!(py, "extras_keys_schema"))?, &extra_behavior) {
-            (Some(v), ExtraBehavior::Allow) => Some(Box::new(build_validator(&v, config, definitions)?)),
+            (Some(v), ExtraBehavior::Allow) => Some(build_validator(&v, config, definitions)?),
             (Some(_), _) => return py_schema_err!("extras_keys_schema can only be used if extra_behavior=allow"),
             (_, _) => None,
         };
@@ -99,7 +101,7 @@ impl BuildValidator for ModelFieldsValidator {
             });
         }
 
-        Ok(Self {
+        Ok(CombinedValidator::ModelFields(Self {
             fields,
             model_name,
             extra_behavior,
@@ -110,7 +112,7 @@ impl BuildValidator for ModelFieldsValidator {
             loc_by_alias: config.get_as(intern!(py, "loc_by_alias"))?.unwrap_or(true),
             validate_by_alias: config.get_as(intern!(py, "validate_by_alias"))?,
             validate_by_name: config.get_as(intern!(py, "validate_by_name"))?,
-        }
+        })
         .into())
     }
 }
@@ -126,7 +128,7 @@ impl Validator for ModelFieldsValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         // this validator does not yet support partial validation, disable it to avoid incorrect results
         state.allow_partial = false.into();
 
@@ -386,7 +388,7 @@ impl Validator for ModelFieldsValidator {
         field_name: &str,
         field_value: &Bound<'py, PyAny>,
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         let dict = obj.downcast::<PyDict>()?;
         let extra_behavior = state.extra_behavior_or(self.extra_behavior);
 
@@ -395,7 +397,7 @@ impl Validator for ModelFieldsValidator {
             Ok(dict)
         };
 
-        let prepare_result = |result: ValResult<PyObject>| match result {
+        let prepare_result = |result: ValResult<Py<PyAny>>| match result {
             Ok(output) => get_updated_dict(&output.into_bound(py)),
             Err(ValError::LineErrors(line_errors)) => {
                 let errors = line_errors

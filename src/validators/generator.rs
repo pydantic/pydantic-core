@@ -33,9 +33,9 @@ impl BuildValidator for GeneratorValidator {
     fn build(
         schema: &Bound<'_, PyDict>,
         config: Option<&Bound<'_, PyDict>>,
-        definitions: &mut DefinitionsBuilder<CombinedValidator>,
-    ) -> PyResult<CombinedValidator> {
-        let item_validator = get_items_schema(schema, config, definitions)?.map(Arc::new);
+        definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
+    ) -> PyResult<Arc<CombinedValidator>> {
+        let item_validator = get_items_schema(schema, config, definitions)?;
         let name = match item_validator {
             Some(ref v) => format!("{}[{}]", Self::EXPECTED_TYPE, v.get_name()),
             None => format!("{}[any]", Self::EXPECTED_TYPE),
@@ -46,14 +46,14 @@ impl BuildValidator for GeneratorValidator {
         let validation_error_cause: bool = config
             .get_as(pyo3::intern!(schema.py(), "validation_error_cause"))?
             .unwrap_or(false);
-        Ok(Self {
+        Ok(CombinedValidator::Generator(Self {
             item_validator,
             name,
             min_length: schema.get_as(pyo3::intern!(schema.py(), "min_length"))?,
             max_length: schema.get_as(pyo3::intern!(schema.py(), "max_length"))?,
             hide_input_in_errors,
             validation_error_cause,
-        }
+        })
         .into())
     }
 }
@@ -66,7 +66,7 @@ impl Validator for GeneratorValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         // this validator does not yet support partial validation, disable it to avoid incorrect results
         state.allow_partial = false.into();
 
@@ -114,7 +114,7 @@ impl ValidatorIterator {
         slf
     }
 
-    fn __next__(mut slf: PyRefMut<'_, Self>, py: Python) -> PyResult<Option<PyObject>> {
+    fn __next__(mut slf: PyRefMut<'_, Self>, py: Python) -> PyResult<Option<Py<PyAny>>> {
         let min_length = slf.min_length;
         let max_length = slf.max_length;
         let hide_input_in_errors = slf.hide_input_in_errors;
@@ -223,8 +223,8 @@ pub struct InternalValidator {
     strict: Option<bool>,
     extra_behavior: Option<ExtraBehavior>,
     from_attributes: Option<bool>,
-    context: Option<PyObject>,
-    self_instance: Option<PyObject>,
+    context: Option<Py<PyAny>>,
+    self_instance: Option<Py<PyAny>>,
     recursion_guard: RecursionState,
     pub(crate) exactness: Option<Exactness>,
     pub(crate) fields_set_count: Option<usize>,
@@ -275,7 +275,7 @@ impl InternalValidator {
         field_name: &str,
         field_value: &Bound<'py, PyAny>,
         outer_location: Option<LocItem>,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<Py<PyAny>> {
         let extra = Extra {
             input_type: self.validation_mode,
             data: self.data.as_ref().map(|data| data.bind(py).clone()),
@@ -314,7 +314,7 @@ impl InternalValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         outer_location: Option<LocItem>,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<Py<PyAny>> {
         let extra = Extra {
             input_type: self.validation_mode,
             data: self.data.as_ref().map(|data| data.bind(py).clone()),

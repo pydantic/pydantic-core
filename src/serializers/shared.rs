@@ -1,10 +1,11 @@
 use std::borrow::Cow;
 use std::fmt::Debug;
 use std::io::{self, Write};
+use std::sync::Arc;
 
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
-use pyo3::sync::GILOnceCell;
+use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyDict, PyString};
 use pyo3::{intern, PyTraverseError, PyVisit};
 
@@ -30,8 +31,8 @@ pub(crate) trait BuildSerializer: Sized {
     fn build(
         schema: &Bound<'_, PyDict>,
         config: Option<&Bound<'_, PyDict>>,
-        definitions: &mut DefinitionsBuilder<CombinedSerializer>,
-    ) -> PyResult<CombinedSerializer>;
+        definitions: &mut DefinitionsBuilder<Arc<CombinedSerializer>>,
+    ) -> PyResult<Arc<CombinedSerializer>>;
 }
 
 /// Build the `CombinedSerializer` enum and implement a `find_serializer` method for it.
@@ -53,8 +54,8 @@ macro_rules! combined_serializer {
                 lookup_type: &str,
                 schema: &Bound<'_, PyDict>,
                 config: Option<&Bound<'_, PyDict>>,
-                definitions: &mut DefinitionsBuilder<CombinedSerializer>
-            ) -> PyResult<CombinedSerializer> {
+                definitions: &mut DefinitionsBuilder<Arc<CombinedSerializer>>
+            ) -> PyResult<Arc<CombinedSerializer>> {
                 match lookup_type {
                     $(
                         <$b_serializer>::EXPECTED_TYPE => match <$b_serializer>::build(schema, config, definitions) {
@@ -156,17 +157,17 @@ impl CombinedSerializer {
     pub fn build_base(
         schema: &Bound<'_, PyDict>,
         config: Option<&Bound<'_, PyDict>>,
-        definitions: &mut DefinitionsBuilder<CombinedSerializer>,
-    ) -> PyResult<CombinedSerializer> {
+        definitions: &mut DefinitionsBuilder<Arc<CombinedSerializer>>,
+    ) -> PyResult<Arc<CombinedSerializer>> {
         Self::_build(schema, config, definitions, false)
     }
 
     fn _build(
         schema: &Bound<'_, PyDict>,
         config: Option<&Bound<'_, PyDict>>,
-        definitions: &mut DefinitionsBuilder<CombinedSerializer>,
+        definitions: &mut DefinitionsBuilder<Arc<CombinedSerializer>>,
         use_prebuilt: bool,
-    ) -> PyResult<CombinedSerializer> {
+    ) -> PyResult<Arc<CombinedSerializer>> {
         let py = schema.py();
         let type_key = intern!(py, "type");
 
@@ -217,7 +218,7 @@ impl CombinedSerializer {
             if let Ok(Some(prebuilt_serializer)) =
                 super::prebuilt::PrebuiltSerializer::try_get_from_schema(type_, schema)
             {
-                return Ok(prebuilt_serializer);
+                return Ok(Arc::new(prebuilt_serializer));
             }
         }
 
@@ -232,7 +233,7 @@ impl CombinedSerializer {
         include: Option<&Bound<'_, PyAny>>,
         exclude: Option<&Bound<'_, PyAny>>,
         extra: &Extra,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<Py<PyAny>> {
         if extra.serialize_as_any {
             infer_to_python(value, include, exclude, extra)
         } else {
@@ -248,7 +249,7 @@ impl CombinedSerializer {
         include: Option<&Bound<'_, PyAny>>,
         exclude: Option<&Bound<'_, PyAny>>,
         extra: &Extra,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<Py<PyAny>> {
         TypeSerializer::to_python(self, value, include, exclude, extra)
     }
 
@@ -300,8 +301,8 @@ impl BuildSerializer for CombinedSerializer {
     fn build(
         schema: &Bound<'_, PyDict>,
         config: Option<&Bound<'_, PyDict>>,
-        definitions: &mut DefinitionsBuilder<CombinedSerializer>,
-    ) -> PyResult<CombinedSerializer> {
+        definitions: &mut DefinitionsBuilder<Arc<CombinedSerializer>>,
+    ) -> PyResult<Arc<CombinedSerializer>> {
         Self::_build(schema, config, definitions, true)
     }
 }
@@ -362,7 +363,7 @@ pub(crate) trait TypeSerializer: Send + Sync + Debug {
         include: Option<&Bound<'_, PyAny>>,
         exclude: Option<&Bound<'_, PyAny>>,
         extra: &Extra,
-    ) -> PyResult<PyObject>;
+    ) -> PyResult<Py<PyAny>>;
 
     fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>>;
 
@@ -397,7 +398,7 @@ pub(crate) trait TypeSerializer: Send + Sync + Debug {
         false
     }
 
-    fn get_default(&self, _py: Python) -> PyResult<Option<PyObject>> {
+    fn get_default(&self, _py: Python) -> PyResult<Option<Py<PyAny>>> {
         Ok(None)
     }
 }
@@ -590,7 +591,7 @@ where
     Ok((fields.iter().filter_map(move |field| next(field).transpose()), fields))
 }
 
-static DC_FIELD_MARKER: GILOnceCell<PyObject> = GILOnceCell::new();
+static DC_FIELD_MARKER: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
 
 /// needed to match the logic from dataclasses.fields `tuple(f for f in fields.values() if f._field_type is _FIELD)`
 fn get_field_marker(py: Python<'_>) -> PyResult<&Bound<'_, PyAny>> {
