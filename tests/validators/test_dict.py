@@ -314,6 +314,7 @@ def test_dict_fail_fast(fail_fast, expected):
 
     assert exc_info.value.errors(include_url=False) == expected
 
+
 @pytest.mark.parametrize('strict', [True, False])
 def test_ordered_dict_key_order_preservation(strict):
     # GH 12273
