@@ -33,7 +33,7 @@ strum = { version = "0.27", features = ["derive"] }
 strum_macros = "0.27"
 serde_json = { version = "1.0.142", features = ["arbitrary_precision"] }
 enum_dispatch = "0.3.13"
-serde = { version = "1.0.219", features = ["derive"] }
+serde = { version = "1.0.228", features = ["derive"] }
 speedate = "0.17.0"
 smallvec = "1.15.1"
 ahash = "0.8.12"
