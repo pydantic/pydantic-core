@@ -516,7 +516,7 @@ fn parse_url<'py>(url_str: &str, input: &(impl Input<'py> + ?Sized), strict: boo
     let vios = RefCell::new(None);
 
     let url = Url::options()
-        // if we're in strict mode, we collect consider a syntax violation as an error
+        // if we're in strict mode, we collect considering a syntax violation as an error
         .syntax_violation_callback(strict.then_some(&|v| {
             match v {
                 // telling users offer about credentials in URLs doesn't really make sense in this context
