@@ -187,6 +187,10 @@ impl Validator for UrlValidator {
     fn get_name(&self) -> &str {
         &self.name
     }
+
+    fn children(&self) -> Vec<&Arc<CombinedValidator>> {
+        vec![]
+    }
 }
 
 impl UrlValidator {
@@ -436,6 +440,10 @@ impl Validator for MultiHostUrlValidator {
 
     fn get_name(&self) -> &str {
         &self.name
+    }
+
+    fn children(&self) -> Vec<&Arc<CombinedValidator>> {
+        vec![]
     }
 }
 
