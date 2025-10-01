@@ -314,7 +314,8 @@ def test_dict_fail_fast(fail_fast, expected):
 
     assert exc_info.value.errors(include_url=False) == expected
 
-def test_ordered_dict_key_order_preservation():
+@pytest.mark.parametrize('strict', [True, False])
+def test_ordered_dict_key_order_preservation(strict):
     # GH 12273
     v = SchemaValidator(cs.dict_schema(keys_schema=cs.str_schema(), values_schema=cs.int_schema()))
 
@@ -322,7 +323,7 @@ def test_ordered_dict_key_order_preservation():
     foo = OrderedDict({'a': 1, 'b': 2})
     foo.move_to_end('a')
 
-    result = v.validate_python(foo)
+    result = v.validate_python(foo, strict=strict)
     assert list(result.keys()) == list(foo.keys()) == ['b', 'a']
     assert result == {'b': 2, 'a': 1}
 
@@ -330,6 +331,6 @@ def test_ordered_dict_key_order_preservation():
     foo2 = OrderedDict({'x': 1, 'y': 2, 'z': 3})
     foo2.move_to_end('x')
 
-    result2 = v.validate_python(foo2)
+    result2 = v.validate_python(foo2, strict=strict)
     assert list(result2.keys()) == list(foo2.keys()) == ['y', 'z', 'x']
     assert result2 == {'y': 2, 'z': 3, 'x': 1}

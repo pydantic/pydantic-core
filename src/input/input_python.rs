@@ -63,17 +63,21 @@ fn get_ordered_dict_type(py: Python<'_>) -> &Bound<'_, PyType> {
 }
 
 fn check_if_ordered_dict(obj: &Bound<'_, PyAny>) -> bool {
+    println!("check_if_ordered_dict: {:?}", obj);
     if obj.is_exact_instance_of::<PyDict>() {
+        println!("is exact dict");
         return false;
     }
 
     if let Ok(type_name) = obj.get_type().name() {
+        println!("this is the type name: {}", type_name);
         if type_name.to_string() != "OrderedDict" {
             return false;
         }
     }
 
     let ordered_dict_type = get_ordered_dict_type(obj.py());
+    println!("is ordered dict type: {}", ordered_dict_type);
     obj.is_instance(ordered_dict_type).unwrap_or(false)
 }
 
@@ -424,26 +428,19 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
         Self: 'a;
 
     fn strict_dict<'a>(&'a self) -> ValResult<GenericPyMapping<'a, 'py>> {
-        if let Ok(dict) = self.downcast::<PyDict>() {
-            Ok(GenericPyMapping::Dict(dict))
-        } else {
+        if self.is_exact_instance_of::<PyDict>() {
+            Ok(GenericPyMapping::Dict(self.downcast::<PyDict>()?))
+        } else if check_if_ordered_dict(self) {
+            Ok(GenericPyMapping::Mapping(self.downcast::<PyMapping>()?))
+        }
+        else {
             Err(ValError::new(ErrorTypeDefaults::DictType, self))
         }
     }
 
     fn lax_dict<'a>(&'a self) -> ValResult<GenericPyMapping<'a, 'py>> {
-
-        if check_if_ordered_dict(self) {
-            // OrderedDict is a subclass of dict, but we want to treat it as a mapping to preserve order
-            if let Ok(mapping) = self.downcast::<PyMapping>() {
-                return Ok(GenericPyMapping::Mapping(mapping));
-            }
-        }
-
-        if let Ok(dict) = self.downcast::<PyDict>() {
-            Ok(GenericPyMapping::Dict(dict))
-        } else if let Ok(mapping) = self.downcast::<PyMapping>() {
-            Ok(GenericPyMapping::Mapping(mapping))
+        if (self.is_instance_of::<PyDict>() || self.is_instance_of::<PyMapping>()) {
+            Ok(GenericPyMapping::Mapping(self.downcast::<PyMapping>()?))
         } else {
             Err(ValError::new(ErrorTypeDefaults::DictType, self))
         }
