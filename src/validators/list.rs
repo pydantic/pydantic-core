@@ -23,7 +23,7 @@ pub struct ListValidator {
 
 pub fn get_items_schema(
     schema: &Bound<'_, PyDict>,
-    config: Option<&Bound<'_, PyDict>>,
+    config: &CoreConfig,
     definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
 ) -> PyResult<Option<Arc<CombinedValidator>>> {
     match schema.get_item(pyo3::intern!(schema.py(), "items_schema"))? {
@@ -99,7 +99,7 @@ impl BuildValidator for ListValidator {
 
     fn build(
         schema: &Bound<'_, PyDict>,
-        config: Option<&Bound<'_, PyDict>>,
+        config: &CoreConfig,
         definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
     ) -> PyResult<Arc<CombinedValidator>> {
         let py = schema.py();

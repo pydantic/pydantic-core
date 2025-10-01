@@ -6,6 +6,7 @@ use pyo3::types::PyDict;
 use pyo3::IntoPyObjectExt;
 
 use crate::build_tools::is_strict;
+use crate::config::CoreConfig;
 use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::Input;
 
@@ -25,7 +26,7 @@ impl BuildValidator for BytesValidator {
 
     fn build(
         schema: &Bound<'_, PyDict>,
-        config: Option<&Bound<'_, PyDict>>,
+        config: &CoreConfig,
         _definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
     ) -> PyResult<Arc<CombinedValidator>> {
         let py = schema.py();
@@ -36,7 +37,7 @@ impl BuildValidator for BytesValidator {
         } else {
             Ok(CombinedValidator::Bytes(Self {
                 strict: is_strict(schema, config)?,
-                bytes_mode: ValBytesMode::from_config(config)?,
+                bytes_mode: ValBytesMode::from_config(config),
             })
             .into())
         }
@@ -115,11 +116,11 @@ impl Validator for BytesConstrainedValidator {
 }
 
 impl BytesConstrainedValidator {
-    fn build(schema: &Bound<'_, PyDict>, config: Option<&Bound<'_, PyDict>>) -> PyResult<Arc<CombinedValidator>> {
+    fn build(schema: &Bound<'_, PyDict>, config: &CoreConfig) -> PyResult<Arc<CombinedValidator>> {
         let py = schema.py();
         Ok(CombinedValidator::ConstrainedBytes(Self {
             strict: is_strict(schema, config)?,
-            bytes_mode: ValBytesMode::from_config(config)?,
+            bytes_mode: ValBytesMode::from_config(config),
             min_length: schema.get_as(intern!(py, "min_length"))?,
             max_length: schema.get_as(intern!(py, "max_length"))?,
         })

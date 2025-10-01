@@ -4,6 +4,7 @@ use pyo3::types::PyDict;
 use pyo3::{prelude::*, IntoPyObjectExt};
 
 use crate::build_tools::{is_strict, LazyLock};
+use crate::config::CoreConfig;
 use crate::errors::ValResult;
 use crate::input::Input;
 
@@ -25,7 +26,7 @@ impl BuildValidator for BoolValidator {
 
     fn build(
         schema: &Bound<'_, PyDict>,
-        config: Option<&Bound<'_, PyDict>>,
+        config: &CoreConfig,
         _definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
     ) -> PyResult<Arc<CombinedValidator>> {
         if is_strict(schema, config)? {

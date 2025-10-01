@@ -255,7 +255,7 @@ impl BuildValidator for LiteralValidator {
 
     fn build(
         schema: &Bound<'_, PyDict>,
-        _config: Option<&Bound<'_, PyDict>>,
+        _config: &CoreConfig,
         _definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
     ) -> PyResult<Arc<CombinedValidator>> {
         let expected: Bound<PyList> = schema.get_as_req(intern!(schema.py(), "expected"))?;

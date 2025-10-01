@@ -5,6 +5,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyString;
 use pyo3::types::{PyDict, PyList};
 
+use crate::config::CoreConfig;
 use crate::definitions::DefinitionRef;
 use crate::errors::{ErrorTypeDefaults, ValError, ValResult};
 use crate::input::Input;
@@ -22,7 +23,7 @@ impl BuildValidator for DefinitionsValidatorBuilder {
 
     fn build(
         schema: &Bound<'_, PyDict>,
-        config: Option<&Bound<'_, PyDict>>,
+        config: &CoreConfig,
         definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
     ) -> PyResult<Arc<CombinedValidator>> {
         let py = schema.py();
@@ -58,7 +59,7 @@ impl BuildValidator for DefinitionRefValidator {
 
     fn build(
         schema: &Bound<'_, PyDict>,
-        _config: Option<&Bound<'_, PyDict>>,
+        _config: &CoreConfig,
         definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
     ) -> PyResult<Arc<CombinedValidator>> {
         let schema_ref: Bound<'_, PyString> = schema.get_as_req(intern!(schema.py(), "schema_ref"))?;

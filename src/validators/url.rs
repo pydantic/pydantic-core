@@ -97,7 +97,7 @@ static SIMPLE_URL_VALIDATOR_STRICT_PRESERVE_EMPTY_PATH: LazyLock<Arc<CombinedVal
     }))
 });
 
-fn get_preserve_empty_path(schema: &Bound<'_, PyDict>, config: Option<&Bound<'_, PyDict>>) -> PyResult<bool> {
+fn get_preserve_empty_path(schema: &Bound<'_, PyDict>, config: &CoreConfig) -> PyResult<bool> {
     schema_or_config(
         schema,
         config,
@@ -112,7 +112,7 @@ impl BuildValidator for UrlValidator {
 
     fn build(
         schema: &Bound<'_, PyDict>,
-        config: Option<&Bound<'_, PyDict>>,
+        config: &CoreConfig,
         _definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
     ) -> PyResult<Arc<CombinedValidator>> {
         let (allowed_schemes, name) = get_allowed_schemes(schema, Self::EXPECTED_TYPE)?;
@@ -357,7 +357,7 @@ impl BuildValidator for MultiHostUrlValidator {
 
     fn build(
         schema: &Bound<'_, PyDict>,
-        config: Option<&Bound<'_, PyDict>>,
+        config: &CoreConfig,
         _definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
     ) -> PyResult<Arc<CombinedValidator>> {
         let (allowed_schemes, name) = get_allowed_schemes(schema, Self::EXPECTED_TYPE)?;

@@ -25,7 +25,7 @@ impl BuildValidator for JsonValidator {
 
     fn build(
         schema: &Bound<'_, PyDict>,
-        config: Option<&Bound<'_, PyDict>>,
+        config: &CoreConfig,
         definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
     ) -> PyResult<Arc<CombinedValidator>> {
         let validator = match schema.get_as(intern!(schema.py(), "schema"))? {

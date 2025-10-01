@@ -6,7 +6,8 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use pyo3::IntoPyObjectExt;
 
-use crate::build_tools::{is_strict, schema_or_config_same};
+use crate::build_tools::is_strict;
+use crate::config::CoreConfig;
 use crate::errors::{ErrorType, ErrorTypeDefaults, ValError, ValResult};
 use crate::input::Input;
 use crate::tools::SchemaDict;
@@ -19,7 +20,7 @@ impl BuildValidator for FloatBuilder {
     const EXPECTED_TYPE: &'static str = "float";
     fn build(
         schema: &Bound<'_, PyDict>,
-        config: Option<&Bound<'_, PyDict>>,
+        config: &CoreConfig,
         definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
     ) -> PyResult<Arc<CombinedValidator>> {
         let py = schema.py();
@@ -33,7 +34,10 @@ impl BuildValidator for FloatBuilder {
         } else {
             Ok(CombinedValidator::Float(FloatValidator {
                 strict: is_strict(schema, config)?,
-                allow_inf_nan: schema_or_config_same(schema, config, intern!(py, "allow_inf_nan"))?.unwrap_or(true),
+                allow_inf_nan: schema
+                    .get_as(intern!(py, "allow_inf_nan"))?
+                    .or(config.allow_inf_nan)
+                    .unwrap_or(true),
             })
             .into())
         }
@@ -51,13 +55,16 @@ impl BuildValidator for FloatValidator {
 
     fn build(
         schema: &Bound<'_, PyDict>,
-        config: Option<&Bound<'_, PyDict>>,
+        config: &CoreConfig,
         _definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
     ) -> PyResult<Arc<CombinedValidator>> {
         let py = schema.py();
         Ok(CombinedValidator::Float(Self {
             strict: is_strict(schema, config)?,
-            allow_inf_nan: schema_or_config_same(schema, config, intern!(py, "allow_inf_nan"))?.unwrap_or(true),
+            allow_inf_nan: schema
+                .get_as(intern!(py, "allow_inf_nan"))?
+                .or(config.allow_inf_nan)
+                .unwrap_or(true),
         })
         .into())
     }
@@ -179,13 +186,16 @@ impl BuildValidator for ConstrainedFloatValidator {
     const EXPECTED_TYPE: &'static str = "float";
     fn build(
         schema: &Bound<'_, PyDict>,
-        config: Option<&Bound<'_, PyDict>>,
+        config: &CoreConfig,
         _definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
     ) -> PyResult<Arc<CombinedValidator>> {
         let py = schema.py();
         Ok(CombinedValidator::ConstrainedFloat(Self {
             strict: is_strict(schema, config)?,
-            allow_inf_nan: schema_or_config_same(schema, config, intern!(py, "allow_inf_nan"))?.unwrap_or(true),
+            allow_inf_nan: schema
+                .get_as(intern!(py, "allow_inf_nan"))?
+                .or(config.allow_inf_nan)
+                .unwrap_or(true),
             multiple_of: schema.get_as(intern!(py, "multiple_of"))?,
             le: schema.get_as(intern!(py, "le"))?,
             lt: schema.get_as(intern!(py, "lt"))?,
