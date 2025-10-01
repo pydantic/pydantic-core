@@ -18,10 +18,10 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Using this action is still necessary for CodSpeed to work:
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.UV_PYTHON}}
 
@@ -60,6 +60,7 @@ jobs:
         run: uv pip install ${{ steps.pgo-wheel.outputs.wheel }} --force-reinstall
 
       - name: Run CodSpeed benchmarks
-        uses: CodSpeedHQ/action@v3
+        uses: CodSpeedHQ/action@v4
         with:
+          mode: instrumentation
           run: uv run --group=codspeed pytest tests/benchmarks/ --codspeed

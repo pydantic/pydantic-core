@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # rust-nightly used for `#[coverage(off)]`
       - uses: dtolnay/rust-toolchain@nightly
@@ -81,7 +81,7 @@ jobs:
     continue-on-error: ${{ endsWith(matrix.python-version, 't') }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: install rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -121,7 +121,7 @@ jobs:
 
     runs-on: ${{ matrix.os }}-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: install rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -150,7 +150,7 @@ jobs:
 
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: install uv
         uses: astral-sh/setup-uv@v6
@@ -193,7 +193,7 @@ jobs:
           - 'pypy3.10'
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: install uv
         uses: astral-sh/setup-uv@v6
@@ -219,12 +219,12 @@ jobs:
     continue-on-error: true
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           repository: pydantic/pydantic
           path: pydantic
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           path: pydantic-core
 
@@ -261,7 +261,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: install rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -272,7 +272,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       # used to lint js code
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '18'
 
@@ -296,7 +296,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: install rust nightly
         uses: dtolnay/rust-toolchain@nightly
@@ -304,7 +304,7 @@ jobs:
       - name: cache rust
         uses: Swatinem/rust-cache@v2
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
 
@@ -315,7 +315,7 @@ jobs:
   build-wasm-emscripten:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: install rust nightly
         uses: dtolnay/rust-toolchain@master
@@ -345,7 +345,7 @@ jobs:
       - name: build wheels
         run: make build-wasm
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '18'
 
@@ -378,8 +378,8 @@ jobs:
     name: build sdist
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
       - uses: PyO3/maturin-action@v1
@@ -475,10 +475,10 @@ jobs:
 
     runs-on: ${{ (matrix.os == 'linux' && 'ubuntu') || matrix.os }}-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: set up python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.13'
           architecture: ${{ matrix.python-architecture || 'x64' }}
@@ -528,7 +528,7 @@ jobs:
 
     runs-on: ${{ matrix.runs-on }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: install uv
         uses: astral-sh/setup-uv@v6
@@ -561,10 +561,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: get dist artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           pattern: pypi_files_*
           merge-multiple: true
@@ -602,10 +602,10 @@ jobs:
             distro: alpine_latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: get dist artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           pattern: pypi_files_linux_*
           merge-multiple: true
@@ -650,13 +650,13 @@ jobs:
 
     runs-on: ${{ matrix.os }}-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: install uv
         uses: astral-sh/setup-uv@v6
 
       - name: get dist artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           pattern: pypi_files_*
           merge-multiple: true
@@ -679,7 +679,7 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: astral-sh/setup-uv@v6
 
@@ -687,7 +687,7 @@ jobs:
         run: uv run .github/check_version.py
 
       - name: get dist artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           pattern: pypi_files_*
           merge-multiple: true
@@ -696,7 +696,7 @@ jobs:
       - run: uv publish --trusted-publishing always
 
       - name: get wasm dist artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: wasm_wheels
           path: wasm
