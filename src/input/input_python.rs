@@ -68,7 +68,7 @@ fn check_if_ordered_dict(obj: &Bound<'_, PyAny>) -> bool {
     }
 
     if let Ok(type_name) = obj.get_type().name() {
-        if type_name.to_string() != "OrderedDict" {
+        if type_name != "OrderedDict" {
             return false;
         }
     }
