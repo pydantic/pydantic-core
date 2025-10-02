@@ -434,7 +434,11 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
     }
 
     fn lax_dict<'a>(&'a self) -> ValResult<GenericPyMapping<'a, 'py>> {
-        if let Ok(mapping) = self.downcast::<PyMapping>() {
+        if check_if_ordered_dict(self) {
+            Ok(GenericPyMapping::Mapping(self.downcast::<PyMapping>()?))
+        } else if let Ok(dict) = self.downcast::<PyDict>() {
+            Ok(GenericPyMapping::Dict(dict))
+        } else if let Ok(mapping) = self.downcast::<PyMapping>() {
             Ok(GenericPyMapping::Mapping(mapping))
         } else {
             Err(ValError::new(ErrorTypeDefaults::DictType, self))
