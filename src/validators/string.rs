@@ -41,7 +41,7 @@ impl BuildValidator for StrValidator {
 
     fn build(
         schema: &Bound<'_, PyDict>,
-        config: Option<&Bound<'_, PyDict>>,
+        config: &CoreConfig,
         _definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
     ) -> PyResult<Arc<CombinedValidator>> {
         let con_str_validator = StrConstrainedValidator::build(schema, config)?;
@@ -178,7 +178,7 @@ impl Validator for StrConstrainedValidator {
 }
 
 impl StrConstrainedValidator {
-    fn build(schema: &Bound<'_, PyDict>, config: Option<&Bound<'_, PyDict>>) -> PyResult<Self> {
+    fn build(schema: &Bound<'_, PyDict>, config: &CoreConfig) -> PyResult<Self> {
         let py = schema.py();
 
         let pattern = schema

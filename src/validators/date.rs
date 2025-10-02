@@ -8,6 +8,7 @@ use speedate::{Date, Time};
 use strum::EnumMessage;
 
 use crate::build_tools::{is_strict, py_schema_error_type};
+use crate::config::CoreConfig;
 use crate::errors::{ErrorType, ErrorTypeDefaults, ValError, ValResult};
 use crate::input::{EitherDate, Input};
 
@@ -28,13 +29,13 @@ impl BuildValidator for DateValidator {
 
     fn build(
         schema: &Bound<'_, PyDict>,
-        config: Option<&Bound<'_, PyDict>>,
+        config: &CoreConfig,
         _definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
     ) -> PyResult<Arc<CombinedValidator>> {
         Ok(CombinedValidator::Date(Self {
             strict: is_strict(schema, config)?,
             constraints: DateConstraints::from_py(schema)?,
-            val_temporal_unit: TemporalUnitMode::from_config(config)?,
+            val_temporal_unit: TemporalUnitMode::from_config(config),
         })
         .into())
     }

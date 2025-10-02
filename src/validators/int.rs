@@ -47,7 +47,7 @@ impl BuildValidator for IntValidator {
 
     fn build(
         schema: &Bound<'_, PyDict>,
-        config: Option<&Bound<'_, PyDict>>,
+        config: &CoreConfig,
         _definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
     ) -> PyResult<Arc<CombinedValidator>> {
         let py = schema.py();
@@ -97,7 +97,7 @@ pub struct ConstrainedIntValidator {
 }
 
 impl ConstrainedIntValidator {
-    fn build(schema: &Bound<'_, PyDict>, config: Option<&Bound<'_, PyDict>>) -> PyResult<Arc<CombinedValidator>> {
+    fn build(schema: &Bound<'_, PyDict>, config: &CoreConfig) -> PyResult<Arc<CombinedValidator>> {
         let py = schema.py();
         Ok(CombinedValidator::ConstrainedInt(Self {
             strict: is_strict(schema, config)?,

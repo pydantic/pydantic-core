@@ -9,7 +9,8 @@ use ahash::AHashSet;
 use pyo3::IntoPyObjectExt;
 
 use crate::build_tools::py_schema_err;
-use crate::build_tools::{is_strict, schema_or_config_same, ExtraBehavior};
+use crate::build_tools::{is_strict, ExtraBehavior};
+use crate::config::CoreConfig;
 use crate::errors::{ErrorType, ErrorTypeDefaults, ValError, ValLineError, ValResult};
 use crate::input::{
     input_as_python_instance, Arguments, BorrowInput, Input, InputType, KeywordArgs, PositionalArgs, ValidationMatch,
@@ -53,7 +54,7 @@ impl BuildValidator for DataclassArgsValidator {
 
     fn build(
         schema: &Bound<'_, PyDict>,
-        config: Option<&Bound<'_, PyDict>>,
+        config: &CoreConfig,
         definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
     ) -> PyResult<Arc<CombinedValidator>> {
         let py = schema.py();
@@ -126,9 +127,9 @@ impl BuildValidator for DataclassArgsValidator {
             validator_name,
             extra_behavior,
             extras_validator,
-            loc_by_alias: config.get_as(intern!(py, "loc_by_alias"))?.unwrap_or(true),
-            validate_by_alias: config.get_as(intern!(py, "validate_by_alias"))?,
-            validate_by_name: config.get_as(intern!(py, "validate_by_name"))?,
+            loc_by_alias: config.loc_by_alias.unwrap_or(true),
+            validate_by_alias: config.validate_by_alias,
+            validate_by_name: config.validate_by_name,
         })
         .into())
     }
@@ -470,14 +471,13 @@ impl BuildValidator for DataclassValidator {
 
     fn build(
         schema: &Bound<'_, PyDict>,
-        _config: Option<&Bound<'_, PyDict>>,
+        _config: &CoreConfig,
         definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
     ) -> PyResult<Arc<CombinedValidator>> {
         let py = schema.py();
 
         // dataclasses ignore the parent config and always use the config from this dataclasses
-        let config = schema.get_as(intern!(py, "config"))?;
-        let config = config.as_ref();
+        let config = schema.get_as(intern!(py, "config"))?.unwrap_or_default();
 
         let class = schema.get_as_req::<Bound<'_, PyType>>(intern!(py, "cls"))?;
         let generic_origin: Option<Bound<'_, PyType>> = schema.get_as(intern!(py, "generic_origin"))?;
@@ -486,7 +486,7 @@ impl BuildValidator for DataclassValidator {
             Err(_) => class.getattr(intern!(py, "__name__"))?.extract()?,
         };
         let sub_schema = schema.get_as_req(intern!(py, "schema"))?;
-        let validator = build_validator(&sub_schema, config, definitions)?;
+        let validator = build_validator(&sub_schema, &config, definitions)?;
 
         let post_init = if schema.get_as::<bool>(intern!(py, "post_init"))?.unwrap_or(false) {
             Some(intern!(py, "__post_init__").clone().unbind())
@@ -497,18 +497,16 @@ impl BuildValidator for DataclassValidator {
         let fields = schema.get_as_req(intern!(py, "fields"))?;
 
         Ok(CombinedValidator::Dataclass(Self {
-            strict: is_strict(schema, config)?,
+            strict: is_strict(schema, &config)?,
             validator,
             class: class.into(),
             generic_origin: generic_origin.map(std::convert::Into::into),
             fields,
             post_init,
-            revalidate: Revalidate::from_str(
-                schema_or_config_same::<Bound<'_, PyString>>(schema, config, intern!(py, "revalidate_instances"))?
-                    .as_ref()
-                    .map(|s| s.to_str())
-                    .transpose()?,
-            )?,
+            revalidate: schema
+                .get_as(intern!(py, "revalidate_instances"))?
+                .or(config.revalidate_instances)
+                .unwrap_or(Revalidate::Never),
             name,
             frozen: schema.get_as(intern!(py, "frozen"))?.unwrap_or(false),
             slots: schema.get_as(intern!(py, "slots"))?.unwrap_or(false),

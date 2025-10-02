@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
 use pyo3::exceptions::{PyAssertionError, PyValueError};
-use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyString};
 use pyo3::{intern, PyTraverseError, PyVisit};
+use pyo3::{prelude::*, IntoPyObjectExt};
 
+use crate::config::CoreConfig;
 use crate::errors::{
     ErrorType, PydanticCustomError, PydanticKnownError, PydanticOmit, ToErrorValue, ValError, ValResult,
     ValidationError,
@@ -50,7 +51,7 @@ macro_rules! impl_build {
             const EXPECTED_TYPE: &'static str = $name;
             fn build(
                 schema: &Bound<'_, PyDict>,
-                config: Option<&Bound<'_, PyDict>>,
+                config: &CoreConfig,
                 definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
             ) -> PyResult<Arc<CombinedValidator>> {
                 let py = schema.py();
@@ -66,10 +67,7 @@ macro_rules! impl_build {
                     Self {
                         validator,
                         func: func_info.function,
-                        config: match config {
-                            Some(c) => c.clone().into(),
-                            None => py.None(),
-                        },
+                        config: config.into_py_any(schema.py())?,
                         name,
                         field_name: func_info.field_name,
                         info_arg: func_info.info_arg,
@@ -243,17 +241,14 @@ impl BuildValidator for FunctionPlainValidator {
 
     fn build(
         schema: &Bound<'_, PyDict>,
-        config: Option<&Bound<'_, PyDict>>,
+        config: &CoreConfig,
         _definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
     ) -> PyResult<Arc<CombinedValidator>> {
         let py = schema.py();
         let function_info = destructure_function_schema(schema)?;
         Ok(CombinedValidator::FunctionPlain(Self {
             func: function_info.function.clone(),
-            config: match config {
-                Some(c) => c.clone().into(),
-                None => py.None(),
-            },
+            config: config.into_py_any(schema.py())?,
             name: format!("function-plain[{}()]", function_name(function_info.function.bind(py))?),
             field_name: function_info.field_name.clone(),
             info_arg: function_info.info_arg,
@@ -308,7 +303,7 @@ impl BuildValidator for FunctionWrapValidator {
 
     fn build(
         schema: &Bound<'_, PyDict>,
-        config: Option<&Bound<'_, PyDict>>,
+        config: &CoreConfig,
         definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
     ) -> PyResult<Arc<CombinedValidator>> {
         let py = schema.py();

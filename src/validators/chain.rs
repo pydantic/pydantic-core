@@ -5,6 +5,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
 use crate::build_tools::py_schema_err;
+use crate::config::CoreConfig;
 use crate::errors::ValResult;
 use crate::input::Input;
 use crate::tools::SchemaDict;
@@ -23,7 +24,7 @@ impl BuildValidator for ChainValidator {
 
     fn build(
         schema: &Bound<'_, PyDict>,
-        config: Option<&Bound<'_, PyDict>>,
+        config: &CoreConfig,
         definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
     ) -> PyResult<Arc<CombinedValidator>> {
         let steps: Vec<Arc<CombinedValidator>> = schema
@@ -58,7 +59,7 @@ impl BuildValidator for ChainValidator {
 // to be flattened into `steps` above
 fn build_validator_steps(
     step: &Bound<'_, PyAny>,
-    config: Option<&Bound<'_, PyDict>>,
+    config: &CoreConfig,
     definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
 ) -> PyResult<Vec<Arc<CombinedValidator>>> {
     let validator = build_validator(step, config, definitions)?;

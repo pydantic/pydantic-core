@@ -9,7 +9,8 @@ use ahash::AHashSet;
 use pyo3::IntoPyObjectExt;
 
 use crate::build_tools::py_schema_err;
-use crate::build_tools::{schema_or_config_same, ExtraBehavior};
+use crate::build_tools::ExtraBehavior;
+use crate::config::CoreConfig;
 use crate::errors::{ErrorTypeDefaults, ValError, ValLineError, ValResult};
 use crate::input::{Arguments, BorrowInput, Input, KeywordArgs, PositionalArgs, ValidationMatch};
 use crate::lookup_key::LookupKeyCollection;
@@ -67,7 +68,7 @@ impl BuildValidator for ArgumentsValidator {
 
     fn build(
         schema: &Bound<'_, PyDict>,
-        config: Option<&Bound<'_, PyDict>>,
+        config: &CoreConfig,
         definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
     ) -> PyResult<Arc<CombinedValidator>> {
         let py = schema.py();
@@ -166,10 +167,14 @@ impl BuildValidator for ArgumentsValidator {
             },
             var_kwargs_mode,
             var_kwargs_validator,
-            loc_by_alias: config.get_as(intern!(py, "loc_by_alias"))?.unwrap_or(true),
+            loc_by_alias: config.loc_by_alias.unwrap_or(true),
             extra: ExtraBehavior::from_schema_or_config(py, schema, config, ExtraBehavior::Forbid)?,
-            validate_by_alias: schema_or_config_same(schema, config, intern!(py, "validate_by_alias"))?,
-            validate_by_name: schema_or_config_same(schema, config, intern!(py, "validate_by_name"))?,
+            validate_by_alias: schema
+                .get_as(intern!(py, "validate_by_alias"))?
+                .or(config.validate_by_alias),
+            validate_by_name: schema
+                .get_as(intern!(py, "validate_by_name"))?
+                .or(config.validate_by_name),
         })
         .into())
     }
