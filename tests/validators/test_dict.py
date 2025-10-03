@@ -377,12 +377,14 @@ def test_userdefined_ordereddict():
 
 @pytest.mark.parametrize('strict', [True, False])
 def test_defaultdict(strict):
-    """Test that defaultdict is accepted and converted to regular dict"""
     v = SchemaValidator(cs.dict_schema(keys_schema=cs.str_schema(), values_schema=cs.int_schema()))
 
-    dd = defaultdict(int, {'a': 1, 'b': 2})
+    dd = defaultdict(int, {})
+    # simulate move to end, since defaultdict doesn't have it
+    dd['a'] = 1
+    dd['b'] = 2
+    dd['a'] = dd.pop('a')
 
     result = v.validate_python(dd, strict=strict)
-    assert result == {'a': 1, 'b': 2}
-    assert isinstance(result, dict)
-    assert not isinstance(result, defaultdict)
+    assert list(result.keys()) == list(dd.keys()) == ['b', 'a']
+    assert result == {'b': 2, 'a': 1}
