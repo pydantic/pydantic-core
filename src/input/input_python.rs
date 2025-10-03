@@ -48,35 +48,6 @@ use super::{
     Input,
 };
 
-static ORDERED_DICT_TYPE: PyOnceLock<Py<PyType>> = PyOnceLock::new();
-
-fn get_ordered_dict_type(py: Python<'_>) -> &Bound<'_, PyType> {
-    ORDERED_DICT_TYPE
-        .get_or_init(py, || {
-            py.import("collections")
-                .and_then(|collections_module| collections_module.getattr("OrderedDict"))
-                .unwrap()
-                .extract()
-                .unwrap()
-        })
-        .bind(py)
-}
-
-fn check_if_ordered_dict(obj: &Bound<'_, PyAny>) -> bool {
-    if obj.is_exact_instance_of::<PyDict>() {
-        return false;
-    }
-
-    if let Ok(type_name) = obj.get_type().name() {
-        if type_name != "OrderedDict" {
-            return false;
-        }
-    }
-
-    let ordered_dict_type = get_ordered_dict_type(obj.py());
-    obj.is_instance(ordered_dict_type).unwrap_or(false)
-}
-
 static FRACTION_TYPE: PyOnceLock<Py<PyType>> = PyOnceLock::new();
 
 pub fn get_fraction_type(py: Python<'_>) -> &Bound<'_, PyType> {
@@ -424,9 +395,9 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
         Self: 'a;
 
     fn strict_dict<'a>(&'a self) -> ValResult<GenericPyMapping<'a, 'py>> {
-        if self.is_exact_instance_of::<PyDict>() {
-            Ok(GenericPyMapping::Dict(self.downcast::<PyDict>()?))
-        } else if check_if_ordered_dict(self) {
+        if let Ok(dict) = self.downcast_exact::<PyDict>() {
+            Ok(GenericPyMapping::Dict(dict))
+        } else if self.is_instance_of::<PyDict>() {
             Ok(GenericPyMapping::Mapping(self.downcast::<PyMapping>()?))
         } else {
             Err(ValError::new(ErrorTypeDefaults::DictType, self))
@@ -434,9 +405,7 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
     }
 
     fn lax_dict<'a>(&'a self) -> ValResult<GenericPyMapping<'a, 'py>> {
-        if check_if_ordered_dict(self) {
-            Ok(GenericPyMapping::Mapping(self.downcast::<PyMapping>()?))
-        } else if let Ok(dict) = self.downcast::<PyDict>() {
+        if let Ok(dict) = self.downcast_exact::<PyDict>() {
             Ok(GenericPyMapping::Dict(dict))
         } else if let Ok(mapping) = self.downcast::<PyMapping>() {
             Ok(GenericPyMapping::Mapping(mapping))
