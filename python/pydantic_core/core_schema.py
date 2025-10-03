@@ -1917,6 +1917,68 @@ def generator_schema(
     )
 
 
+class IterableSchema(TypedDict, total=False):
+    type: Required[Literal['iterable']]
+    items_schema: CoreSchema
+    min_length: int
+    max_length: int
+    lazy: bool
+    ref: str
+    metadata: dict[str, Any]
+    serialization: IncExSeqOrElseSerSchema
+
+
+def iterable_schema(
+    items_schema: CoreSchema | None = None,
+    *,
+    min_length: int | None = None,
+    max_length: int | None = None,
+    lazy: bool | None = None,
+    ref: str | None = None,
+    metadata: dict[str, Any] | None = None,
+    serialization: IncExSeqOrElseSerSchema | None = None,
+) -> IterableSchema:
+    """
+    Returns a schema that matches an iterable value, e.g.:
+
+    ```py
+    from typing import Iterator
+    from pydantic_core import SchemaValidator, core_schema
+
+    def gen() -> Iterator[int]:
+        yield 1
+
+    schema = core_schema.iterable_schema(items_schema=core_schema.int_schema())
+    v = SchemaValidator(schema)
+    v.validate_python(gen())
+    ```
+
+    Lazy validation (the default) is equivalent to `generator_schema` for
+    backwards compatibility in Pydantic V2.
+
+    When not using lazy validation, validated iterables will be collected into a list.
+
+    Args:
+        items_schema: The value must be an iterable with items that match this schema
+        min_length: The value must be an iterable that yields at least this many items
+        max_length: The value must be an iterable that yields at most this many items
+        lazy: Whether to use lazy evaluation, defaults to True
+        ref: optional unique identifier of the schema, used to reference the schema in other places
+        metadata: Any other information you want to include with the schema, not used by pydantic-core
+        serialization: Custom serialization schema
+    """
+    return _dict_not_none(
+        type='iterable',
+        items_schema=items_schema,
+        min_length=min_length,
+        max_length=max_length,
+        lazy=lazy,
+        ref=ref,
+        metadata=metadata,
+        serialization=serialization,
+    )
+
+
 IncExDict = set[Union[int, str]]
 
 
