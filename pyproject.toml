@@ -1,12 +1,21 @@
 [build-system]
-requires = ['maturin>=1,<2', 'typing-extensions >=4.6.0,!=4.7.0']
+requires = ['maturin>=1.9.4,<2']
 build-backend = 'maturin'
 
 [project]
 name = 'pydantic_core'
 description = "Core functionality for Pydantic validation and serialization"
 requires-python = '>=3.9'
-authors = [{ name = 'Samuel Colvin', email = 's@muelcolvin.com' }]
+license = 'MIT'
+license-files = ['LICENSE']
+authors = [
+    { name = 'Samuel Colvin', email = 's@muelcolvin.com' },
+    { name = 'Adrian Garcia Badaracco', email = '1755071+adriangb@users.noreply.github.com' },
+    { name = 'David Montague', email = 'david@pydantic.dev' },
+    { name = 'David Hewitt', email = 'mail@davidhewitt.dev' },
+    { name = 'Sydney Runkle', email = 'sydneymarierunkle@gmail.com' },
+    { name = 'Victorien Plot', email = 'contact@vctrn.dev' },
+]
 classifiers = [
     'Development Status :: 3 - Alpha',
     'Programming Language :: Python',
@@ -17,18 +26,21 @@ classifiers = [
     'Programming Language :: Python :: 3.11',
     'Programming Language :: Python :: 3.12',
     'Programming Language :: Python :: 3.13',
+    'Programming Language :: Python :: 3.14',
+    'Programming Language :: Python :: Implementation :: CPython',
+    'Programming Language :: Python :: Implementation :: PyPy',
+    'Programming Language :: Python :: Implementation :: GraalPy',
     'Programming Language :: Rust',
     'Framework :: Pydantic',
     'Intended Audience :: Developers',
     'Intended Audience :: Information Technology',
-    'License :: OSI Approved :: MIT License',
     'Operating System :: POSIX :: Linux',
     'Operating System :: Microsoft :: Windows',
     'Operating System :: MacOS',
     'Typing :: Typed',
 ]
-dependencies = ['typing-extensions >=4.6.0,!=4.7.0']
-dynamic = ['description', 'license', 'readme', 'version']
+dependencies = ['typing-extensions>=4.14.1']
+dynamic = ['readme', 'version']
 
 [project.urls]
 Homepage = 'https://github.com/pydantic/pydantic-core'
@@ -39,29 +51,36 @@ Source = 'https://github.com/pydantic/pydantic-core'
 dev = ["maturin"]
 testing = [
     { include-group = "dev" },
-    'backports.zoneinfo; python_version < "3.9"',
     'coverage',
     'dirty-equals',
-    'inline-snapshot',
+    'exceptiongroup; python_version < "3.11"',
     'hypothesis',
+    'inline-snapshot',
+    # numpy doesn't offer prebuilt wheels for all versions and platforms we test in CI e.g. aarch64 musllinux
+    'numpy; python_version < "3.13" and implementation_name == "cpython" and platform_machine == "x86_64"',
     # pandas doesn't offer prebuilt wheels for all versions and platforms we test in CI e.g. aarch64 musllinux
-    'pandas; python_version >= "3.9" and python_version < "3.13" and implementation_name == "cpython" and platform_machine == "x86_64"',
+    'pandas; python_version < "3.13" and implementation_name == "cpython" and platform_machine == "x86_64"',
     'pytest',
     # pytest-examples currently depends on aiohttp via black; we don't want to build it on platforms like aarch64 musllinux in CI
     'pytest-examples; implementation_name == "cpython" and platform_machine == "x86_64"',
-    'pytest-speed',
     'pytest-mock',
     'pytest-pretty',
+    'pytest-run-parallel',
+    'pytest-speed',
     'pytest-timeout',
     'python-dateutil',
-    # numpy doesn't offer prebuilt wheels for all versions and platforms we test in CI e.g. aarch64 musllinux
-    'numpy; python_version >= "3.9" and python_version < "3.13" and implementation_name == "cpython" and platform_machine == "x86_64"',
-    'exceptiongroup; python_version < "3.11"',
+    'typing-inspection>=0.4.1',
     'tzdata',
-    'typing_extensions',
 ]
-linting = [{ include-group = "dev" }, 'griffe', 'pyright', 'ruff', 'mypy']
-wasm = [{ include-group = "dev" }, 'typing_extensions', 'ruff']
+linting = [
+    { include-group = "dev" },
+    'griffe',
+    'mypy',
+    'pre-commit',
+    'pyright',
+    'ruff',
+]
+wasm = [{ include-group = "dev" }, 'ruff']
 codspeed = [
     # codspeed is only run on CI, with latest version of CPython
     'pytest-codspeed; python_version == "3.13" and implementation_name == "cpython"',
@@ -78,7 +97,6 @@ all = [
 python-source = "python"
 module-name = "pydantic_core._pydantic_core"
 bindings = 'pyo3'
-features = ["pyo3/extension-module"]
 
 [tool.ruff]
 line-length = 120
@@ -136,7 +154,7 @@ exclude_lines = [
 
 # configuring https://github.com/pydantic/hooky
 [tool.hooky]
-reviewers = ['sydney-runkle', 'davidhewitt']
+reviewers = ['Viicos', 'davidhewitt']
 require_change_file = false
 
 [tool.pyright]
@@ -150,3 +168,4 @@ fix = ["create", "fix"]
 # this ensures that `uv run` doesn't actually build the package; a `make`
 # command is needed to build
 package = false
+required-version = '>=0.7.2'

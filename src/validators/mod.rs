@@ -1,26 +1,27 @@
 use std::fmt::Debug;
+use std::str::FromStr;
+use std::sync::Arc;
 
 use enum_dispatch::enum_dispatch;
 use jiter::{PartialMode, StringCacheMode};
 
-use pyo3::exceptions::PyTypeError;
-use pyo3::ffi::c_str;
-use pyo3::sync::GILOnceCell;
+use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::types::{PyAny, PyDict, PyString, PyTuple, PyType};
 use pyo3::{intern, PyTraverseError, PyVisit};
 use pyo3::{prelude::*, IntoPyObjectExt};
 
-use crate::build_tools::{py_schema_err, py_schema_error_type, SchemaError};
+use crate::build_tools::{py_schema_err, py_schema_error_type, ExtraBehavior};
 use crate::definitions::{Definitions, DefinitionsBuilder};
 use crate::errors::{LocItem, ValError, ValResult, ValidationError};
 use crate::input::{Input, InputType, StringMapping};
 use crate::py_gc::PyGcTraverse;
 use crate::recursion_guard::RecursionState;
 use crate::tools::SchemaDict;
-pub(crate) use config::ValBytesMode;
+pub(crate) use config::{TemporalUnitMode, ValBytesMode};
 
 mod any;
 mod arguments;
+mod arguments_v3;
 mod bool;
 mod bytes;
 mod call;
@@ -48,10 +49,12 @@ mod json_or_python;
 mod lax_or_strict;
 mod list;
 mod literal;
+mod missing_sentinel;
 mod model;
 mod model_fields;
 mod none;
 mod nullable;
+mod prebuilt;
 mod set;
 mod string;
 mod time;
@@ -59,7 +62,7 @@ mod timedelta;
 mod tuple;
 mod typed_dict;
 mod union;
-mod url;
+pub(crate) mod url;
 mod uuid;
 mod validation_state;
 mod with_default;
@@ -70,11 +73,11 @@ pub use with_default::DefaultType;
 #[pyclass(module = "pydantic_core._pydantic_core", name = "Some")]
 pub struct PySome {
     #[pyo3(get)]
-    value: PyObject,
+    value: Py<PyAny>,
 }
 
 impl PySome {
-    fn new(value: PyObject) -> Self {
+    fn new(value: Py<PyAny>) -> Self {
         Self { value }
     }
 }
@@ -86,7 +89,7 @@ impl PySome {
     }
 
     #[new]
-    pub fn py_new(value: PyObject) -> Self {
+    pub fn py_new(value: Py<PyAny>) -> Self {
         Self { value }
     }
 
@@ -105,14 +108,14 @@ impl PySome {
 #[pyclass(module = "pydantic_core._pydantic_core", frozen)]
 #[derive(Debug)]
 pub struct SchemaValidator {
-    validator: CombinedValidator,
-    definitions: Definitions<CombinedValidator>,
+    validator: Arc<CombinedValidator>,
+    definitions: Definitions<Arc<CombinedValidator>>,
     // References to the Python schema and config objects are saved to enable
     // reconstructing the object for cloudpickle support (see `__reduce__`).
     py_schema: Py<PyAny>,
     py_config: Option<Py<PyDict>>,
     #[pyo3(get)]
-    title: PyObject,
+    title: Py<PyAny>,
     hide_input_in_errors: bool,
     validation_error_cause: bool,
     cache_str: StringCacheMode,
@@ -125,7 +128,7 @@ impl SchemaValidator {
     pub fn py_new(py: Python, schema: &Bound<'_, PyAny>, config: Option<&Bound<'_, PyDict>>) -> PyResult<Self> {
         let mut definitions_builder = DefinitionsBuilder::new();
 
-        let validator = build_validator(schema, config, &mut definitions_builder)?;
+        let validator = build_validator_base(schema, config, &mut definitions_builder)?;
         let definitions = definitions_builder.finish()?;
         let py_schema = schema.clone().unbind();
         let py_config = match config {
@@ -157,57 +160,73 @@ impl SchemaValidator {
         })
     }
 
-    pub fn __reduce__<'py>(slf: &Bound<'py, Self>) -> PyResult<(Bound<'py, PyType>, Bound<'py, PyTuple>)> {
-        let init_args = (&slf.get().py_schema, &slf.get().py_config).into_pyobject(slf.py())?;
-        Ok((slf.get_type(), init_args))
-    }
-
     #[allow(clippy::too_many_arguments)]
-    #[pyo3(signature = (input, *, strict=None, from_attributes=None, context=None, self_instance=None, allow_partial=PartialMode::Off))]
+    #[pyo3(signature = (input, *, strict=None, extra=None, from_attributes=None, context=None, self_instance=None, allow_partial=PartialMode::Off, by_alias=None, by_name=None))]
     pub fn validate_python(
         &self,
         py: Python,
         input: &Bound<'_, PyAny>,
         strict: Option<bool>,
+        extra: Option<&Bound<'_, PyString>>,
         from_attributes: Option<bool>,
         context: Option<&Bound<'_, PyAny>>,
         self_instance: Option<&Bound<'_, PyAny>>,
         allow_partial: PartialMode,
-    ) -> PyResult<PyObject> {
+        by_alias: Option<bool>,
+        by_name: Option<bool>,
+    ) -> PyResult<Py<PyAny>> {
+        let extra_behavior = extra
+            .map(|e| ExtraBehavior::from_str(e.to_str()?).map_err(|err| PyValueError::new_err(err.to_string())))
+            .transpose()?;
+
         #[allow(clippy::used_underscore_items)]
         self._validate(
             py,
             input,
             InputType::Python,
             strict,
+            extra_behavior,
             from_attributes,
             context,
             self_instance,
             allow_partial,
+            by_alias,
+            by_name,
         )
         .map_err(|e| self.prepare_validation_err(py, e, InputType::Python))
     }
 
-    #[pyo3(signature = (input, *, strict=None, from_attributes=None, context=None, self_instance=None))]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (input, *, strict=None, extra=None, from_attributes=None, context=None, self_instance=None, by_alias=None, by_name=None))]
     pub fn isinstance_python(
         &self,
         py: Python,
         input: &Bound<'_, PyAny>,
         strict: Option<bool>,
+        extra: Option<&Bound<'_, PyString>>,
         from_attributes: Option<bool>,
         context: Option<&Bound<'_, PyAny>>,
         self_instance: Option<&Bound<'_, PyAny>>,
+        by_alias: Option<bool>,
+        by_name: Option<bool>,
     ) -> PyResult<bool> {
+        let extra_behavior = extra
+            .map(|e| ExtraBehavior::from_str(e.to_str()?).map_err(|err| PyValueError::new_err(err.to_string())))
+            .transpose()?;
+
         #[allow(clippy::used_underscore_items)]
         match self._validate(
             py,
             input,
             InputType::Python,
             strict,
+            extra_behavior,
             from_attributes,
             context,
             self_instance,
             false.into(),
+            by_alias,
+            by_name,
         ) {
             Ok(_) => Ok(true),
             Err(ValError::InternalErr(err)) => Err(err),
@@ -217,16 +236,24 @@ impl SchemaValidator {
         }
     }
 
-    #[pyo3(signature = (input, *, strict=None, context=None, self_instance=None, allow_partial=PartialMode::Off))]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (input, *, strict=None, extra=None, context=None, self_instance=None, allow_partial=PartialMode::Off, by_alias=None, by_name=None))]
     pub fn validate_json(
         &self,
         py: Python,
         input: &Bound<'_, PyAny>,
         strict: Option<bool>,
+        extra: Option<&Bound<'_, PyString>>,
         context: Option<&Bound<'_, PyAny>>,
         self_instance: Option<&Bound<'_, PyAny>>,
         allow_partial: PartialMode,
-    ) -> PyResult<PyObject> {
+        by_alias: Option<bool>,
+        by_name: Option<bool>,
+    ) -> PyResult<Py<PyAny>> {
+        let extra_behavior = extra
+            .map(|e| ExtraBehavior::from_str(e.to_str()?).map_err(|err| PyValueError::new_err(err.to_string())))
+            .transpose()?;
+
         let r = match json::validate_json_bytes(input) {
             #[allow(clippy::used_underscore_items)]
             Ok(v_match) => self._validate_json(
@@ -234,36 +261,58 @@ impl SchemaValidator {
                 input,
                 v_match.into_inner().as_slice(),
                 strict,
+                extra_behavior,
                 context,
                 self_instance,
                 allow_partial,
+                by_alias,
+                by_name,
             ),
             Err(err) => Err(err),
         };
         r.map_err(|e| self.prepare_validation_err(py, e, InputType::Json))
     }
 
-    #[pyo3(signature = (input, *, strict=None, context=None, allow_partial=PartialMode::Off))]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (input, *, strict=None, extra=None, context=None, allow_partial=PartialMode::Off, by_alias=None, by_name=None))]
     pub fn validate_strings(
         &self,
         py: Python,
         input: Bound<'_, PyAny>,
         strict: Option<bool>,
+        extra: Option<&Bound<'_, PyString>>,
         context: Option<&Bound<'_, PyAny>>,
         allow_partial: PartialMode,
-    ) -> PyResult<PyObject> {
+        by_alias: Option<bool>,
+        by_name: Option<bool>,
+    ) -> PyResult<Py<PyAny>> {
         let t = InputType::String;
         let string_mapping = StringMapping::new_value(input).map_err(|e| self.prepare_validation_err(py, e, t))?;
+        let extra_behavior = extra
+            .map(|e| ExtraBehavior::from_str(e.to_str()?).map_err(|err| PyValueError::new_err(err.to_string())))
+            .transpose()?;
 
         #[allow(clippy::used_underscore_items)]
-        match self._validate(py, &string_mapping, t, strict, None, context, None, allow_partial) {
+        match self._validate(
+            py,
+            &string_mapping,
+            t,
+            strict,
+            extra_behavior,
+            None,
+            context,
+            None,
+            allow_partial,
+            by_alias,
+            by_name,
+        ) {
             Ok(r) => Ok(r),
             Err(e) => Err(self.prepare_validation_err(py, e, t)),
         }
     }
 
     #[allow(clippy::too_many_arguments)]
-    #[pyo3(signature = (obj, field_name, field_value, *, strict=None, from_attributes=None, context=None))]
+    #[pyo3(signature = (obj, field_name, field_value, *, strict=None, extra=None,from_attributes=None, context=None, by_alias=None, by_name=None))]
     pub fn validate_assignment(
         &self,
         py: Python,
@@ -271,17 +320,28 @@ impl SchemaValidator {
         field_name: &str,
         field_value: Bound<'_, PyAny>,
         strict: Option<bool>,
+        extra: Option<&Bound<'_, PyString>>,
         from_attributes: Option<bool>,
         context: Option<&Bound<'_, PyAny>>,
-    ) -> PyResult<PyObject> {
+        by_alias: Option<bool>,
+        by_name: Option<bool>,
+    ) -> PyResult<Py<PyAny>> {
+        let extra_behavior = extra
+            .map(|e| ExtraBehavior::from_str(e.to_str()?).map_err(|err| PyValueError::new_err(err.to_string())))
+            .transpose()?;
+
         let extra = Extra {
             input_type: InputType::Python,
             data: None,
             strict,
+            extra_behavior,
             from_attributes,
+            field_name: Some(PyString::new(py, field_name)),
             context,
             self_instance: None,
             cache_str: self.cache_str,
+            by_alias,
+            by_name,
         };
 
         let guard = &mut RecursionState::default();
@@ -297,15 +357,19 @@ impl SchemaValidator {
         py: Python,
         strict: Option<bool>,
         context: Option<&Bound<'_, PyAny>>,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<Py<PyAny>> {
         let extra = Extra {
             input_type: InputType::Python,
             data: None,
             strict,
+            extra_behavior: None,
             from_attributes: None,
+            field_name: None,
             context,
             self_instance: None,
             cache_str: self.cache_str,
+            by_alias: None,
+            by_name: None,
         };
         let recursion_guard = &mut RecursionState::default();
         let mut state = ValidationState::new(extra, recursion_guard, false.into());
@@ -317,6 +381,11 @@ impl SchemaValidator {
             },
             Err(e) => Err(self.prepare_validation_err(py, e, InputType::Python)),
         }
+    }
+
+    pub fn __reduce__<'py>(slf: &Bound<'py, Self>) -> PyResult<(Bound<'py, PyType>, Bound<'py, PyTuple>)> {
+        let init_args = (&slf.get().py_schema, &slf.get().py_config).into_pyobject(slf.py())?;
+        Ok((slf.get_type(), init_args))
     }
 
     pub fn __repr__(&self, py: Python) -> String {
@@ -351,20 +420,26 @@ impl SchemaValidator {
         input: &(impl Input<'py> + ?Sized),
         input_type: InputType,
         strict: Option<bool>,
+        extra_behavior: Option<ExtraBehavior>,
         from_attributes: Option<bool>,
         context: Option<&Bound<'py, PyAny>>,
         self_instance: Option<&Bound<'py, PyAny>>,
         allow_partial: PartialMode,
-    ) -> ValResult<PyObject> {
+        by_alias: Option<bool>,
+        by_name: Option<bool>,
+    ) -> ValResult<Py<PyAny>> {
         let mut recursion_guard = RecursionState::default();
         let mut state = ValidationState::new(
             Extra::new(
                 strict,
+                extra_behavior,
                 from_attributes,
                 context,
                 self_instance,
                 input_type,
                 self.cache_str,
+                by_alias,
+                by_name,
             ),
             &mut recursion_guard,
             allow_partial,
@@ -379,10 +454,13 @@ impl SchemaValidator {
         input: &Bound<'_, PyAny>,
         json_data: &[u8],
         strict: Option<bool>,
+        extra_behavior: Option<ExtraBehavior>,
         context: Option<&Bound<'_, PyAny>>,
         self_instance: Option<&Bound<'_, PyAny>>,
         allow_partial: PartialMode,
-    ) -> ValResult<PyObject> {
+        by_alias: Option<bool>,
+        by_name: Option<bool>,
+    ) -> ValResult<Py<PyAny>> {
         let json_value = jiter::JsonValue::parse_with_config(json_data, true, allow_partial)
             .map_err(|e| json::map_json_err(input, e, json_data))?;
         #[allow(clippy::used_underscore_items)]
@@ -391,10 +469,13 @@ impl SchemaValidator {
             &json_value,
             InputType::Json,
             strict,
+            extra_behavior,
             None,
             context,
             self_instance,
             allow_partial,
+            by_alias,
+            by_name,
         )
     }
 
@@ -411,68 +492,6 @@ impl SchemaValidator {
     }
 }
 
-static SCHEMA_DEFINITION: GILOnceCell<SchemaValidator> = GILOnceCell::new();
-
-#[derive(Debug, Clone)]
-pub struct SelfValidator<'py> {
-    validator: &'py SchemaValidator,
-}
-
-impl<'py> SelfValidator<'py> {
-    pub fn new(py: Python<'py>) -> PyResult<Self> {
-        let validator = SCHEMA_DEFINITION.get_or_init(py, || match Self::build(py) {
-            Ok(schema) => schema,
-            Err(e) => panic!("Error building schema validator:\n  {e}"),
-        });
-        Ok(Self { validator })
-    }
-
-    pub fn validate_schema(&self, schema: &Bound<'py, PyAny>, strict: Option<bool>) -> PyResult<Bound<'py, PyAny>> {
-        let py = schema.py();
-        let mut recursion_guard = RecursionState::default();
-        let mut state = ValidationState::new(
-            Extra::new(strict, None, None, None, InputType::Python, true.into()),
-            &mut recursion_guard,
-            false.into(),
-        );
-        match self.validator.validator.validate(py, schema, &mut state) {
-            Ok(schema_obj) => Ok(schema_obj.into_bound(py)),
-            Err(e) => Err(SchemaError::from_val_error(py, e)),
-        }
-    }
-
-    fn build(py: Python) -> PyResult<SchemaValidator> {
-        let code = c_str!(include_str!("../self_schema.py"));
-        let locals = PyDict::new(py);
-        py.run(code, None, Some(&locals))?;
-        let self_schema = locals.get_as_req(intern!(py, "self_schema"))?;
-
-        let mut definitions_builder = DefinitionsBuilder::new();
-
-        let validator = match build_validator(&self_schema, None, &mut definitions_builder) {
-            Ok(v) => v,
-            Err(err) => return py_schema_err!("Error building self-schema:\n  {}", err),
-        };
-        let definitions = definitions_builder.finish()?;
-        Ok(SchemaValidator {
-            validator,
-            definitions,
-            py_schema: py.None(),
-            py_config: None,
-            title: "Self Schema".into_py_any(py)?,
-            hide_input_in_errors: false,
-            validation_error_cause: false,
-            cache_str: true.into(),
-        })
-    }
-}
-
-#[pyfunction(signature = (schema, *, strict = None))]
-pub fn validate_core_schema<'py>(schema: &Bound<'py, PyAny>, strict: Option<bool>) -> PyResult<Bound<'py, PyAny>> {
-    let self_validator = SelfValidator::new(schema.py())?;
-    self_validator.validate_schema(schema, strict)
-}
-
 pub trait BuildValidator: Sized {
     const EXPECTED_TYPE: &'static str;
 
@@ -481,8 +500,8 @@ pub trait BuildValidator: Sized {
     fn build(
         schema: &Bound<'_, PyDict>,
         config: Option<&Bound<'_, PyDict>>,
-        definitions: &mut DefinitionsBuilder<CombinedValidator>,
-    ) -> PyResult<CombinedValidator>;
+        definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
+    ) -> PyResult<Arc<CombinedValidator>>;
 }
 
 /// Logic to create a particular validator, called in the `validator_match` macro, then in turn by `build_validator`
@@ -490,8 +509,8 @@ fn build_specific_validator<T: BuildValidator>(
     val_type: &str,
     schema_dict: &Bound<'_, PyDict>,
     config: Option<&Bound<'_, PyDict>>,
-    definitions: &mut DefinitionsBuilder<CombinedValidator>,
-) -> PyResult<CombinedValidator> {
+    definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
+) -> PyResult<Arc<CombinedValidator>> {
     T::build(schema_dict, config, definitions)
         .map_err(|err| py_schema_error_type!("Error building \"{}\" validator:\n  {}", val_type, err))
 }
@@ -509,14 +528,42 @@ macro_rules! validator_match {
     };
 }
 
+// Used when creating the base validator instance, to avoid reusing the instance
+// when unpickling:
+pub fn build_validator_base(
+    schema: &Bound<'_, PyAny>,
+    config: Option<&Bound<'_, PyDict>>,
+    definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
+) -> PyResult<Arc<CombinedValidator>> {
+    build_validator_inner(schema, config, definitions, false)
+}
+
 pub fn build_validator(
     schema: &Bound<'_, PyAny>,
     config: Option<&Bound<'_, PyDict>>,
-    definitions: &mut DefinitionsBuilder<CombinedValidator>,
-) -> PyResult<CombinedValidator> {
+    definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
+) -> PyResult<Arc<CombinedValidator>> {
+    build_validator_inner(schema, config, definitions, true)
+}
+
+fn build_validator_inner(
+    schema: &Bound<'_, PyAny>,
+    config: Option<&Bound<'_, PyDict>>,
+    definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
+    use_prebuilt: bool,
+) -> PyResult<Arc<CombinedValidator>> {
     let dict = schema.downcast::<PyDict>()?;
-    let type_: Bound<'_, PyString> = dict.get_as_req(intern!(schema.py(), "type"))?;
+    let py = schema.py();
+    let type_: Bound<'_, PyString> = dict.get_as_req(intern!(py, "type"))?;
     let type_ = type_.to_str()?;
+
+    if use_prebuilt {
+        // if we have a SchemaValidator on the type already, use it
+        if let Ok(Some(prebuilt_validator)) = prebuilt::PrebuiltValidator::try_get_from_schema(type_, dict) {
+            return Ok(Arc::new(prebuilt_validator));
+        }
+    }
+
     validator_match!(
         type_,
         dict,
@@ -564,6 +611,8 @@ pub fn build_validator(
         call::CallValidator,
         // literals
         literal::LiteralValidator,
+        // missing sentinel
+        missing_sentinel::MissingSentinelValidator,
         // enums
         enum_::BuildEnumValidator,
         // any
@@ -586,6 +635,7 @@ pub fn build_validator(
         callable::CallableValidator,
         // arguments
         arguments::ArgumentsValidator,
+        arguments_v3::ArgumentsV3Validator,
         // default value
         with_default::WithDefaultValidator,
         // chain validators
@@ -622,33 +672,50 @@ pub struct Extra<'a, 'py> {
     pub data: Option<Bound<'py, PyDict>>,
     /// whether we're in strict or lax mode
     pub strict: Option<bool>,
+    /// Whether to ignore, allow, or forbid extra data during model validation
+    #[allow(clippy::struct_field_names)]
+    pub extra_behavior: Option<ExtraBehavior>,
     /// Validation time setting of `from_attributes`
     pub from_attributes: Option<bool>,
     /// context used in validator functions
     pub context: Option<&'a Bound<'py, PyAny>>,
+    /// The name of the field being validated, if applicable
+    pub field_name: Option<Bound<'py, PyString>>,
     /// This is an instance of the model or dataclass being validated, when validation is performed from `__init__`
     self_instance: Option<&'a Bound<'py, PyAny>>,
     /// Whether to use a cache of short strings to accelerate python string construction
     cache_str: StringCacheMode,
+    /// Whether to use the field's alias to match the input data to an attribute.
+    by_alias: Option<bool>,
+    /// Whether to use the field's name to match the input data to an attribute.
+    by_name: Option<bool>,
 }
 
 impl<'a, 'py> Extra<'a, 'py> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         strict: Option<bool>,
+        extra_behavior: Option<ExtraBehavior>,
         from_attributes: Option<bool>,
         context: Option<&'a Bound<'py, PyAny>>,
         self_instance: Option<&'a Bound<'py, PyAny>>,
         input_type: InputType,
         cache_str: StringCacheMode,
+        by_alias: Option<bool>,
+        by_name: Option<bool>,
     ) -> Self {
         Extra {
             input_type,
             data: None,
             strict,
+            extra_behavior,
             from_attributes,
+            field_name: None,
             context,
             self_instance,
             cache_str,
+            by_alias,
+            by_name,
         }
     }
 }
@@ -659,10 +726,14 @@ impl Extra<'_, '_> {
             input_type: self.input_type,
             data: self.data.clone(),
             strict: Some(true),
+            extra_behavior: self.extra_behavior,
             from_attributes: self.from_attributes,
+            field_name: self.field_name.clone(),
             context: self.context,
             self_instance: self.self_instance,
             cache_str: self.cache_str,
+            by_alias: self.by_alias,
+            by_name: self.by_name,
         }
     }
 }
@@ -715,6 +786,8 @@ pub enum CombinedValidator {
     FunctionCall(call::CallValidator),
     // literals
     Literal(literal::LiteralValidator),
+    // Missing sentinel
+    MissingSentinel(missing_sentinel::MissingSentinelValidator),
     // enums
     IntEnum(enum_::EnumValidator<enum_::IntEnumValidator>),
     StrEnum(enum_::EnumValidator<enum_::StrEnumValidator>),
@@ -741,6 +814,7 @@ pub enum CombinedValidator {
     Callable(callable::CallableValidator),
     // arguments
     Arguments(arguments::ArgumentsValidator),
+    ArgumentsV3(arguments_v3::ArgumentsV3Validator),
     // default value
     WithDefault(with_default::WithDefaultValidator),
     // chain validators
@@ -763,6 +837,8 @@ pub enum CombinedValidator {
     // input dependent
     JsonOrPython(json_or_python::JsonOrPython),
     Complex(complex::ComplexValidator),
+    // uses a reference to an existing SchemaValidator to reduce memory usage
+    Prebuilt(prebuilt::PrebuiltValidator),
 }
 
 /// This trait must be implemented by all validators, it allows various validators to be accessed consistently,
@@ -775,7 +851,7 @@ pub trait Validator: Send + Sync + Debug {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject>;
+    ) -> ValResult<Py<PyAny>>;
 
     /// Get a default value, currently only used by `WithDefaultValidator`
     fn default_value<'py>(
@@ -783,7 +859,7 @@ pub trait Validator: Send + Sync + Debug {
         _py: Python<'py>,
         _outer_loc: Option<impl Into<LocItem>>,
         _state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<Option<PyObject>> {
+    ) -> ValResult<Option<Py<PyAny>>> {
         Ok(None)
     }
 
@@ -796,7 +872,7 @@ pub trait Validator: Send + Sync + Debug {
         _field_name: &str,
         _field_value: &Bound<'py, PyAny>,
         _state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         let py_err = PyTypeError::new_err(format!("validate_assignment is not supported for {}", self.get_name()));
         Err(py_err.into())
     }

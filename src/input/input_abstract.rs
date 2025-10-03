@@ -8,7 +8,7 @@ use pyo3::{intern, prelude::*, IntoPyObjectExt};
 use crate::errors::{ErrorTypeDefaults, InputValue, LocItem, ValError, ValResult};
 use crate::lookup_key::{LookupKey, LookupPath};
 use crate::tools::py_err;
-use crate::validators::ValBytesMode;
+use crate::validators::{TemporalUnitMode, ValBytesMode};
 
 use super::datetime::{EitherDate, EitherDateTime, EitherTime, EitherTimedelta};
 use super::return_enums::{EitherBytes, EitherComplex, EitherInt, EitherString};
@@ -81,9 +81,11 @@ pub trait Input<'py>: fmt::Debug {
 
     fn validate_args(&self) -> ValResult<Self::Arguments<'_>>;
 
+    fn validate_args_v3(&self) -> ValResult<Self::Arguments<'_>>;
+
     fn validate_dataclass_args<'a>(&'a self, dataclass_name: &str) -> ValResult<Self::Arguments<'a>>;
 
-    fn validate_str(&self, strict: bool, coerce_numbers_to_str: bool) -> ValMatch<EitherString<'_>>;
+    fn validate_str(&self, strict: bool, coerce_numbers_to_str: bool) -> ValMatch<EitherString<'_, 'py>>;
 
     fn validate_bytes<'a>(&'a self, strict: bool, mode: ValBytesMode) -> ValMatch<EitherBytes<'a, 'py>>;
 
@@ -101,7 +103,7 @@ pub trait Input<'py>: fmt::Debug {
 
     /// Extract a String from the input, only allowing exact
     /// matches for a String (no subclasses)
-    fn exact_str(&self) -> ValResult<EitherString<'_>> {
+    fn exact_str(&self) -> ValResult<EitherString<'_, 'py>> {
         self.validate_str(true, false).and_then(|val_match| {
             val_match
                 .require_exact()
@@ -156,7 +158,7 @@ pub trait Input<'py>: fmt::Debug {
 
     fn validate_iter(&self) -> ValResult<GenericIterator<'static>>;
 
-    fn validate_date(&self, strict: bool) -> ValMatch<EitherDate<'py>>;
+    fn validate_date(&self, strict: bool, mode: TemporalUnitMode) -> ValMatch<EitherDate<'py>>;
 
     fn validate_time(
         &self,
@@ -168,6 +170,7 @@ pub trait Input<'py>: fmt::Debug {
         &self,
         strict: bool,
         microseconds_overflow_behavior: speedate::MicrosecondsPrecisionOverflowBehavior,
+        mode: TemporalUnitMode,
     ) -> ValMatch<EitherDateTime<'py>>;
 
     fn validate_timedelta(
@@ -265,6 +268,7 @@ pub trait ValidatedList<'py> {
 pub trait ValidatedTuple<'py> {
     type Item: BorrowInput<'py>;
     fn len(&self) -> Option<usize>;
+    fn try_for_each(self, f: impl FnMut(PyResult<Self::Item>) -> ValResult<()>) -> ValResult<()>;
     fn iterate<R>(self, consumer: impl ConsumeIterator<PyResult<Self::Item>, Output = R>) -> ValResult<R>;
 }
 
@@ -311,6 +315,9 @@ impl<'py> ValidatedList<'py> for Never {
 impl<'py> ValidatedTuple<'py> for Never {
     type Item = Bound<'py, PyAny>;
     fn len(&self) -> Option<usize> {
+        unreachable!()
+    }
+    fn try_for_each(self, _f: impl FnMut(PyResult<Self::Item>) -> ValResult<()>) -> ValResult<()> {
         unreachable!()
     }
     fn iterate<R>(self, _consumer: impl ConsumeIterator<PyResult<Self::Item>, Output = R>) -> ValResult<R> {

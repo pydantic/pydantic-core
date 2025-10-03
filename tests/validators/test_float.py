@@ -1,5 +1,6 @@
 import math
 import re
+import sys
 from decimal import Decimal
 from typing import Any
 
@@ -7,10 +8,12 @@ import pytest
 from dirty_equals import FunctionCheck, IsFloatNan, IsStr
 
 from pydantic_core import SchemaValidator, ValidationError, core_schema
+from pydantic_core import core_schema as cs
 
 from ..conftest import Err, PyAndJson, plain_repr
 
-f64_max = 1.7976931348623157e308
+i64_max = (2**63) - 1
+f64_max = sys.float_info.max
 
 
 @pytest.mark.parametrize(
@@ -19,6 +22,8 @@ f64_max = 1.7976931348623157e308
         (0, 0),
         (1, 1),
         (42, 42),
+        (i64_max + 1, i64_max + 1),
+        (f64_max, f64_max),
         ('42', 42),
         ('  42.1  ', 42.1),
         ('42.123', 42.123),
@@ -200,23 +205,23 @@ def test_union_float_simple(py_and_json: PyAndJson):
 
 
 def test_float_repr():
-    v = SchemaValidator({'type': 'float'})
+    v = SchemaValidator(cs.float_schema())
     assert (
         plain_repr(v)
         == 'SchemaValidator(title="float",validator=Float(FloatValidator{strict:false,allow_inf_nan:true}),definitions=[],cache_strings=True)'
     )
-    v = SchemaValidator({'type': 'float', 'strict': True})
+    v = SchemaValidator(cs.float_schema(strict=True))
     assert (
         plain_repr(v)
         == 'SchemaValidator(title="float",validator=Float(FloatValidator{strict:true,allow_inf_nan:true}),definitions=[],cache_strings=True)'
     )
-    v = SchemaValidator({'type': 'float', 'multiple_of': 7})
+    v = SchemaValidator(cs.float_schema(multiple_of=7))
     assert plain_repr(v).startswith('SchemaValidator(title="constrained-float",validator=ConstrainedFloat(')
 
 
 @pytest.mark.parametrize('input_value,expected', [(Decimal('1.23'), 1.23), (Decimal('1'), 1.0)])
 def test_float_not_json(input_value, expected):
-    v = SchemaValidator({'type': 'float'})
+    v = SchemaValidator(cs.float_schema())
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
@@ -315,7 +320,7 @@ def test_non_finite_json_values(py_and_json: PyAndJson, input_value, allow_inf_n
     ],
 )
 def test_non_finite_float_values(strict, input_value, allow_inf_nan, expected):
-    v = SchemaValidator({'type': 'float', 'allow_inf_nan': allow_inf_nan, 'strict': strict})
+    v = SchemaValidator(cs.float_schema(allow_inf_nan=allow_inf_nan, strict=strict))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
@@ -345,7 +350,7 @@ def test_non_finite_float_values(strict, input_value, allow_inf_nan, expected):
     ],
 )
 def test_non_finite_constrained_float_values(input_value, allow_inf_nan, expected):
-    v = SchemaValidator({'type': 'float', 'allow_inf_nan': allow_inf_nan, 'gt': 0})
+    v = SchemaValidator(cs.float_schema(allow_inf_nan=allow_inf_nan, gt=0))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             v.validate_python(input_value)
@@ -383,12 +388,12 @@ def test_non_finite_constrained_float_values(input_value, allow_inf_nan, expecte
     ],
 )
 def test_validate_scientific_notation_from_json(input_value, expected):
-    v = SchemaValidator({'type': 'float'})
+    v = SchemaValidator(cs.float_schema())
     assert v.validate_json(input_value) == expected
 
 
 def test_string_with_underscores() -> None:
-    v = SchemaValidator({'type': 'float'})
+    v = SchemaValidator(cs.float_schema())
     assert v.validate_python('1_000_000.0') == 1_000_000.0
     assert v.validate_json('"1_000_000.0"') == 1_000_000.0
 
@@ -413,7 +418,7 @@ def test_allow_inf_nan_true_json() -> None:
 
 
 def test_allow_inf_nan_false_json() -> None:
-    v = SchemaValidator(core_schema.float_schema(), core_schema.CoreConfig(allow_inf_nan=False))
+    v = SchemaValidator(core_schema.float_schema(), config=core_schema.CoreConfig(allow_inf_nan=False))
 
     assert v.validate_json('123') == 123
     with pytest.raises(ValidationError) as exc_info1:

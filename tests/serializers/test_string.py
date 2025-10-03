@@ -23,9 +23,41 @@ def test_str():
     assert json.loads(json_emoji) == 'emoji 💩'
 
 
+# Tests borrowed from:
+# - https://github.com/python/cpython/blob/d87e7f35/Lib/test/test_json/test_encode_basestring_ascii.py
+# - https://github.com/python/cpython/blob/d87e7f35/Lib/test/test_json/test_unicode.py
+@pytest.mark.parametrize(
+    ['input', 'expected'],
+    [
+        (
+            '/\\"\ucafe\ubabe\uab98\ufcde\ubcda\uef4a\x08\x0c\n\r\t`1~!@#$%^&*()_+-=[]{}|;:\',./<>?',
+            '"/\\\\\\"\\ucafe\\ubabe\\uab98\\ufcde\\ubcda\\uef4a\\b\\f\\n\\r\\t`1~!@#$%^&*()_+-=[]{}|;:\',./<>?"',
+        ),
+        ('\u0123\u4567\u89ab\ucdef\uabcd\uef4a', '"\\u0123\\u4567\\u89ab\\ucdef\\uabcd\\uef4a"'),
+        ('controls', '"controls"'),
+        ('\x08\x0c\n\r\t', '"\\b\\f\\n\\r\\t"'),
+        (
+            '{"object with 1 member":["array with 1 element"]}',
+            '"{\\"object with 1 member\\":[\\"array with 1 element\\"]}"',
+        ),
+        (' s p a c e d ', '" s p a c e d "'),
+        ('\U0001d120', '"\\ud834\\udd20"'),
+        ('\u03b1\u03a9', '"\\u03b1\\u03a9"'),
+        ("`1~!@#$%^&*()_+-={':[,]}|;.</>?", '"`1~!@#$%^&*()_+-={\':[,]}|;.</>?"'),
+        ('\x08\x0c\n\r\t', '"\\b\\f\\n\\r\\t"'),
+        ('\u0123\u4567\u89ab\ucdef\uabcd\uef4a', '"\\u0123\\u4567\\u89ab\\ucdef\\uabcd\\uef4a"'),
+        ('\N{GREEK SMALL LETTER ALPHA}\N{GREEK CAPITAL LETTER OMEGA}', '"\\u03b1\\u03a9"'),
+        ('\U0001d120', '"\\ud834\\udd20"'),
+    ],
+)
+def test_str_ensure_ascii(input: str, expected: str) -> None:
+    v = SchemaSerializer(core_schema.str_schema())
+    assert v.to_json(input, ensure_ascii=True).decode('utf-8') == expected
+
+
 def test_huge_str():
     v = SchemaSerializer(core_schema.int_schema())
-    msg = "Expected `int` but got `str` with value `'123456789012345678901234...89012345678901234567890'` - serialized value may not be as expected"
+    msg = r"Expected `int` - serialized value may not be as expected \[input_value='123456789012345678901234...89012345678901234567890', input_type=str\]"
     with pytest.warns(UserWarning, match=msg):
         v.to_python(
             '12345678901234567890123456789012345678901234567890123456789012345678901234567890\
@@ -41,39 +73,48 @@ def test_str_fallback():
     assert s.to_python(None, mode='json') is None
     assert s.to_json(None) == b'null'
     with pytest.warns(
-        UserWarning, match='Expected `str` but got `int` with value `123` - serialized value may not be as expected'
+        UserWarning,
+        match=r'Expected `str` - serialized value may not be as expected \[input_value=123, input_type=int\]',
     ):
         assert s.to_python(123) == 123
     with pytest.warns(
-        UserWarning, match='Expected `str` but got `int` with value `123` - serialized value may not be as expected'
+        UserWarning,
+        match=r'Expected `str` - serialized value may not be as expected \[input_value=123, input_type=int\]',
     ):
         assert s.to_python(123, mode='json') == 123
     with pytest.warns(
-        UserWarning, match='Expected `str` but got `int` with value `123` - serialized value may not be as expected'
+        UserWarning,
+        match=r'Expected `str` - serialized value may not be as expected \[input_value=123, input_type=int\]',
     ):
         assert s.to_json(123) == b'123'
     with pytest.warns(
-        UserWarning, match='Expected `str` but got `int` with value `123` - serialized value may not be as expected'
+        UserWarning,
+        match=r'Expected `str` - serialized value may not be as expected \[input_value=123, input_type=int\]',
     ):
         assert s.to_python(123, warnings='warn') == 123
     with pytest.warns(
-        UserWarning, match='Expected `str` but got `int` with value `123` - serialized value may not be as expected'
+        UserWarning,
+        match=r'Expected `str` - serialized value may not be as expected \[input_value=123, input_type=int\]',
     ):
         assert s.to_python(123, mode='json', warnings='warn') == 123
     with pytest.warns(
-        UserWarning, match='Expected `str` but got `int` with value `123` - serialized value may not be as expected'
+        UserWarning,
+        match=r'Expected `str` - serialized value may not be as expected \[input_value=123, input_type=int\]',
     ):
         assert s.to_json(123, warnings='warn') == b'123'
     with pytest.warns(
-        UserWarning, match='Expected `str` but got `int` with value `123` - serialized value may not be as expected'
+        UserWarning,
+        match=r'Expected `str` - serialized value may not be as expected \[input_value=123, input_type=int\]',
     ):
         assert s.to_python(123, warnings=True) == 123
     with pytest.warns(
-        UserWarning, match='Expected `str` but got `int` with value `123` - serialized value may not be as expected'
+        UserWarning,
+        match=r'Expected `str` - serialized value may not be as expected \[input_value=123, input_type=int\]',
     ):
         assert s.to_python(123, mode='json', warnings=True) == 123
     with pytest.warns(
-        UserWarning, match='Expected `str` but got `int` with value `123` - serialized value may not be as expected'
+        UserWarning,
+        match=r'Expected `str` - serialized value may not be as expected \[input_value=123, input_type=int\]',
     ):
         assert s.to_json(123, warnings=True) == b'123'
 
@@ -92,17 +133,17 @@ def test_str_errors():
     s = SchemaSerializer(core_schema.str_schema())
     with pytest.raises(
         PydanticSerializationError,
-        match='Expected `str` but got `int` with value `123` - serialized value may not be as expected',
+        match=r'Expected `str` - serialized value may not be as expected \[input_value=123, input_type=int\]',
     ):
         assert s.to_python(123, warnings='error') == 123
     with pytest.raises(
         PydanticSerializationError,
-        match='Expected `str` but got `int` with value `123` - serialized value may not be as expected',
+        match=r'Expected `str` - serialized value may not be as expected \[input_value=123, input_type=int\]',
     ):
         assert s.to_python(123, mode='json', warnings='error') == 123
     with pytest.raises(
         PydanticSerializationError,
-        match='Expected `str` but got `int` with value `123` - serialized value may not be as expected',
+        match=r'Expected `str` - serialized value may not be as expected \[input_value=123, input_type=int\]',
     ):
         assert s.to_json(123, warnings='error') == b'123'
 

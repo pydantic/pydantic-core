@@ -7,7 +7,7 @@ use pyo3::exceptions::{PyKeyError, PyTypeError, PyValueError};
 use pyo3::ffi::{self, c_str};
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::sync::GILOnceCell;
+use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyDict, PyList, PyString, PyTuple, PyType};
 use serde::ser::{Error, SerializeMap, SerializeSeq};
 use serde::{Serialize, Serializer};
@@ -18,7 +18,7 @@ use crate::build_tools::py_schema_error_type;
 use crate::errors::LocItem;
 use crate::get_pydantic_version;
 use crate::input::InputType;
-use crate::serializers::{DuckTypingSerMode, Extra, SerMode, SerializationState};
+use crate::serializers::{Extra, SerMode, SerializationState};
 use crate::tools::{safe_repr, write_truncated_to_limited_bytes, SchemaDict};
 
 use super::line_error::ValLineError;
@@ -32,13 +32,13 @@ use super::{InputValue, ValError};
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub struct ValidationError {
     line_errors: Vec<PyLineError>,
-    title: PyObject,
+    title: Py<PyAny>,
     input_type: InputType,
     hide_input: bool,
 }
 
 impl ValidationError {
-    pub fn new(line_errors: Vec<PyLineError>, title: PyObject, input_type: InputType, hide_input: bool) -> Self {
+    pub fn new(line_errors: Vec<PyLineError>, title: Py<PyAny>, input_type: InputType, hide_input: bool) -> Self {
         Self {
             line_errors,
             title,
@@ -49,7 +49,7 @@ impl ValidationError {
 
     pub fn from_val_error(
         py: Python,
-        title: PyObject,
+        title: Py<PyAny>,
         input_type: InputType,
         error: ValError,
         outer_location: Option<LocItem>,
@@ -110,7 +110,7 @@ impl ValidationError {
     }
 
     pub fn use_default_error() -> PyErr {
-        py_schema_error_type!("Uncaught UseDefault error, please check your usage of `default` validators.")
+        py_schema_error_type!("Uncaught `PydanticUseDefault` exception: the error was raised in a field validator and no default value is available for that field.")
     }
 
     fn maybe_add_cause(self_: PyRef<'_, Self>, py: Python) -> Option<PyErr> {
@@ -198,7 +198,7 @@ impl ValidationError {
     }
 }
 
-static URL_ENV_VAR: GILOnceCell<bool> = GILOnceCell::new();
+static URL_ENV_VAR: PyOnceLock<bool> = PyOnceLock::new();
 
 fn include_url_env(py: Python) -> bool {
     *URL_ENV_VAR.get_or_init(py, || {
@@ -227,7 +227,7 @@ fn include_url_env(py: Python) -> bool {
     })
 }
 
-static URL_PREFIX: GILOnceCell<String> = GILOnceCell::new();
+static URL_PREFIX: PyOnceLock<String> = PyOnceLock::new();
 
 fn get_formated_url(py: Python) -> &'static str {
     let pydantic_version = match get_pydantic_version(py) {
@@ -238,7 +238,7 @@ fn get_formated_url(py: Python) -> &'static str {
     URL_PREFIX.get_or_init(py, || format!("https://errors.pydantic.dev/{pydantic_version}/v/"))
 }
 
-fn get_url_prefix(py: Python, include_url: bool) -> Option<&str> {
+fn get_url_prefix(py: Python<'_>, include_url: bool) -> Option<&str> {
     if include_url {
         Some(get_formated_url(py))
     } else {
@@ -257,7 +257,7 @@ impl ValidationError {
 impl ValidationError {
     #[new]
     #[pyo3(signature = (title, line_errors, input_type="python", hide_input=false))]
-    fn py_new(title: PyObject, line_errors: Vec<PyLineError>, input_type: &str, hide_input: bool) -> PyResult<Self> {
+    fn py_new(title: Py<PyAny>, line_errors: Vec<PyLineError>, input_type: &str, hide_input: bool) -> PyResult<Self> {
         Ok(Self {
             line_errors,
             title,
@@ -270,7 +270,7 @@ impl ValidationError {
     #[pyo3(signature = (title, line_errors, input_type="python", hide_input=false))]
     fn from_exception_data<'py>(
         cls: &Bound<'py, PyType>,
-        title: PyObject,
+        title: Py<PyAny>,
         line_errors: Bound<'_, PyList>,
         input_type: &str,
         hide_input: bool,
@@ -287,7 +287,7 @@ impl ValidationError {
     }
 
     #[getter]
-    fn title(&self, py: Python) -> PyObject {
+    fn title(&self, py: Python) -> Py<PyAny> {
         self.title.clone_ref(py)
     }
 
@@ -310,7 +310,7 @@ impl ValidationError {
             // PyList::new takes ExactSizeIterator, so if an error occurs during iteration we
             // fill the list with None before returning the error; the list will then be thrown
             // away safely.
-            self.line_errors.iter().map(|e| -> PyObject {
+            self.line_errors.iter().map(|e| -> Py<PyAny> {
                 if iteration_error.is_some() {
                     return py.None();
                 }
@@ -340,18 +340,8 @@ impl ValidationError {
         include_context: bool,
         include_input: bool,
     ) -> PyResult<Bound<'py, PyString>> {
-        let state = SerializationState::new("iso8601", "utf8", "constants")?;
-        let extra = state.extra(
-            py,
-            &SerMode::Json,
-            true,
-            false,
-            false,
-            true,
-            None,
-            DuckTypingSerMode::SchemaBased,
-            None,
-        );
+        let state = SerializationState::new("iso8601", "iso8601", "utf8", "constants")?;
+        let extra = state.extra(py, &SerMode::Json, None, false, false, true, None, false, None);
         let serializer = ValidationErrorSerializer {
             py,
             line_errors: &self.line_errors,
@@ -425,7 +415,7 @@ pub fn pretty_py_line_errors<'a>(
 pub struct PyLineError {
     error_type: ErrorType,
     location: Location,
-    input_value: PyObject,
+    input_value: Py<PyAny>,
 }
 
 impl From<PyLineError> for ValLineError {

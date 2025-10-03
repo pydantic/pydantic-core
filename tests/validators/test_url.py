@@ -5,7 +5,7 @@ from typing import Optional, Union
 import pytest
 from dirty_equals import HasRepr, IsInstance
 
-from pydantic_core import MultiHostUrl, SchemaError, SchemaValidator, Url, ValidationError, core_schema
+from pydantic_core import CoreConfig, MultiHostUrl, SchemaError, SchemaValidator, Url, ValidationError, core_schema
 
 from ..conftest import Err, PyAndJson
 
@@ -121,13 +121,19 @@ def url_test_case_helper(
         ('http://example.com:65535', 'http://example.com:65535/'),
         ('http:\\\\example.com', 'http://example.com/'),
         ('http:example.com', 'http://example.com/'),
+        ('http:example.com/path', 'http://example.com/path'),
+        ('http:example.com/path/', 'http://example.com/path/'),
+        ('http:example.com?query=nopath', 'http://example.com/?query=nopath'),
+        ('http:example.com/?query=haspath', 'http://example.com/?query=haspath'),
+        ('http:example.com#nopath', 'http://example.com/#nopath'),
+        ('http:example.com/#haspath', 'http://example.com/#haspath'),
         ('http://example.com:65536', Err('invalid port number')),
         ('http://1...1', Err('invalid IPv4 address')),
         ('https://[2001:0db8:85a3:0000:0000:8a2e:0370:7334[', Err('invalid IPv6 address')),
         ('https://[', Err('invalid IPv6 address')),
-        ('https://example com', Err('invalid domain character')),
-        ('http://exam%ple.com', Err('invalid domain character')),
-        ('http:// /', Err('invalid domain character')),
+        ('https://example com', Err('invalid international domain name')),
+        ('http://exam%ple.com', Err('invalid international domain name')),
+        ('http:// /', Err('invalid international domain name')),
         ('/more', Err('relative URL without a base')),
         ('http://example.com./foobar', {'str()': 'http://example.com./foobar'}),
         # works since we're in lax mode
@@ -172,7 +178,7 @@ def url_test_case_helper(
         ('https:more', {'str()': 'https://more/', 'host': 'more'}),
         ('file:///foobar', {'str()': 'file:///foobar', 'host': None, 'unicode_host()': None}),
         ('file:///:80', {'str()': 'file:///:80'}),
-        ('file://:80', Err('invalid domain character')),
+        ('file://:80', Err('invalid international domain name')),
         ('foobar://:80', Err('empty host')),
         # with bashslashes
         ('file:\\\\foobar\\more', {'str()': 'file://foobar/more', 'host': 'foobar', 'path': '/more'}),
@@ -272,6 +278,79 @@ def test_url_cases(url_validator, url, expected, mode):
 
 
 @pytest.mark.parametrize(
+    ('url', 'expected', 'expected_path'),
+    [
+        ('http://example.com', 'http://example.com', None),
+        ('http:example.com', 'http://example.com', None),
+        ('http:/example.com', 'http://example.com', None),
+        ('http://example.com/', 'http://example.com/', '/'),
+        ('http:example.com/', 'http://example.com/', '/'),
+        ('http:/example.com/', 'http://example.com/', '/'),
+        ('http://example.com?x=1', 'http://example.com?x=1', None),
+        ('http://example.com/?x=1', 'http://example.com/?x=1', '/'),
+        ('http://example.com#foo', 'http://example.com#foo', None),
+        ('http://example.com/#foo', 'http://example.com/#foo', '/'),
+        ('http://example.com/path', 'http://example.com/path', '/path'),
+        ('http://example.com/path/', 'http://example.com/path/', '/path/'),
+        ('http://example.com/path?x=1', 'http://example.com/path?x=1', '/path'),
+        ('http://example.com/path/?x=1', 'http://example.com/path/?x=1', '/path/'),
+    ],
+)
+def test_trailing_slash(url: str, expected: str, expected_path: Optional[str]):
+    url1 = Url(url, preserve_empty_path=True)
+    assert str(url1) == expected
+    assert url1.unicode_string() == expected
+    assert url1.path == expected_path
+
+    v = SchemaValidator(core_schema.url_schema(preserve_empty_path=True))
+    url2 = v.validate_python(url)
+    assert str(url2) == expected
+    assert url2.unicode_string() == expected
+    assert url2.path == expected_path
+
+    v = SchemaValidator(core_schema.url_schema(), CoreConfig(url_preserve_empty_path=True))
+    url3 = v.validate_python(url)
+    assert str(url3) == expected
+    assert url3.unicode_string() == expected
+    assert url3.path == expected_path
+
+
+@pytest.mark.parametrize(
+    ('url', 'expected', 'expected_path'),
+    [
+        ('http://example.com', 'http://example.com', None),
+        ('http://example.com/', 'http://example.com/', '/'),
+        ('http://example.com/path', 'http://example.com/path', '/path'),
+        ('http://example.com/path/', 'http://example.com/path/', '/path/'),
+        ('http://example.com,example.org', 'http://example.com,example.org', None),
+        ('http://example.com,example.org/', 'http://example.com,example.org/', '/'),
+        ('http://localhost,127.0.0.1', 'http://localhost,127.0.0.1', None),
+        ('http://localhost,127.0.0.1/', 'http://localhost,127.0.0.1/', '/'),
+        ('http:localhost,127.0.0.1', 'http://localhost,127.0.0.1', None),
+        ('http://localhost,127.0.0.1/path', 'http://localhost,127.0.0.1/path', '/path'),
+        ('http://localhost,127.0.0.1/path/', 'http://localhost,127.0.0.1/path/', '/path/'),
+    ],
+)
+def test_multi_trailing_slash(url: str, expected: str, expected_path: Optional[str]):
+    url1 = MultiHostUrl(url, preserve_empty_path=True)
+    assert str(url1) == expected
+    assert url1.unicode_string() == expected
+    assert url1.path == expected_path
+
+    v = SchemaValidator(core_schema.multi_host_url_schema(preserve_empty_path=True))
+    url2 = v.validate_python(url)
+    assert str(url2) == expected
+    assert url2.unicode_string() == expected
+    assert url2.path == expected_path
+
+    v = SchemaValidator(core_schema.multi_host_url_schema(), CoreConfig(url_preserve_empty_path=True))
+    url3 = v.validate_python(url)
+    assert str(url3) == expected
+    assert url3.unicode_string() == expected
+    assert url3.path == expected_path
+
+
+@pytest.mark.parametrize(
     'validator_kwargs,url,expected',
     [
         (
@@ -367,7 +446,7 @@ def test_multi_host_default_host_no_comma():
 
 @pytest.fixture(scope='module', name='strict_url_validator')
 def strict_url_validator_fixture():
-    return SchemaValidator(core_schema.url_schema(), {'strict': True})
+    return SchemaValidator(core_schema.url_schema(), config=CoreConfig(strict=True))
 
 
 @pytest.mark.parametrize(
@@ -383,7 +462,7 @@ def strict_url_validator_fixture():
         ('https:/more', Err('expected //', 'url_syntax_violation')),
         ('https:more', Err('expected //', 'url_syntax_violation')),
         ('file:///foobar', {'str()': 'file:///foobar', 'host': None, 'unicode_host()': None}),
-        ('file://:80', Err('invalid domain character', 'url_parsing')),
+        ('file://:80', Err('invalid international domain name', 'url_parsing')),
         ('file:/xx', Err('expected // after file:', 'url_syntax_violation')),
         ('foobar://:80', Err('empty host', 'url_parsing')),
         ('mongodb+srv://server.example.com/', 'mongodb+srv://server.example.com/'),
@@ -1046,7 +1125,7 @@ def test_zero_schemas():
         (
             'http://127.0.0.1%0d%0aConnection%3a%20keep-alive',
             # dict(scheme='http', host='127.0.0.1%0d%0aconnection%3a%20keep-alive'), CHANGED
-            Err('Input should be a valid URL, invalid domain character [type=url_parsing,'),
+            Err('Input should be a valid URL, invalid international domain name [type=url_parsing,'),
         ),
         # NodeJS unicode -> double dot
         ('http://google.com/\uff2e\uff2e/abc', dict(scheme='http', host='google.com', path='/%EF%BC%AE%EF%BC%AE/abc')),

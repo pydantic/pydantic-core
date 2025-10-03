@@ -1,5 +1,6 @@
 import datetime
 import platform
+import sys
 from dataclasses import dataclass
 from typing import Optional
 
@@ -7,7 +8,8 @@ import pytest
 from dirty_equals import AnyThing, HasAttributes, IsList, IsPartialDict, IsStr, IsTuple
 
 import pydantic_core
-from pydantic_core import SchemaError, SchemaValidator, ValidationError, core_schema
+from pydantic_core import CoreConfig, SchemaError, SchemaValidator, ValidationError, core_schema
+from pydantic_core import core_schema as cs
 
 from ..conftest import Err, plain_repr
 from .test_typed_dict import Cls
@@ -53,14 +55,13 @@ def test_branch_nullable():
 
 def test_unused_ref():
     v = SchemaValidator(
-        {
-            'type': 'typed-dict',
-            'ref': 'Branch',
-            'fields': {
-                'name': {'type': 'typed-dict-field', 'schema': {'type': 'str'}},
-                'other': {'type': 'typed-dict-field', 'schema': {'type': 'int'}},
+        cs.typed_dict_schema(
+            fields={
+                'name': cs.typed_dict_field(schema=cs.str_schema()),
+                'other': cs.typed_dict_field(schema=cs.int_schema()),
             },
-        }
+            ref='Branch',
+        )
     )
     assert v.validate_python({'name': 'root', 'other': '4'}) == {'name': 'root', 'other': 4}
 
@@ -246,26 +247,19 @@ def test_model_class():
 def test_invalid_schema():
     with pytest.raises(SchemaError, match='Definitions error: definition `Branch` was never filled'):
         SchemaValidator(
-            {
-                'type': 'list',
-                'items_schema': {
-                    'type': 'typed-dict',
-                    'fields': {
-                        'width': {'type': 'typed-dict-field', 'schema': {'type': 'int'}},
-                        'branch': {
-                            'type': 'typed-dict-field',
-                            'schema': {
-                                'type': 'default',
-                                'schema': {
-                                    'type': 'nullable',
-                                    'schema': {'type': 'definition-ref', 'schema_ref': 'Branch'},
-                                },
-                                'default': None,
-                            },
-                        },
-                    },
-                },
-            }
+            schema=cs.list_schema(
+                items_schema=cs.typed_dict_schema(
+                    fields={
+                        'width': cs.typed_dict_field(schema=cs.int_schema()),
+                        'branch': cs.typed_dict_field(
+                            schema=cs.with_default_schema(
+                                schema=cs.nullable_schema(schema=cs.definition_reference_schema(schema_ref='Branch')),
+                                default=None,
+                            )
+                        ),
+                    }
+                )
+            )
         )
 
 
@@ -311,7 +305,7 @@ def test_recursion_branch():
                 )
             ],
         ),
-        {'from_attributes': True},
+        config=CoreConfig(from_attributes=True),
     )
     assert ',definitions=[TypedDict(TypedDictValidator{' in plain_repr(v)
 
@@ -355,7 +349,7 @@ def test_recursion_branch_from_attributes():
                 )
             ],
         ),
-        {'from_attributes': True},
+        config=CoreConfig(from_attributes=True),
     )
 
     assert v.validate_python({'name': 'root'}) == ({'name': 'root', 'branch': None}, None, {'name'})
@@ -618,11 +612,11 @@ def test_union_cycle(strict: bool):
                                 'foobar': core_schema.typed_dict_field(
                                     core_schema.list_schema(core_schema.definition_reference_schema('root-schema'))
                                 )
-                            }
+                            },
+                            strict=strict,
                         )
                     ],
                     auto_collapse=False,
-                    strict=strict,
                     ref='root-schema',
                 )
             ],
@@ -707,11 +701,11 @@ def test_function_change_id(strict: bool):
                         )
                     ],
                     auto_collapse=False,
-                    strict=strict,
                     ref='root-schema',
                 )
             ],
-        )
+        ),
+        config=CoreConfig(strict=strict),
     )
 
     with pytest.raises(ValidationError) as exc_info:
@@ -759,27 +753,24 @@ def test_many_uses_of_ref():
     assert v.validate_python(long_input) == long_input
 
 
+@pytest.mark.xfail(
+    platform.python_implementation() == 'PyPy' and sys.version_info[:2] == (3, 11), reason='pypy 3.11 type formatting'
+)
 def test_error_inside_definition_wrapper():
     with pytest.raises(SchemaError) as exc_info:
         SchemaValidator(
-            {
-                'type': 'typed-dict',
-                'ref': 'Branch',
-                'fields': {
-                    'sub_branch': {
-                        'type': 'typed-dict-field',
-                        'schema': {
-                            'type': 'default',
-                            'schema': {
-                                'type': 'nullable',
-                                'schema': {'type': 'definition-ref', 'schema_ref': 'Branch'},
-                            },
-                            'default': None,
-                            'default_factory': lambda x: 'foobar',
-                        },
-                    }
+            schema=cs.typed_dict_schema(
+                fields={
+                    'sub_branch': cs.typed_dict_field(
+                        schema=cs.with_default_schema(
+                            schema=cs.nullable_schema(schema=cs.definition_reference_schema(schema_ref='Branch')),
+                            default_factory=lambda x: 'foobar',
+                            default=None,
+                        )
+                    )
                 },
-            }
+                ref='Branch',
+            )
         )
     assert str(exc_info.value) == (
         'Error building "typed-dict" validator:\n'

@@ -232,8 +232,8 @@ def test_ser_function_plain():
         )
     )
     assert s.to_python(123) == (
-        "SerializationInfo(include=None, exclude=None, context=None, mode='python', by_alias=True, exclude_unset=False, "
-        'exclude_defaults=False, exclude_none=False, round_trip=False, serialize_as_any=False)'
+        "SerializationInfo(include=None, exclude=None, context=None, mode='python', by_alias=False, exclude_unset=False, "
+        'exclude_defaults=False, exclude_none=False, exclude_computed_fields=False, round_trip=False, serialize_as_any=False)'
     )
 
 
@@ -253,8 +253,8 @@ def test_ser_function_wrap():
     # insert_assert(s.to_python(123, mode='json'))
     assert s.to_python(123, mode='json') == (
         'SerializationCallable(serializer=str) '
-        "SerializationInfo(include=None, exclude=None, context=None, mode='json', by_alias=True, exclude_unset=False, "
-        'exclude_defaults=False, exclude_none=False, round_trip=False, serialize_as_any=False)'
+        "SerializationInfo(include=None, exclude=None, context=None, mode='json', by_alias=False, exclude_unset=False, "
+        'exclude_defaults=False, exclude_none=False, exclude_computed_fields=False, round_trip=False, serialize_as_any=False)'
     )
 
 

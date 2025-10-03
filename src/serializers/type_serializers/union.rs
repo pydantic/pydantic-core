@@ -4,12 +4,13 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
 use smallvec::SmallVec;
 use std::borrow::Cow;
+use std::sync::Arc;
 
 use crate::build_tools::py_schema_err;
 use crate::common::union::{Discriminator, SMALL_UNION_THRESHOLD};
 use crate::definitions::DefinitionsBuilder;
 use crate::serializers::PydanticSerializationUnexpectedValue;
-use crate::tools::{truncate_safe_repr, SchemaDict};
+use crate::tools::SchemaDict;
 
 use super::{
     infer_json_key, infer_serialize, infer_to_python, BuildSerializer, CombinedSerializer, Extra, SerCheck,
@@ -18,7 +19,7 @@ use super::{
 
 #[derive(Debug)]
 pub struct UnionSerializer {
-    choices: Vec<CombinedSerializer>,
+    choices: Vec<Arc<CombinedSerializer>>,
     name: String,
 }
 
@@ -28,10 +29,10 @@ impl BuildSerializer for UnionSerializer {
     fn build(
         schema: &Bound<'_, PyDict>,
         config: Option<&Bound<'_, PyDict>>,
-        definitions: &mut DefinitionsBuilder<CombinedSerializer>,
-    ) -> PyResult<CombinedSerializer> {
+        definitions: &mut DefinitionsBuilder<Arc<CombinedSerializer>>,
+    ) -> PyResult<Arc<CombinedSerializer>> {
         let py = schema.py();
-        let choices: Vec<CombinedSerializer> = schema
+        let choices = schema
             .get_as_req::<Bound<'_, PyList>>(intern!(py, "choices"))?
             .iter()
             .map(|choice| {
@@ -41,27 +42,23 @@ impl BuildSerializer for UnionSerializer {
                 };
                 CombinedSerializer::build(choice.downcast()?, config, definitions)
             })
-            .collect::<PyResult<Vec<CombinedSerializer>>>()?;
+            .collect::<PyResult<_>>()?;
 
         Self::from_choices(choices)
     }
 }
 
 impl UnionSerializer {
-    fn from_choices(choices: Vec<CombinedSerializer>) -> PyResult<CombinedSerializer> {
+    fn from_choices(choices: Vec<Arc<CombinedSerializer>>) -> PyResult<Arc<CombinedSerializer>> {
         match choices.len() {
             0 => py_schema_err!("One or more union choices required"),
             1 => Ok(choices.into_iter().next().unwrap()),
             _ => {
-                let descr = choices
-                    .iter()
-                    .map(TypeSerializer::get_name)
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                Ok(Self {
+                let descr = choices.iter().map(|v| v.get_name()).collect::<Vec<_>>().join(", ");
+                Ok(CombinedSerializer::Union(Self {
                     choices,
                     name: format!("Union[{descr}]"),
-                }
+                })
                 .into())
             }
         }
@@ -76,8 +73,9 @@ fn union_serialize<S>(
     // Finally, `Err(err)` if we encountered errors while trying to serialize
     mut selector: impl FnMut(&CombinedSerializer, &Extra) -> PyResult<S>,
     extra: &Extra,
-    choices: &[CombinedSerializer],
+    choices: &[Arc<CombinedSerializer>],
     retry_with_lax_check: bool,
+    py: Python<'_>,
 ) -> PyResult<Option<S>> {
     // try the serializers in left to right order with error_on fallback=true
     let mut new_extra = extra.clone();
@@ -104,14 +102,23 @@ fn union_serialize<S>(
     // If extra.check is SerCheck::None, we're in a top-level union. We should thus raise the warnings
     if extra.check == SerCheck::None {
         for err in &errors {
-            extra.warnings.custom_warning(err.to_string());
+            if err.is_instance_of::<PydanticSerializationUnexpectedValue>(py) {
+                let pydantic_err: PydanticSerializationUnexpectedValue = err.value(py).extract()?;
+                extra.warnings.register_warning(pydantic_err);
+            } else {
+                extra
+                    .warnings
+                    .register_warning(PydanticSerializationUnexpectedValue::new_from_msg(Some(
+                        err.to_string(),
+                    )));
+            }
         }
     }
     // Otherwise, if we've encountered errors, return them to the parent union, which should take
     // care of the formatting for us
     else if !errors.is_empty() {
         let message = errors.iter().map(ToString::to_string).collect::<Vec<_>>().join("\n");
-        return Err(PydanticSerializationUnexpectedValue::new_err(Some(message)));
+        return Err(PydanticSerializationUnexpectedValue::new_from_msg(Some(message)).to_py_err());
     }
 
     Ok(None)
@@ -124,12 +131,13 @@ impl TypeSerializer for UnionSerializer {
         include: Option<&Bound<'_, PyAny>>,
         exclude: Option<&Bound<'_, PyAny>>,
         extra: &Extra,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<Py<PyAny>> {
         union_serialize(
             |comb_serializer, new_extra| comb_serializer.to_python(value, include, exclude, new_extra),
             extra,
             &self.choices,
             self.retry_with_lax_check(),
+            value.py(),
         )?
         .map_or_else(|| infer_to_python(value, include, exclude, extra), Ok)
     }
@@ -140,6 +148,7 @@ impl TypeSerializer for UnionSerializer {
             extra,
             &self.choices,
             self.retry_with_lax_check(),
+            key.py(),
         )?
         .map_or_else(|| infer_json_key(key, extra), Ok)
     }
@@ -157,6 +166,7 @@ impl TypeSerializer for UnionSerializer {
             extra,
             &self.choices,
             self.retry_with_lax_check(),
+            value.py(),
         ) {
             Ok(Some(v)) => infer_serialize(v.bind(value.py()), serializer, None, None, extra),
             Ok(None) => infer_serialize(value, serializer, include, exclude, extra),
@@ -169,7 +179,7 @@ impl TypeSerializer for UnionSerializer {
     }
 
     fn retry_with_lax_check(&self) -> bool {
-        self.choices.iter().any(CombinedSerializer::retry_with_lax_check)
+        self.choices.iter().any(|c| c.retry_with_lax_check())
     }
 }
 
@@ -177,7 +187,7 @@ impl TypeSerializer for UnionSerializer {
 pub struct TaggedUnionSerializer {
     discriminator: Discriminator,
     lookup: HashMap<String, usize>,
-    choices: Vec<CombinedSerializer>,
+    choices: Vec<Arc<CombinedSerializer>>,
     name: String,
 }
 
@@ -187,8 +197,8 @@ impl BuildSerializer for TaggedUnionSerializer {
     fn build(
         schema: &Bound<'_, PyDict>,
         config: Option<&Bound<'_, PyDict>>,
-        definitions: &mut DefinitionsBuilder<CombinedSerializer>,
-    ) -> PyResult<CombinedSerializer> {
+        definitions: &mut DefinitionsBuilder<Arc<CombinedSerializer>>,
+    ) -> PyResult<Arc<CombinedSerializer>> {
         let py = schema.py();
         let discriminator = Discriminator::new(py, &schema.get_as_req(intern!(py, "discriminator"))?)?;
 
@@ -203,18 +213,14 @@ impl BuildSerializer for TaggedUnionSerializer {
             lookup.insert(choice_key.to_string(), idx);
         }
 
-        let descr = choices
-            .iter()
-            .map(TypeSerializer::get_name)
-            .collect::<Vec<_>>()
-            .join(", ");
+        let descr = choices.iter().map(|s| s.get_name()).collect::<Vec<_>>().join(", ");
 
-        Ok(Self {
+        Ok(CombinedSerializer::TaggedUnion(Self {
             discriminator,
             lookup,
             choices,
             name: format!("TaggedUnion[{descr}]"),
-        }
+        })
         .into())
     }
 }
@@ -228,7 +234,7 @@ impl TypeSerializer for TaggedUnionSerializer {
         include: Option<&Bound<'_, PyAny>>,
         exclude: Option<&Bound<'_, PyAny>>,
         extra: &Extra,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<Py<PyAny>> {
         self.tagged_union_serialize(
             value,
             |comb_serializer: &CombinedSerializer, new_extra: &Extra| {
@@ -274,7 +280,7 @@ impl TypeSerializer for TaggedUnionSerializer {
     }
 
     fn retry_with_lax_check(&self) -> bool {
-        self.choices.iter().any(CombinedSerializer::retry_with_lax_check)
+        self.choices.iter().any(|c| c.retry_with_lax_check())
     }
 }
 
@@ -328,10 +334,12 @@ impl TaggedUnionSerializer {
         } else if extra.check == SerCheck::None {
             // If extra.check is SerCheck::None, we're in a top-level union. We should thus raise
             // this warning
-            let value_str = truncate_safe_repr(value, None);
-            extra.warnings.custom_warning(
-                format!(
-                    "Failed to get discriminator value for tagged union serialization with value `{value_str}` - defaulting to left to right union serialization."
+            extra.warnings.register_warning(
+                PydanticSerializationUnexpectedValue::new(
+                    Some("Defaulting to left to right union serialization - failed to get discriminator value for tagged union serialization".to_string()),
+                    None,
+                    None,
+                    Some(value.clone().unbind()),
                 )
             );
         }
@@ -339,6 +347,6 @@ impl TaggedUnionSerializer {
         // if we haven't returned at this point, we should fallback to the union serializer
         // which preserves the historical expectation that we do our best with serialization
         // even if that means we resort to inference
-        union_serialize(selector, extra, &self.choices, self.retry_with_lax_check())
+        union_serialize(selector, extra, &self.choices, self.retry_with_lax_check(), value.py())
     }
 }

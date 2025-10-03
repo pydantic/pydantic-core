@@ -1,6 +1,7 @@
 use std::convert::Infallible;
 use std::ffi::CString;
 use std::fmt;
+use std::string::ToString;
 use std::sync::Mutex;
 
 use pyo3::exceptions::{PyTypeError, PyUserWarning, PyValueError};
@@ -17,7 +18,6 @@ use crate::recursion_guard::ContainsRecursionState;
 use crate::recursion_guard::RecursionError;
 use crate::recursion_guard::RecursionGuard;
 use crate::recursion_guard::RecursionState;
-use crate::tools::truncate_safe_repr;
 use crate::PydanticSerializationError;
 
 /// this is ugly, would be much better if extra could be stored in `SerializationState`
@@ -28,50 +28,11 @@ pub(crate) struct SerializationState {
     config: SerializationConfig,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum DuckTypingSerMode {
-    // Don't check the type of the value, use the type of the schema
-    SchemaBased,
-    // Check the type of the value, use the type of the value
-    NeedsInference,
-    // We already checked the type of the value
-    // we don't want to infer again, but if we recurse down
-    // we do want to flip this back to NeedsInference for the
-    // fields / keys / items of any inner serializers
-    Inferred,
-}
-
-impl DuckTypingSerMode {
-    pub fn from_bool(serialize_as_any: bool) -> Self {
-        if serialize_as_any {
-            DuckTypingSerMode::NeedsInference
-        } else {
-            DuckTypingSerMode::SchemaBased
-        }
-    }
-
-    pub fn to_bool(self) -> bool {
-        match self {
-            DuckTypingSerMode::SchemaBased => false,
-            DuckTypingSerMode::NeedsInference => true,
-            DuckTypingSerMode::Inferred => true,
-        }
-    }
-
-    pub fn next_mode(self) -> Self {
-        match self {
-            DuckTypingSerMode::SchemaBased => DuckTypingSerMode::SchemaBased,
-            DuckTypingSerMode::NeedsInference => DuckTypingSerMode::Inferred,
-            DuckTypingSerMode::Inferred => DuckTypingSerMode::NeedsInference,
-        }
-    }
-}
-
 impl SerializationState {
-    pub fn new(timedelta_mode: &str, bytes_mode: &str, inf_nan_mode: &str) -> PyResult<Self> {
+    pub fn new(timedelta_mode: &str, temporal_mode: &str, bytes_mode: &str, inf_nan_mode: &str) -> PyResult<Self> {
         let warnings = CollectWarnings::new(WarningsMode::None);
         let rec_guard = SerRecursionState::default();
-        let config = SerializationConfig::from_args(timedelta_mode, bytes_mode, inf_nan_mode)?;
+        let config = SerializationConfig::from_args(timedelta_mode, temporal_mode, bytes_mode, inf_nan_mode)?;
         Ok(Self {
             warnings,
             rec_guard,
@@ -84,12 +45,12 @@ impl SerializationState {
         &'py self,
         py: Python<'py>,
         mode: &'py SerMode,
-        by_alias: bool,
+        by_alias: Option<bool>,
         exclude_none: bool,
         round_trip: bool,
         serialize_unknown: bool,
         fallback: Option<&'py Bound<'_, PyAny>>,
-        duck_typing_ser_mode: DuckTypingSerMode,
+        serialize_as_any: bool,
         context: Option<&'py Bound<'_, PyAny>>,
     ) -> Extra<'py> {
         Extra::new(
@@ -100,12 +61,13 @@ impl SerializationState {
             false,
             false,
             exclude_none,
+            false,
             round_trip,
             &self.config,
             &self.rec_guard,
             serialize_unknown,
             fallback,
-            duck_typing_ser_mode,
+            serialize_as_any,
             context,
         )
     }
@@ -122,10 +84,11 @@ pub(crate) struct Extra<'a> {
     pub mode: &'a SerMode,
     pub ob_type_lookup: &'a ObTypeLookup,
     pub warnings: &'a CollectWarnings,
-    pub by_alias: bool,
+    pub by_alias: Option<bool>,
     pub exclude_unset: bool,
     pub exclude_defaults: bool,
     pub exclude_none: bool,
+    pub exclude_computed_fields: bool,
     pub round_trip: bool,
     pub config: &'a SerializationConfig,
     pub rec_guard: &'a SerRecursionState,
@@ -138,7 +101,7 @@ pub(crate) struct Extra<'a> {
     pub field_name: Option<&'a str>,
     pub serialize_unknown: bool,
     pub fallback: Option<&'a Bound<'a, PyAny>>,
-    pub duck_typing_ser_mode: DuckTypingSerMode,
+    pub serialize_as_any: bool,
     pub context: Option<&'a Bound<'a, PyAny>>,
 }
 
@@ -147,17 +110,18 @@ impl<'a> Extra<'a> {
     pub fn new(
         py: Python<'a>,
         mode: &'a SerMode,
-        by_alias: bool,
+        by_alias: Option<bool>,
         warnings: &'a CollectWarnings,
         exclude_unset: bool,
         exclude_defaults: bool,
         exclude_none: bool,
+        exclude_computed_fields: bool,
         round_trip: bool,
         config: &'a SerializationConfig,
         rec_guard: &'a SerRecursionState,
         serialize_unknown: bool,
         fallback: Option<&'a Bound<'a, PyAny>>,
-        duck_typing_ser_mode: DuckTypingSerMode,
+        serialize_as_any: bool,
         context: Option<&'a Bound<'a, PyAny>>,
     ) -> Self {
         Self {
@@ -168,6 +132,7 @@ impl<'a> Extra<'a> {
             exclude_unset,
             exclude_defaults,
             exclude_none,
+            exclude_computed_fields,
             round_trip,
             config,
             rec_guard,
@@ -176,7 +141,7 @@ impl<'a> Extra<'a> {
             field_name: None,
             serialize_unknown,
             fallback,
-            duck_typing_ser_mode,
+            serialize_as_any,
             context,
         }
     }
@@ -204,6 +169,10 @@ impl<'a> Extra<'a> {
     pub(crate) fn model_type_name(&self) -> Option<Bound<'a, PyString>> {
         self.model.and_then(|model| model.get_type().name().ok())
     }
+
+    pub fn serialize_by_alias_or(&self, serialize_by_alias: Option<bool>) -> bool {
+        self.by_alias.or(serialize_by_alias).unwrap_or(false)
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -228,20 +197,21 @@ impl SerCheck {
 pub(crate) struct ExtraOwned {
     mode: SerMode,
     warnings: CollectWarnings,
-    by_alias: bool,
+    by_alias: Option<bool>,
     exclude_unset: bool,
     exclude_defaults: bool,
     exclude_none: bool,
+    exclude_computed_fields: bool,
     round_trip: bool,
     config: SerializationConfig,
     rec_guard: SerRecursionState,
     check: SerCheck,
-    pub model: Option<PyObject>,
+    pub model: Option<Py<PyAny>>,
     field_name: Option<String>,
     serialize_unknown: bool,
-    pub fallback: Option<PyObject>,
-    duck_typing_ser_mode: DuckTypingSerMode,
-    pub context: Option<PyObject>,
+    pub fallback: Option<Py<PyAny>>,
+    serialize_as_any: bool,
+    pub context: Option<Py<PyAny>>,
 }
 
 impl ExtraOwned {
@@ -253,6 +223,7 @@ impl ExtraOwned {
             exclude_unset: extra.exclude_unset,
             exclude_defaults: extra.exclude_defaults,
             exclude_none: extra.exclude_none,
+            exclude_computed_fields: extra.exclude_computed_fields,
             round_trip: extra.round_trip,
             config: extra.config.clone(),
             rec_guard: extra.rec_guard.clone(),
@@ -261,7 +232,7 @@ impl ExtraOwned {
             field_name: extra.field_name.map(ToString::to_string),
             serialize_unknown: extra.serialize_unknown,
             fallback: extra.fallback.map(|model| model.clone().into()),
-            duck_typing_ser_mode: extra.duck_typing_ser_mode,
+            serialize_as_any: extra.serialize_as_any,
             context: extra.context.map(|model| model.clone().into()),
         }
     }
@@ -275,6 +246,7 @@ impl ExtraOwned {
             exclude_unset: self.exclude_unset,
             exclude_defaults: self.exclude_defaults,
             exclude_none: self.exclude_none,
+            exclude_computed_fields: self.exclude_computed_fields,
             round_trip: self.round_trip,
             config: &self.config,
             rec_guard: &self.rec_guard,
@@ -283,7 +255,7 @@ impl ExtraOwned {
             field_name: self.field_name.as_deref(),
             serialize_unknown: self.serialize_unknown,
             fallback: self.fallback.as_ref().map(|m| m.bind(py)),
-            duck_typing_ser_mode: self.duck_typing_ser_mode,
+            serialize_as_any: self.serialize_as_any,
             context: self.context.as_ref().map(|m| m.bind(py)),
         }
     }
@@ -380,7 +352,7 @@ impl From<bool> for WarningsMode {
 pub(crate) struct CollectWarnings {
     mode: WarningsMode,
     // FIXME: mutex is to satisfy PyO3 0.23, we should be able to refactor this away
-    warnings: Mutex<Vec<String>>,
+    warnings: Mutex<Vec<PydanticSerializationUnexpectedValue>>,
 }
 
 impl Clone for CollectWarnings {
@@ -400,9 +372,9 @@ impl CollectWarnings {
         }
     }
 
-    pub fn custom_warning(&self, warning: String) {
+    pub fn register_warning(&self, warning: PydanticSerializationUnexpectedValue) {
         if self.mode != WarningsMode::None {
-            self.add_warning(warning);
+            self.warnings.lock().expect("lock poisoned").push(warning);
         }
     }
 
@@ -411,17 +383,14 @@ impl CollectWarnings {
         if value.is_none() {
             Ok(())
         } else if extra.check.enabled() {
-            let type_name = value
-                .get_type()
-                .qualname()
-                .unwrap_or_else(|_| PyString::new(value.py(), "<unknown python object>"));
-
-            let value_str = truncate_safe_repr(value, None);
-            Err(PydanticSerializationUnexpectedValue::new_err(Some(format!(
-                "Expected `{field_type}` but got `{type_name}` with value `{value_str}` - serialized value may not be as expected"
-            ))))
+            Err(PydanticSerializationUnexpectedValue::new_from_parts(
+                extra.field_name.map(ToString::to_string),
+                Some(field_type.to_string()),
+                Some(value.clone().unbind()),
+            )
+            .to_py_err())
         } else {
-            self.fallback_warning(field_type, value);
+            self.fallback_warning(extra.field_name, field_type, value);
             Ok(())
         }
     }
@@ -441,28 +410,19 @@ impl CollectWarnings {
             // in particular, in future we could allow errors instead of warnings on fallback
             Err(S::Error::custom(UNEXPECTED_TYPE_SER_MARKER))
         } else {
-            self.fallback_warning(field_type, value);
+            self.fallback_warning(extra.field_name, field_type, value);
             Ok(())
         }
     }
 
-    fn fallback_warning(&self, field_type: &str, value: &Bound<'_, PyAny>) {
+    fn fallback_warning(&self, field_name: Option<&str>, field_type: &str, value: &Bound<'_, PyAny>) {
         if self.mode != WarningsMode::None {
-            let type_name = value
-                .get_type()
-                .qualname()
-                .unwrap_or_else(|_| PyString::new(value.py(), "<unknown python object>"));
-
-            let value_str = truncate_safe_repr(value, None);
-
-            self.add_warning(format!(
-                "Expected `{field_type}` but got `{type_name}` with value `{value_str}` - serialized value may not be as expected"
+            self.register_warning(PydanticSerializationUnexpectedValue::new_from_parts(
+                field_name.map(ToString::to_string),
+                Some(field_type.to_string()),
+                Some(value.clone().unbind()),
             ));
         }
-    }
-
-    fn add_warning(&self, message: String) {
-        self.warnings.lock().expect("lock poisoned").push(message);
     }
 
     pub fn final_check(&self, py: Python) -> PyResult<()> {
@@ -475,7 +435,9 @@ impl CollectWarnings {
             return Ok(());
         }
 
-        let message = format!("Pydantic serializer warnings:\n  {}", warnings.join("\n  "));
+        let formatted_warnings: Vec<String> = warnings.iter().map(|w| w.__repr__(py).to_string()).collect();
+
+        let message = format!("Pydantic serializer warnings:\n  {}", formatted_warnings.join("\n  "));
         if self.mode == WarningsMode::Warn {
             let user_warning_type = PyUserWarning::type_object(py);
             PyErr::warn(py, &user_warning_type, &CString::new(message)?, 0)

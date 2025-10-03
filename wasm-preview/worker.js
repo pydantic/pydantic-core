@@ -89,7 +89,7 @@ async function main() {
       get(`./run_tests.py?v=${Date.now()}`, 'text'),
       // e4cf2e2 commit matches the pydantic-core wheel being used, so tests should pass
       get(zip_url, 'blob'),
-      importScripts('https://cdn.jsdelivr.net/pyodide/v0.26.3/full/pyodide.js'),
+      importScripts('https://cdn.jsdelivr.net/pyodide/v0.27.7/full/pyodide.js'),
     ]);
 
     const pyodide = await loadPyodide();
@@ -97,8 +97,7 @@ async function main() {
     setupStreams(FS, pyodide._module.TTY);
     FS.mkdir('/test_dir');
     FS.chdir('/test_dir');
-    await pyodide.loadPackage(['micropip', 'pytest', 'numpy']);
-    if (pydantic_core_version < '2.0.0') await pyodide.loadPackage(['typing-extensions']);
+    await pyodide.loadPackage(['micropip', 'pytest', 'numpy', 'pygments']);
     await pyodide.runPythonAsync(python_code, {globals: pyodide.toPy({pydantic_core_version, tests_zip})});
     post();
   } catch (err) {

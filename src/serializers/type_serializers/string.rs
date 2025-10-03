@@ -1,8 +1,10 @@
 use std::borrow::Cow;
+use std::sync::Arc;
 
 use pyo3::types::{PyDict, PyString};
 use pyo3::{prelude::*, IntoPyObjectExt};
 
+use crate::build_tools::LazyLock;
 use crate::definitions::DefinitionsBuilder;
 
 use super::{
@@ -13,9 +15,11 @@ use super::{
 #[derive(Debug)]
 pub struct StrSerializer;
 
+static STR_SERIALIZER: LazyLock<Arc<CombinedSerializer>> = LazyLock::new(|| Arc::new(StrSerializer.into()));
+
 impl StrSerializer {
-    pub fn new() -> Self {
-        Self {}
+    pub fn get() -> &'static Arc<CombinedSerializer> {
+        &STR_SERIALIZER
     }
 }
 
@@ -25,9 +29,9 @@ impl BuildSerializer for StrSerializer {
     fn build(
         _schema: &Bound<'_, PyDict>,
         _config: Option<&Bound<'_, PyDict>>,
-        _definitions: &mut DefinitionsBuilder<CombinedSerializer>,
-    ) -> PyResult<CombinedSerializer> {
-        Ok(Self::new().into())
+        _definitions: &mut DefinitionsBuilder<Arc<CombinedSerializer>>,
+    ) -> PyResult<Arc<CombinedSerializer>> {
+        Ok(Self::get().clone())
     }
 }
 
@@ -40,7 +44,7 @@ impl TypeSerializer for StrSerializer {
         include: Option<&Bound<'_, PyAny>>,
         exclude: Option<&Bound<'_, PyAny>>,
         extra: &Extra,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<Py<PyAny>> {
         let py = value.py();
         match extra.ob_type_lookup.is_type(value, ObType::Str) {
             IsType::Exact => Ok(value.clone().unbind()),

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString};
@@ -20,8 +22,8 @@ impl BuildSerializer for TypedDictBuilder {
     fn build(
         schema: &Bound<'_, PyDict>,
         config: Option<&Bound<'_, PyDict>>,
-        definitions: &mut DefinitionsBuilder<CombinedSerializer>,
-    ) -> PyResult<CombinedSerializer> {
+        definitions: &mut DefinitionsBuilder<Arc<CombinedSerializer>>,
+    ) -> PyResult<Arc<CombinedSerializer>> {
         let py = schema.py();
 
         let total =
@@ -31,6 +33,8 @@ impl BuildSerializer for TypedDictBuilder {
             ExtraBehavior::Allow => FieldsMode::TypedDictAllow,
             _ => FieldsMode::SimpleDict,
         };
+
+        let serialize_by_alias = config.get_as(intern!(py, "serialize_by_alias"))?;
 
         let fields_dict: Bound<'_, PyDict> = schema.get_as_req(intern!(py, "fields"))?;
         let mut fields: AHashMap<String, SerField> = AHashMap::with_capacity(fields_dict.len());
@@ -52,19 +56,36 @@ impl BuildSerializer for TypedDictBuilder {
             let required = field_info.get_as(intern!(py, "required"))?.unwrap_or(total);
 
             if field_info.get_as(intern!(py, "serialization_exclude"))? == Some(true) {
-                fields.insert(key, SerField::new(py, key_py, None, None, required));
+                fields.insert(
+                    key,
+                    SerField::new(py, key_py, None, None, required, serialize_by_alias, None),
+                );
             } else {
                 let alias: Option<String> = field_info.get_as(intern!(py, "serialization_alias"))?;
-
+                let serialization_exclude_if: Option<Py<PyAny>> =
+                    field_info.get_as(intern!(py, "serialization_exclude_if"))?;
                 let schema = field_info.get_as_req(intern!(py, "schema"))?;
                 let serializer = CombinedSerializer::build(&schema, config, definitions)
                     .map_err(|e| py_schema_error_type!("Field `{}`:\n  {}", key, e))?;
-                fields.insert(key, SerField::new(py, key_py, alias, Some(serializer), required));
+                fields.insert(
+                    key,
+                    SerField::new(
+                        py,
+                        key_py,
+                        alias,
+                        Some(serializer),
+                        required,
+                        serialize_by_alias,
+                        serialization_exclude_if,
+                    ),
+                );
             }
         }
 
         let computed_fields = ComputedFields::new(schema, config, definitions)?;
 
-        Ok(GeneralFieldsSerializer::new(fields, fields_mode, extra_serializer, computed_fields).into())
+        Ok(Arc::new(
+            GeneralFieldsSerializer::new(fields, fields_mode, extra_serializer, computed_fields).into(),
+        ))
     }
 }

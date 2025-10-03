@@ -1,4 +1,4 @@
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 
 use pyo3::types::PyDict;
 use pyo3::{prelude::*, IntoPyObjectExt};
@@ -14,7 +14,7 @@ use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuild
 #[derive(Debug)]
 pub struct ListValidator {
     strict: bool,
-    item_validator: Option<Box<CombinedValidator>>,
+    item_validator: Option<Arc<CombinedValidator>>,
     min_length: Option<usize>,
     max_length: Option<usize>,
     name: OnceLock<String>,
@@ -24,12 +24,12 @@ pub struct ListValidator {
 pub fn get_items_schema(
     schema: &Bound<'_, PyDict>,
     config: Option<&Bound<'_, PyDict>>,
-    definitions: &mut DefinitionsBuilder<CombinedValidator>,
-) -> PyResult<Option<CombinedValidator>> {
+    definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
+) -> PyResult<Option<Arc<CombinedValidator>>> {
     match schema.get_item(pyo3::intern!(schema.py(), "items_schema"))? {
         Some(d) => {
             let validator = build_validator(&d, config, definitions)?;
-            match validator {
+            match validator.as_ref() {
                 CombinedValidator::Any(_) => Ok(None),
                 _ => Ok(Some(validator)),
             }
@@ -100,18 +100,18 @@ impl BuildValidator for ListValidator {
     fn build(
         schema: &Bound<'_, PyDict>,
         config: Option<&Bound<'_, PyDict>>,
-        definitions: &mut DefinitionsBuilder<CombinedValidator>,
-    ) -> PyResult<CombinedValidator> {
+        definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
+    ) -> PyResult<Arc<CombinedValidator>> {
         let py = schema.py();
-        let item_validator = get_items_schema(schema, config, definitions)?.map(Box::new);
-        Ok(Self {
+        let item_validator = get_items_schema(schema, config, definitions)?;
+        Ok(CombinedValidator::List(Self {
             strict: crate::build_tools::is_strict(schema, config)?,
             item_validator,
             min_length: schema.get_as(pyo3::intern!(py, "min_length"))?,
             max_length: schema.get_as(pyo3::intern!(py, "max_length"))?,
             name: OnceLock::new(),
             fail_fast: schema.get_as(pyo3::intern!(py, "fail_fast"))?.unwrap_or(false),
-        }
+        })
         .into())
     }
 }
@@ -124,7 +124,7 @@ impl Validator for ListValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         let seq = input.validate_list(state.strict_or(self.strict))?.unpack(state);
 
         let actual_length = seq.len();
@@ -197,8 +197,8 @@ impl<'py, T, I: Input<'py> + ?Sized> ConsumeIterator<PyResult<T>> for ValidateTo
 where
     T: BorrowInput<'py>,
 {
-    type Output = ValResult<Vec<PyObject>>;
-    fn consume_iterator(self, iterator: impl Iterator<Item = PyResult<T>>) -> ValResult<Vec<PyObject>> {
+    type Output = ValResult<Vec<Py<PyAny>>>;
+    fn consume_iterator(self, iterator: impl Iterator<Item = PyResult<T>>) -> ValResult<Vec<Py<PyAny>>> {
         let capacity = self.actual_length.unwrap_or(DEFAULT_CAPACITY);
         let max_length_check = MaxLengthCheck::new(self.max_length, self.field_type, self.input, self.actual_length);
         validate_iter_to_vec(
@@ -225,8 +225,8 @@ impl<'py, T, I: Input<'py> + ?Sized> ConsumeIterator<PyResult<T>> for ToVec<'_, 
 where
     T: BorrowInput<'py>,
 {
-    type Output = ValResult<Vec<PyObject>>;
-    fn consume_iterator(self, iterator: impl Iterator<Item = PyResult<T>>) -> ValResult<Vec<PyObject>> {
+    type Output = ValResult<Vec<Py<PyAny>>>;
+    fn consume_iterator(self, iterator: impl Iterator<Item = PyResult<T>>) -> ValResult<Vec<Py<PyAny>>> {
         let max_length_check = MaxLengthCheck::new(self.max_length, self.field_type, self.input, self.actual_length);
         no_validator_iter_to_vec(self.py, self.input, iterator, max_length_check)
     }

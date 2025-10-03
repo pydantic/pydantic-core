@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::str::from_utf8;
+use std::sync::Arc;
 
 use pyo3::intern;
 use pyo3::prelude::*;
@@ -19,7 +20,7 @@ use super::{
 
 #[derive(Debug)]
 pub struct JsonSerializer {
-    serializer: Box<CombinedSerializer>,
+    serializer: Arc<CombinedSerializer>,
 }
 
 impl BuildSerializer for JsonSerializer {
@@ -28,18 +29,15 @@ impl BuildSerializer for JsonSerializer {
     fn build(
         schema: &Bound<'_, PyDict>,
         config: Option<&Bound<'_, PyDict>>,
-        definitions: &mut DefinitionsBuilder<CombinedSerializer>,
-    ) -> PyResult<CombinedSerializer> {
+        definitions: &mut DefinitionsBuilder<Arc<CombinedSerializer>>,
+    ) -> PyResult<Arc<CombinedSerializer>> {
         let py = schema.py();
 
         let serializer = match schema.get_as(intern!(py, "schema"))? {
             Some(items_schema) => CombinedSerializer::build(&items_schema, config, definitions)?,
             None => AnySerializer::build(schema, config, definitions)?,
         };
-        Ok(Self {
-            serializer: Box::new(serializer),
-        }
-        .into())
+        Ok(Arc::new(Self { serializer }.into()))
     }
 }
 
@@ -52,9 +50,9 @@ impl TypeSerializer for JsonSerializer {
         include: Option<&Bound<'_, PyAny>>,
         exclude: Option<&Bound<'_, PyAny>>,
         extra: &Extra,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<Py<PyAny>> {
         if extra.round_trip {
-            let bytes = to_json_bytes(value, &self.serializer, include, exclude, extra, None, 0)?;
+            let bytes = to_json_bytes(value, &self.serializer, include, exclude, extra, None, false, 0)?;
             let py = value.py();
             let s = from_utf8(&bytes).map_err(|e| utf8_py_error(py, e, &bytes))?;
             Ok(PyString::new(py, s).into())
@@ -65,7 +63,7 @@ impl TypeSerializer for JsonSerializer {
 
     fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
         if extra.round_trip {
-            let bytes = to_json_bytes(key, &self.serializer, None, None, extra, None, 0)?;
+            let bytes = to_json_bytes(key, &self.serializer, None, None, extra, None, false, 0)?;
             let py = key.py();
             let s = from_utf8(&bytes).map_err(|e| utf8_py_error(py, e, &bytes))?;
             Ok(Cow::Owned(s.to_string()))
@@ -83,8 +81,8 @@ impl TypeSerializer for JsonSerializer {
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         if extra.round_trip {
-            let bytes =
-                to_json_bytes(value, &self.serializer, include, exclude, extra, None, 0).map_err(py_err_se_err)?;
+            let bytes = to_json_bytes(value, &self.serializer, include, exclude, extra, None, false, 0)
+                .map_err(py_err_se_err)?;
             match from_utf8(&bytes) {
                 Ok(s) => serializer.serialize_str(s),
                 Err(e) => Err(Error::custom(e.to_string())),

@@ -2,6 +2,7 @@
 // which can be an int, a string, bytes or an Enum value (including `class Foo(str, Enum)` type enums)
 use core::fmt::Debug;
 use std::cell::OnceCell;
+use std::sync::Arc;
 
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyInt, PyList};
@@ -158,7 +159,7 @@ impl<T: Debug> LiteralLookup<T> {
                 let id: usize = v.extract().unwrap();
                 return Ok(Some((input, &self.values[id])));
             }
-        };
+        }
         if let Some(expected_py_values) = &self.expected_py_values {
             let py_input = get_py_input()?;
             for (k, id) in expected_py_values {
@@ -166,7 +167,7 @@ impl<T: Debug> LiteralLookup<T> {
                     return Ok(Some((input, &self.values[*id])));
                 }
             }
-        };
+        }
 
         // this one must be last to avoid conflicts with the other lookups, think of this
         // almost as a lax fallback
@@ -179,7 +180,7 @@ impl<T: Debug> LiteralLookup<T> {
                 let id: usize = v.extract().unwrap();
                 return Ok(Some((input, &self.values[id])));
             }
-        };
+        }
         Ok(None)
     }
 
@@ -244,7 +245,7 @@ impl<T: PyGcTraverse + Debug> PyGcTraverse for LiteralLookup<T> {
 
 #[derive(Debug, Clone)]
 pub struct LiteralValidator {
-    lookup: LiteralLookup<PyObject>,
+    lookup: LiteralLookup<Py<PyAny>>,
     expected_repr: String,
     name: String,
 }
@@ -255,8 +256,8 @@ impl BuildValidator for LiteralValidator {
     fn build(
         schema: &Bound<'_, PyDict>,
         _config: Option<&Bound<'_, PyDict>>,
-        _definitions: &mut DefinitionsBuilder<CombinedValidator>,
-    ) -> PyResult<CombinedValidator> {
+        _definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
+    ) -> PyResult<Arc<CombinedValidator>> {
         let expected: Bound<PyList> = schema.get_as_req(intern!(schema.py(), "expected"))?;
         if expected.is_empty() {
             return py_schema_err!("`expected` should have length > 0");
@@ -272,7 +273,8 @@ impl BuildValidator for LiteralValidator {
             lookup,
             expected_repr,
             name,
-        }))
+        })
+        .into())
     }
 }
 
@@ -284,7 +286,7 @@ impl Validator for LiteralValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         _state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         match self.lookup.validate(py, input)? {
             Some((_, v)) => Ok(v.clone()),
             None => Err(ValError::new(

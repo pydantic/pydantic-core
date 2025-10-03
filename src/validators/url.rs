@@ -1,6 +1,8 @@
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::iter::Peekable;
 use std::str::Chars;
+use std::sync::Arc;
 
 use pyo3::intern;
 use pyo3::prelude::*;
@@ -10,30 +12,99 @@ use ahash::AHashSet;
 use pyo3::IntoPyObjectExt;
 use url::{ParseError, SyntaxViolation, Url};
 
+use crate::build_tools::schema_or_config;
+use crate::build_tools::LazyLock;
 use crate::build_tools::{is_strict, py_schema_err};
-use crate::errors::ToErrorValue;
 use crate::errors::{ErrorType, ErrorTypeDefaults, ValError, ValResult};
 use crate::input::downcast_python_input;
 use crate::input::Input;
+use crate::input::ValidationMatch;
 use crate::tools::SchemaDict;
-use crate::url::{schema_is_special, PyMultiHostUrl, PyUrl};
+use crate::url::{scheme_is_special, PyMultiHostUrl, PyUrl};
 
 use super::literal::expected_repr_name;
 use super::Exactness;
 use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
 
-type AllowedSchemas = Option<(AHashSet<String>, String)>;
+type AllowedSchemes = Option<(AHashSet<String>, String)>;
 
 #[derive(Debug, Clone)]
 pub struct UrlValidator {
     strict: bool,
     max_length: Option<usize>,
-    allowed_schemes: AllowedSchemas,
+    allowed_schemes: AllowedSchemes,
     host_required: bool,
     default_host: Option<String>,
     default_port: Option<u16>,
     default_path: Option<String>,
     name: String,
+    preserve_empty_path: bool,
+}
+
+static SIMPLE_URL_VALIDATOR: LazyLock<Arc<CombinedValidator>> = LazyLock::new(|| {
+    Arc::new(CombinedValidator::Url(UrlValidator {
+        strict: false,
+        max_length: None,
+        allowed_schemes: None,
+        host_required: false,
+        default_host: None,
+        default_port: None,
+        default_path: None,
+        name: "url".to_string(),
+        preserve_empty_path: false,
+    }))
+});
+
+static SIMPLE_URL_VALIDATOR_STRICT: LazyLock<Arc<CombinedValidator>> = LazyLock::new(|| {
+    Arc::new(CombinedValidator::Url(UrlValidator {
+        strict: true,
+        max_length: None,
+        allowed_schemes: None,
+        host_required: false,
+        default_host: None,
+        default_port: None,
+        default_path: None,
+        name: "url".to_string(),
+        preserve_empty_path: false,
+    }))
+});
+
+static SIMPLE_URL_VALIDATOR_PRESERVE_EMPTY_PATH: LazyLock<Arc<CombinedValidator>> = LazyLock::new(|| {
+    Arc::new(CombinedValidator::Url(UrlValidator {
+        strict: false,
+        max_length: None,
+        allowed_schemes: None,
+        host_required: false,
+        default_host: None,
+        default_port: None,
+        default_path: None,
+        name: "url".to_string(),
+        preserve_empty_path: true,
+    }))
+});
+
+static SIMPLE_URL_VALIDATOR_STRICT_PRESERVE_EMPTY_PATH: LazyLock<Arc<CombinedValidator>> = LazyLock::new(|| {
+    Arc::new(CombinedValidator::Url(UrlValidator {
+        strict: true,
+        max_length: None,
+        allowed_schemes: None,
+        host_required: false,
+        default_host: None,
+        default_port: None,
+        default_path: None,
+        name: "url".to_string(),
+        preserve_empty_path: true,
+    }))
+});
+
+fn get_preserve_empty_path(schema: &Bound<'_, PyDict>, config: Option<&Bound<'_, PyDict>>) -> PyResult<bool> {
+    schema_or_config(
+        schema,
+        config,
+        intern!(schema.py(), "preserve_empty_path"),
+        intern!(schema.py(), "url_preserve_empty_path"),
+    )
+    .map(|v| v.unwrap_or(false))
 }
 
 impl BuildValidator for UrlValidator {
@@ -42,11 +113,11 @@ impl BuildValidator for UrlValidator {
     fn build(
         schema: &Bound<'_, PyDict>,
         config: Option<&Bound<'_, PyDict>>,
-        _definitions: &mut DefinitionsBuilder<CombinedValidator>,
-    ) -> PyResult<CombinedValidator> {
-        let (allowed_schemes, name) = get_allowed_schemas(schema, Self::EXPECTED_TYPE)?;
+        _definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
+    ) -> PyResult<Arc<CombinedValidator>> {
+        let (allowed_schemes, name) = get_allowed_schemes(schema, Self::EXPECTED_TYPE)?;
 
-        Ok(Self {
+        let validator = Self {
             strict: is_strict(schema, config)?,
             max_length: schema.get_as(intern!(schema.py(), "max_length"))?,
             host_required: schema.get_as(intern!(schema.py(), "host_required"))?.unwrap_or(false),
@@ -55,8 +126,21 @@ impl BuildValidator for UrlValidator {
             default_path: schema.get_as(intern!(schema.py(), "default_path"))?,
             allowed_schemes,
             name,
+            preserve_empty_path: get_preserve_empty_path(schema, config)?,
+        };
+
+        // if no defaults, the prebuilt simple validator will do
+        if validator.max_length.is_none()
+            && validator.allowed_schemes.is_none()
+            && !validator.host_required
+            && validator.default_host.is_none()
+            && validator.default_port.is_none()
+            && validator.default_path.is_none()
+        {
+            return Ok(UrlValidator::get_simple(validator.strict, validator.preserve_empty_path).clone());
         }
-        .into())
+
+        Ok(CombinedValidator::Url(validator).into())
     }
 }
 
@@ -68,8 +152,8 @@ impl Validator for UrlValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
-        let mut either_url = self.get_url(input, state.strict_or(self.strict))?;
+    ) -> ValResult<Py<PyAny>> {
+        let mut either_url = self.get_url(py, input, state.strict_or(self.strict))?;
 
         if let Some((ref allowed_schemes, ref expected_schemes_repr)) = self.allowed_schemes {
             if !allowed_schemes.contains(either_url.url().scheme()) {
@@ -106,33 +190,43 @@ impl Validator for UrlValidator {
 }
 
 impl UrlValidator {
-    fn get_url<'py>(&self, input: &(impl Input<'py> + ?Sized), strict: bool) -> ValResult<EitherUrl<'py>> {
-        match input.validate_str(strict, false) {
-            Ok(val_match) => {
-                let either_str = val_match.into_inner();
-                let cow = either_str.as_cow()?;
-                let url_str = cow.as_ref();
-
-                self.check_length(input, url_str)?;
-
-                parse_url(url_str, input, strict).map(EitherUrl::Rust)
-            }
-            Err(_) => {
-                // we don't need to worry about whether the url was parsed in strict mode before,
-                // even if it was, any syntax errors would have been fixed by the first validation
-                if let Some(py_url) = downcast_python_input::<PyUrl>(input) {
-                    self.check_length(input, py_url.get().url().as_str())?;
-                    Ok(EitherUrl::Py(py_url.clone()))
-                } else if let Some(multi_host_url) = downcast_python_input::<PyMultiHostUrl>(input) {
-                    let url_str = multi_host_url.get().__str__();
-                    self.check_length(input, &url_str)?;
-
-                    parse_url(&url_str, input, strict).map(EitherUrl::Rust)
-                } else {
-                    Err(ValError::new(ErrorTypeDefaults::UrlType, input))
-                }
-            }
+    pub(crate) fn get_simple(strict: bool, preserve_empty_path: bool) -> &'static Arc<CombinedValidator> {
+        match (strict, preserve_empty_path) {
+            (false, false) => &SIMPLE_URL_VALIDATOR,
+            (true, false) => &SIMPLE_URL_VALIDATOR_STRICT,
+            (false, true) => &SIMPLE_URL_VALIDATOR_PRESERVE_EMPTY_PATH,
+            (true, true) => &SIMPLE_URL_VALIDATOR_STRICT_PRESERVE_EMPTY_PATH,
         }
+    }
+
+    fn get_url<'py>(
+        &self,
+        py: Python<'py>,
+        input: &(impl Input<'py> + ?Sized),
+        strict: bool,
+    ) -> ValResult<EitherUrl<'py>> {
+        if let Some(py_url) = downcast_python_input::<PyUrl>(input) {
+            // we don't need to worry about whether the url was parsed in strict mode before,
+            // even if it was, any syntax errors would have been fixed by the first validation
+            self.check_length(input, py_url.get().__str__(py))?;
+            return Ok(EitherUrl::Py(py_url.clone()));
+        }
+
+        let either_str_owned;
+        let url_str = if let Some(multi_host_url) = downcast_python_input::<PyMultiHostUrl>(input) {
+            Cow::Owned(multi_host_url.get().__str__(py))
+        } else if let Ok(either_str) = input.validate_str(strict, false).map(ValidationMatch::into_inner) {
+            either_str_owned = either_str; // to extend the lifetime outside the if let
+            either_str_owned.as_cow()?
+        } else {
+            return Err(ValError::new(ErrorTypeDefaults::UrlType, input));
+        };
+
+        let url_str = url_str.as_ref();
+        self.check_length(input, url_str)?;
+        let url = parse_url(url_str, input, strict)?;
+        let path_is_empty = need_to_preserve_empty_path(&url, url_str, self.preserve_empty_path);
+        Ok(EitherUrl::Rust(PyUrl::new(url, path_is_empty)))
     }
 
     fn check_length<'py>(&self, input: &(impl Input<'py> + ?Sized), url_str: &str) -> ValResult<()> {
@@ -153,7 +247,7 @@ impl UrlValidator {
 
 enum EitherUrl<'py> {
     Py(Bound<'py, PyUrl>),
-    Rust(Url),
+    Rust(PyUrl),
 }
 
 impl<'py> IntoPyObject<'py> for EitherUrl<'py> {
@@ -164,7 +258,7 @@ impl<'py> IntoPyObject<'py> for EitherUrl<'py> {
     fn into_pyobject(self, py: Python<'py>) -> PyResult<Self::Output> {
         match self {
             EitherUrl::Py(py_url) => Ok(py_url),
-            EitherUrl::Rust(rust_url) => Bound::new(py, PyUrl::new(rust_url)),
+            EitherUrl::Rust(rust_url) => Bound::new(py, rust_url),
         }
     }
 }
@@ -173,17 +267,17 @@ impl CopyFromPyUrl for EitherUrl<'_> {
     fn url(&self) -> &Url {
         match self {
             EitherUrl::Py(py_url) => py_url.get().url(),
-            EitherUrl::Rust(rust_url) => rust_url,
+            EitherUrl::Rust(rust_url) => rust_url.url(),
         }
     }
 
     fn url_mut(&mut self) -> &mut Url {
         if let EitherUrl::Py(py_url) = self {
-            *self = EitherUrl::Rust(py_url.get().url().clone());
+            *self = EitherUrl::Rust(py_url.get().clone());
         }
         match self {
             EitherUrl::Py(_) => unreachable!(),
-            EitherUrl::Rust(rust_url) => rust_url,
+            EitherUrl::Rust(rust_url) => rust_url.url_mut(),
         }
     }
 }
@@ -192,13 +286,71 @@ impl CopyFromPyUrl for EitherUrl<'_> {
 pub struct MultiHostUrlValidator {
     strict: bool,
     max_length: Option<usize>,
-    allowed_schemes: AllowedSchemas,
+    allowed_schemes: AllowedSchemes,
     host_required: bool,
     default_host: Option<String>,
     default_port: Option<u16>,
     default_path: Option<String>,
     name: String,
+    preserve_empty_path: bool,
 }
+
+static SIMPLE_MULTI_HOST_URL_VALIDATOR: LazyLock<Arc<CombinedValidator>> = LazyLock::new(|| {
+    Arc::new(CombinedValidator::MultiHostUrl(MultiHostUrlValidator {
+        strict: false,
+        max_length: None,
+        allowed_schemes: None,
+        host_required: false,
+        default_host: None,
+        default_port: None,
+        default_path: None,
+        name: "multi-host-url".to_string(),
+        preserve_empty_path: false,
+    }))
+});
+
+static SIMPLE_MULTI_HOST_URL_VALIDATOR_STRICT: LazyLock<Arc<CombinedValidator>> = LazyLock::new(|| {
+    Arc::new(CombinedValidator::MultiHostUrl(MultiHostUrlValidator {
+        strict: true,
+        max_length: None,
+        allowed_schemes: None,
+        host_required: false,
+        default_host: None,
+        default_port: None,
+        default_path: None,
+        name: "multi-host-url".to_string(),
+        preserve_empty_path: false,
+    }))
+});
+
+static SIMPLE_MULTI_HOST_URL_VALIDATOR_PRESERVE_EMPTY_PATH: LazyLock<Arc<CombinedValidator>> = LazyLock::new(|| {
+    Arc::new(CombinedValidator::MultiHostUrl(MultiHostUrlValidator {
+        strict: false,
+        max_length: None,
+        allowed_schemes: None,
+        host_required: false,
+        default_host: None,
+        default_port: None,
+        default_path: None,
+        name: "multi-host-url".to_string(),
+        preserve_empty_path: true,
+    }))
+});
+
+static SIMPLE_MULTI_HOST_URL_VALIDATOR_STRICT_PRESERVE_EMPTY_PATH: LazyLock<Arc<CombinedValidator>> =
+    LazyLock::new(|| {
+        Arc::new(CombinedValidator::MultiHostUrl(MultiHostUrlValidator {
+            strict: true,
+            max_length: None,
+            allowed_schemes: None,
+            host_required: false,
+            default_host: None,
+            default_port: None,
+            default_path: None,
+            name: "multi-host-url".to_string(),
+            preserve_empty_path: true,
+        }))
+    });
 
 impl BuildValidator for MultiHostUrlValidator {
     const EXPECTED_TYPE: &'static str = "multi-host-url";
@@ -206,9 +358,9 @@ impl BuildValidator for MultiHostUrlValidator {
     fn build(
         schema: &Bound<'_, PyDict>,
         config: Option<&Bound<'_, PyDict>>,
-        _definitions: &mut DefinitionsBuilder<CombinedValidator>,
-    ) -> PyResult<CombinedValidator> {
-        let (allowed_schemes, name) = get_allowed_schemas(schema, Self::EXPECTED_TYPE)?;
+        _definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
+    ) -> PyResult<Arc<CombinedValidator>> {
+        let (allowed_schemes, name) = get_allowed_schemes(schema, Self::EXPECTED_TYPE)?;
 
         let default_host: Option<String> = schema.get_as(intern!(schema.py(), "default_host"))?;
         if let Some(ref default_host) = default_host {
@@ -216,7 +368,8 @@ impl BuildValidator for MultiHostUrlValidator {
                 return py_schema_err!("default_host cannot contain a comma, see pydantic-core#326");
             }
         }
-        Ok(Self {
+
+        let validator = Self {
             strict: is_strict(schema, config)?,
             max_length: schema.get_as(intern!(schema.py(), "max_length"))?,
             allowed_schemes,
@@ -225,8 +378,20 @@ impl BuildValidator for MultiHostUrlValidator {
             default_port: schema.get_as(intern!(schema.py(), "default_port"))?,
             default_path: schema.get_as(intern!(schema.py(), "default_path"))?,
             name,
+            preserve_empty_path: get_preserve_empty_path(schema, config)?,
+        };
+
+        if validator.max_length.is_none()
+            && validator.allowed_schemes.is_none()
+            && !validator.host_required
+            && validator.default_host.is_none()
+            && validator.default_port.is_none()
+            && validator.default_path.is_none()
+        {
+            return Ok(MultiHostUrlValidator::get_simple(validator.strict, validator.preserve_empty_path).clone());
         }
-        .into())
+
+        Ok(CombinedValidator::MultiHostUrl(validator).into())
     }
 }
 
@@ -238,8 +403,8 @@ impl Validator for MultiHostUrlValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
-        let mut multi_url = self.get_url(input, state.strict_or(self.strict))?;
+    ) -> ValResult<Py<PyAny>> {
+        let mut multi_url = self.get_url(py, input, state.strict_or(self.strict))?;
 
         if let Some((ref allowed_schemes, ref expected_schemes_repr)) = self.allowed_schemes {
             if !allowed_schemes.contains(multi_url.url().scheme()) {
@@ -275,33 +440,41 @@ impl Validator for MultiHostUrlValidator {
 }
 
 impl MultiHostUrlValidator {
-    fn get_url<'py>(&self, input: &(impl Input<'py> + ?Sized), strict: bool) -> ValResult<EitherMultiHostUrl<'py>> {
-        match input.validate_str(strict, false) {
-            Ok(val_match) => {
-                let either_str = val_match.into_inner();
-                let cow = either_str.as_cow()?;
-                let url_str = cow.as_ref();
+    pub(crate) fn get_simple(strict: bool, preserve_empty_path: bool) -> &'static Arc<CombinedValidator> {
+        match (strict, preserve_empty_path) {
+            (false, false) => &SIMPLE_MULTI_HOST_URL_VALIDATOR,
+            (true, false) => &SIMPLE_MULTI_HOST_URL_VALIDATOR_STRICT,
+            (false, true) => &SIMPLE_MULTI_HOST_URL_VALIDATOR_PRESERVE_EMPTY_PATH,
+            (true, true) => &SIMPLE_MULTI_HOST_URL_VALIDATOR_STRICT_PRESERVE_EMPTY_PATH,
+        }
+    }
 
-                self.check_length(input, || url_str.len())?;
+    fn get_url<'py>(
+        &self,
+        py: Python<'py>,
+        input: &(impl Input<'py> + ?Sized),
+        strict: bool,
+    ) -> ValResult<EitherMultiHostUrl<'py>> {
+        // we don't need to worry about whether the url was parsed in strict mode before,
+        // even if it was, any syntax errors would have been fixed by the first validation
+        if let Some(multi_url) = downcast_python_input::<PyMultiHostUrl>(input) {
+            self.check_length(input, || multi_url.get().__str__(py).len())?;
+            Ok(EitherMultiHostUrl::Py(multi_url.clone()))
+        } else if let Some(py_url) = downcast_python_input::<PyUrl>(input) {
+            self.check_length(input, || py_url.get().__str__(py).len())?;
+            Ok(EitherMultiHostUrl::Rust(PyMultiHostUrl::new(
+                py_url.get().clone(),
+                None,
+            )))
+        } else if let Ok(either_str) = input.validate_str(strict, false).map(ValidationMatch::into_inner) {
+            let cow = either_str.as_cow()?;
+            let url_str = cow.as_ref();
 
-                parse_multihost_url(url_str, input, strict).map(EitherMultiHostUrl::Rust)
-            }
-            Err(_) => {
-                // we don't need to worry about whether the url was parsed in strict mode before,
-                // even if it was, any syntax errors would have been fixed by the first validation
-                if let Some(multi_url) = downcast_python_input::<PyMultiHostUrl>(input) {
-                    self.check_length(input, || multi_url.get().__str__().len())?;
-                    Ok(EitherMultiHostUrl::Py(multi_url.clone()))
-                } else if let Some(py_url) = downcast_python_input::<PyUrl>(input) {
-                    self.check_length(input, || py_url.get().url().as_str().len())?;
-                    Ok(EitherMultiHostUrl::Rust(PyMultiHostUrl::new(
-                        py_url.get().url().clone(),
-                        None,
-                    )))
-                } else {
-                    Err(ValError::new(ErrorTypeDefaults::UrlType, input))
-                }
-            }
+            self.check_length(input, || url_str.len())?;
+
+            parse_multihost_url(url_str, input, strict, self.preserve_empty_path).map(EitherMultiHostUrl::Rust)
+        } else {
+            Err(ValError::new(ErrorTypeDefaults::UrlType, input))
         }
     }
 
@@ -365,6 +538,7 @@ fn parse_multihost_url<'py>(
     url_str: &str,
     input: &(impl Input<'py> + ?Sized),
     strict: bool,
+    preserve_empty_path: bool,
 ) -> ValResult<PyMultiHostUrl> {
     macro_rules! parsing_err {
         ($parse_error:expr) => {
@@ -392,31 +566,31 @@ fn parse_multihost_url<'py>(
                 '\t' | '\n' | '\r' => (),
                 c if c <= &' ' => (),
                 _ => break,
-            };
+            }
             chars.next();
         } else {
             break;
         }
     }
 
-    // consume the url schema, some logic from `parse_scheme`
+    // consume the url scheme, some logic from `parse_scheme`
     // https://github.com/servo/rust-url/blob/v2.3.1/url/src/parser.rs#L387-L411
-    let schema_start = chars.position;
-    let schema_end = loop {
+    let scheme_start = chars.position;
+    let scheme_end = loop {
         match chars.next() {
             Some('a'..='z' | 'A'..='Z' | '0'..='9' | '+' | '-' | '.') => continue,
             Some(':') => {
-                // require the schema to be non-empty
-                let schema_end = chars.position - ':'.len_utf8();
-                if schema_end > schema_start {
-                    break schema_end;
+                // require the scheme to be non-empty
+                let scheme_end = chars.position - ':'.len_utf8();
+                if scheme_end > scheme_start {
+                    break scheme_end;
                 }
             }
             _ => {}
         }
         return parsing_err!(ParseError::RelativeUrlWithoutBase);
     };
-    let schema = url_str[schema_start..schema_end].to_ascii_lowercase();
+    let scheme = url_str[scheme_start..scheme_end].to_ascii_lowercase();
 
     // consume the double slash, or any number of slashes, including backslashes, taken from `parse_with_scheme`
     // https://github.com/servo/rust-url/blob/v2.3.1/url/src/parser.rs#L413-L456
@@ -437,7 +611,7 @@ fn parse_multihost_url<'py>(
     let mut start = chars.position;
     while let Some(c) = chars.next() {
         match c {
-            '\\' if schema_is_special(&schema) => break,
+            '\\' if scheme_is_special(&scheme) => break,
             '/' | '?' | '#' => break,
             ',' => {
                 // minus 1 because we know that the last char was a `,` with length 1
@@ -455,13 +629,16 @@ fn parse_multihost_url<'py>(
 
     let reconstructed_url = format!("{prefix}{}", &url_str[start..]);
     let ref_url = parse_url(&reconstructed_url, input, strict)?;
+    let path_is_empty = need_to_preserve_empty_path(&ref_url, &reconstructed_url, preserve_empty_path);
+
+    let ref_url = PyUrl::new(ref_url, path_is_empty);
 
     if hosts.is_empty() {
         // if there's no one host (e.g. no `,`), we allow it to be empty to allow for default hosts
         Ok(PyMultiHostUrl::new(ref_url, None))
     } else {
         // with more than one host, none of them can be empty
-        if !ref_url.has_host() {
+        if !ref_url.url().has_host() {
             return parsing_err!(ParseError::EmptyHost);
         }
         let extra_urls: Vec<Url> = hosts
@@ -480,7 +657,7 @@ fn parse_multihost_url<'py>(
     }
 }
 
-fn parse_url(url_str: &str, input: impl ToErrorValue, strict: bool) -> ValResult<Url> {
+fn parse_url<'py>(url_str: &str, input: &(impl Input<'py> + ?Sized), strict: bool) -> ValResult<Url> {
     if url_str.is_empty() {
         return Err(ValError::new(
             ErrorType::UrlParsing {
@@ -491,45 +668,21 @@ fn parse_url(url_str: &str, input: impl ToErrorValue, strict: bool) -> ValResult
         ));
     }
 
-    // if we're in strict mode, we collect consider a syntax violation as an error
-    if strict {
-        // we could build a vec of syntax violations and return them all, but that seems like overkill
-        // and unlike other parser style validators
-        let vios: RefCell<Option<SyntaxViolation>> = RefCell::new(None);
-        let r = Url::options()
-            .syntax_violation_callback(Some(&|v| {
-                match v {
-                    // telling users offer about credentials in URLs doesn't really make sense in this context
-                    SyntaxViolation::EmbeddedCredentials => (),
-                    _ => *vios.borrow_mut() = Some(v),
-                }
-            }))
-            .parse(url_str);
+    // we could build a vec of syntax violations and return them all, but that seems like overkill
+    // and unlike other parser style validators
+    let vios = RefCell::new(None);
 
-        match r {
-            Ok(url) => {
-                if let Some(vio) = vios.into_inner() {
-                    Err(ValError::new(
-                        ErrorType::UrlSyntaxViolation {
-                            error: vio.description().into(),
-                            context: None,
-                        },
-                        input,
-                    ))
-                } else {
-                    Ok(url)
-                }
+    let url = Url::options()
+        // if we're in strict mode, we collect considering a syntax violation as an error
+        .syntax_violation_callback(strict.then_some(&|v| {
+            match v {
+                // telling users offer about credentials in URLs doesn't really make sense in this context
+                SyntaxViolation::EmbeddedCredentials => (),
+                _ => *vios.borrow_mut() = Some(v),
             }
-            Err(e) => Err(ValError::new(
-                ErrorType::UrlParsing {
-                    error: e.to_string(),
-                    context: None,
-                },
-                input,
-            )),
-        }
-    } else {
-        Url::parse(url_str).map_err(move |e| {
+        }))
+        .parse(url_str)
+        .map_err(|e| {
             ValError::new(
                 ErrorType::UrlParsing {
                     error: e.to_string(),
@@ -537,8 +690,56 @@ fn parse_url(url_str: &str, input: impl ToErrorValue, strict: bool) -> ValResult
                 },
                 input,
             )
-        })
+        })?;
+
+    if let Some(vio) = vios.into_inner() {
+        return Err(ValError::new(
+            ErrorType::UrlSyntaxViolation {
+                error: vio.description().into(),
+                context: None,
+            },
+            input,
+        ));
     }
+
+    Ok(url)
+}
+
+/// Check if the path got normalized to `/` and the original string had an empty path
+fn need_to_preserve_empty_path(url: &Url, url_str: &str, preserve_empty_path: bool) -> bool {
+    if !preserve_empty_path {
+        return false;
+    }
+
+    if url.path() != "/" {
+        // was definitely not the case
+        return false;
+    }
+
+    if !scheme_is_special(url.scheme()) {
+        // non-special schemes don't normalize the path
+        return false;
+    }
+
+    // find the scheme marker in the original input
+    let (_, input_without_scheme) = url_str.split_once(':').expect("url has a scheme");
+
+    // strip any leading / (which would be part of the authority marker), URL will normalize any
+    // number of them even if there should only be two
+    let input_without_scheme = input_without_scheme.trim_start_matches('/');
+
+    // Now find the start of the path, which is either the first /, ?, or #, or the end of the
+    // string
+    for c in input_without_scheme.chars() {
+        match c {
+            '/' => return false,      // found the start of the path, and it's not empty
+            '?' | '#' => return true, // found the start of the query or fragment, so path is empty
+            _ => (),
+        }
+    }
+
+    // reached the end of the string without finding a path, so it's empty
+    true
 }
 
 /// check host_required and substitute `default_host`, `default_port` & `default_path` if they aren't set
@@ -587,7 +788,7 @@ trait CopyFromPyUrl {
     fn url_mut(&mut self) -> &mut Url;
 }
 
-fn get_allowed_schemas(schema: &Bound<'_, PyDict>, name: &'static str) -> PyResult<(AllowedSchemas, String)> {
+fn get_allowed_schemes(schema: &Bound<'_, PyDict>, name: &'static str) -> PyResult<(AllowedSchemes, String)> {
     match schema.get_as::<Bound<'_, PyList>>(intern!(schema.py(), "allowed_schemes"))? {
         Some(list) => {
             if list.is_empty() {

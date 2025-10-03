@@ -1,4 +1,3 @@
-import gc
 import platform
 import weakref
 
@@ -6,9 +5,11 @@ import pytest
 
 from pydantic_core import SchemaValidator, ValidationError, core_schema
 
+from ..conftest import assert_gc
+
 
 def test_nullable():
-    v = SchemaValidator({'type': 'nullable', 'schema': {'type': 'int'}})
+    v = SchemaValidator(core_schema.nullable_schema(schema=core_schema.int_schema()))
     assert v.validate_python(None) is None
     assert v.validate_python(1) == 1
     assert v.validate_python('123') == 123
@@ -26,13 +27,12 @@ def test_nullable():
 
 def test_union_nullable_bool_int():
     v = SchemaValidator(
-        {
-            'type': 'union',
-            'choices': [
-                {'type': 'nullable', 'schema': {'type': 'bool'}},
-                {'type': 'nullable', 'schema': {'type': 'int'}},
-            ],
-        }
+        core_schema.union_schema(
+            choices=[
+                core_schema.nullable_schema(schema=core_schema.bool_schema()),
+                core_schema.nullable_schema(schema=core_schema.int_schema()),
+            ]
+        )
     )
     assert v.validate_python(None) is None
     assert v.validate_python(True) is True
@@ -42,6 +42,7 @@ def test_union_nullable_bool_int():
 @pytest.mark.xfail(
     condition=platform.python_implementation() == 'PyPy', reason='https://foss.heptapod.net/pypy/pypy/-/issues/3899'
 )
+@pytest.mark.skipif(platform.python_implementation() == 'GraalVM', reason='Cannot reliably trigger GC on GraalPy')
 def test_leak_nullable():
     def fn():
         def validate(v, info):
@@ -62,9 +63,5 @@ def test_leak_nullable():
     assert ref() is not None
 
     del cycle
-    gc.collect(0)
-    gc.collect(1)
-    gc.collect(2)
-    gc.collect()
 
-    assert ref() is None
+    assert_gc(lambda: ref() is None)

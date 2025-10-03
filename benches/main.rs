@@ -8,15 +8,14 @@ use test::{black_box, Bencher};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString};
 
-use _pydantic_core::{validate_core_schema, SchemaValidator};
+use _pydantic_core::SchemaValidator;
 
 fn build_schema_validator_with_globals(
     py: Python,
     code: &CStr,
     globals: Option<&Bound<'_, PyDict>>,
 ) -> SchemaValidator {
-    let mut schema = py.eval(code, globals, None).unwrap().extract().unwrap();
-    schema = validate_core_schema(&schema, None).unwrap().extract().unwrap();
+    let schema = py.eval(code, globals, None).unwrap().extract().unwrap();
     SchemaValidator::py_new(py, &schema, None).unwrap()
 }
 
@@ -30,11 +29,11 @@ fn json<'a>(py: Python<'a>, code: &'a str) -> Bound<'a, PyAny> {
 
 #[bench]
 fn ints_json(bench: &mut Bencher) {
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         let validator = build_schema_validator(py, c"{'type': 'int'}");
 
         let result = validator
-            .validate_json(py, &json(py, "123"), None, None, None, false.into())
+            .validate_json(py, &json(py, "123"), None, None, None, None, false.into(), None, None)
             .unwrap();
         let result_int: i64 = result.extract(py).unwrap();
         assert_eq!(result_int, 123);
@@ -42,7 +41,7 @@ fn ints_json(bench: &mut Bencher) {
         bench.iter(|| {
             black_box(
                 validator
-                    .validate_json(py, &json(py, "123"), None, None, None, false.into())
+                    .validate_json(py, &json(py, "123"), None, None, None, None, false.into(), None, None)
                     .unwrap(),
             )
         })
@@ -51,12 +50,12 @@ fn ints_json(bench: &mut Bencher) {
 
 #[bench]
 fn ints_python(bench: &mut Bencher) {
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         let validator = build_schema_validator(py, c"{'type': 'int'}");
 
         let Ok(input) = 123_i64.into_pyobject(py);
         let result = validator
-            .validate_python(py, &input, None, None, None, None, false.into())
+            .validate_python(py, &input, None, None, None, None, None, false.into(), None, None)
             .unwrap();
         let result_int: i64 = result.extract(py).unwrap();
         assert_eq!(result_int, 123);
@@ -65,7 +64,7 @@ fn ints_python(bench: &mut Bencher) {
         bench.iter(|| {
             black_box(
                 validator
-                    .validate_python(py, &input, None, None, None, None, false.into())
+                    .validate_python(py, &input, None, None, None, None, None, false.into(), None, None)
                     .unwrap(),
             )
         })
@@ -74,7 +73,7 @@ fn ints_python(bench: &mut Bencher) {
 
 #[bench]
 fn list_int_json(bench: &mut Bencher) {
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         let validator = build_schema_validator(py, c"{'type': 'list', 'items_schema': {'type': 'int'}}");
         let code = format!(
             "[{}]",
@@ -84,7 +83,7 @@ fn list_int_json(bench: &mut Bencher) {
         bench.iter(|| {
             black_box(
                 validator
-                    .validate_json(py, &json(py, &code), None, None, None, false.into())
+                    .validate_json(py, &json(py, &code), None, None, None, None, false.into(), None, None)
                     .unwrap(),
             )
         })
@@ -105,12 +104,12 @@ fn list_int_input(py: Python<'_>) -> (SchemaValidator, PyObject) {
 
 #[bench]
 fn list_int_python(bench: &mut Bencher) {
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         let (validator, input) = list_int_input(py);
         let input = black_box(input.bind(py));
         bench.iter(|| {
             let v = validator
-                .validate_python(py, &input, None, None, None, None, false.into())
+                .validate_python(py, &input, None, None, None, None, None, false.into(), None, None)
                 .unwrap();
             black_box(v)
         })
@@ -119,14 +118,18 @@ fn list_int_python(bench: &mut Bencher) {
 
 #[bench]
 fn list_int_python_isinstance(bench: &mut Bencher) {
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         let (validator, input) = list_int_input(py);
         let input = black_box(input.bind(py));
-        let v = validator.isinstance_python(py, &input, None, None, None, None).unwrap();
+        let v = validator
+            .isinstance_python(py, &input, None, None, None, None, None, None, None)
+            .unwrap();
         assert!(v);
 
         bench.iter(|| {
-            let v = validator.isinstance_python(py, &input, None, None, None, None).unwrap();
+            let v = validator
+                .isinstance_python(py, &input, None, None, None, None, None, None, None)
+                .unwrap();
             black_box(v)
         })
     })
@@ -134,7 +137,7 @@ fn list_int_python_isinstance(bench: &mut Bencher) {
 
 #[bench]
 fn list_error_json(bench: &mut Bencher) {
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         let validator = build_schema_validator(py, c"{'type': 'list', 'items_schema': {'type': 'int'}}");
         let code = format!(
             "[{}]",
@@ -144,7 +147,7 @@ fn list_error_json(bench: &mut Bencher) {
                 .join(", ")
         );
 
-        match validator.validate_json(py, &json(py, &code), None, None, None, false.into()) {
+        match validator.validate_json(py, &json(py, &code), None, None, None, None, false.into(), None, None) {
             Ok(_) => panic!("unexpectedly valid"),
             Err(e) => {
                 let v = e.value(py);
@@ -155,12 +158,12 @@ fn list_error_json(bench: &mut Bencher) {
             }
         };
 
-        bench.iter(
-            || match validator.validate_json(py, &json(py, &code), None, None, None, false.into()) {
+        bench.iter(|| {
+            match validator.validate_json(py, &json(py, &code), None, None, None, None, false.into(), None, None) {
                 Ok(_) => panic!("unexpectedly valid"),
                 Err(e) => black_box(e),
-            },
-        )
+            }
+        })
     })
 }
 
@@ -177,7 +180,7 @@ fn list_error_python_input(py: Python<'_>) -> (SchemaValidator, PyObject) {
 
     let input = py.eval(&code, None, None).unwrap().extract().unwrap();
 
-    match validator.validate_python(py, &input, None, None, None, None, false.into()) {
+    match validator.validate_python(py, &input, None, None, None, None, None, false.into(), None, None) {
         Ok(_) => panic!("unexpectedly valid"),
         Err(e) => {
             let v = e.value(py);
@@ -192,12 +195,12 @@ fn list_error_python_input(py: Python<'_>) -> (SchemaValidator, PyObject) {
 
 #[bench]
 fn list_error_python(bench: &mut Bencher) {
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         let (validator, input) = list_error_python_input(py);
 
         let input = black_box(input.bind(py));
         bench.iter(|| {
-            let result = validator.validate_python(py, &input, None, None, None, None, false.into());
+            let result = validator.validate_python(py, &input, None, None, None, None, None, false.into(), None, None);
 
             match result {
                 Ok(_) => panic!("unexpectedly valid"),
@@ -209,21 +212,27 @@ fn list_error_python(bench: &mut Bencher) {
 
 #[bench]
 fn list_error_python_isinstance(bench: &mut Bencher) {
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         let (validator, input) = list_error_python_input(py);
         let input = black_box(input.bind(py));
-        let r = validator.isinstance_python(py, &input, None, None, None, None).unwrap();
+        let r = validator
+            .isinstance_python(py, &input, None, None, None, None, None, None, None)
+            .unwrap();
         assert!(!r);
 
         bench.iter(|| {
-            black_box(validator.isinstance_python(py, &input, None, None, None, None).unwrap());
+            black_box(
+                validator
+                    .isinstance_python(py, &input, None, None, None, None, None, None, None)
+                    .unwrap(),
+            );
         })
     })
 }
 
 #[bench]
 fn list_any_json(bench: &mut Bencher) {
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         let validator = build_schema_validator(py, c"{'type': 'list'}");
         let code = format!(
             "[{}]",
@@ -233,7 +242,7 @@ fn list_any_json(bench: &mut Bencher) {
         bench.iter(|| {
             black_box(
                 validator
-                    .validate_json(py, &json(py, &code), None, None, None, false.into())
+                    .validate_json(py, &json(py, &code), None, None, None, None, false.into(), None, None)
                     .unwrap(),
             )
         })
@@ -242,7 +251,7 @@ fn list_any_json(bench: &mut Bencher) {
 
 #[bench]
 fn list_any_python(bench: &mut Bencher) {
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         let validator = build_schema_validator(py, c"{'type': 'list'}");
         let code = CString::new(format!(
             "[{}]",
@@ -253,7 +262,7 @@ fn list_any_python(bench: &mut Bencher) {
         let input = black_box(input);
         bench.iter(|| {
             let v = validator
-                .validate_python(py, &input, None, None, None, None, false.into())
+                .validate_python(py, &input, None, None, None, None, None, false.into(), None, None)
                 .unwrap();
             black_box(v)
         })
@@ -270,7 +279,7 @@ fn as_str(i: u8) -> String {
 
 #[bench]
 fn dict_json(bench: &mut Bencher) {
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         let validator = build_schema_validator(
             py,
             c"{'type': 'dict', 'keys_schema': {'type': 'str'}, 'values_schema': {'type': 'int'}}",
@@ -287,7 +296,7 @@ fn dict_json(bench: &mut Bencher) {
         bench.iter(|| {
             black_box(
                 validator
-                    .validate_json(py, &json(py, &code), None, None, None, false.into())
+                    .validate_json(py, &json(py, &code), None, None, None, None, false.into(), None, None)
                     .unwrap(),
             )
         })
@@ -296,7 +305,7 @@ fn dict_json(bench: &mut Bencher) {
 
 #[bench]
 fn dict_python(bench: &mut Bencher) {
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         let validator = build_schema_validator(
             py,
             c"{'type': 'dict', 'keys_schema': {'type': 'str'}, 'values_schema': {'type': 'int'}}",
@@ -314,7 +323,7 @@ fn dict_python(bench: &mut Bencher) {
         let input = black_box(input);
         bench.iter(|| {
             let v = validator
-                .validate_python(py, &input, None, None, None, None, false.into())
+                .validate_python(py, &input, None, None, None, None, None, false.into(), None, None)
                 .unwrap();
             black_box(v)
         })
@@ -323,7 +332,7 @@ fn dict_python(bench: &mut Bencher) {
 
 #[bench]
 fn dict_value_error(bench: &mut Bencher) {
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         let validator = build_schema_validator(
             py,
             cr"{
@@ -344,7 +353,7 @@ fn dict_value_error(bench: &mut Bencher) {
 
         let input = py.eval(&code, None, None).unwrap();
 
-        match validator.validate_python(py, &input, None, None, None, None, false.into()) {
+        match validator.validate_python(py, &input, None, None, None, None, None, false.into(), None, None) {
             Ok(_) => panic!("unexpectedly valid"),
             Err(e) => {
                 let v = e.value(py);
@@ -357,7 +366,7 @@ fn dict_value_error(bench: &mut Bencher) {
 
         let input = black_box(input);
         bench.iter(|| {
-            let result = validator.validate_python(py, &input, None, None, None, None, false.into());
+            let result = validator.validate_python(py, &input, None, None, None, None, None, false.into(), None, None);
 
             match result {
                 Ok(_) => panic!("unexpectedly valid"),
@@ -369,7 +378,7 @@ fn dict_value_error(bench: &mut Bencher) {
 
 #[bench]
 fn typed_dict_json(bench: &mut Bencher) {
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         let validator = build_schema_validator(
             py,
             cr"{
@@ -395,7 +404,7 @@ fn typed_dict_json(bench: &mut Bencher) {
         bench.iter(|| {
             black_box(
                 validator
-                    .validate_json(py, &json(py, code), None, None, None, false.into())
+                    .validate_json(py, &json(py, code), None, None, None, None, false.into(), None, None)
                     .unwrap(),
             )
         })
@@ -404,7 +413,7 @@ fn typed_dict_json(bench: &mut Bencher) {
 
 #[bench]
 fn typed_dict_python(bench: &mut Bencher) {
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         let validator = build_schema_validator(
             py,
             cr"{
@@ -430,7 +439,7 @@ fn typed_dict_python(bench: &mut Bencher) {
         let input = black_box(input);
         bench.iter(|| {
             let v = validator
-                .validate_python(py, &input, None, None, None, None, false.into())
+                .validate_python(py, &input, None, None, None, None, None, false.into(), None, None)
                 .unwrap();
             black_box(v)
         })
@@ -439,7 +448,7 @@ fn typed_dict_python(bench: &mut Bencher) {
 
 #[bench]
 fn typed_dict_deep_error(bench: &mut Bencher) {
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         let validator = build_schema_validator(
             py,
             cr"{
@@ -471,7 +480,7 @@ fn typed_dict_deep_error(bench: &mut Bencher) {
         let input = py.eval(code, None, None).unwrap();
         let input = black_box(input);
 
-        match validator.validate_python(py, &input, None, None, None, None, false.into()) {
+        match validator.validate_python(py, &input, None, None, None, None, None, false.into(), None, None) {
             Ok(_) => panic!("unexpectedly valid"),
             Err(e) => {
                 let v = e.value(py);
@@ -483,7 +492,7 @@ fn typed_dict_deep_error(bench: &mut Bencher) {
         };
 
         bench.iter(|| {
-            let result = validator.validate_python(py, &input, None, None, None, None, false.into());
+            let result = validator.validate_python(py, &input, None, None, None, None, None, false.into(), None, None);
 
             match result {
                 Ok(_) => panic!("unexpectedly valid"),
@@ -495,13 +504,12 @@ fn typed_dict_deep_error(bench: &mut Bencher) {
 
 #[bench]
 fn complete_model(bench: &mut Bencher) {
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         let sys_path = py.import("sys").unwrap().getattr("path").unwrap();
         sys_path.call_method1("append", ("./tests/benchmarks/",)).unwrap();
 
         let complete_schema = py.import("complete_schema").unwrap();
-        let mut schema = complete_schema.call_method0("schema").unwrap();
-        schema = validate_core_schema(&schema, None).unwrap().extract().unwrap();
+        let schema = complete_schema.call_method0("schema").unwrap();
         let validator = SchemaValidator::py_new(py, &schema, None).unwrap();
 
         let input = complete_schema.call_method0("input_data_lax").unwrap();
@@ -510,7 +518,7 @@ fn complete_model(bench: &mut Bencher) {
         bench.iter(|| {
             black_box(
                 validator
-                    .validate_python(py, &input, None, None, None, None, false.into())
+                    .validate_python(py, &input, None, None, None, None, None, false.into(), None, None)
                     .unwrap(),
             );
         })
@@ -519,26 +527,25 @@ fn complete_model(bench: &mut Bencher) {
 
 #[bench]
 fn nested_model_using_definitions(bench: &mut Bencher) {
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         let sys_path = py.import("sys").unwrap().getattr("path").unwrap();
         sys_path.call_method1("append", ("./tests/benchmarks/",)).unwrap();
 
         let complete_schema = py.import("nested_schema").unwrap();
-        let mut schema = complete_schema.call_method0("schema_using_defs").unwrap();
-        schema = validate_core_schema(&schema, None).unwrap().extract().unwrap();
+        let schema = complete_schema.call_method0("schema_using_defs").unwrap();
         let validator = SchemaValidator::py_new(py, &schema, None).unwrap();
 
         let input = complete_schema.call_method0("input_data_valid").unwrap();
         let input = black_box(input);
 
         validator
-            .validate_python(py, &input, None, None, None, None, false.into())
+            .validate_python(py, &input, None, None, None, None, None, false.into(), None, None)
             .unwrap();
 
         bench.iter(|| {
             black_box(
                 validator
-                    .validate_python(py, &input, None, None, None, None, false.into())
+                    .validate_python(py, &input, None, None, None, None, None, false.into(), None, None)
                     .unwrap(),
             );
         })
@@ -547,26 +554,25 @@ fn nested_model_using_definitions(bench: &mut Bencher) {
 
 #[bench]
 fn nested_model_inlined(bench: &mut Bencher) {
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         let sys_path = py.import("sys").unwrap().getattr("path").unwrap();
         sys_path.call_method1("append", ("./tests/benchmarks/",)).unwrap();
 
         let complete_schema = py.import("nested_schema").unwrap();
-        let mut schema = complete_schema.call_method0("inlined_schema").unwrap();
-        schema = validate_core_schema(&schema, None).unwrap().extract().unwrap();
+        let schema = complete_schema.call_method0("inlined_schema").unwrap();
         let validator = SchemaValidator::py_new(py, &schema, None).unwrap();
 
         let input = complete_schema.call_method0("input_data_valid").unwrap();
         let input = black_box(input);
 
         validator
-            .validate_python(py, &input, None, None, None, None, false.into())
+            .validate_python(py, &input, None, None, None, None, None, false.into(), None, None)
             .unwrap();
 
         bench.iter(|| {
             black_box(
                 validator
-                    .validate_python(py, &input, None, None, None, None, false.into())
+                    .validate_python(py, &input, None, None, None, None, None, false.into(), None, None)
                     .unwrap(),
             );
         })
@@ -575,12 +581,12 @@ fn nested_model_inlined(bench: &mut Bencher) {
 
 #[bench]
 fn literal_ints_few_python(bench: &mut Bencher) {
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         let validator = build_schema_validator(py, c"{'type': 'literal', 'expected': list(range(5))}");
 
         let Ok(input) = 4_i64.into_pyobject(py);
         let result = validator
-            .validate_python(py, &input, None, None, None, None, false.into())
+            .validate_python(py, &input, None, None, None, None, None, false.into(), None, None)
             .unwrap();
         let result_int: i64 = result.extract(py).unwrap();
         assert_eq!(result_int, 4);
@@ -589,7 +595,7 @@ fn literal_ints_few_python(bench: &mut Bencher) {
         bench.iter(|| {
             black_box(
                 validator
-                    .validate_python(py, &input, None, None, None, None, false.into())
+                    .validate_python(py, &input, None, None, None, None, None, false.into(), None, None)
                     .unwrap(),
             )
         })
@@ -598,13 +604,13 @@ fn literal_ints_few_python(bench: &mut Bencher) {
 
 #[bench]
 fn literal_strings_few_small_python(bench: &mut Bencher) {
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         let validator = build_schema_validator(py, c"{'type': 'literal', 'expected': [f'{idx}' for idx in range(5)]}");
 
         let input = py.eval(c"'4'", None, None).unwrap();
         let input_str: String = input.extract().unwrap();
         let result = validator
-            .validate_python(py, &input, None, None, None, None, false.into())
+            .validate_python(py, &input, None, None, None, None, None, false.into(), None, None)
             .unwrap();
         let result_str: String = result.extract(py).unwrap();
         assert_eq!(result_str, input_str);
@@ -613,7 +619,7 @@ fn literal_strings_few_small_python(bench: &mut Bencher) {
         bench.iter(|| {
             black_box(
                 validator
-                    .validate_python(py, &input, None, None, None, None, false.into())
+                    .validate_python(py, &input, None, None, None, None, None, false.into(), None, None)
                     .unwrap(),
             )
         })
@@ -622,7 +628,7 @@ fn literal_strings_few_small_python(bench: &mut Bencher) {
 
 #[bench]
 fn literal_strings_few_large_python(bench: &mut Bencher) {
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         let validator = build_schema_validator(
             py,
             c"{'type': 'literal', 'expected': ['a' * 25 + f'{idx}' for idx in range(5)]}",
@@ -631,7 +637,7 @@ fn literal_strings_few_large_python(bench: &mut Bencher) {
         let input = py.eval(c"'a' * 25 + '4'", None, None).unwrap();
         let input_str: String = input.extract().unwrap();
         let result = validator
-            .validate_python(py, &input, None, None, None, None, false.into())
+            .validate_python(py, &input, None, None, None, None, None, false.into(), None, None)
             .unwrap();
         let result_str: String = result.extract(py).unwrap();
         assert_eq!(result_str, input_str);
@@ -640,7 +646,7 @@ fn literal_strings_few_large_python(bench: &mut Bencher) {
         bench.iter(|| {
             black_box(
                 validator
-                    .validate_python(py, &input, None, None, None, None, false.into())
+                    .validate_python(py, &input, None, None, None, None, None, false.into(), None, None)
                     .unwrap(),
             )
         })
@@ -649,7 +655,7 @@ fn literal_strings_few_large_python(bench: &mut Bencher) {
 
 #[bench]
 fn literal_enums_few_python(bench: &mut Bencher) {
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         let globals = PyDict::new(py);
         py.run(
             cr"
@@ -674,7 +680,7 @@ class Foo(Enum):
 
         let input = py.eval(c"Foo.v4", Some(&globals), None).unwrap();
         let result = validator
-            .validate_python(py, &input, None, None, None, None, false.into())
+            .validate_python(py, &input, None, None, None, None, None, false.into(), None, None)
             .unwrap();
         assert!(input.eq(result).unwrap());
 
@@ -682,7 +688,7 @@ class Foo(Enum):
         bench.iter(|| {
             black_box(
                 validator
-                    .validate_python(py, &input, None, None, None, None, false.into())
+                    .validate_python(py, &input, None, None, None, None, None, false.into(), None, None)
                     .unwrap(),
             )
         })
@@ -691,12 +697,12 @@ class Foo(Enum):
 
 #[bench]
 fn literal_ints_many_python(bench: &mut Bencher) {
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         let validator = build_schema_validator(py, c"{'type': 'literal', 'expected': list(range(100))}");
 
         let Ok(input) = 99_i64.into_pyobject(py);
         let result = validator
-            .validate_python(py, &input, None, None, None, None, false.into())
+            .validate_python(py, &input, None, None, None, None, None, false.into(), None, None)
             .unwrap();
         let result_int: i64 = result.extract(py).unwrap();
         assert_eq!(result_int, 99);
@@ -705,7 +711,7 @@ fn literal_ints_many_python(bench: &mut Bencher) {
         bench.iter(|| {
             black_box(
                 validator
-                    .validate_python(py, &input, None, None, None, None, false.into())
+                    .validate_python(py, &input, None, None, None, None, None, false.into(), None, None)
                     .unwrap(),
             )
         })
@@ -714,14 +720,14 @@ fn literal_ints_many_python(bench: &mut Bencher) {
 
 #[bench]
 fn literal_strings_many_small_python(bench: &mut Bencher) {
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         let validator =
             build_schema_validator(py, c"{'type': 'literal', 'expected': [f'{idx}' for idx in range(100)]}");
 
         let input = py.eval(c"'99'", None, None).unwrap();
         let input_str: String = input.extract().unwrap();
         let result = validator
-            .validate_python(py, &input, None, None, None, None, false.into())
+            .validate_python(py, &input, None, None, None, None, None, false.into(), None, None)
             .unwrap();
         let result_str: String = result.extract(py).unwrap();
         assert_eq!(result_str, input_str);
@@ -730,7 +736,7 @@ fn literal_strings_many_small_python(bench: &mut Bencher) {
         bench.iter(|| {
             black_box(
                 validator
-                    .validate_python(py, &input, None, None, None, None, false.into())
+                    .validate_python(py, &input, None, None, None, None, None, false.into(), None, None)
                     .unwrap(),
             )
         })
@@ -739,7 +745,7 @@ fn literal_strings_many_small_python(bench: &mut Bencher) {
 
 #[bench]
 fn literal_strings_many_large_python(bench: &mut Bencher) {
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         let validator = build_schema_validator(
             py,
             c"{'type': 'literal', 'expected': ['a' * 25 + f'{idx}' for idx in range(100)]}",
@@ -748,7 +754,7 @@ fn literal_strings_many_large_python(bench: &mut Bencher) {
         let input = py.eval(c"'a' * 25 + '99'", None, None).unwrap();
         let input_str: String = input.extract().unwrap();
         let result = validator
-            .validate_python(py, &input, None, None, None, None, false.into())
+            .validate_python(py, &input, None, None, None, None, None, false.into(), None, None)
             .unwrap();
         let result_str: String = result.extract(py).unwrap();
         assert_eq!(result_str, input_str);
@@ -757,7 +763,7 @@ fn literal_strings_many_large_python(bench: &mut Bencher) {
         bench.iter(|| {
             black_box(
                 validator
-                    .validate_python(py, &input, None, None, None, None, false.into())
+                    .validate_python(py, &input, None, None, None, None, None, false.into(), None, None)
                     .unwrap(),
             )
         })
@@ -766,12 +772,12 @@ fn literal_strings_many_large_python(bench: &mut Bencher) {
 
 #[bench]
 fn literal_ints_many_json(bench: &mut Bencher) {
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         let validator = build_schema_validator(py, c"{'type': 'literal', 'expected': list(range(100))}");
 
         let input_json = py.eval(c"'99'", None, None).unwrap();
         let result = validator
-            .validate_json(py, &input_json, None, None, None, false.into())
+            .validate_json(py, &input_json, None, None, None, None, false.into(), None, None)
             .unwrap();
         let result_int: i64 = result.extract(py).unwrap();
         assert_eq!(result_int, 99);
@@ -780,7 +786,7 @@ fn literal_ints_many_json(bench: &mut Bencher) {
         bench.iter(|| {
             black_box(
                 validator
-                    .validate_json(py, &input_json, None, None, None, false.into())
+                    .validate_json(py, &input_json, None, None, None, None, false.into(), None, None)
                     .unwrap(),
             )
         })
@@ -789,7 +795,7 @@ fn literal_ints_many_json(bench: &mut Bencher) {
 
 #[bench]
 fn literal_strings_many_large_json(bench: &mut Bencher) {
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         let validator = build_schema_validator(
             py,
             c"{'type': 'literal', 'expected': ['a' * 25 + f'{idx}' for idx in range(100)]}",
@@ -799,7 +805,7 @@ fn literal_strings_many_large_json(bench: &mut Bencher) {
         let input_json = py.eval(c"'\"' + 'a' * 25 + '99' + '\"'", None, None).unwrap();
         let input_str: String = input.extract().unwrap();
         let result = validator
-            .validate_json(py, &input_json, None, None, None, false.into())
+            .validate_json(py, &input_json, None, None, None, None, false.into(), None, None)
             .unwrap();
         let result_str: String = result.extract(py).unwrap();
         assert_eq!(result_str, input_str);
@@ -808,7 +814,7 @@ fn literal_strings_many_large_json(bench: &mut Bencher) {
         bench.iter(|| {
             black_box(
                 validator
-                    .validate_json(py, &input_json, None, None, None, false.into())
+                    .validate_json(py, &input_json, None, None, None, None, false.into(), None, None)
                     .unwrap(),
             )
         })
@@ -817,7 +823,7 @@ fn literal_strings_many_large_json(bench: &mut Bencher) {
 
 #[bench]
 fn literal_mixed_few_python(bench: &mut Bencher) {
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         let globals = PyDict::new(py);
         py.run(
             cr"
@@ -844,7 +850,7 @@ class Foo(Enum):
             let input = py.eval(c"'null'", None, None).unwrap();
             let input_str: String = input.extract().unwrap();
             let result = validator
-                .validate_python(py, &input, None, None, None, None, false.into())
+                .validate_python(py, &input, None, None, None, None, None, false.into(), None, None)
                 .unwrap();
             let result_str: String = result.extract(py).unwrap();
             assert_eq!(result_str, input_str);
@@ -853,7 +859,7 @@ class Foo(Enum):
             bench.iter(|| {
                 black_box(
                     validator
-                        .validate_python(py, &input, None, None, None, None, false.into())
+                        .validate_python(py, &input, None, None, None, None, None, false.into(), None, None)
                         .unwrap(),
                 )
             })
@@ -864,7 +870,7 @@ class Foo(Enum):
             let input = py.eval(c"-1", None, None).unwrap();
             let input_int: i64 = input.extract().unwrap();
             let result = validator
-                .validate_python(py, &input, None, None, None, None, false.into())
+                .validate_python(py, &input, None, None, None, None, None, false.into(), None, None)
                 .unwrap();
             let result_int: i64 = result.extract(py).unwrap();
             assert_eq!(result_int, input_int);
@@ -873,7 +879,7 @@ class Foo(Enum):
             bench.iter(|| {
                 black_box(
                     validator
-                        .validate_python(py, &input, None, None, None, None, false.into())
+                        .validate_python(py, &input, None, None, None, None, None, false.into(), None, None)
                         .unwrap(),
                 )
             })
@@ -883,7 +889,7 @@ class Foo(Enum):
         {
             let input = py.eval(c"None", None, None).unwrap();
             let result = validator
-                .validate_python(py, &input, None, None, None, None, false.into())
+                .validate_python(py, &input, None, None, None, None, None, false.into(), None, None)
                 .unwrap();
             assert!(input.eq(result).unwrap());
 
@@ -891,7 +897,7 @@ class Foo(Enum):
             bench.iter(|| {
                 black_box(
                     validator
-                        .validate_python(py, &input, None, None, None, None, false.into())
+                        .validate_python(py, &input, None, None, None, None, None, false.into(), None, None)
                         .unwrap(),
                 )
             })
@@ -901,7 +907,7 @@ class Foo(Enum):
         {
             let input = py.eval(c"Foo.v4", Some(&globals), None).unwrap();
             let result = validator
-                .validate_python(py, &input, None, None, None, None, false.into())
+                .validate_python(py, &input, None, None, None, None, None, false.into(), None, None)
                 .unwrap();
             assert!(input.eq(result).unwrap());
 
@@ -909,7 +915,7 @@ class Foo(Enum):
             bench.iter(|| {
                 black_box(
                     validator
-                        .validate_python(py, &input, None, None, None, None, false.into())
+                        .validate_python(py, &input, None, None, None, None, None, false.into(), None, None)
                         .unwrap(),
                 )
             })

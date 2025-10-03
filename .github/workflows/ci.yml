@@ -14,49 +14,49 @@ env:
 
 jobs:
   coverage:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - name: install rust nightly
-        uses: dtolnay/rust-toolchain@nightly
-
-      - id: cache-rust
-        name: cache rust
-        uses: Swatinem/rust-cache@v2
-
-      - run: cargo install rustfilt coverage-prepare
-        if: steps.cache-rust.outputs.cache-hit != 'true'
-
-      - run: rustup component add llvm-tools-preview
+      # rust-nightly used for `#[coverage(off)]`
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@cargo-llvm-cov
 
       - name: install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v6
 
       - name: install deps
         run: uv sync --group testing
 
       - run: rustc --version --verbose
 
-      - run: make build-dev
+      - run: |
+          source <(cargo llvm-cov show-env --export-prefix)
+          cargo llvm-cov clean --workspace --profraw-only
+          make build-dev
         env:
           RUST_BACKTRACE: 1
           RUSTFLAGS: '-C instrument-coverage'
 
       - run: uv pip freeze
 
-      - run: uv run coverage run -m pytest
+      - run: uv run coverage run -m pytest --junitxml=junit.xml -o junit_family=legacy
 
       - run: ls -lha
       - run: uv run coverage xml
 
-      - run: coverage-prepare lcov python/pydantic_core/*.so
+      - run: |
+          source <(cargo llvm-cov show-env --export-prefix)
+          cargo llvm-cov --codecov --output-path=codecov.json
 
       - uses: codecov/codecov-action@v5
+        with:
+          files: codecov.json
 
-  # See https://github.com/PyO3/pyo3/discussions/2781
-  # tests intermittently segfault with pypy and cpython 3.7 when using `coverage run ...`, hence separate job
+      - uses: codecov/test-results-action@v1
+
   test-python:
     name: test ${{ matrix.python-version }}
     strategy:
@@ -68,13 +68,20 @@ jobs:
           - '3.11'
           - '3.12'
           - '3.13'
-          - 'pypy3.9'
+          - '3.14'
+          - '3.14t'
           - 'pypy3.10'
+          - 'pypy3.11'
+          - 'graalpy-3.11'
+          - 'graalpy-3.12'
 
     runs-on: ubuntu-latest
 
+    # TODO: get test suite stable with free-threaded python
+    continue-on-error: ${{ endsWith(matrix.python-version, 't') }}
+
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: install rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -85,7 +92,7 @@ jobs:
           key: test-v3
 
       - name: install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v6
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -101,6 +108,8 @@ jobs:
       - run: uv run pytest
         env:
           HYPOTHESIS_PROFILE: slow
+          # TODO: remove --inline-snapshot=disable after https://github.com/15r10nk/inline-snapshot/issues/192
+          PYTEST_ADDOPTS: ${{ endsWith(matrix.python-version, 't') && '--parallel-threads=2 --inline-snapshot=disable' || '' }}
 
   test-os:
     name: test on ${{ matrix.os }}
@@ -112,7 +121,7 @@ jobs:
 
     runs-on: ${{ matrix.os }}-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: install rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -121,7 +130,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v6
 
       - name: install deps
         run: uv sync --group testing
@@ -141,10 +150,10 @@ jobs:
 
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v6
 
       - name: install deps
         run: uv sync --group testing
@@ -184,10 +193,10 @@ jobs:
           - 'pypy3.10'
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v6
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -210,12 +219,12 @@ jobs:
     continue-on-error: true
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           repository: pydantic/pydantic
           path: pydantic
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           path: pydantic-core
 
@@ -226,7 +235,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v6
 
       - name: install deps
         run: |
@@ -240,7 +249,7 @@ jobs:
 
       # Run pytest with lax xfail because we often add tests to pydantic
       # which xfail on a pending release of pydantic-core
-      - run: uv run pytest --override-ini=xfail_strict=False
+      - run: uv run --no-sync pytest --override-ini=xfail_strict=False
         working-directory: pydantic
         env:
           PYDANTIC_PRIVATE_ALLOW_UNHANDLED_SCHEMA_TYPES: 1
@@ -252,7 +261,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: install rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -263,12 +272,12 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       # used to lint js code
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '18'
 
       - name: install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v6
 
       - name: install deps
         run: |
@@ -287,7 +296,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: install rust nightly
         uses: dtolnay/rust-toolchain@nightly
@@ -295,7 +304,7 @@ jobs:
       - name: cache rust
         uses: Swatinem/rust-cache@v2
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
 
@@ -306,13 +315,15 @@ jobs:
   build-wasm-emscripten:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: install rust nightly
-        uses: dtolnay/rust-toolchain@nightly
+        uses: dtolnay/rust-toolchain@master
         with:
           components: rust-src
           targets: wasm32-unknown-emscripten
+          # might be able to unpin when pydodide uses emscripten 4, see below
+          toolchain: nightly-2025-02-17
 
       - name: cache rust
         uses: Swatinem/rust-cache@v2
@@ -320,13 +331,13 @@ jobs:
       - uses: mymindstorm/setup-emsdk@v14
         with:
           # NOTE!: as per https://github.com/pydantic/pydantic-core/pull/149 this version needs to match the version
-          # in node_modules/pyodide/repodata.json, to get the version, run:
-          # `cat node_modules/pyodide/repodata.json | python -m json.tool | rg platform`
+          # in node_modules/pyodide/pyodide-lock.json, to get the version, run:
+          # `cat node_modules/pyodide/pyodide-lock.json | jq .info.platform`
           version: '3.1.58'
           actions-cache-folder: emsdk-cache
 
       - name: install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v6
 
       - name: install deps
         run: uv sync --group wasm
@@ -334,7 +345,7 @@ jobs:
       - name: build wheels
         run: make build-wasm
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '18'
 
@@ -367,8 +378,8 @@ jobs:
     name: build sdist
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
       - uses: PyO3/maturin-action@v1
@@ -399,22 +410,27 @@ jobs:
           - os: linux
             manylinux: auto
             target: aarch64
+            interpreter: 3.9 3.10 3.11 3.12 3.13 3.14 pypy3.10 pypy3.11 graalpy3.11 graalpy3.12
           - os: linux
             manylinux: auto
             target: armv7
-            interpreter: 3.9 3.10 3.11 3.12 3.13
+            interpreter: 3.9 3.10 3.11 3.12 3.13 3.14
           - os: linux
             manylinux: auto
             target: ppc64le
-            interpreter: 3.9 3.10 3.11 3.12 3.13
+            interpreter: 3.9 3.10 3.11 3.12 3.13 3.14
           - os: linux
             manylinux: auto
             target: s390x
-            interpreter: 3.9 3.10 3.11 3.12 3.13
+            interpreter: 3.9 3.10 3.11 3.12 3.13 3.14
           - os: linux
             manylinux: auto
             target: x86_64
-            interpreter: pypy3.9 pypy3.10
+            interpreter: pypy3.10 pypy3.11
+          - os: linux
+            manylinux: auto
+            target: x86_64
+            interpreter: graalpy3.11 graalpy3.12
 
           # musllinux
           - os: linux
@@ -432,9 +448,10 @@ jobs:
           # arm pypy and older pythons which can't be run on the arm hardware for PGO
           - os: macos
             target: x86_64
+            interpreter: 3.9 3.10 3.11 3.12 3.13 3.14 pypy3.10 pypy3.11 graalpy3.11 graalpy3.12
           - os: macos
             target: aarch64
-            interpreter: 3.9 pypy3.9 pypy3.10
+            interpreter: 3.9 pypy3.10 pypy3.11 graalpy3.11 graalpy3.12
 
           # windows;
           # x86_64 pypy builds are not PGO optimized
@@ -442,14 +459,14 @@ jobs:
           # aarch64 only 3.11 and up, also not PGO optimized
           - os: windows
             target: x86_64
-            interpreter: pypy3.9 pypy3.10
+            interpreter: pypy3.10 pypy3.11
           - os: windows
             target: i686
             python-architecture: x86
-            interpreter: 3.9 3.10 3.11 3.12 3.13
+            interpreter: 3.9 3.10 3.11 3.12 3.13 3.14
           - os: windows
             target: aarch64
-            interpreter: 3.11 3.12 3.13
+            interpreter: 3.11 3.12 3.13 3.14
 
         exclude:
           # See above; disabled for now.
@@ -458,25 +475,22 @@ jobs:
 
     runs-on: ${{ (matrix.os == 'linux' && 'ubuntu') || matrix.os }}-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: set up python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.13'
           architecture: ${{ matrix.python-architecture || 'x64' }}
 
       - run: pip install -U twine 'ruff==0.5.0' typing_extensions
 
-      # generate self-schema now, so we don't have to do so inside docker in maturin build
-      - run: python generate_self_schema.py
-
       - name: build wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
           manylinux: ${{ matrix.manylinux }}
-          args: --release --out dist --interpreter ${{ matrix.interpreter || '3.9 3.10 3.11 3.12 3.13 pypy3.9 pypy3.10' }}
+          args: --release --out dist --interpreter ${{ matrix.interpreter || '3.9 3.10 3.11 3.12 3.13 3.14 pypy3.10 pypy3.11' }}
           rust-toolchain: stable
           docker-options: -e CI
 
@@ -497,7 +511,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [linux, windows, macos]
-        interpreter: ['3.9', '3.10', '3.11', '3.12', '3.13']
+        interpreter: ['3.9', '3.10', '3.11', '3.12', '3.13', '3.13t', '3.14', '3.14t']
         include:
           # standard runners with override for macos arm
           - os: linux
@@ -506,7 +520,7 @@ jobs:
             ls: dir
             runs-on: windows-latest
           - os: macos
-            runs-on: macos-latest-xlarge
+            runs-on: macos-latest
         exclude:
           # macos arm only supported from 3.10 and up
           - os: macos
@@ -514,10 +528,10 @@ jobs:
 
     runs-on: ${{ matrix.runs-on }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v6
         with:
           python-version: ${{ matrix.interpreter }}
 
@@ -547,10 +561,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: get dist artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           pattern: pypi_files_*
           merge-multiple: true
@@ -588,16 +602,16 @@ jobs:
             distro: alpine_latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: get dist artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           pattern: pypi_files_linux_*
           merge-multiple: true
           path: dist
 
-      - uses: uraimo/run-on-arch-action@v2.8.1
+      - uses: uraimo/run-on-arch-action@v3.0.1
         name: install & test
         with:
           arch: ${{ matrix.target }}
@@ -614,6 +628,8 @@ jobs:
               apk update
               apk add python3 py3-pip git curl
             fi
+          env: |
+            UV_NO_PROGRESS: '1'
           run: |
             set -x
             curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -634,13 +650,13 @@ jobs:
 
     runs-on: ${{ matrix.os }}-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v6
 
       - name: get dist artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           pattern: pypi_files_*
           merge-multiple: true
@@ -652,39 +668,35 @@ jobs:
 
   release:
     needs: [test-builds-arch, test-builds-os, build-sdist, check]
-    if: success() && startsWith(github.ref, 'refs/tags/')
+    if: always() && startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
 
+    environment:
+      name: release
+
+    permissions:
+      id-token: write
+      contents: write
+
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - name: set up python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-
-      - run: pip install -U twine
+      - uses: astral-sh/setup-uv@v6
 
       - name: check package version
-        run: python .github/check_version.py
+        run: uv run .github/check_version.py
 
       - name: get dist artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           pattern: pypi_files_*
           merge-multiple: true
           path: dist
 
-      - run: twine check --strict dist/*
-
-      - name: upload to pypi
-        run: twine upload dist/*
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.pypi_token }}
+      - run: uv publish --trusted-publishing always
 
       - name: get wasm dist artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: wasm_wheels
           path: wasm

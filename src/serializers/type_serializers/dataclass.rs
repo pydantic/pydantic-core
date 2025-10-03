@@ -2,13 +2,13 @@ use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyString, PyType};
 use std::borrow::Cow;
+use std::sync::Arc;
 
 use ahash::AHashMap;
 use serde::ser::SerializeMap;
 
 use crate::build_tools::{py_schema_error_type, ExtraBehavior};
 use crate::definitions::DefinitionsBuilder;
-use crate::serializers::DuckTypingSerMode;
 use crate::tools::SchemaDict;
 
 use super::{
@@ -25,8 +25,8 @@ impl BuildSerializer for DataclassArgsBuilder {
     fn build(
         schema: &Bound<'_, PyDict>,
         config: Option<&Bound<'_, PyDict>>,
-        definitions: &mut DefinitionsBuilder<CombinedSerializer>,
-    ) -> PyResult<CombinedSerializer> {
+        definitions: &mut DefinitionsBuilder<Arc<CombinedSerializer>>,
+    ) -> PyResult<Arc<CombinedSerializer>> {
         let py = schema.py();
 
         let fields_list: Bound<'_, PyList> = schema.get_as_req(intern!(py, "fields"))?;
@@ -37,36 +37,52 @@ impl BuildSerializer for DataclassArgsBuilder {
             _ => FieldsMode::SimpleDict,
         };
 
+        let serialize_by_alias = config.get_as(intern!(py, "serialize_by_alias"))?;
+
         for (index, item) in fields_list.iter().enumerate() {
             let field_info = item.downcast::<PyDict>()?;
             let name: String = field_info.get_as_req(intern!(py, "name"))?;
 
             let key_py: Py<PyString> = PyString::new(py, &name).into();
-
             if !field_info.get_as(intern!(py, "init_only"))?.unwrap_or(false) {
                 if field_info.get_as(intern!(py, "serialization_exclude"))? == Some(true) {
-                    fields.insert(name, SerField::new(py, key_py, None, None, true));
+                    fields.insert(
+                        name,
+                        SerField::new(py, key_py, None, None, true, serialize_by_alias, None),
+                    );
                 } else {
                     let schema = field_info.get_as_req(intern!(py, "schema"))?;
                     let serializer = CombinedSerializer::build(&schema, config, definitions)
                         .map_err(|e| py_schema_error_type!("Field `{}`:\n  {}", index, e))?;
 
                     let alias = field_info.get_as(intern!(py, "serialization_alias"))?;
-                    fields.insert(name, SerField::new(py, key_py, alias, Some(serializer), true));
+                    let serialization_exclude_if: Option<Py<PyAny>> =
+                        field_info.get_as(intern!(py, "serialization_exclude_if"))?;
+                    fields.insert(
+                        name,
+                        SerField::new(
+                            py,
+                            key_py,
+                            alias,
+                            Some(serializer),
+                            true,
+                            serialize_by_alias,
+                            serialization_exclude_if,
+                        ),
+                    );
                 }
             }
         }
-
         let computed_fields = ComputedFields::new(schema, config, definitions)?;
 
-        Ok(GeneralFieldsSerializer::new(fields, fields_mode, None, computed_fields).into())
+        Ok(CombinedSerializer::Fields(GeneralFieldsSerializer::new(fields, fields_mode, None, computed_fields)).into())
     }
 }
 
 #[derive(Debug)]
 pub struct DataclassSerializer {
     class: Py<PyType>,
-    serializer: Box<CombinedSerializer>,
+    serializer: Arc<CombinedSerializer>,
     fields: Vec<Py<PyString>>,
     name: String,
 }
@@ -77,8 +93,8 @@ impl BuildSerializer for DataclassSerializer {
     fn build(
         schema: &Bound<'_, PyDict>,
         _config: Option<&Bound<'_, PyDict>>,
-        definitions: &mut DefinitionsBuilder<CombinedSerializer>,
-    ) -> PyResult<CombinedSerializer> {
+        definitions: &mut DefinitionsBuilder<Arc<CombinedSerializer>>,
+    ) -> PyResult<Arc<CombinedSerializer>> {
         let py = schema.py();
 
         // models ignore the parent config and always use the config from this model
@@ -86,7 +102,7 @@ impl BuildSerializer for DataclassSerializer {
 
         let class: Bound<'_, PyType> = schema.get_as_req(intern!(py, "cls"))?;
         let sub_schema = schema.get_as_req(intern!(py, "schema"))?;
-        let serializer = Box::new(CombinedSerializer::build(&sub_schema, config.as_ref(), definitions)?);
+        let serializer = CombinedSerializer::build(&sub_schema, config.as_ref(), definitions)?;
 
         let fields = schema
             .get_as_req::<Bound<'_, PyList>>(intern!(py, "fields"))?
@@ -94,12 +110,12 @@ impl BuildSerializer for DataclassSerializer {
             .map(|s| Ok(s.downcast_into::<PyString>()?.unbind()))
             .collect::<PyResult<Vec<_>>>()?;
 
-        Ok(Self {
+        Ok(CombinedSerializer::Dataclass(Self {
             class: class.clone().unbind(),
             serializer,
             fields,
             name: class.getattr(intern!(py, "__name__"))?.extract()?,
-        }
+        })
         .into())
     }
 }
@@ -134,21 +150,13 @@ impl TypeSerializer for DataclassSerializer {
         include: Option<&Bound<'_, PyAny>>,
         exclude: Option<&Bound<'_, PyAny>>,
         extra: &Extra,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<Py<PyAny>> {
         let model = Some(value);
-        let duck_typing_ser_mode = extra.duck_typing_ser_mode.next_mode();
-        let dc_extra = Extra {
-            model,
-            duck_typing_ser_mode,
-            ..*extra
-        };
-        if dc_extra.duck_typing_ser_mode == DuckTypingSerMode::Inferred {
-            return infer_to_python(value, include, exclude, &dc_extra);
-        }
+        let dc_extra = Extra { model, ..*extra };
         if self.allow_value(value, &dc_extra)? {
             let py = value.py();
             if let CombinedSerializer::Fields(ref fields_serializer) = *self.serializer {
-                let output_dict = fields_serializer.main_to_python(
+                let output_dict: Bound<PyDict> = fields_serializer.main_to_python(
                     py,
                     known_dataclass_iter(&self.fields, value),
                     include,
@@ -185,16 +193,8 @@ impl TypeSerializer for DataclassSerializer {
         exclude: Option<&Bound<'_, PyAny>>,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
-        let duck_typing_ser_mode = extra.duck_typing_ser_mode.next_mode();
         let model = Some(value);
-        let dc_extra = Extra {
-            model,
-            duck_typing_ser_mode,
-            ..*extra
-        };
-        if dc_extra.duck_typing_ser_mode == DuckTypingSerMode::Inferred {
-            return infer_serialize(value, serializer, include, exclude, &dc_extra);
-        }
+        let dc_extra = Extra { model, ..*extra };
         if self.allow_value(value, &dc_extra).map_err(py_err_se_err)? {
             if let CombinedSerializer::Fields(ref fields_serializer) = *self.serializer {
                 let expected_len = self.fields.len() + fields_serializer.computed_field_count();

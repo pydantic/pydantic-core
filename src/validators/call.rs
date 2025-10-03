@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use pyo3::exceptions::PyTypeError;
 use pyo3::intern;
 use pyo3::prelude::*;
@@ -14,9 +16,9 @@ use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuild
 
 #[derive(Debug)]
 pub struct CallValidator {
-    function: PyObject,
-    arguments_validator: Box<CombinedValidator>,
-    return_validator: Option<Box<CombinedValidator>>,
+    function: Py<PyAny>,
+    arguments_validator: Arc<CombinedValidator>,
+    return_validator: Option<Arc<CombinedValidator>>,
     name: String,
 }
 
@@ -26,16 +28,16 @@ impl BuildValidator for CallValidator {
     fn build(
         schema: &Bound<'_, PyDict>,
         config: Option<&Bound<'_, PyDict>>,
-        definitions: &mut DefinitionsBuilder<CombinedValidator>,
-    ) -> PyResult<CombinedValidator> {
+        definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
+    ) -> PyResult<Arc<CombinedValidator>> {
         let py = schema.py();
 
         let arguments_schema = schema.get_as_req(intern!(py, "arguments_schema"))?;
-        let arguments_validator = Box::new(build_validator(&arguments_schema, config, definitions)?);
+        let arguments_validator = build_validator(&arguments_schema, config, definitions)?;
 
         let return_schema = schema.get_item(intern!(py, "return_schema"))?;
         let return_validator = match return_schema {
-            Some(return_schema) => Some(Box::new(build_validator(&return_schema, config, definitions)?)),
+            Some(return_schema) => Some(build_validator(&return_schema, config, definitions)?),
             None => None,
         };
         let function: Bound<'_, PyAny> = schema.get_as_req(intern!(py, "function"))?;
@@ -58,12 +60,12 @@ impl BuildValidator for CallValidator {
         let function_name = function_name.bind(py);
         let name = format!("{}[{function_name}]", Self::EXPECTED_TYPE);
 
-        Ok(Self {
+        Ok(CombinedValidator::FunctionCall(Self {
             function: function.unbind(),
             arguments_validator,
             return_validator,
             name,
-        }
+        })
         .into())
     }
 }
@@ -80,7 +82,7 @@ impl Validator for CallValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         let args = self.arguments_validator.validate(py, input, state)?.into_bound(py);
 
         let return_value = if let Ok((args, kwargs)) = args.extract::<(Bound<PyTuple>, Bound<PyDict>)>() {

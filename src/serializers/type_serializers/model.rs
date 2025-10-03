@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::sync::Arc;
 
 use pyo3::intern;
 use pyo3::prelude::*;
@@ -16,7 +17,6 @@ use crate::build_tools::py_schema_err;
 use crate::build_tools::{py_schema_error_type, ExtraBehavior};
 use crate::definitions::DefinitionsBuilder;
 use crate::serializers::errors::PydanticSerializationUnexpectedValue;
-use crate::serializers::extra::DuckTypingSerMode;
 use crate::tools::SchemaDict;
 
 const ROOT_FIELD: &str = "root";
@@ -29,8 +29,8 @@ impl BuildSerializer for ModelFieldsBuilder {
     fn build(
         schema: &Bound<'_, PyDict>,
         config: Option<&Bound<'_, PyDict>>,
-        definitions: &mut DefinitionsBuilder<CombinedSerializer>,
-    ) -> PyResult<CombinedSerializer> {
+        definitions: &mut DefinitionsBuilder<Arc<CombinedSerializer>>,
+    ) -> PyResult<Arc<CombinedSerializer>> {
         let py = schema.py();
 
         let fields_mode = match has_extra(schema, config)? {
@@ -47,6 +47,8 @@ impl BuildSerializer for ModelFieldsBuilder {
             (_, _) => None,
         };
 
+        let serialize_by_alias = config.get_as(intern!(py, "serialize_by_alias"))?;
+
         for (key, value) in fields_dict {
             let key_py = key.downcast_into::<PyString>()?;
             let key: String = key_py.extract()?;
@@ -55,28 +57,45 @@ impl BuildSerializer for ModelFieldsBuilder {
             let key_py: Py<PyString> = key_py.into();
 
             if field_info.get_as(intern!(py, "serialization_exclude"))? == Some(true) {
-                fields.insert(key, SerField::new(py, key_py, None, None, true));
+                fields.insert(
+                    key,
+                    SerField::new(py, key_py, None, None, true, serialize_by_alias, None),
+                );
             } else {
                 let alias: Option<String> = field_info.get_as(intern!(py, "serialization_alias"))?;
-
+                let serialization_exclude_if: Option<Py<PyAny>> =
+                    field_info.get_as(intern!(py, "serialization_exclude_if"))?;
                 let schema = field_info.get_as_req(intern!(py, "schema"))?;
                 let serializer = CombinedSerializer::build(&schema, config, definitions)
                     .map_err(|e| py_schema_error_type!("Field `{}`:\n  {}", key, e))?;
 
-                fields.insert(key, SerField::new(py, key_py, alias, Some(serializer), true));
+                fields.insert(
+                    key,
+                    SerField::new(
+                        py,
+                        key_py,
+                        alias,
+                        Some(serializer),
+                        true,
+                        serialize_by_alias,
+                        serialization_exclude_if,
+                    ),
+                );
             }
         }
 
         let computed_fields = ComputedFields::new(schema, config, definitions)?;
 
-        Ok(GeneralFieldsSerializer::new(fields, fields_mode, extra_serializer, computed_fields).into())
+        Ok(Arc::new(
+            GeneralFieldsSerializer::new(fields, fields_mode, extra_serializer, computed_fields).into(),
+        ))
     }
 }
 
 #[derive(Debug)]
 pub struct ModelSerializer {
     class: Py<PyType>,
-    serializer: Box<CombinedSerializer>,
+    serializer: Arc<CombinedSerializer>,
     has_extra: bool,
     root_model: bool,
     name: String,
@@ -88,8 +107,8 @@ impl BuildSerializer for ModelSerializer {
     fn build(
         schema: &Bound<'_, PyDict>,
         _config: Option<&Bound<'_, PyDict>>,
-        definitions: &mut DefinitionsBuilder<CombinedSerializer>,
-    ) -> PyResult<CombinedSerializer> {
+        definitions: &mut DefinitionsBuilder<Arc<CombinedSerializer>>,
+    ) -> PyResult<Arc<CombinedSerializer>> {
         let py = schema.py();
 
         // models ignore the parent config and always use the config from this model
@@ -97,17 +116,17 @@ impl BuildSerializer for ModelSerializer {
 
         let class: Py<PyType> = schema.get_as_req(intern!(py, "cls"))?;
         let sub_schema = schema.get_as_req(intern!(py, "schema"))?;
-        let serializer = Box::new(CombinedSerializer::build(&sub_schema, config.as_ref(), definitions)?);
+        let serializer = CombinedSerializer::build(&sub_schema, config.as_ref(), definitions)?;
         let root_model = schema.get_as(intern!(py, "root_model"))?.unwrap_or(false);
         let name = class.bind(py).getattr(intern!(py, "__name__"))?.extract()?;
 
-        Ok(Self {
+        Ok(CombinedSerializer::Model(Self {
             class,
             serializer,
             has_extra: has_extra(schema, config.as_ref())?,
             root_model,
             name,
-        }
+        })
         .into())
     }
 }
@@ -164,18 +183,10 @@ impl TypeSerializer for ModelSerializer {
         include: Option<&Bound<'_, PyAny>>,
         exclude: Option<&Bound<'_, PyAny>>,
         extra: &Extra,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<Py<PyAny>> {
         let model = Some(value);
-        let duck_typing_ser_mode = extra.duck_typing_ser_mode.next_mode();
 
-        let model_extra = Extra {
-            model,
-            duck_typing_ser_mode,
-            ..*extra
-        };
-        if model_extra.duck_typing_ser_mode == DuckTypingSerMode::Inferred {
-            return infer_to_python(value, include, exclude, &model_extra);
-        }
+        let model_extra = Extra { model, ..*extra };
         if self.root_model {
             let field_name = Some(ROOT_FIELD);
             let root_extra = Extra {
@@ -185,7 +196,7 @@ impl TypeSerializer for ModelSerializer {
             let py = value.py();
             let root = value.getattr(intern!(py, ROOT_FIELD)).map_err(|original_err| {
                 if root_extra.check.enabled() {
-                    PydanticSerializationUnexpectedValue::new_err(None)
+                    PydanticSerializationUnexpectedValue::new_from_msg(None).to_py_err()
                 } else {
                     original_err
                 }
@@ -193,7 +204,10 @@ impl TypeSerializer for ModelSerializer {
             self.serializer.to_python(&root, include, exclude, &root_extra)
         } else if self.allow_value(value, &model_extra)? {
             let inner_value = self.get_inner_value(value, &model_extra)?;
-            self.serializer.to_python(&inner_value, include, exclude, &model_extra)
+            // There is strong coupling between a model serializer and its child, we should
+            // not fall back to type inference in the midddle.
+            self.serializer
+                .to_python_no_infer(&inner_value, include, exclude, &model_extra)
         } else {
             extra.warnings.on_fallback_py(self.get_name(), value, &model_extra)?;
             infer_to_python(value, include, exclude, &model_extra)
@@ -218,15 +232,7 @@ impl TypeSerializer for ModelSerializer {
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         let model = Some(value);
-        let duck_typing_ser_mode = extra.duck_typing_ser_mode.next_mode();
-        let model_extra = Extra {
-            model,
-            duck_typing_ser_mode,
-            ..*extra
-        };
-        if model_extra.duck_typing_ser_mode == DuckTypingSerMode::Inferred {
-            return infer_serialize(value, serializer, include, exclude, &model_extra);
-        }
+        let model_extra = Extra { model, ..*extra };
         if self.root_model {
             let field_name = Some(ROOT_FIELD);
             let root_extra = Extra {
@@ -239,8 +245,10 @@ impl TypeSerializer for ModelSerializer {
                 .serde_serialize(&root, serializer, include, exclude, &root_extra)
         } else if self.allow_value(value, &model_extra).map_err(py_err_se_err)? {
             let inner_value = self.get_inner_value(value, &model_extra).map_err(py_err_se_err)?;
+            // There is strong coupling between a model serializer and its child, we should
+            // not fall back to type inference in the midddle.
             self.serializer
-                .serde_serialize(&inner_value, serializer, include, exclude, &model_extra)
+                .serde_serialize_no_infer(&inner_value, serializer, include, exclude, &model_extra)
         } else {
             extra
                 .warnings

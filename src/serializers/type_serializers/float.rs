@@ -2,9 +2,11 @@ use pyo3::types::PyDict;
 use pyo3::{intern, prelude::*, IntoPyObjectExt};
 
 use std::borrow::Cow;
+use std::sync::Arc;
 
 use serde::Serializer;
 
+use crate::build_tools::LazyLock;
 use crate::definitions::DefinitionsBuilder;
 use crate::serializers::config::InfNanMode;
 use crate::tools::SchemaDict;
@@ -21,13 +23,36 @@ pub struct FloatSerializer {
     inf_nan_mode: InfNanMode,
 }
 
+static FLOAT_SERIALIZER_NULL: LazyLock<Arc<CombinedSerializer>> = LazyLock::new(|| {
+    Arc::new(CombinedSerializer::Float(FloatSerializer {
+        inf_nan_mode: InfNanMode::Null,
+    }))
+});
+
+static FLOAT_SERIALIZER_CONSTANTS: LazyLock<Arc<CombinedSerializer>> = LazyLock::new(|| {
+    Arc::new(CombinedSerializer::Float(FloatSerializer {
+        inf_nan_mode: InfNanMode::Constants,
+    }))
+});
+
+static FLOAT_SERIALIZER_STRINGS: LazyLock<Arc<CombinedSerializer>> = LazyLock::new(|| {
+    Arc::new(CombinedSerializer::Float(FloatSerializer {
+        inf_nan_mode: InfNanMode::Strings,
+    }))
+});
+
 impl FloatSerializer {
-    pub fn new(py: Python, config: Option<&Bound<'_, PyDict>>) -> PyResult<Self> {
+    pub fn get(py: Python, config: Option<&Bound<'_, PyDict>>) -> PyResult<&'static Arc<CombinedSerializer>> {
         let inf_nan_mode = config
             .and_then(|c| c.get_as(intern!(py, "ser_json_inf_nan")).transpose())
             .transpose()?
             .unwrap_or_default();
-        Ok(Self { inf_nan_mode })
+
+        match inf_nan_mode {
+            InfNanMode::Null => Ok(&FLOAT_SERIALIZER_NULL),
+            InfNanMode::Constants => Ok(&FLOAT_SERIALIZER_CONSTANTS),
+            InfNanMode::Strings => Ok(&FLOAT_SERIALIZER_STRINGS),
+        }
     }
 }
 
@@ -55,9 +80,9 @@ impl BuildSerializer for FloatSerializer {
     fn build(
         schema: &Bound<'_, PyDict>,
         config: Option<&Bound<'_, PyDict>>,
-        _definitions: &mut DefinitionsBuilder<CombinedSerializer>,
-    ) -> PyResult<CombinedSerializer> {
-        Self::new(schema.py(), config).map(Into::into)
+        _definitions: &mut DefinitionsBuilder<Arc<CombinedSerializer>>,
+    ) -> PyResult<Arc<CombinedSerializer>> {
+        Self::get(schema.py(), config).cloned()
     }
 }
 
@@ -70,12 +95,12 @@ impl TypeSerializer for FloatSerializer {
         include: Option<&Bound<'_, PyAny>>,
         exclude: Option<&Bound<'_, PyAny>>,
         extra: &Extra,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<Py<PyAny>> {
         let py = value.py();
         match extra.ob_type_lookup.is_type(value, ObType::Float) {
             IsType::Exact => Ok(value.clone().unbind()),
             IsType::Subclass => match extra.check {
-                SerCheck::Strict => Err(PydanticSerializationUnexpectedValue::new_err(None)),
+                SerCheck::Strict => Err(PydanticSerializationUnexpectedValue::new_from_msg(None).to_py_err()),
                 SerCheck::Lax | SerCheck::None => match extra.mode {
                     SerMode::Json => value.extract::<f64>()?.into_py_any(py),
                     _ => infer_to_python(value, include, exclude, extra),

@@ -1,7 +1,9 @@
+use std::sync::Arc;
+
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::intern;
-use pyo3::sync::GILOnceCell;
-use pyo3::types::{IntoPyDict, PyDict, PyTuple, PyType};
+use pyo3::sync::PyOnceLock;
+use pyo3::types::{IntoPyDict, PyDict, PyString, PyTuple, PyType};
 use pyo3::{prelude::*, PyTypeInfo};
 
 use crate::build_tools::{is_strict, schema_or_config_same};
@@ -14,9 +16,9 @@ use crate::tools::SchemaDict;
 
 use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
 
-static DECIMAL_TYPE: GILOnceCell<Py<PyType>> = GILOnceCell::new();
+static DECIMAL_TYPE: PyOnceLock<Py<PyType>> = PyOnceLock::new();
 
-pub fn get_decimal_type(py: Python) -> &Bound<'_, PyType> {
+pub fn get_decimal_type(py: Python<'_>) -> &Bound<'_, PyType> {
     DECIMAL_TYPE
         .get_or_init(py, || {
             py.import("decimal")
@@ -26,6 +28,22 @@ pub fn get_decimal_type(py: Python) -> &Bound<'_, PyType> {
                 .unwrap()
         })
         .bind(py)
+}
+
+fn validate_as_decimal(
+    py: Python,
+    schema: &Bound<'_, PyDict>,
+    key: &Bound<'_, PyString>,
+) -> PyResult<Option<Py<PyAny>>> {
+    match schema.get_item(key)? {
+        Some(value) => match value.validate_decimal(false, py) {
+            Ok(v) => Ok(Some(v.into_inner().unbind())),
+            Err(_) => Err(PyValueError::new_err(format!(
+                "'{key}' must be coercible to a Decimal instance",
+            ))),
+        },
+        None => Ok(None),
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -47,9 +65,10 @@ impl BuildValidator for DecimalValidator {
     fn build(
         schema: &Bound<'_, PyDict>,
         config: Option<&Bound<'_, PyDict>>,
-        _definitions: &mut DefinitionsBuilder<CombinedValidator>,
-    ) -> PyResult<CombinedValidator> {
+        _definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
+    ) -> PyResult<Arc<CombinedValidator>> {
         let py = schema.py();
+
         let allow_inf_nan = schema_or_config_same(schema, config, intern!(py, "allow_inf_nan"))?.unwrap_or(false);
         let decimal_places = schema.get_as(intern!(py, "decimal_places"))?;
         let max_digits = schema.get_as(intern!(py, "max_digits"))?;
@@ -58,18 +77,19 @@ impl BuildValidator for DecimalValidator {
                 "allow_inf_nan=True cannot be used with max_digits or decimal_places",
             ));
         }
-        Ok(Self {
+
+        Ok(CombinedValidator::Decimal(Self {
             strict: is_strict(schema, config)?,
             allow_inf_nan,
             check_digits: decimal_places.is_some() || max_digits.is_some(),
             decimal_places,
-            multiple_of: schema.get_as(intern!(py, "multiple_of"))?,
-            le: schema.get_as(intern!(py, "le"))?,
-            lt: schema.get_as(intern!(py, "lt"))?,
-            ge: schema.get_as(intern!(py, "ge"))?,
-            gt: schema.get_as(intern!(py, "gt"))?,
+            multiple_of: validate_as_decimal(py, schema, intern!(py, "multiple_of"))?,
+            le: validate_as_decimal(py, schema, intern!(py, "le"))?,
+            lt: validate_as_decimal(py, schema, intern!(py, "lt"))?,
+            ge: validate_as_decimal(py, schema, intern!(py, "ge"))?,
+            gt: validate_as_decimal(py, schema, intern!(py, "gt"))?,
             max_digits,
-        }
+        })
         .into())
     }
 }
@@ -121,7 +141,7 @@ impl Validator for DecimalValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         let decimal = input.validate_decimal(state.strict_or(self.strict), py)?.unpack(state);
 
         if !self.allow_inf_nan || self.check_digits {
@@ -176,17 +196,13 @@ impl Validator for DecimalValidator {
                             }
                         }
                     }
-                };
+                }
             }
         }
 
         if let Some(multiple_of) = &self.multiple_of {
             // fraction = (decimal / multiple_of) % 1
-            let fraction = unsafe {
-                let division = decimal.div(multiple_of)?;
-                let one = 1u8.into_pyobject(py)?;
-                Bound::from_owned_ptr_or_err(py, pyo3::ffi::PyNumber_Remainder(division.as_ptr(), one.as_ptr()))?
-            };
+            let fraction = (decimal.div(multiple_of)?).rem(1)?;
             let zero = 0u8.into_pyobject(py)?;
             if !fraction.eq(&zero)? {
                 return Err(ValError::new(

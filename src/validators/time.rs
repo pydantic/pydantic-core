@@ -1,14 +1,16 @@
+use std::sync::Arc;
+
+use pyo3::exceptions::PyValueError;
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString};
 
 use pyo3::IntoPyObjectExt;
-use speedate::Time;
+use speedate::{MicrosecondsPrecisionOverflowBehavior, Time};
 
 use crate::build_tools::is_strict;
 use crate::errors::{ErrorType, ValError, ValResult};
-use crate::input::{EitherTime, Input};
-use crate::tools::SchemaDict;
+use crate::input::Input;
 
 use super::datetime::extract_microseconds_precision;
 use super::datetime::TZConstraint;
@@ -18,7 +20,7 @@ use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationSta
 pub struct TimeValidator {
     strict: bool,
     constraints: Option<TimeConstraints>,
-    microseconds_precision: speedate::MicrosecondsPrecisionOverflowBehavior,
+    microseconds_precision: MicrosecondsPrecisionOverflowBehavior,
 }
 
 impl BuildValidator for TimeValidator {
@@ -27,14 +29,14 @@ impl BuildValidator for TimeValidator {
     fn build(
         schema: &Bound<'_, PyDict>,
         config: Option<&Bound<'_, PyDict>>,
-        _definitions: &mut DefinitionsBuilder<CombinedValidator>,
-    ) -> PyResult<CombinedValidator> {
+        _definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
+    ) -> PyResult<Arc<CombinedValidator>> {
         let s = Self {
             strict: is_strict(schema, config)?,
             constraints: TimeConstraints::from_py(schema)?,
             microseconds_precision: extract_microseconds_precision(schema, config)?,
         };
-        Ok(s.into())
+        Ok(Arc::new(s.into()))
     }
 }
 
@@ -46,7 +48,7 @@ impl Validator for TimeValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         let time = input
             .validate_time(state.strict_or(self.strict), self.microseconds_precision)?
             .unpack(state);
@@ -86,9 +88,14 @@ impl Validator for TimeValidator {
     }
 }
 
-fn convert_pytime(schema: &Bound<'_, PyDict>, field: &Bound<'_, PyString>) -> PyResult<Option<Time>> {
-    match schema.get_as(field)? {
-        Some(date) => Ok(Some(EitherTime::Py(date).as_raw()?)),
+fn convert_pytime(schema: &Bound<'_, PyDict>, key: &Bound<'_, PyString>) -> PyResult<Option<Time>> {
+    match schema.get_item(key)? {
+        Some(value) => match value.validate_time(false, MicrosecondsPrecisionOverflowBehavior::default()) {
+            Ok(v) => Ok(Some(v.into_inner().as_raw()?)),
+            Err(_) => Err(PyValueError::new_err(format!(
+                "'{key}' must be coercible to a time instance",
+            ))),
+        },
         None => Ok(None),
     }
 }

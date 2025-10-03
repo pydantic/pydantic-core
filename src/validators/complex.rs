@@ -1,17 +1,19 @@
+use std::sync::Arc;
+
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use pyo3::sync::GILOnceCell;
+use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyComplex, PyDict, PyString, PyType};
 
-use crate::build_tools::is_strict;
+use crate::build_tools::{is_strict, LazyLock};
 use crate::errors::{ErrorTypeDefaults, ToErrorValue, ValError, ValResult};
 use crate::input::Input;
 
 use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
 
-static COMPLEX_TYPE: GILOnceCell<Py<PyType>> = GILOnceCell::new();
+static COMPLEX_TYPE: PyOnceLock<Py<PyType>> = PyOnceLock::new();
 
-pub fn get_complex_type(py: Python) -> &Bound<'_, PyType> {
+pub fn get_complex_type(py: Python<'_>) -> &Bound<'_, PyType> {
     COMPLEX_TYPE
         .get_or_init(py, || py.get_type::<PyComplex>().into())
         .bind(py)
@@ -22,17 +24,24 @@ pub struct ComplexValidator {
     strict: bool,
 }
 
+static STRICT_COMPLEX_VALIDATOR: LazyLock<Arc<CombinedValidator>> =
+    LazyLock::new(|| Arc::new(ComplexValidator { strict: true }.into()));
+
+static LAX_COMPLEX_VALIDATOR: LazyLock<Arc<CombinedValidator>> =
+    LazyLock::new(|| Arc::new(ComplexValidator { strict: false }.into()));
+
 impl BuildValidator for ComplexValidator {
     const EXPECTED_TYPE: &'static str = "complex";
     fn build(
         schema: &Bound<'_, PyDict>,
         config: Option<&Bound<'_, PyDict>>,
-        _definitions: &mut DefinitionsBuilder<CombinedValidator>,
-    ) -> PyResult<CombinedValidator> {
-        Ok(Self {
-            strict: is_strict(schema, config)?,
+        _definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
+    ) -> PyResult<Arc<CombinedValidator>> {
+        if is_strict(schema, config)? {
+            Ok(STRICT_COMPLEX_VALIDATOR.clone())
+        } else {
+            Ok(LAX_COMPLEX_VALIDATOR.clone())
         }
-        .into())
     }
 }
 
@@ -44,7 +53,7 @@ impl Validator for ComplexValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         let res = input.validate_complex(self.strict, py)?.unpack(state);
         Ok(res.into_pyobject(py)?.into())
     }

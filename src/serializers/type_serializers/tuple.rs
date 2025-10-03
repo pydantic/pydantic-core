@@ -3,6 +3,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
 use std::borrow::Cow;
 use std::iter;
+use std::sync::Arc;
 
 use serde::ser::SerializeSeq;
 
@@ -19,7 +20,7 @@ use super::{
 
 #[derive(Debug)]
 pub struct TupleSerializer {
-    serializers: Vec<CombinedSerializer>,
+    serializers: Vec<Arc<CombinedSerializer>>,
     variadic_item_index: Option<usize>,
     filter: SchemaFilter<usize>,
     name: String,
@@ -31,28 +32,28 @@ impl BuildSerializer for TupleSerializer {
     fn build(
         schema: &Bound<'_, PyDict>,
         config: Option<&Bound<'_, PyDict>>,
-        definitions: &mut DefinitionsBuilder<CombinedSerializer>,
-    ) -> PyResult<CombinedSerializer> {
+        definitions: &mut DefinitionsBuilder<Arc<CombinedSerializer>>,
+    ) -> PyResult<Arc<CombinedSerializer>> {
         let py = schema.py();
         let items: Bound<'_, PyList> = schema.get_as_req(intern!(py, "items_schema"))?;
-        let serializers: Vec<CombinedSerializer> = items
+        let serializers: Vec<Arc<CombinedSerializer>> = items
             .iter()
             .map(|item| CombinedSerializer::build(item.downcast()?, config, definitions))
             .collect::<PyResult<_>>()?;
 
-        let mut serializer_names = serializers.iter().map(TypeSerializer::get_name).collect::<Vec<_>>();
+        let mut serializer_names = serializers.iter().map(|v| v.get_name()).collect::<Vec<_>>();
         let variadic_item_index: Option<usize> = schema.get_as(intern!(py, "variadic_item_index"))?;
         if let Some(variadic_item_index) = variadic_item_index {
             serializer_names.insert(variadic_item_index + 1, "...");
         }
         let name = format!("tuple[{}]", serializer_names.join(", "));
 
-        Ok(Self {
+        Ok(CombinedSerializer::Tuple(Self {
             serializers,
             variadic_item_index,
             filter: SchemaFilter::from_schema(schema)?,
             name,
-        }
+        })
         .into())
     }
 }
@@ -66,7 +67,7 @@ impl TypeSerializer for TupleSerializer {
         include: Option<&Bound<'_, PyAny>>,
         exclude: Option<&Bound<'_, PyAny>>,
         extra: &Extra,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<Py<PyAny>> {
         match value.downcast::<PyTuple>() {
             Ok(py_tuple) => {
                 let py = value.py();
@@ -214,11 +215,12 @@ impl TupleSerializer {
                 .chain(self.serializers[variadic_item_index + 1..].iter());
             use_serializers!(serializers_iter);
         } else if extra.check == SerCheck::Strict && n_items != self.serializers.len() {
-            return Err(PydanticSerializationUnexpectedValue::new_err(Some(format!(
+            return Err(PydanticSerializationUnexpectedValue::new_from_msg(Some(format!(
                 "Expected {} items, but got {}",
                 self.serializers.len(),
                 n_items
-            ))));
+            )))
+            .to_py_err());
         } else {
             use_serializers!(self.serializers.iter());
             let mut warned = false;
@@ -226,7 +228,9 @@ impl TupleSerializer {
                 if !warned {
                     extra
                         .warnings
-                        .custom_warning("Unexpected extra items present in tuple".to_string());
+                        .register_warning(PydanticSerializationUnexpectedValue::new_from_msg(Some(
+                            "Unexpected extra items present in tuple".to_string(),
+                        )));
                     warned = true;
                 }
                 let op_next = self
@@ -240,10 +244,10 @@ impl TupleSerializer {
                         serializer: &CombinedSerializer::Any(AnySerializer),
                     }) {
                         return Ok(Err(e));
-                    };
+                    }
                 }
             }
-        };
+        }
         Ok(Ok(()))
     }
 }

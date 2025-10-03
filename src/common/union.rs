@@ -4,12 +4,12 @@ use pyo3::{PyTraverseError, PyVisit};
 use crate::lookup_key::LookupKey;
 use crate::py_gc::PyGcTraverse;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum Discriminator {
     /// use `LookupKey` to find the tag, same as we do to find values in typed_dict aliases
     LookupKey(LookupKey),
     /// call a function to find the tag to use
-    Function(PyObject),
+    Function(Py<PyAny>),
 }
 
 impl Discriminator {

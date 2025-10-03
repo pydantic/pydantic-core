@@ -1,5 +1,4 @@
 import dataclasses
-import gc
 import platform
 import re
 import sys
@@ -10,8 +9,9 @@ import pytest
 from dirty_equals import IsListOrTuple, IsStr
 
 from pydantic_core import ArgsKwargs, SchemaValidator, ValidationError, core_schema
+from pydantic_core.core_schema import ExtraBehavior
 
-from ..conftest import Err, PyAndJson
+from ..conftest import Err, PyAndJson, assert_gc
 
 
 @pytest.mark.parametrize(
@@ -507,9 +507,7 @@ def test_dataclass_field_after_validator():
                 core_schema.dataclass_field(name='a', schema=core_schema.int_schema()),
                 core_schema.dataclass_field(
                     name='b',
-                    schema=core_schema.with_info_after_validator_function(
-                        Foo.validate_b, core_schema.str_schema(), field_name='b'
-                    ),
+                    schema=core_schema.with_info_after_validator_function(Foo.validate_b, core_schema.str_schema()),
                 ),
             ],
         ),
@@ -541,7 +539,7 @@ def test_dataclass_field_plain_validator():
             [
                 core_schema.dataclass_field(name='a', schema=core_schema.int_schema()),
                 core_schema.dataclass_field(
-                    name='b', schema=core_schema.with_info_plain_validator_function(Foo.validate_b, field_name='b')
+                    name='b', schema=core_schema.with_info_plain_validator_function(Foo.validate_b)
                 ),
             ],
         ),
@@ -574,9 +572,7 @@ def test_dataclass_field_before_validator():
                 core_schema.dataclass_field(name='a', schema=core_schema.int_schema()),
                 core_schema.dataclass_field(
                     name='b',
-                    schema=core_schema.with_info_before_validator_function(
-                        Foo.validate_b, core_schema.str_schema(), field_name='b'
-                    ),
+                    schema=core_schema.with_info_before_validator_function(Foo.validate_b, core_schema.str_schema()),
                 ),
             ],
         ),
@@ -613,9 +609,7 @@ def test_dataclass_field_wrap_validator1():
                 core_schema.dataclass_field(name='a', schema=core_schema.int_schema()),
                 core_schema.dataclass_field(
                     name='b',
-                    schema=core_schema.with_info_wrap_validator_function(
-                        Foo.validate_b, core_schema.str_schema(), field_name='b'
-                    ),
+                    schema=core_schema.with_info_wrap_validator_function(Foo.validate_b, core_schema.str_schema()),
                 ),
             ],
         ),
@@ -650,9 +644,7 @@ def test_dataclass_field_wrap_validator2():
                 core_schema.dataclass_field(name='a', schema=core_schema.int_schema()),
                 core_schema.dataclass_field(
                     name='b',
-                    schema=core_schema.with_info_wrap_validator_function(
-                        Foo.validate_b, core_schema.str_schema(), field_name='b'
-                    ),
+                    schema=core_schema.with_info_wrap_validator_function(Foo.validate_b, core_schema.str_schema()),
                 ),
             ],
         ),
@@ -879,9 +871,7 @@ def test_validate_assignment_function():
                     core_schema.dataclass_field('field_a', core_schema.str_schema()),
                     core_schema.dataclass_field(
                         'field_b',
-                        core_schema.with_info_after_validator_function(
-                            func, core_schema.int_schema(), field_name='field_b'
-                        ),
+                        core_schema.with_info_after_validator_function(func, core_schema.int_schema()),
                     ),
                     core_schema.dataclass_field('field_c', core_schema.int_schema()),
                 ],
@@ -959,16 +949,25 @@ def test_frozen_field():
 
 
 @pytest.mark.parametrize(
-    'config,schema_extra_behavior_kw',
+    'config,schema_extra_behavior_kw,validate_fn_extra_kw',
     [
-        (core_schema.CoreConfig(extra_fields_behavior='ignore'), {}),
-        (core_schema.CoreConfig(extra_fields_behavior='ignore'), {'extra_behavior': None}),
-        (core_schema.CoreConfig(), {'extra_behavior': 'ignore'}),
-        (None, {'extra_behavior': 'ignore'}),
-        (core_schema.CoreConfig(extra_fields_behavior='allow'), {'extra_behavior': 'ignore'}),
+        (core_schema.CoreConfig(extra_fields_behavior='ignore'), {}, None),
+        (core_schema.CoreConfig(extra_fields_behavior='ignore'), {'extra_behavior': None}, None),
+        (core_schema.CoreConfig(), {'extra_behavior': 'ignore'}, None),
+        (None, {'extra_behavior': 'ignore'}, None),
+        (core_schema.CoreConfig(extra_fields_behavior='allow'), {'extra_behavior': 'ignore'}, None),
+        (core_schema.CoreConfig(extra_fields_behavior='allow'), {}, 'ignore'),
+        (core_schema.CoreConfig(extra_fields_behavior='allow'), {'extra_behavior': None}, 'ignore'),
+        (core_schema.CoreConfig(), {'extra_behavior': 'allow'}, 'ignore'),
+        (None, {'extra_behavior': 'allow'}, 'ignore'),
+        (core_schema.CoreConfig(extra_fields_behavior='forbid'), {'extra_behavior': 'allow'}, 'ignore'),
     ],
 )
-def test_extra_behavior_ignore(config: Union[core_schema.CoreConfig, None], schema_extra_behavior_kw: dict[str, Any]):
+def test_extra_behavior_ignore(
+    config: Union[core_schema.CoreConfig, None],
+    schema_extra_behavior_kw: dict[str, Any],
+    validate_fn_extra_kw: Union[ExtraBehavior, None],
+):
     @dataclasses.dataclass
     class MyModel:
         f: str
@@ -984,15 +983,15 @@ def test_extra_behavior_ignore(config: Union[core_schema.CoreConfig, None], sche
         config=config,
     )
 
-    m: MyModel = v.validate_python({'f': 'x', 'extra_field': 123})
+    m: MyModel = v.validate_python({'f': 'x', 'extra_field': 123}, extra=validate_fn_extra_kw)
     assert m.f == 'x'
     assert not hasattr(m, 'extra_field')
 
-    v.validate_assignment(m, 'f', 'y')
+    v.validate_assignment(m, 'f', 'y', extra=validate_fn_extra_kw)
     assert m.f == 'y'
 
     with pytest.raises(ValidationError) as exc_info:
-        v.validate_assignment(m, 'not_f', 'xyz')
+        v.validate_assignment(m, 'not_f', 'xyz', extra=validate_fn_extra_kw)
 
     assert exc_info.value.errors(include_url=False) == [
         {
@@ -1007,16 +1006,28 @@ def test_extra_behavior_ignore(config: Union[core_schema.CoreConfig, None], sche
 
 
 @pytest.mark.parametrize(
-    'config,schema_extra_behavior_kw',
+    'config,schema_extra_behavior_kw,validate_fn_extra_kw',
     [
-        (core_schema.CoreConfig(extra_fields_behavior='forbid'), {}),
-        (core_schema.CoreConfig(extra_fields_behavior='forbid'), {'extra_behavior': None}),
-        (core_schema.CoreConfig(), {'extra_behavior': 'forbid'}),
-        (None, {'extra_behavior': 'forbid'}),
-        (core_schema.CoreConfig(extra_fields_behavior='ignore'), {'extra_behavior': 'forbid'}),
+        (core_schema.CoreConfig(extra_fields_behavior='forbid'), {}, None),
+        (core_schema.CoreConfig(extra_fields_behavior='forbid'), {'extra_behavior': None}, None),
+        (core_schema.CoreConfig(), {'extra_behavior': 'forbid'}, None),
+        (None, {'extra_behavior': 'forbid'}, None),
+        (core_schema.CoreConfig(extra_fields_behavior='ignore'), {'extra_behavior': 'forbid'}, None),
+        (core_schema.CoreConfig(extra_fields_behavior='ignore'), {}, 'forbid'),
+        (core_schema.CoreConfig(extra_fields_behavior='ignore'), {'extra_behavior': None}, 'forbid'),
+        (core_schema.CoreConfig(), {'extra_behavior': 'ignore'}, 'forbid'),
+        (None, {'extra_behavior': 'ignore'}, 'forbid'),
+        (core_schema.CoreConfig(extra_fields_behavior='allow'), {'extra_behavior': 'ignore'}, 'forbid'),
+        (core_schema.CoreConfig(), {}, 'forbid'),
+        (core_schema.CoreConfig(), {'extra_behavior': None}, 'forbid'),
+        (None, {'extra_behavior': None}, 'forbid'),
     ],
 )
-def test_extra_behavior_forbid(config: Union[core_schema.CoreConfig, None], schema_extra_behavior_kw: dict[str, Any]):
+def test_extra_behavior_forbid(
+    config: Union[core_schema.CoreConfig, None],
+    schema_extra_behavior_kw: dict[str, Any],
+    validate_fn_extra_kw: Union[ExtraBehavior, None],
+):
     @dataclasses.dataclass
     class MyModel:
         f: str
@@ -1032,14 +1043,14 @@ def test_extra_behavior_forbid(config: Union[core_schema.CoreConfig, None], sche
         config=config,
     )
 
-    m: MyModel = v.validate_python({'f': 'x'})
+    m: MyModel = v.validate_python({'f': 'x'}, extra=validate_fn_extra_kw)
     assert m.f == 'x'
 
-    v.validate_assignment(m, 'f', 'y')
+    v.validate_assignment(m, 'f', 'y', extra=validate_fn_extra_kw)
     assert m.f == 'y'
 
     with pytest.raises(ValidationError) as exc_info:
-        v.validate_assignment(m, 'not_f', 'xyz')
+        v.validate_assignment(m, 'not_f', 'xyz', extra=validate_fn_extra_kw)
     assert exc_info.value.errors(include_url=False) == [
         {
             'type': 'no_such_attribute',
@@ -1053,16 +1064,28 @@ def test_extra_behavior_forbid(config: Union[core_schema.CoreConfig, None], sche
 
 
 @pytest.mark.parametrize(
-    'config,schema_extra_behavior_kw',
+    'config,schema_extra_behavior_kw,validate_fn_extra_kw',
     [
-        (core_schema.CoreConfig(extra_fields_behavior='allow'), {}),
-        (core_schema.CoreConfig(extra_fields_behavior='allow'), {'extra_behavior': None}),
-        (core_schema.CoreConfig(), {'extra_behavior': 'allow'}),
-        (None, {'extra_behavior': 'allow'}),
-        (core_schema.CoreConfig(extra_fields_behavior='forbid'), {'extra_behavior': 'allow'}),
+        (core_schema.CoreConfig(extra_fields_behavior='allow'), {}, None),
+        (core_schema.CoreConfig(extra_fields_behavior='allow'), {'extra_behavior': None}, None),
+        (core_schema.CoreConfig(), {'extra_behavior': 'allow'}, None),
+        (None, {'extra_behavior': 'allow'}, None),
+        (core_schema.CoreConfig(extra_fields_behavior='forbid'), {'extra_behavior': 'allow'}, None),
+        (core_schema.CoreConfig(extra_fields_behavior='forbid'), {}, 'allow'),
+        (core_schema.CoreConfig(extra_fields_behavior='forbid'), {'extra_behavior': None}, 'allow'),
+        (core_schema.CoreConfig(), {'extra_behavior': 'forbid'}, 'allow'),
+        (None, {'extra_behavior': 'forbid'}, 'allow'),
+        (core_schema.CoreConfig(extra_fields_behavior='ignore'), {'extra_behavior': 'forbid'}, 'allow'),
+        (core_schema.CoreConfig(), {}, 'allow'),
+        (core_schema.CoreConfig(), {'extra_behavior': None}, 'allow'),
+        (None, {'extra_behavior': None}, 'allow'),
     ],
 )
-def test_extra_behavior_allow(config: Union[core_schema.CoreConfig, None], schema_extra_behavior_kw: dict[str, Any]):
+def test_extra_behavior_allow(
+    config: Union[core_schema.CoreConfig, None],
+    schema_extra_behavior_kw: dict[str, Any],
+    validate_fn_extra_kw: Union[ExtraBehavior, None],
+):
     @dataclasses.dataclass
     class MyModel:
         f: str
@@ -1078,14 +1101,14 @@ def test_extra_behavior_allow(config: Union[core_schema.CoreConfig, None], schem
         )
     )
 
-    m: MyModel = v.validate_python({'f': 'x', 'extra_field': '123'})
+    m: MyModel = v.validate_python({'f': 'x', 'extra_field': '123'}, extra=validate_fn_extra_kw)
     assert m.f == 'x'
     assert getattr(m, 'extra_field') == '123'
 
-    v.validate_assignment(m, 'f', 'y')
+    v.validate_assignment(m, 'f', 'y', extra=validate_fn_extra_kw)
     assert m.f == 'y'
 
-    v.validate_assignment(m, 'not_f', '123')
+    v.validate_assignment(m, 'not_f', '123', extra=validate_fn_extra_kw)
     assert getattr(m, 'not_f') == '123'
 
 
@@ -1296,9 +1319,7 @@ def test_dataclass_slots_field_before_validator():
                 core_schema.dataclass_field(name='a', schema=core_schema.int_schema()),
                 core_schema.dataclass_field(
                     name='b',
-                    schema=core_schema.with_info_before_validator_function(
-                        Foo.validate_b, core_schema.str_schema(), field_name='b'
-                    ),
+                    schema=core_schema.with_info_before_validator_function(Foo.validate_b, core_schema.str_schema()),
                 ),
             ],
         ),
@@ -1333,9 +1354,7 @@ def test_dataclass_slots_field_after_validator():
                 core_schema.dataclass_field(name='a', schema=core_schema.int_schema()),
                 core_schema.dataclass_field(
                     name='b',
-                    schema=core_schema.with_info_after_validator_function(
-                        Foo.validate_b, core_schema.str_schema(), field_name='b'
-                    ),
+                    schema=core_schema.with_info_after_validator_function(Foo.validate_b, core_schema.str_schema()),
                 ),
             ],
         ),
@@ -1534,6 +1553,7 @@ def test_dataclass_wrap_json():
 @pytest.mark.xfail(
     condition=platform.python_implementation() == 'PyPy', reason='https://foss.heptapod.net/pypy/pypy/-/issues/3899'
 )
+@pytest.mark.skipif(platform.python_implementation() == 'GraalVM', reason='Cannot reliably trigger GC on GraalPy')
 @pytest.mark.parametrize('validator', [None, 'field', 'dataclass'])
 def test_leak_dataclass(validator):
     def fn():
@@ -1551,15 +1571,9 @@ def test_leak_dataclass(validator):
 
         field_schema = core_schema.int_schema()
         if validator == 'field':
-            field_schema = core_schema.with_info_before_validator_function(
-                Dataclass._validator, field_schema, field_name='a'
-            )
-            field_schema = core_schema.with_info_wrap_validator_function(
-                Dataclass._wrap_validator, field_schema, field_name='a'
-            )
-            field_schema = core_schema.with_info_after_validator_function(
-                Dataclass._validator, field_schema, field_name='a'
-            )
+            field_schema = core_schema.with_info_before_validator_function(Dataclass._validator, field_schema)
+            field_schema = core_schema.with_info_wrap_validator_function(Dataclass._wrap_validator, field_schema)
+            field_schema = core_schema.with_info_after_validator_function(Dataclass._validator, field_schema)
 
         dataclass_schema = core_schema.dataclass_schema(
             Dataclass,
@@ -1586,12 +1600,8 @@ def test_leak_dataclass(validator):
     assert ref() is not None
 
     del klass
-    gc.collect(0)
-    gc.collect(1)
-    gc.collect(2)
-    gc.collect()
 
-    assert ref() is None
+    assert_gc(lambda: ref() is None)
 
 
 init_test_cases = [
@@ -1713,3 +1723,125 @@ def test_dataclass_args_init_with_default(input_value, extra_behavior, expected)
             assert exc_info.value.errors(include_url=False) == expected.errors
     else:
         assert dataclasses.asdict(v.validate_python(input_value)) == expected
+
+
+@dataclasses.dataclass
+class BasicDataclass:
+    a: str
+
+
+def test_alias_allow_pop(py_and_json: PyAndJson):
+    schema = core_schema.dataclass_schema(
+        BasicDataclass,
+        core_schema.dataclass_args_schema(
+            'BasicDataclass',
+            [
+                core_schema.dataclass_field(name='a', schema=core_schema.str_schema(), validation_alias='FieldA'),
+            ],
+        ),
+        ['a'],
+        config=core_schema.CoreConfig(validate_by_name=True, validate_by_alias=True),
+    )
+    v = py_and_json(schema)
+    assert v.validate_test({'FieldA': 'hello'}) == BasicDataclass(a='hello')
+    assert v.validate_test({'a': 'hello'}) == BasicDataclass(a='hello')
+    assert v.validate_test(
+        {
+            'FieldA': 'hello',
+            'a': 'world',
+        }
+    ) == BasicDataclass(a='hello')
+    with pytest.raises(ValidationError, match=r'FieldA\n +Field required \[type=missing,'):
+        assert v.validate_test({'foobar': 'hello'})
+
+
+def test_only_validate_by_name(py_and_json) -> None:
+    schema = core_schema.dataclass_schema(
+        BasicDataclass,
+        core_schema.dataclass_args_schema(
+            'BasicDataclass',
+            [
+                core_schema.dataclass_field(name='a', schema=core_schema.str_schema(), validation_alias='FieldA'),
+            ],
+        ),
+        ['a'],
+        config=core_schema.CoreConfig(validate_by_name=True, validate_by_alias=False),
+    )
+    v = py_and_json(schema)
+    assert v.validate_test({'a': 'hello'}) == BasicDataclass(a='hello')
+    with pytest.raises(ValidationError, match=r'a\n +Field required \[type=missing,'):
+        assert v.validate_test({'FieldA': 'hello'})
+
+
+def test_only_allow_alias(py_and_json) -> None:
+    schema = core_schema.dataclass_schema(
+        BasicDataclass,
+        core_schema.dataclass_args_schema(
+            'BasicDataclass',
+            [
+                core_schema.dataclass_field(name='a', schema=core_schema.str_schema(), validation_alias='FieldA'),
+            ],
+        ),
+        ['a'],
+        config=core_schema.CoreConfig(validate_by_name=False, validate_by_alias=True),
+    )
+    v = py_and_json(schema)
+    assert v.validate_test({'FieldA': 'hello'}) == BasicDataclass(a='hello')
+    with pytest.raises(ValidationError, match=r'FieldA\n +Field required \[type=missing,'):
+        assert v.validate_test({'a': 'hello'})
+
+
+@pytest.mark.parametrize('config_by_alias', [None, True, False])
+@pytest.mark.parametrize('config_by_name', [None, True, False])
+@pytest.mark.parametrize('runtime_by_alias', [None, True, False])
+@pytest.mark.parametrize('runtime_by_name', [None, True, False])
+def test_by_alias_and_name_config_interaction(
+    config_by_alias: Union[bool, None],
+    config_by_name: Union[bool, None],
+    runtime_by_alias: Union[bool, None],
+    runtime_by_name: Union[bool, None],
+) -> None:
+    """This test reflects the priority that applies for config vs runtime validation alias configuration.
+
+    Runtime values take precedence over config values, when set.
+    By default, by_alias is True and by_name is False.
+    """
+
+    if config_by_alias is False and config_by_name is False and runtime_by_alias is False and runtime_by_name is False:
+        pytest.skip("Can't have both by_alias and by_name as effectively False")
+
+    core_config = {
+        **({'validate_by_alias': config_by_alias} if config_by_alias is not None else {}),
+        **({'validate_by_name': config_by_name} if config_by_name is not None else {}),
+    }
+
+    @dataclasses.dataclass
+    class MyDataclass:
+        my_field: int
+
+    schema = core_schema.dataclass_schema(
+        MyDataclass,
+        core_schema.dataclass_args_schema(
+            'MyDataclass',
+            [
+                core_schema.dataclass_field(
+                    name='my_field', schema=core_schema.int_schema(), validation_alias='my_alias'
+                ),
+            ],
+        ),
+        ['my_field'],
+        config=core_schema.CoreConfig(**core_config),
+    )
+    s = SchemaValidator(schema)
+
+    alias_allowed = next(x for x in (runtime_by_alias, config_by_alias, True) if x is not None)
+    name_allowed = next(x for x in (runtime_by_name, config_by_name, False) if x is not None)
+
+    if alias_allowed:
+        assert dataclasses.asdict(
+            s.validate_python({'my_alias': 1}, by_alias=runtime_by_alias, by_name=runtime_by_name)
+        ) == {'my_field': 1}
+    if name_allowed:
+        assert dataclasses.asdict(
+            s.validate_python({'my_field': 1}, by_alias=runtime_by_alias, by_name=runtime_by_name)
+        ) == {'my_field': 1}

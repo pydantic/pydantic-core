@@ -1,11 +1,12 @@
-use std::borrow::Cow;
-
+use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
+use std::borrow::Cow;
+use std::sync::Arc;
 
 use crate::definitions::DefinitionsBuilder;
 use crate::input::EitherTimedelta;
-use crate::serializers::config::{FromConfig, TimedeltaMode};
+use crate::serializers::config::{FromConfig, TemporalMode, TimedeltaMode};
 
 use super::{
     infer_json_key, infer_serialize, infer_to_python, BuildSerializer, CombinedSerializer, Extra, SerMode,
@@ -14,7 +15,7 @@ use super::{
 
 #[derive(Debug)]
 pub struct TimeDeltaSerializer {
-    timedelta_mode: TimedeltaMode,
+    temporal_mode: TemporalMode,
 }
 
 impl BuildSerializer for TimeDeltaSerializer {
@@ -23,10 +24,19 @@ impl BuildSerializer for TimeDeltaSerializer {
     fn build(
         _schema: &Bound<'_, PyDict>,
         config: Option<&Bound<'_, PyDict>>,
-        _definitions: &mut DefinitionsBuilder<CombinedSerializer>,
-    ) -> PyResult<CombinedSerializer> {
-        let timedelta_mode = TimedeltaMode::from_config(config)?;
-        Ok(Self { timedelta_mode }.into())
+        _definitions: &mut DefinitionsBuilder<Arc<CombinedSerializer>>,
+    ) -> PyResult<Arc<CombinedSerializer>> {
+        let temporal_set = config
+            .and_then(|cfg| cfg.contains(intern!(cfg.py(), "ser_json_temporal")).ok())
+            .unwrap_or(false);
+        let temporal_mode = if temporal_set {
+            TemporalMode::from_config(config)?
+        } else {
+            let td_mode = TimedeltaMode::from_config(config)?;
+            td_mode.into()
+        };
+
+        Ok(Arc::new(Self { temporal_mode }.into()))
     }
 }
 
@@ -39,10 +49,10 @@ impl TypeSerializer for TimeDeltaSerializer {
         include: Option<&Bound<'_, PyAny>>,
         exclude: Option<&Bound<'_, PyAny>>,
         extra: &Extra,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<Py<PyAny>> {
         match extra.mode {
             SerMode::Json => match EitherTimedelta::try_from(value) {
-                Ok(either_timedelta) => self.timedelta_mode.either_delta_to_json(value.py(), either_timedelta),
+                Ok(either_timedelta) => Ok(self.temporal_mode.timedelta_to_json(value.py(), either_timedelta)?),
                 Err(_) => {
                     extra.warnings.on_fallback_py(self.get_name(), value, extra)?;
                     infer_to_python(value, include, exclude, extra)
@@ -54,7 +64,7 @@ impl TypeSerializer for TimeDeltaSerializer {
 
     fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
         match EitherTimedelta::try_from(key) {
-            Ok(either_timedelta) => self.timedelta_mode.json_key(key.py(), either_timedelta),
+            Ok(either_timedelta) => self.temporal_mode.timedelta_json_key(&either_timedelta),
             Err(_) => {
                 extra.warnings.on_fallback_py(self.get_name(), key, extra)?;
                 infer_json_key(key, extra)
@@ -71,9 +81,7 @@ impl TypeSerializer for TimeDeltaSerializer {
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
         match EitherTimedelta::try_from(value) {
-            Ok(either_timedelta) => self
-                .timedelta_mode
-                .timedelta_serialize(value.py(), either_timedelta, serializer),
+            Ok(either_timedelta) => self.temporal_mode.timedelta_serialize(either_timedelta, serializer),
             Err(_) => {
                 extra.warnings.on_fallback_ser::<S>(self.get_name(), value, extra)?;
                 infer_serialize(value, serializer, include, exclude, extra)

@@ -1,8 +1,9 @@
 use std::str::from_utf8;
+use std::sync::Arc;
 
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::sync::GILOnceCell;
+use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyDict, PyType};
 use uuid::Uuid;
 use uuid::Variant;
@@ -24,13 +25,13 @@ use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, Exactness, Va
 const UUID_INT: &str = "int";
 const UUID_IS_SAFE: &str = "is_safe";
 
-static UUID_TYPE: GILOnceCell<Py<PyType>> = GILOnceCell::new();
+static UUID_TYPE: PyOnceLock<Py<PyType>> = PyOnceLock::new();
 
 fn import_type(py: Python, module: &str, attr: &str) -> PyResult<Py<PyType>> {
     py.import(module)?.getattr(attr)?.extract()
 }
 
-fn get_uuid_type(py: Python) -> PyResult<&Bound<'_, PyType>> {
+fn get_uuid_type(py: Python<'_>) -> PyResult<&Bound<'_, PyType>> {
     Ok(UUID_TYPE
         .get_or_init(py, || import_type(py, "uuid", "UUID").unwrap())
         .bind(py))
@@ -42,6 +43,9 @@ enum Version {
     UUIDv3 = 3,
     UUIDv4 = 4,
     UUIDv5 = 5,
+    UUIDv6 = 6,
+    UUIDv7 = 7,
+    UUIDv8 = 8,
 }
 
 impl From<Version> for usize {
@@ -57,6 +61,9 @@ impl From<u8> for Version {
             3 => Version::UUIDv3,
             4 => Version::UUIDv4,
             5 => Version::UUIDv5,
+            6 => Version::UUIDv6,
+            7 => Version::UUIDv7,
+            8 => Version::UUIDv8,
             _ => unreachable!(),
         }
     }
@@ -74,15 +81,15 @@ impl BuildValidator for UuidValidator {
     fn build(
         schema: &Bound<'_, PyDict>,
         config: Option<&Bound<'_, PyDict>>,
-        _definitions: &mut DefinitionsBuilder<CombinedValidator>,
-    ) -> PyResult<CombinedValidator> {
+        _definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
+    ) -> PyResult<Arc<CombinedValidator>> {
         let py = schema.py();
         // Note(lig): let's keep this conversion through the Version enum just for the sake of validation
         let version = schema.get_as::<u8>(intern!(py, "version"))?.map(Version::from);
-        Ok(Self {
+        Ok(CombinedValidator::Uuid(Self {
             strict: is_strict(schema, config)?,
             version: version.map(usize::from),
-        }
+        })
         .into())
     }
 }
@@ -95,7 +102,7 @@ impl Validator for UuidValidator {
         py: Python<'py>,
         input: &(impl Input<'py> + ?Sized),
         state: &mut ValidationState<'_, 'py>,
-    ) -> ValResult<PyObject> {
+    ) -> ValResult<Py<PyAny>> {
         let class = get_uuid_type(py)?;
         if let Some(py_input) = input_as_python_instance(input, class) {
             if let Some(expected_version) = self.version {
@@ -134,8 +141,8 @@ impl Validator for UuidValidator {
             }
             let uuid = self.get_uuid(input)?;
             // This block checks if the UUID version matches the expected version and
-            // if the UUID variant conforms to RFC 4122. When dealing with Python inputs,
-            // UUIDs must adhere to RFC 4122 standards.
+            // if the UUID variant conforms to RFC 9562 (superseding RFC 4122).
+            // When dealing with Python inputs, UUIDs must adhere to RFC 9562 standards.
             if let Some(expected_version) = self.version {
                 if uuid.get_version_num() != expected_version || uuid.get_variant() != Variant::RFC4122 {
                     return Err(ValError::new(
@@ -209,7 +216,7 @@ impl UuidValidator {
                     input,
                 ));
             }
-        };
+        }
         Ok(uuid)
     }
 
@@ -220,7 +227,7 @@ impl UuidValidator {
     ///
     /// This implementation does not use the Python `__init__` function to speed up the process,
     /// as the `__init__` function in the Python `uuid` module performs extensive checks.
-    fn create_py_uuid(&self, py_type: &Bound<'_, PyType>, uuid: &Uuid) -> ValResult<PyObject> {
+    fn create_py_uuid(&self, py_type: &Bound<'_, PyType>, uuid: &Uuid) -> ValResult<Py<PyAny>> {
         let py = py_type.py();
         let dc = create_class(py_type)?;
         let int = uuid.as_u128();
