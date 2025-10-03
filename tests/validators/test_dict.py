@@ -1,5 +1,6 @@
 import re
-from collections import OrderedDict
+import sys
+from collections import OrderedDict, defaultdict
 from collections.abc import Mapping
 from typing import Any
 
@@ -10,6 +11,12 @@ from pydantic_core import SchemaValidator, ValidationError
 from pydantic_core import core_schema as cs
 
 from ..conftest import Err, PyAndJson
+
+# Skip OrderedDict tests on GraalPy due to a bug in PyMapping.items()
+skip_on_graalpy = pytest.mark.skipif(
+    sys.implementation.name == 'graalpy',
+    reason='GraalPy has a bug where PyMapping.items() does not preserve OrderedDict order',
+)
 
 
 def test_dict(py_and_json: PyAndJson):
@@ -315,6 +322,7 @@ def test_dict_fail_fast(fail_fast, expected):
     assert exc_info.value.errors(include_url=False) == expected
 
 
+@skip_on_graalpy
 @pytest.mark.parametrize('strict', [True, False])
 def test_ordered_dict_key_order_preservation(strict):
     # GH 12273
@@ -335,3 +343,46 @@ def test_ordered_dict_key_order_preservation(strict):
     result2 = v.validate_python(foo2, strict=strict)
     assert list(result2.keys()) == list(foo2.keys()) == ['y', 'z', 'x']
     assert result2 == {'y': 2, 'z': 3, 'x': 1}
+
+
+@skip_on_graalpy
+def test_userdefined_ordereddict():
+    class MyOD(Mapping):
+        def __init__(self, **kwargs):
+            self.dict = {}
+            for kv in kwargs.items():
+                self.dict[kv[0]] = kv[1]
+
+        def __iter__(self):
+            return iter(self.dict.keys())
+
+        def move_to_end(self, key):
+            self.dict[key] = self.dict.pop(key)
+
+        def __getitem__(self, key):
+            return self.dict[key]
+
+        def __len__(self):
+            return len(self.dict)
+
+    v = SchemaValidator(cs.dict_schema(keys_schema=cs.str_schema(), values_schema=cs.int_schema()))
+
+    foo = MyOD(**{'a': 1, 'b': 2})
+    foo.move_to_end('a')
+
+    result = v.validate_python(foo)
+    assert list(result.keys()) == list(foo.keys()) == ['b', 'a']
+    assert result == {'b': 2, 'a': 1}
+
+
+@pytest.mark.parametrize('strict', [True, False])
+def test_defaultdict(strict):
+    """Test that defaultdict is accepted and converted to regular dict"""
+    v = SchemaValidator(cs.dict_schema(keys_schema=cs.str_schema(), values_schema=cs.int_schema()))
+
+    dd = defaultdict(int, {'a': 1, 'b': 2})
+
+    result = v.validate_python(dd, strict=strict)
+    assert result == {'a': 1, 'b': 2}
+    assert isinstance(result, dict)
+    assert not isinstance(result, defaultdict)
