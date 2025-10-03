@@ -12,12 +12,6 @@ from pydantic_core import core_schema as cs
 
 from ..conftest import Err, PyAndJson
 
-# Skip OrderedDict tests on GraalPy due to a bug in PyMapping.items()
-skip_on_graalpy = pytest.mark.skipif(
-    sys.implementation.name == 'graalpy',
-    reason='GraalPy has a bug where PyMapping.items() does not preserve OrderedDict order',
-)
-
 
 def test_dict(py_and_json: PyAndJson):
     v = py_and_json({'type': 'dict', 'keys_schema': {'type': 'int'}, 'values_schema': {'type': 'int'}})
@@ -322,7 +316,10 @@ def test_dict_fail_fast(fail_fast, expected):
     assert exc_info.value.errors(include_url=False) == expected
 
 
-@skip_on_graalpy
+@pytest.mark.skipif(
+    sys.implementation.name == 'graalpy',
+    reason='GraalPy has a bug where PyMapping.items() does not preserve OrderedDict order',
+)
 @pytest.mark.parametrize('strict', [True, False])
 def test_ordered_dict_key_order_preservation(strict):
     # GH 12273
