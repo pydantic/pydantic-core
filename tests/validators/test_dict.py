@@ -318,7 +318,7 @@ def test_dict_fail_fast(fail_fast, expected):
 
 @pytest.mark.skipif(
     sys.implementation.name == 'graalpy',
-    reason='GraalPy has a bug where PyMapping.items() does not preserve OrderedDict order',
+    reason='GraalPy has a bug where PyMapping.items() does not preserve OrderedDict order. See: https://github.com/oracle/graalpython/issues/553',
 )
 @pytest.mark.parametrize('strict', [True, False])
 def test_ordered_dict_key_order_preservation(strict):
