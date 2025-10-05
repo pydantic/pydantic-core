@@ -822,7 +822,7 @@ def test_validate_default_raises_dataclass(input_value: dict, expected: Any) -> 
     assert exc_info.value.errors(include_url=False, include_context=False) == expected
 
 
-def test_default_factory_not_called_if_existing_error() -> None:
+def test_default_factory_not_called_if_existing_error(pydantic_version) -> None:
     class Test:
         def __init__(self, a: int, b: int):
             self.a = a
@@ -868,12 +868,11 @@ def test_default_factory_not_called_if_existing_error() -> None:
 
     assert (
         str(e.value)
-        == """ValidationError: 2 validation errors found
-2 validation errors for Test
+        == f"""2 validation errors for Test
 a
   Input should be a valid integer, unable to parse string as an integer [type=int_parsing, input_value='not_an_int', input_type=str]
-    For further information visit https://errors.pydantic.dev/2.12/v/int_parsing
+    For further information visit https://errors.pydantic.dev/{pydantic_version}/v/int_parsing
 b
   The default factory uses validated data, but at least one validation error occurred [type=default_factory_not_called, input_value=PydanticUndefined, input_type=PydanticUndefinedType]
-    For further information visit https://errors.pydantic.dev/2.12/v/default_factory_not_called"""
+    For further information visit https://errors.pydantic.dev/{pydantic_version}/v/default_factory_not_called"""
     )
