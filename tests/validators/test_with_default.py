@@ -873,6 +873,6 @@ a
   Input should be a valid integer, unable to parse string as an integer [type=int_parsing, input_value='not_an_int', input_type=str]
     For further information visit https://errors.pydantic.dev/{pydantic_version}/v/int_parsing
 b
-  The default factory uses validated data, but at least one validation error occurred [type=default_factory_not_called, input_value=PydanticUndefined, input_type=PydanticUndefinedType]
+  The default factory uses validated data, but at least one validation error occurred [type=default_factory_not_called]
     For further information visit https://errors.pydantic.dev/{pydantic_version}/v/default_factory_not_called"""
     )
