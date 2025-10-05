@@ -595,7 +595,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [aarch64, armv7, s390x, ppc64le]
+        target: [armv7, s390x, ppc64le]
         distro: ['ubuntu22.04']
         include:
           - target: aarch64
@@ -636,7 +636,7 @@ jobs:
             source $HOME/.local/bin/env
             uv sync --frozen --group testing --no-install-project
             uv pip install pydantic-core --no-index --no-deps --find-links dist --force-reinstall
-            uv run --no-sync pytest --ignore=tests/test_docstrings.py
+            uv run --no-sync pytest --ignore=tests/test_docstrings.py --hypothesis-profile=fast
             uv run --no-sync python -c 'import pydantic_core._pydantic_core; print(pydantic_core._pydantic_core.__version__)'
 
   test-builds-os:
@@ -646,7 +646,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu, macos, windows]
+        os: [ubuntu, ubuntu-24.04-arm, macos, windows, windows-11-arm]
 
     runs-on: ${{ matrix.os }}-latest
     steps:
