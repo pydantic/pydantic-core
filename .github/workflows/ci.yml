@@ -650,15 +650,22 @@ jobs:
             uv run --no-sync python -c 'import pydantic_core._pydantic_core; print(pydantic_core._pydantic_core.__version__)'
 
   test-builds-os:
-    name: test build on ${{ matrix.os }}
+    name: test build on ${{ matrix.platform.os }}
     needs: [build, build-pgo]
 
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu, ubuntu-24.04-arm, macos, windows, windows-11-arm]
+        platform:
+          [
+            { os: linux, runs-on: ubuntu-latest },
+            { os: linux_aarch64, runs-on: ubuntu-24.04-arm },
+            { os: windows, runs-on: windows-latest },
+            { os: windows_aarch64, runs-on: windows-11-arm },
+            { os: macos, runs-on: macos-latest },
+          ]
 
-    runs-on: ${{ matrix.os }}-latest
+    runs-on: ${{ matrix.platform.runs-on }}
     steps:
       - uses: actions/checkout@v5
 
