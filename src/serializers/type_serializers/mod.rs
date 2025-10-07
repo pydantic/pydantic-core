@@ -4,6 +4,7 @@ pub mod complex;
 pub mod dataclass;
 pub mod datetime_etc;
 pub mod decimal;
+pub mod fraction;
 pub mod definitions;
 pub mod dict;
 pub mod enum_;

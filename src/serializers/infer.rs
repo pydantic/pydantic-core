@@ -136,7 +136,16 @@ pub(crate) fn infer_to_python_known(
                 }
                 v.into_py_any(py)?
             }
-            ObType::Decimal => value.to_string().into_py_any(py)?,
+            ObType::Decimal => {
+                // todo: delete before PR ready
+                println!("[RUST] infer_to_python_known - SerMode::Json - serializing ObType::Decimal");
+                value.to_string().into_py_any(py)?
+            },
+            ObType::Fraction => {
+                // todo: delete before PR ready
+                println!("[RUST] infer_to_python_known - SerMode::Json - serializing ObType::Fraction");
+                value.to_string().into_py_any(py)?
+            },
             ObType::StrSubclass => PyString::new(py, value.downcast::<PyString>()?.to_str()?).into(),
             ObType::Bytes => extra
                 .config
@@ -430,7 +439,16 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
             let v = value.extract::<f64>().map_err(py_err_se_err)?;
             type_serializers::float::serialize_f64(v, serializer, extra.config.inf_nan_mode)
         }
-        ObType::Decimal => value.to_string().serialize(serializer),
+        ObType::Decimal => {
+            // todo: delete before PR ready
+            println!("[RUST] infer_serialize_known - serializing ObType::Decimal");
+            value.to_string().serialize(serializer)
+        },
+        ObType::Fraction => {
+            // todo: delete before PR ready
+            println!("[RUST] infer_serialize_known - serializing ObType::Fraction");
+            value.to_string().serialize(serializer)
+        },
         ObType::Str | ObType::StrSubclass => {
             let py_str = value.downcast::<PyString>().map_err(py_err_se_err)?;
             super::type_serializers::string::serialize_py_str(py_str, serializer)
@@ -612,7 +630,16 @@ pub(crate) fn infer_json_key_known<'a>(
                 super::type_serializers::simple::to_str_json_key(key)
             }
         }
-        ObType::Decimal => Ok(Cow::Owned(key.to_string())),
+        ObType::Decimal => {
+            // todo: delete before PR ready
+            println!("[RUST] infer_json_key_known - converting ObType::Decimal to json key");
+            Ok(Cow::Owned(key.to_string()))
+        },
+        ObType::Fraction => {
+            // todo: delete before PR ready
+            println!("[RUST] infer_json_key_known - converting ObType::Fraction to json key");
+            Ok(Cow::Owned(key.to_string()))
+        },
         ObType::Bool => super::type_serializers::simple::bool_json_key(key),
         ObType::Str | ObType::StrSubclass => key.downcast::<PyString>()?.to_cow(),
         ObType::Bytes => extra

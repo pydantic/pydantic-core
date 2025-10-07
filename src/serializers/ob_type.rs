@@ -23,6 +23,7 @@ pub struct ObTypeLookup {
     dict: usize,
     // other numeric types
     decimal_object: Py<PyAny>,
+    fraction_object: Py<PyAny>,
     // other string types
     bytes: usize,
     bytearray: usize,
@@ -62,6 +63,8 @@ pub enum IsType {
 
 impl ObTypeLookup {
     fn new(py: Python) -> Self {
+        // todo: delete before PR ready
+        println!("[RUST] ObTypeLookup::new");
         Self {
             none: PyNone::type_object_raw(py) as usize,
             int: PyInt::type_object_raw(py) as usize,
@@ -69,7 +72,16 @@ impl ObTypeLookup {
             float: PyFloat::type_object_raw(py) as usize,
             list: PyList::type_object_raw(py) as usize,
             dict: PyDict::type_object_raw(py) as usize,
-            decimal_object: py.import("decimal").unwrap().getattr("Decimal").unwrap().unbind(),
+            decimal_object: {
+                // todo: delete before PR ready
+                println!("[RUST] ObTypeLookup::new - loading decimal_object");
+                py.import("decimal").unwrap().getattr("Decimal").unwrap().unbind()
+            },
+            fraction_object: {
+                // todo: delete before PR ready
+                println!("[RUST] ObTypeLookup::new - loading fraction_object");
+                py.import("fractions").unwrap().getattr("Fraction").unwrap().unbind()
+            },
             string: PyString::type_object_raw(py) as usize,
             bytes: PyBytes::type_object_raw(py) as usize,
             bytearray: PyByteArray::type_object_raw(py) as usize,
@@ -96,6 +108,7 @@ impl ObTypeLookup {
     }
 
     pub fn is_type(&self, value: &Bound<'_, PyAny>, expected_ob_type: ObType) -> IsType {
+        println!("[RUST] is_type - expected_ob_type: {expected_ob_type}");
         match self.ob_type_is_expected(Some(value), &value.get_type(), &expected_ob_type) {
             IsType::False => {
                 if expected_ob_type == self.fallback_isinstance(value) {
@@ -116,6 +129,7 @@ impl ObTypeLookup {
     ) -> IsType {
         let type_ptr = py_type.as_ptr();
         let ob_type = type_ptr as usize;
+        println!("[RUST] ob_type_is_expected - ob_type: {ob_type}, expected_ob_type: {expected_ob_type}");
         let ans = match expected_ob_type {
             ObType::None => self.none == ob_type,
             ObType::Int => self.int == ob_type,
@@ -137,7 +151,16 @@ impl ObTypeLookup {
             ObType::Str => self.string == ob_type,
             ObType::List => self.list == ob_type,
             ObType::Dict => self.dict == ob_type,
-            ObType::Decimal => self.decimal_object.as_ptr() as usize == ob_type,
+            ObType::Decimal => {
+                // todo: delete before PR ready
+                println!("[RUST] ob_type_is_expected - checking ObType::Decimal");
+                self.decimal_object.as_ptr() as usize == ob_type
+            },
+            ObType::Fraction => {
+                // todo: delete before PR ready
+                println!("[RUST] ob_type_is_expected - checking ObType::Fraction");
+                self.fraction_object.as_ptr() as usize == ob_type
+            },
             ObType::StrSubclass => self.string == ob_type && op_value.is_none(),
             ObType::Tuple => self.tuple == ob_type,
             ObType::Set => self.set == ob_type,
@@ -214,7 +237,13 @@ impl ObTypeLookup {
         } else if ob_type == self.dict {
             ObType::Dict
         } else if ob_type == self.decimal_object.as_ptr() as usize {
+            // todo: delete before PR ready
+            println!("[RUST] lookup_by_ob_type - found ObType::Decimal");
             ObType::Decimal
+        } else if ob_type == self.fraction_object.as_ptr() as usize {
+            // todo: delete before PR ready
+            println!("[RUST] lookup_by_ob_type - found ObType::Fraction");
+            ObType::Fraction
         } else if ob_type == self.bytes {
             ObType::Bytes
         } else if ob_type == self.tuple {
@@ -322,7 +351,13 @@ impl ObTypeLookup {
         } else if value.is_instance_of::<PyMultiHostUrl>() {
             ObType::MultiHostUrl
         } else if value.is_instance(self.decimal_object.bind(py)).unwrap_or(false) {
+            // todo: delete before PR ready
+            println!("[RUST] fallback_isinstance - found ObType::Decimal");
             ObType::Decimal
+        } else if value.is_instance(self.fraction_object.bind(py)).unwrap_or(false) {
+            // todo: delete before PR ready
+            println!("[RUST] fallback_isinstance - found ObType::Fraction");
+            ObType::Fraction
         } else if value.is_instance(self.uuid_object.bind(py)).unwrap_or(false) {
             ObType::Uuid
         } else if value.is_instance(self.enum_object.bind(py)).unwrap_or(false) {
@@ -380,6 +415,7 @@ pub enum ObType {
     Float,
     FloatSubclass,
     Decimal,
+    Fraction,
     // string types
     Str,
     StrSubclass,
