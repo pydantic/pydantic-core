@@ -2,7 +2,7 @@ use pyo3::prelude::*;
 use pyo3::sync::PyOnceLock;
 use pyo3::types::{
     PyBool, PyByteArray, PyBytes, PyComplex, PyDate, PyDateTime, PyDelta, PyDict, PyFloat, PyFrozenSet, PyInt,
-    PyIterator, PyList, PyNone, PySet, PyString, PyTime, PyTuple, PyType,
+    PyIterator, PyList, PyModule, PyNone, PySet, PyString, PyTime, PyTuple, PyType,
 };
 use pyo3::{intern, PyTypeInfo};
 
@@ -48,6 +48,7 @@ pub struct ObTypeLookup {
     pattern_object: Py<PyAny>,
     // uuid type
     uuid_object: Py<PyAny>,
+    module_object: usize,
     complex: usize,
 }
 
@@ -87,6 +88,7 @@ impl ObTypeLookup {
             path_object: py.import("pathlib").unwrap().getattr("Path").unwrap().unbind(),
             pattern_object: py.import("re").unwrap().getattr("Pattern").unwrap().unbind(),
             uuid_object: py.import("uuid").unwrap().getattr("UUID").unwrap().unbind(),
+            module_object: PyModule::type_object_raw(py) as usize,
             complex: PyComplex::type_object_raw(py) as usize,
         }
     }
@@ -157,8 +159,9 @@ impl ObTypeLookup {
             ObType::Path => self.path_object.as_ptr() as usize == ob_type,
             ObType::Pattern => self.path_object.as_ptr() as usize == ob_type,
             ObType::Uuid => self.uuid_object.as_ptr() as usize == ob_type,
-            ObType::Unknown => false,
             ObType::Complex => self.complex == ob_type,
+            ObType::Module => self.module_object == ob_type,
+            ObType::Unknown => false,
         };
 
         if ans {
@@ -241,6 +244,8 @@ impl ObTypeLookup {
             ObType::Complex
         } else if ob_type == self.uuid_object.as_ptr() as usize {
             ObType::Uuid
+        } else if ob_type == self.module_object {
+            ObType::Module
         } else if is_pydantic_serializable(op_value) {
             ObType::PydanticSerializable
         } else if is_dataclass(op_value) {
@@ -414,9 +419,10 @@ pub enum ObType {
     Pattern,
     // Uuid
     Uuid,
+    Complex,
+    Module,
     // unknown type
     Unknown,
-    Complex,
 }
 
 impl PartialEq for ObType {
