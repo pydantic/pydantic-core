@@ -8,6 +8,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyFloat, PyInt, PyList, PyString, PyType};
 
 use crate::build_tools::{is_strict, py_schema_err};
+use crate::config::CoreConfig;
 use crate::errors::{ErrorType, ValError, ValResult};
 use crate::input::{Input, InputType};
 use crate::tools::{safe_repr, SchemaDict};
@@ -24,7 +25,7 @@ impl BuildValidator for BuildEnumValidator {
 
     fn build(
         schema: &Bound<'_, PyDict>,
-        config: Option<&Bound<'_, PyDict>>,
+        config: &CoreConfig,
         _definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
     ) -> PyResult<Arc<CombinedValidator>> {
         let members: Bound<PyList> = schema.get_as_req(intern!(schema.py(), "members"))?;

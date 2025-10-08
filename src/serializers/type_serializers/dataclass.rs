@@ -8,6 +8,7 @@ use ahash::AHashMap;
 use serde::ser::SerializeMap;
 
 use crate::build_tools::{py_schema_error_type, ExtraBehavior};
+use crate::config::CoreConfig;
 use crate::definitions::DefinitionsBuilder;
 use crate::tools::SchemaDict;
 
@@ -29,10 +30,16 @@ impl BuildSerializer for DataclassArgsBuilder {
     ) -> PyResult<Arc<CombinedSerializer>> {
         let py = schema.py();
 
+        let typed_config: CoreConfig = match config {
+            Some(config) => config.extract()?,
+            None => CoreConfig::default(),
+        };
+
         let fields_list: Bound<'_, PyList> = schema.get_as_req(intern!(py, "fields"))?;
         let mut fields: AHashMap<String, SerField> = AHashMap::with_capacity(fields_list.len());
 
-        let fields_mode = match ExtraBehavior::from_schema_or_config(py, schema, config, ExtraBehavior::Ignore)? {
+        let fields_mode = match ExtraBehavior::from_schema_or_config(py, schema, &typed_config, ExtraBehavior::Ignore)?
+        {
             ExtraBehavior::Allow => FieldsMode::TypedDictAllow,
             _ => FieldsMode::SimpleDict,
         };

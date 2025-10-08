@@ -6,7 +6,8 @@ use pyo3::sync::PyOnceLock;
 use pyo3::types::{IntoPyDict, PyDict, PyString, PyTuple, PyType};
 use pyo3::{prelude::*, PyTypeInfo};
 
-use crate::build_tools::{is_strict, schema_or_config_same};
+use crate::build_tools::is_strict;
+use crate::config::CoreConfig;
 use crate::errors::ErrorType;
 use crate::errors::ValResult;
 use crate::errors::{ErrorTypeDefaults, Number};
@@ -64,12 +65,15 @@ impl BuildValidator for DecimalValidator {
     const EXPECTED_TYPE: &'static str = "decimal";
     fn build(
         schema: &Bound<'_, PyDict>,
-        config: Option<&Bound<'_, PyDict>>,
+        config: &CoreConfig,
         _definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
     ) -> PyResult<Arc<CombinedValidator>> {
         let py = schema.py();
 
-        let allow_inf_nan = schema_or_config_same(schema, config, intern!(py, "allow_inf_nan"))?.unwrap_or(false);
+        let allow_inf_nan = schema
+            .get_as(intern!(py, "allow_inf_nan"))?
+            .or(config.allow_inf_nan)
+            .unwrap_or(false);
         let decimal_places = schema.get_as(intern!(py, "decimal_places"))?;
         let max_digits = schema.get_as(intern!(py, "max_digits"))?;
         if allow_inf_nan && (decimal_places.is_some() || max_digits.is_some()) {

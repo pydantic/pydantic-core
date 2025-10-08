@@ -3,6 +3,7 @@ use std::sync::Arc;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
+use crate::config::CoreConfig;
 use crate::input::Input;
 use crate::{build_tools::LazyLock, errors::ValResult};
 
@@ -21,7 +22,7 @@ impl BuildValidator for AnyValidator {
 
     fn build(
         _schema: &Bound<'_, PyDict>,
-        _config: Option<&Bound<'_, PyDict>>,
+        _config: &CoreConfig,
         _definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
     ) -> PyResult<Arc<CombinedValidator>> {
         Ok(ANY_VALIDATOR.clone())

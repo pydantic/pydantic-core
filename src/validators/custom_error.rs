@@ -5,6 +5,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use crate::build_tools::py_schema_err;
+use crate::config::CoreConfig;
 use crate::errors::ToErrorValue;
 use crate::errors::{ErrorType, PydanticCustomError, PydanticKnownError, ValError, ValResult};
 use crate::input::Input;
@@ -22,7 +23,7 @@ pub enum CustomError {
 impl CustomError {
     pub fn build(
         schema: &Bound<'_, PyDict>,
-        _config: Option<&Bound<'_, PyDict>>,
+        _config: &CoreConfig,
         _definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
     ) -> PyResult<Option<Self>> {
         let py = schema.py();
@@ -71,7 +72,7 @@ impl BuildValidator for CustomErrorValidator {
 
     fn build(
         schema: &Bound<'_, PyDict>,
-        config: Option<&Bound<'_, PyDict>>,
+        config: &CoreConfig,
         definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
     ) -> PyResult<Arc<CombinedValidator>> {
         let custom_error = CustomError::build(schema, config, definitions)?.unwrap();

@@ -25,20 +25,19 @@ const DUNDER_MODEL_EXTRA_KEY: &str = "__pydantic_extra__";
 const DUNDER_MODEL_PRIVATE_KEY: &str = "__pydantic_private__";
 
 #[derive(Debug, Clone)]
-pub(super) enum Revalidate {
+pub enum Revalidate {
     Always,
     Never,
     SubclassInstances,
 }
 
 impl Revalidate {
-    pub fn from_str(s: Option<&str>) -> PyResult<Self> {
+    pub fn from_str(s: &str) -> PyResult<Self> {
         match s {
-            None => Ok(Self::Never),
-            Some("always") => Ok(Self::Always),
-            Some("never") => Ok(Self::Never),
-            Some("subclass-instances") => Ok(Self::SubclassInstances),
-            Some(s) => py_schema_err!("Invalid revalidate_instances value: {}", s),
+            "always" => Ok(Self::Always),
+            "never" => Ok(Self::Never),
+            "subclass-instances" => Ok(Self::SubclassInstances),
+            s => py_schema_err!("Invalid revalidate_instances value: {}", s),
         }
     }
 
@@ -48,6 +47,28 @@ impl Revalidate {
             Revalidate::Never => false,
             Revalidate::SubclassInstances => !input.is_exact_instance(class),
         }
+    }
+}
+
+impl FromPyObject<'_> for Revalidate {
+    fn extract_bound(ob: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let s: &str = ob.extract()?;
+        Self::from_str(s)
+    }
+}
+
+impl<'py> IntoPyObject<'py> for Revalidate {
+    type Target = PyString;
+    type Output = Borrowed<'py, 'py, PyString>;
+    type Error = PyErr;
+
+    fn into_pyobject(self, py: Python<'py>) -> PyResult<Self::Output> {
+        let s = match self {
+            Revalidate::Always => intern!(py, "always"),
+            Revalidate::Never => intern!(py, "never"),
+            Revalidate::SubclassInstances => intern!(py, "subclass-instances"),
+        };
+        Ok(s.as_borrowed())
     }
 }
 
@@ -70,7 +91,7 @@ impl BuildValidator for ModelValidator {
 
     fn build(
         schema: &Bound<'_, PyDict>,
-        _config: Option<&Bound<'_, PyDict>>,
+        _config: &CoreConfig,
         definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
     ) -> PyResult<Arc<CombinedValidator>> {
         let py = schema.py();

@@ -1,3 +1,4 @@
+use std::convert::Infallible;
 use std::error::Error;
 use std::fmt;
 use std::ops::Deref;
@@ -9,6 +10,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyString};
 use pyo3::{intern, FromPyObject, PyErrArguments};
 
+use crate::config::CoreConfig;
 use crate::errors::{PyLineError, ValError};
 use crate::input::InputType;
 use crate::tools::SchemaDict;
@@ -43,9 +45,14 @@ where
     schema_or_config(schema, config, key, key)
 }
 
-pub fn is_strict(schema: &Bound<'_, PyDict>, config: Option<&Bound<'_, PyDict>>) -> PyResult<bool> {
+pub fn is_strict(schema: &Bound<'_, PyDict>, config: &CoreConfig) -> PyResult<bool> {
     let py = schema.py();
-    Ok(schema_or_config_same(schema, config, intern!(py, "strict"))?.unwrap_or(false))
+    let is_strict = schema
+        .get_as(intern!(py, "strict"))?
+        .flatten()
+        .or(config.strict)
+        .unwrap_or(false);
+    Ok(is_strict)
 }
 
 enum SchemaErrorEnum {
@@ -189,21 +196,36 @@ impl ExtraBehavior {
     pub fn from_schema_or_config(
         py: Python,
         schema: &Bound<'_, PyDict>,
-        config: Option<&Bound<'_, PyDict>>,
+        config: &CoreConfig,
         default: Self,
     ) -> PyResult<Self> {
-        let extra_behavior = schema_or_config::<Option<Bound<'_, PyString>>>(
-            schema,
-            config,
-            intern!(py, "extra_behavior"),
-            intern!(py, "extra_fields_behavior"),
-        )?
-        .flatten();
-        let res = match extra_behavior.as_ref().map(|s| s.to_str()).transpose()? {
-            Some(s) => Self::from_str(s)?,
-            None => default,
+        let extra_behavior = schema.get_as(intern!(py, "extra_behavior"))?.flatten();
+        let extra_behavior = extra_behavior.or(config.extra_fields_behavior);
+        Ok(extra_behavior.unwrap_or(default))
+    }
+}
+
+impl FromPyObject<'_> for ExtraBehavior {
+    fn extract_bound(ob: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let s: &str = ob.extract()?;
+        Self::from_str(s)
+    }
+}
+
+impl<'py> IntoPyObject<'py> for ExtraBehavior {
+    type Target = PyString;
+
+    type Output = Borrowed<'py, 'py, PyString>;
+
+    type Error = Infallible;
+
+    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
+        let s = match self {
+            Self::Allow => intern!(py, "allow"),
+            Self::Forbid => intern!(py, "forbid"),
+            Self::Ignore => intern!(py, "ignore"),
         };
-        Ok(res)
+        Ok(s.as_borrowed())
     }
 }
 

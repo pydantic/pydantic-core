@@ -8,6 +8,7 @@ use ahash::AHashMap;
 
 use crate::build_tools::py_schema_err;
 use crate::build_tools::{py_schema_error_type, schema_or_config, ExtraBehavior};
+use crate::config::CoreConfig;
 use crate::definitions::DefinitionsBuilder;
 use crate::tools::SchemaDict;
 
@@ -29,7 +30,13 @@ impl BuildSerializer for TypedDictBuilder {
         let total =
             schema_or_config(schema, config, intern!(py, "total"), intern!(py, "typed_dict_total"))?.unwrap_or(true);
 
-        let fields_mode = match ExtraBehavior::from_schema_or_config(py, schema, config, ExtraBehavior::Ignore)? {
+        let typed_config: CoreConfig = match config {
+            Some(config) => config.extract()?,
+            None => CoreConfig::default(),
+        };
+
+        let fields_mode = match ExtraBehavior::from_schema_or_config(py, schema, &typed_config, ExtraBehavior::Ignore)?
+        {
             ExtraBehavior::Allow => FieldsMode::TypedDictAllow,
             _ => FieldsMode::SimpleDict,
         };

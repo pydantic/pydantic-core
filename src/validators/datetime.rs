@@ -8,8 +8,9 @@ use std::cmp::Ordering;
 use std::sync::Arc;
 use strum::EnumMessage;
 
+use crate::build_tools::py_schema_err;
 use crate::build_tools::{is_strict, py_schema_error_type};
-use crate::build_tools::{py_schema_err, schema_or_config_same};
+use crate::config::CoreConfig;
 use crate::errors::ToErrorValue;
 use crate::errors::{py_err_string, ErrorType, ErrorTypeDefaults, ValError, ValResult};
 use crate::input::{EitherDateTime, Input};
@@ -29,16 +30,21 @@ pub struct DateTimeValidator {
 
 pub(crate) fn extract_microseconds_precision(
     schema: &Bound<'_, PyDict>,
-    config: Option<&Bound<'_, PyDict>>,
+    config: &CoreConfig,
 ) -> PyResult<speedate::MicrosecondsPrecisionOverflowBehavior> {
-    schema_or_config_same(schema, config, intern!(schema.py(), "microseconds_precision"))?
-        .map_or(
-            Ok(speedate::MicrosecondsPrecisionOverflowBehavior::Truncate),
-            |v: Bound<'_, PyString>| v.to_str().unwrap().parse(),
-        )
-        .map_err(|_| {
-            py_schema_error_type!("Invalid `microseconds_precision`, must be one of \"truncate\" or \"error\"")
-        })
+    let value = schema
+        .get_as(intern!(schema.py(), "microseconds_precision"))?
+        .or(config.microseconds_precision)
+        .map_or(speedate::MicrosecondsPrecisionOverflowBehavior::Truncate, |v| v.0);
+    Ok(value)
+    // schema_or_config_same(schema, config, intern!(schema.py(), "microseconds_precision"))?
+    //     .map_or(
+    //         Ok(speedate::MicrosecondsPrecisionOverflowBehavior::Truncate),
+    //         |v: Bound<'_, PyString>| v.to_str().unwrap().parse(),
+    //     )
+    //     .map_err(|_| {
+    //         py_schema_error_type!("Invalid `microseconds_precision`, must be one of \"truncate\" or \"error\"")
+    //     })
 }
 
 impl BuildValidator for DateTimeValidator {
@@ -46,14 +52,14 @@ impl BuildValidator for DateTimeValidator {
 
     fn build(
         schema: &Bound<'_, PyDict>,
-        config: Option<&Bound<'_, PyDict>>,
+        config: &CoreConfig,
         _definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
     ) -> PyResult<Arc<CombinedValidator>> {
         Ok(CombinedValidator::Datetime(Self {
             strict: is_strict(schema, config)?,
             constraints: DateTimeConstraints::from_py(schema)?,
             microseconds_precision: extract_microseconds_precision(schema, config)?,
-            val_temporal_unit: TemporalUnitMode::from_config(config)?,
+            val_temporal_unit: TemporalUnitMode::from_config(config),
         })
         .into())
     }

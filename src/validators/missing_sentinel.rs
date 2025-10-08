@@ -22,7 +22,7 @@ impl BuildValidator for MissingSentinelValidator {
 
     fn build(
         _schema: &Bound<'_, PyDict>,
-        _config: Option<&Bound<'_, PyDict>>,
+        _config: &CoreConfig,
         _definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
     ) -> PyResult<Arc<CombinedValidator>> {
         Ok(MISSING_SENTINEL_VALIDATOR.clone())

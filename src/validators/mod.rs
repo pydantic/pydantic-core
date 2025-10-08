@@ -11,6 +11,7 @@ use pyo3::{intern, PyTraverseError, PyVisit};
 use pyo3::{prelude::*, IntoPyObjectExt};
 
 use crate::build_tools::{py_schema_err, py_schema_error_type, ExtraBehavior};
+use crate::config::CoreConfig;
 use crate::definitions::{Definitions, DefinitionsBuilder};
 use crate::errors::{LocItem, ValError, ValResult, ValidationError};
 use crate::input::{Input, InputType, StringMapping};
@@ -18,6 +19,7 @@ use crate::py_gc::PyGcTraverse;
 use crate::recursion_guard::RecursionState;
 use crate::tools::SchemaDict;
 pub(crate) use config::{TemporalUnitMode, ValBytesMode};
+pub(crate) use model::Revalidate;
 
 mod any;
 mod arguments;
@@ -125,10 +127,10 @@ pub struct SchemaValidator {
 impl SchemaValidator {
     #[new]
     #[pyo3(signature = (schema, config=None))]
-    pub fn py_new(py: Python, schema: &Bound<'_, PyAny>, config: Option<&Bound<'_, PyDict>>) -> PyResult<Self> {
+    pub fn py_new(py: Python, schema: &Bound<'_, PyAny>, config: Option<CoreConfig>) -> PyResult<Self> {
         let mut definitions_builder = DefinitionsBuilder::new();
 
-        let validator = build_validator_base(schema, config, &mut definitions_builder)?;
+        let validator = build_validator_base(schema, config.as_ref(), &mut definitions_builder)?;
         let definitions = definitions_builder.finish()?;
         let py_schema = schema.clone().unbind();
         let py_config = match config {
@@ -499,7 +501,7 @@ pub trait BuildValidator: Sized {
     /// to return other validators, see `string.rs`, `int.rs`, `float.rs` and `function.rs` for examples
     fn build(
         schema: &Bound<'_, PyDict>,
-        config: Option<&Bound<'_, PyDict>>,
+        config: &CoreConfig,
         definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
     ) -> PyResult<Arc<CombinedValidator>>;
 }
@@ -508,7 +510,7 @@ pub trait BuildValidator: Sized {
 fn build_specific_validator<T: BuildValidator>(
     val_type: &str,
     schema_dict: &Bound<'_, PyDict>,
-    config: Option<&Bound<'_, PyDict>>,
+    config: &CoreConfig,
     definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
 ) -> PyResult<Arc<CombinedValidator>> {
     T::build(schema_dict, config, definitions)
@@ -532,7 +534,7 @@ macro_rules! validator_match {
 // when unpickling:
 pub fn build_validator_base(
     schema: &Bound<'_, PyAny>,
-    config: Option<&Bound<'_, PyDict>>,
+    config: &CoreConfig,
     definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
 ) -> PyResult<Arc<CombinedValidator>> {
     build_validator_inner(schema, config, definitions, false)
@@ -540,7 +542,7 @@ pub fn build_validator_base(
 
 pub fn build_validator(
     schema: &Bound<'_, PyAny>,
-    config: Option<&Bound<'_, PyDict>>,
+    config: &CoreConfig,
     definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
 ) -> PyResult<Arc<CombinedValidator>> {
     build_validator_inner(schema, config, definitions, true)
@@ -548,7 +550,7 @@ pub fn build_validator(
 
 fn build_validator_inner(
     schema: &Bound<'_, PyAny>,
-    config: Option<&Bound<'_, PyDict>>,
+    config: &CoreConfig,
     definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
     use_prebuilt: bool,
 ) -> PyResult<Arc<CombinedValidator>> {

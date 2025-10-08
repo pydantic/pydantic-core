@@ -6,6 +6,7 @@ use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyComplex, PyDict, PyString, PyType};
 
 use crate::build_tools::{is_strict, LazyLock};
+use crate::config::CoreConfig;
 use crate::errors::{ErrorTypeDefaults, ToErrorValue, ValError, ValResult};
 use crate::input::Input;
 
@@ -34,7 +35,7 @@ impl BuildValidator for ComplexValidator {
     const EXPECTED_TYPE: &'static str = "complex";
     fn build(
         schema: &Bound<'_, PyDict>,
-        config: Option<&Bound<'_, PyDict>>,
+        config: &CoreConfig,
         _definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
     ) -> PyResult<Arc<CombinedValidator>> {
         if is_strict(schema, config)? {
