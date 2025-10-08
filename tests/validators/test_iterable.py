@@ -1,5 +1,4 @@
 import re
-from typing import Callable
 
 import pytest
 from dirty_equals import HasRepr, IsStr
@@ -8,17 +7,6 @@ from pydantic_core import CoreConfig, SchemaValidator, ValidationError
 from pydantic_core import core_schema as cs
 
 from ..conftest import Err, PyAndJson
-
-
-@pytest.fixture(params=['generator', 'iterable'])
-def schema_type(request):
-    # both generator and (lazy) iterable should behave the same
-    return request.param
-
-
-@pytest.fixture(params=[cs.generator_schema, cs.iterable_schema])
-def schema_func(request):
-    return request.param
 
 
 @pytest.mark.parametrize(
@@ -33,8 +21,8 @@ def schema_func(request):
     ],
     ids=repr,
 )
-def test_generator_json_int(schema_type: str, py_and_json: PyAndJson, input_value, expected):
-    v = py_and_json({'type': schema_type, 'items_schema': {'type': 'int'}})
+def test_iterable_json_int(py_and_json: PyAndJson, input_value, expected):
+    v = py_and_json(cs.iterable_schema(lazy=False, items_schema=cs.int_schema()))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             list(v.validate_test(input_value))
@@ -51,8 +39,8 @@ def test_generator_json_int(schema_type: str, py_and_json: PyAndJson, input_valu
         (CoreConfig(hide_input_in_errors=True), 'type=iterable_type'),
     ),
 )
-def test_generator_json_hide_input(schema_type: str, py_and_json: PyAndJson, config, input_str):
-    v = py_and_json({'type': schema_type, 'items_schema': {'type': 'int'}}, config)
+def test_iterable_json_hide_input(py_and_json: PyAndJson, config, input_str):
+    v = py_and_json(cs.iterable_schema(lazy=False, items_schema=cs.int_schema()), config)
     with pytest.raises(ValidationError, match=re.escape(f'[{input_str}]')):
         list(v.validate_test(5))
 
@@ -69,8 +57,8 @@ def test_generator_json_hide_input(schema_type: str, py_and_json: PyAndJson, con
     ],
     ids=repr,
 )
-def test_generator_json_any(schema_type: str, py_and_json: PyAndJson, input_value, expected):
-    v = py_and_json({'type': schema_type})
+def test_iterable_json_any(py_and_json: PyAndJson, input_value, expected):
+    v = py_and_json(cs.iterable_schema(lazy=False))
     if isinstance(expected, Err):
         with pytest.raises(ValidationError, match=re.escape(expected.message)):
             list(v.validate_test(input_value))
@@ -79,16 +67,13 @@ def test_generator_json_any(schema_type: str, py_and_json: PyAndJson, input_valu
         assert list(v.validate_test(input_value)) == expected
 
 
-def test_error_index(schema_type: str, py_and_json: PyAndJson):
-    v = py_and_json({'type': schema_type, 'items_schema': {'type': 'int'}})
-    gen = v.validate_test(['wrong'])
-    assert gen.index == 0
+def test_error_index(py_and_json: PyAndJson):
+    v = py_and_json(cs.iterable_schema(lazy=False, items_schema=cs.int_schema()))
     with pytest.raises(ValidationError) as exc_info:
-        next(gen)
-    assert gen.index == 1
+        v.validate_test(['wrong'])
     # insert_assert(exc_info.value.errors(include_url=False))
-    assert exc_info.value.title == 'ValidatorIterator'
-    assert str(exc_info.value).startswith('1 validation error for ValidatorIterator\n')
+    assert exc_info.value.title == 'iterable[int]'
+    assert str(exc_info.value).startswith('1 validation error for iterable[int]\n')
     assert exc_info.value.errors(include_url=False) == [
         {
             'type': 'int_parsing',
@@ -97,17 +82,10 @@ def test_error_index(schema_type: str, py_and_json: PyAndJson):
             'input': 'wrong',
         }
     ]
-    gen = v.validate_test([1, 2, 3, 'wrong', 4])
-    assert gen.index == 0
-    assert next(gen) == 1
-    assert gen.index == 1
-    assert next(gen) == 2
-    assert gen.index == 2
-    assert next(gen) == 3
-    assert gen.index == 3
+
     with pytest.raises(ValidationError) as exc_info:
-        next(gen)
-    assert gen.index == 4
+        v.validate_test([1, 2, 3, 'wrong', 4])
+
     assert exc_info.value.errors(include_url=False) == [
         {
             'type': 'int_parsing',
@@ -116,12 +94,10 @@ def test_error_index(schema_type: str, py_and_json: PyAndJson):
             'input': 'wrong',
         }
     ]
-    assert next(gen) == 4
-    assert gen.index == 5
 
 
-def test_too_long(schema_type: str, py_and_json: PyAndJson):
-    v = py_and_json({'type': schema_type, 'items_schema': {'type': 'int'}, 'max_length': 2})
+def test_too_long(py_and_json: PyAndJson):
+    v = py_and_json(cs.iterable_schema(lazy=False, items_schema=cs.int_schema(), max_length=2))
     assert list(v.validate_test([1])) == [1]
     assert list(v.validate_test([1, 2])) == [1, 2]
     with pytest.raises(ValidationError) as exc_info:
@@ -131,15 +107,15 @@ def test_too_long(schema_type: str, py_and_json: PyAndJson):
         {
             'type': 'too_long',
             'loc': (),
-            'msg': 'Generator should have at most 2 items after validation, not more',
+            'msg': 'Iterable should have at most 2 items after validation, not more',
             'input': [1, 2, 3],
-            'ctx': {'field_type': 'Generator', 'max_length': 2, 'actual_length': None},
+            'ctx': {'field_type': 'Iterable', 'max_length': 2, 'actual_length': None},
         }
     ]
 
 
-def test_too_short(schema_type: str, py_and_json: PyAndJson):
-    v = py_and_json({'type': schema_type, 'items_schema': {'type': 'int'}, 'min_length': 2})
+def test_too_short(py_and_json: PyAndJson):
+    v = py_and_json(cs.iterable_schema(lazy=False, items_schema=cs.int_schema(), min_length=2))
     assert list(v.validate_test([1, 2, 3])) == [1, 2, 3]
     assert list(v.validate_test([1, 2])) == [1, 2]
     with pytest.raises(ValidationError) as exc_info:
@@ -149,9 +125,9 @@ def test_too_short(schema_type: str, py_and_json: PyAndJson):
         {
             'type': 'too_short',
             'loc': (),
-            'msg': 'Generator should have at least 2 items after validation, not 1',
+            'msg': 'Iterable should have at least 2 items after validation, not 1',
             'input': [1],
-            'ctx': {'field_type': 'Generator', 'min_length': 2, 'actual_length': 1},
+            'ctx': {'field_type': 'Iterable', 'min_length': 2, 'actual_length': 1},
         }
     ]
 
@@ -162,16 +138,11 @@ def gen():
     yield 3
 
 
-def test_generator_too_long(schema_func: Callable):
-    v = SchemaValidator(schema_func(items_schema=cs.int_schema(), max_length=2))
+def test_generator_too_long():
+    v = SchemaValidator(cs.iterable_schema(lazy=False, items_schema=cs.int_schema(), max_length=2))
 
-    validating_iterator = v.validate_python(gen())
-
-    # Ensure the error happens at exactly the right step:
-    assert next(validating_iterator) == 1
-    assert next(validating_iterator) == 2
     with pytest.raises(ValidationError) as exc_info:
-        next(validating_iterator)
+        v.validate_python(gen())
 
     errors = exc_info.value.errors(include_url=False)
     # insert_assert(errors)
@@ -180,23 +151,17 @@ def test_generator_too_long(schema_func: Callable):
             'type': 'too_long',
             'loc': (),
             'input': HasRepr(IsStr(regex='<generator object gen at .+>')),
-            'msg': 'Generator should have at most 2 items after validation, not more',
-            'ctx': {'field_type': 'Generator', 'max_length': 2, 'actual_length': None},
+            'msg': 'Iterable should have at most 2 items after validation, not more',
+            'ctx': {'field_type': 'Iterable', 'max_length': 2, 'actual_length': None},
         }
     ]
 
 
-def test_generator_too_short(schema_func: Callable):
-    v = SchemaValidator(schema_func(items_schema=cs.int_schema(), min_length=4))
+def test_generator_too_short():
+    v = SchemaValidator(cs.iterable_schema(lazy=False, items_schema=cs.int_schema(), min_length=4))
 
-    validating_iterator = v.validate_python(gen())
-
-    # Ensure the error happens at exactly the right step:
-    assert next(validating_iterator) == 1
-    assert next(validating_iterator) == 2
-    assert next(validating_iterator) == 3
     with pytest.raises(ValidationError) as exc_info:
-        next(validating_iterator)
+        v.validate_python(gen())
 
     errors = exc_info.value.errors(include_url=False)
     # insert_assert(errors)
@@ -205,7 +170,7 @@ def test_generator_too_short(schema_func: Callable):
             'type': 'too_short',
             'input': HasRepr(IsStr(regex='<generator object gen at .+>')),
             'loc': (),
-            'msg': 'Generator should have at least 4 items after validation, not 3',
-            'ctx': {'field_type': 'Generator', 'min_length': 4, 'actual_length': 3},
+            'msg': 'Iterable should have at least 4 items after validation, not 3',
+            'ctx': {'field_type': 'Iterable', 'min_length': 4, 'actual_length': 3},
         }
     ]
