@@ -602,10 +602,14 @@ fn is_punnycode_domain(lib_url: &Url, domain: &str) -> bool {
     scheme_is_special(lib_url.scheme()) && domain.split('.').any(|part| part.starts_with(PUNYCODE_PREFIX))
 }
 
-fn encode_userinfo_component(value: &str) -> impl Display {
-    utf8_percent_encode(value, NON_ALPHANUMERIC)
+fn encode_userinfo_component(value: &str) -> Cow<'_, str> {
+    let encoded = percent_encode(value.as_bytes(), NON_ALPHANUMERIC).to_string();
+    if encoded == value {
+        Cow::Borrowed(value)
+    } else {
+        Cow::Owned(encoded)
+    }
 }
-
 // based on https://github.com/servo/rust-url/blob/1c1e406874b3d2aa6f36c5d2f3a5c2ea74af9efb/url/src/parser.rs#L161-L167
 pub fn scheme_is_special(scheme: &str) -> bool {
     matches!(scheme, "http" | "https" | "ws" | "wss" | "ftp" | "file")
