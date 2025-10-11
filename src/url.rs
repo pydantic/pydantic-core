@@ -1,13 +1,13 @@
 use std::borrow::Cow;
 use std::collections::hash_map::DefaultHasher;
 use std::fmt;
-use std::fmt::Formatter;
+use std::fmt::{Formatter, Write};
 use std::hash::{Hash, Hasher};
 use std::sync::OnceLock;
 
 use idna::punycode::decode_to_string;
 use jiter::{PartialMode, StringCacheMode};
-use percent_encoding::{percent_encode, NON_ALPHANUMERIC};
+use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use pyo3::exceptions::PyValueError;
 use pyo3::pyclass::CompareOp;
 use pyo3::sync::OnceLockExt;
@@ -360,53 +360,49 @@ impl PyMultiHostUrl {
             let host_offset = scheme.len() + 3;
 
             let mut full_url = self.ref_url.unicode_string(py).into_owned();
-            full_url.insert(host_offset, ',');
+            let mut extra_hosts = String::new();
 
             // special urls will have had a trailing slash added, non-special urls will not
             // hence we need to remove the last char if the scheme is special
             #[allow(clippy::bool_to_int_with_if)]
             let sub = if scheme_is_special(scheme) { 1 } else { 0 };
 
-            let hosts = extra_urls
-                .iter()
-                .map(|url| {
-                    let str = unicode_url(url.as_str(), url);
-                    str[host_offset..str.len() - sub].to_string()
-                })
-                .collect::<Vec<String>>()
-                .join(",");
-            full_url.insert_str(host_offset, &hosts);
+            for url in extra_urls {
+                let str = unicode_url(url.as_str(), url);
+                extra_hosts.push_str(&str[host_offset..str.len() - sub]);
+                extra_hosts.push(',');
+            }
+
+            full_url.insert_str(host_offset, &extra_hosts);
             Cow::Owned(full_url)
         } else {
             self.ref_url.unicode_string(py)
         }
     }
 
-    pub fn __str__(&self, py: Python<'_>) -> String {
+    pub fn __str__(&self, py: Python<'_>) -> Cow<'_, str> {
         if let Some(extra_urls) = &self.extra_urls {
             let scheme = self.ref_url.lib_url.scheme();
             let host_offset = scheme.len() + 3;
 
             let mut full_url = self.ref_url.serialized(py).to_string();
-            full_url.insert(host_offset, ',');
+            let mut extra_hosts = String::new();
 
             // special urls will have had a trailing slash added, non-special urls will not
             // hence we need to remove the last char if the scheme is special
             #[allow(clippy::bool_to_int_with_if)]
             let sub = if scheme_is_special(scheme) { 1 } else { 0 };
 
-            let hosts = extra_urls
-                .iter()
-                .map(|url| {
-                    let str = url.as_str();
-                    &str[host_offset..str.len() - sub]
-                })
-                .collect::<Vec<&str>>()
-                .join(",");
-            full_url.insert_str(host_offset, &hosts);
-            full_url
+            for url in extra_urls {
+                let str = url.as_str();
+                extra_hosts.push_str(&str[host_offset..str.len() - sub]);
+                extra_hosts.push(',');
+            }
+
+            full_url.insert_str(host_offset, &extra_hosts);
+            Cow::Owned(full_url)
         } else {
-            self.ref_url.__str__(py).to_string()
+            Cow::Borrowed(self.ref_url.__str__(py))
         }
     }
 
@@ -439,7 +435,7 @@ impl PyMultiHostUrl {
         self.clone().into_py_any(py)
     }
 
-    fn __getnewargs__(&self, py: Python<'_>) -> (String,) {
+    fn __getnewargs__(&self, py: Python<'_>) -> (Cow<'_, str>,) {
         (self.__str__(py),)
     }
 
@@ -474,7 +470,7 @@ impl PyMultiHostUrl {
                             "expected one of 'host', 'username', 'password' or 'port' to be set",
                         ));
                     }
-                    multi_url.push_str(&single_host.to_string());
+                    write!(multi_url, "{single_host}").expect("string formatting never fails");
                     if index != hosts.len() - 1 {
                         multi_url.push(',');
                     }
@@ -602,13 +598,8 @@ fn is_punnycode_domain(lib_url: &Url, domain: &str) -> bool {
     scheme_is_special(lib_url.scheme()) && domain.split('.').any(|part| part.starts_with(PUNYCODE_PREFIX))
 }
 
-fn encode_userinfo_component(value: &str) -> Cow<'_, str> {
-    let encoded = percent_encode(value.as_bytes(), NON_ALPHANUMERIC).to_string();
-    if encoded == value {
-        Cow::Borrowed(value)
-    } else {
-        Cow::Owned(encoded)
-    }
+fn encode_userinfo_component(value: &str) -> impl fmt::Display + use<'_> {
+    utf8_percent_encode(value, NON_ALPHANUMERIC)
 }
 // based on https://github.com/servo/rust-url/blob/1c1e406874b3d2aa6f36c5d2f3a5c2ea74af9efb/url/src/parser.rs#L161-L167
 pub fn scheme_is_special(scheme: &str) -> bool {
