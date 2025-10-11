@@ -18,6 +18,7 @@ use crate::errors::{ErrorType, ErrorTypeDefaults, InputValue, LocItem, ValError,
 use crate::tools::{extract_i64, safe_repr};
 use crate::validators::complex::string_to_complex;
 use crate::validators::decimal::{create_decimal, get_decimal_type};
+use crate::validators::fraction::{create_fraction, get_fraction_type};
 use crate::validators::Exactness;
 use crate::validators::TemporalUnitMode;
 use crate::validators::ValBytesMode;
@@ -50,18 +51,6 @@ use super::{
 
 static FRACTION_TYPE: PyOnceLock<Py<PyType>> = PyOnceLock::new();
 
-pub fn get_fraction_type(py: Python<'_>) -> &Bound<'_, PyType> {
-    FRACTION_TYPE
-        .get_or_init(py, || {
-            py.import("fractions")
-                .and_then(|fractions_module| fractions_module.getattr("Fraction"))
-                .unwrap()
-                .extract()
-                .unwrap()
-        })
-        .bind(py)
-}
-
 pub(crate) fn downcast_python_input<'py, T: PyTypeCheck>(input: &(impl Input<'py> + ?Sized)) -> Option<&Bound<'py, T>> {
     input.as_python().and_then(|any| any.downcast::<T>().ok())
 }
@@ -70,6 +59,7 @@ pub(crate) fn input_as_python_instance<'a, 'py>(
     input: &'a (impl Input<'py> + ?Sized),
     class: &Bound<'py, PyType>,
 ) -> Option<&'a Bound<'py, PyAny>> {
+    println!("input_as_python_instance: class={:?}", class);
     input.as_python().filter(|any| any.is_instance(class).unwrap_or(false))
 }
 
@@ -168,6 +158,7 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
         strict: bool,
         coerce_numbers_to_str: bool,
     ) -> ValResult<ValidationMatch<EitherString<'_, 'py>>> {
+        println!("[RUST]: Call validate_str with {:?}, and strict {:?}", self, strict);
         if let Ok(py_str) = self.downcast_exact::<PyString>() {
             return Ok(ValidationMatch::exact(py_str.clone().into()));
         } else if let Ok(py_str) = self.downcast::<PyString>() {
@@ -284,13 +275,14 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
 
         'lax: {
             if !strict {
+                println!("[RUST]: validate_int lax path for {:?}", self);
                 return if let Some(s) = maybe_as_string(self, ErrorTypeDefaults::IntParsing)? {
                     str_as_int(self, s)
                 } else if self.is_exact_instance_of::<PyFloat>() {
                     float_as_int(self, self.extract::<f64>()?)
                 } else if let Ok(decimal) = self.validate_decimal(true, self.py()) {
                     decimal_as_int(self, &decimal.into_inner())
-                } else if self.is_instance(get_fraction_type(self.py()))? {
+                } else if let Ok(fraction) = self.validate_fraction(true, self.py()) {
                     fraction_as_int(self)
                 } else if let Ok(float) = self.extract::<f64>() {
                     float_as_int(self, float)
@@ -349,7 +341,49 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
         Err(ValError::new(ErrorTypeDefaults::FloatType, self))
     }
 
+    fn validate_fraction(&self, strict: bool, py: Python<'py>) -> ValMatch<Bound<'py, PyAny>> {
+        println!("[RUST]: Call validate_fraction with {:?}, and strict {:?}", self, strict);
+        let fraction_type = get_fraction_type(py);
+
+        // Fast path for existing decimal objects
+        if self.is_exact_instance(fraction_type) {
+            return Ok(ValidationMatch::exact(self.to_owned().clone()));
+        }
+
+        if !strict {
+            if self.is_instance_of::<PyString>() || (self.is_instance_of::<PyInt>() && !self.is_instance_of::<PyBool>())
+            {
+                // Checking isinstance for str / int / bool is fast compared to decimal / float
+                return create_fraction(self, self).map(ValidationMatch::lax);
+            }
+
+            if self.is_instance_of::<PyFloat>() {
+                return create_fraction(self.str()?.as_any(), self).map(ValidationMatch::lax);
+            }
+        }
+
+        if self.is_instance(fraction_type)? {
+            // Upcast subclasses to decimal
+            return create_decimal(self, self).map(ValidationMatch::strict);
+        }
+
+        let error_type = if strict {
+            ErrorType::IsInstanceOf {
+                class: fraction_type
+                    .qualname()
+                    .and_then(|name| name.extract())
+                    .unwrap_or_else(|_| "Decimal".to_owned()),
+                context: None,
+            }
+        } else {
+            ErrorTypeDefaults::FractionType
+        };
+
+        Err(ValError::new(error_type, self))
+    }
+
     fn validate_decimal(&self, strict: bool, py: Python<'py>) -> ValMatch<Bound<'py, PyAny>> {
+        println!("[RUST]: Call validate_decimal with {:?}, and strict {:?}", self, strict);
         let decimal_type = get_decimal_type(py);
 
         // Fast path for existing decimal objects
