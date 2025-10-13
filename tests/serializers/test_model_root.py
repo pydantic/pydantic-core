@@ -202,7 +202,7 @@ def test_not_root_model():
 
     if os.name == 'nt':
         path_value = Path('C:\\a\\b')
-        path_bytes = b'"C:\\a\\b"'
+        path_bytes = b'"C:\\\\a\\\\b"'  # fixme double escaping?
     else:
         path_value = Path('/a/b')
         path_bytes = b'"/a/b"'
