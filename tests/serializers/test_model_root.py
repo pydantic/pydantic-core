@@ -1,15 +1,9 @@
 import json
 import platform
-from pathlib import Path
+from pathlib import PurePosixPath
 from typing import Any, Union
 
 import pytest
-
-try:
-    from functools import cached_property
-except ImportError:
-    cached_property = None
-
 
 from pydantic_core import SchemaSerializer, core_schema
 
@@ -203,10 +197,10 @@ def test_not_root_model():
     assert s.to_json(v) == b'"123"'
 
     with pytest.warns(UserWarning, match=r'PydanticSerializationUnexpectedValue\(Expected `RootModel`'):
-        assert s.to_python(Path('/a/b')) == Path('/a/b')
+        assert s.to_python(PurePosixPath('/a/b')) == PurePosixPath('/a/b')
 
     with pytest.warns(UserWarning, match=r'PydanticSerializationUnexpectedValue\(Expected `RootModel`'):
-        assert s.to_json(Path('/a/b')) == b'"/a/b"'
+        assert s.to_json(PurePosixPath('/a/b')) == b'"/a/b"'
 
-    assert s.to_python(Path('/a/b'), warnings=False) == Path('/a/b')
-    assert s.to_json(Path('/a/b'), warnings=False) == b'"/a/b"'
+    assert s.to_python(PurePosixPath('/a/b'), warnings=False) == PurePosixPath('/a/b')
+    assert s.to_json(PurePosixPath('/a/b'), warnings=False) == b'"/a/b"'
