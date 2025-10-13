@@ -425,7 +425,7 @@ def test_serialize_as_any_with_field_serializer(container_schema_builder) -> Non
 
 
 def test_serialize_as_any_with_field_serializer_root_model() -> None:
-    # https://github.com/pydantic/pydantic/issues/12379
+    """https://github.com/pydantic/pydantic/issues/12379."""
 
     schema = core_schema.model_schema(
         type('Test', (), {}),
