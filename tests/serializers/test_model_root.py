@@ -1,5 +1,6 @@
 import json
 import platform
+from pathlib import Path
 from typing import Any, Union
 
 import pytest
@@ -181,27 +182,25 @@ def test_root_model_dump_with_base_model(order):
     assert s.to_json(m) == b'[1,2,{"value":"abc"}]'
 
 
-def test_construct_nested():
-    class RModel(RootModel):
+def test_not_root_model():
+    # https://github.com/pydantic/pydantic/issues/8963
+
+    class RootModel:
         root: int
 
-    class BModel(BaseModel):
-        value: RModel
+    v = RootModel()
+    v.root = '123'
 
     s = SchemaSerializer(
         core_schema.model_schema(
-            BModel,
-            core_schema.model_fields_schema(
-                {
-                    'value': core_schema.model_field(
-                        core_schema.model_schema(RModel, core_schema.int_schema(), root_model=True)
-                    )
-                }
-            ),
-        )
+            RootModel,
+            core_schema.str_schema(),
+            root_model=True,
+        ),
     )
 
-    m = BModel(value=42)
+    assert s.to_python(v) == '123'
+    assert s.to_json(v) == b'"123"'
 
-    with pytest.raises(AttributeError, match="'int' object has no attribute 'root'"):
-        s.to_python(m)
+    assert s.to_python(Path('/a/b')) == '/a/b'
+    assert s.to_json(Path('/a/b')) == b'"/a/b"'

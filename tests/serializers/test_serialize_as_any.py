@@ -420,3 +420,28 @@ def test_serialize_as_any_with_field_serializer(container_schema_builder) -> Non
     assert s.to_python(v, serialize_as_any=True) == {'value': 246}
     assert s.to_json(v, serialize_as_any=False) == b'{"value":246}'
     assert s.to_json(v, serialize_as_any=True) == b'{"value":246}'
+
+
+def test_serialize_as_any_with_field_serializer_root_model() -> None:
+    # https://github.com/pydantic/pydantic/issues/12379
+
+    schema = core_schema.model_schema(
+        type('Test', (), {}),
+        core_schema.int_schema(
+            serialization=core_schema.plain_serializer_function_ser_schema(
+                lambda model, v: v * 2, is_field_serializer=True
+            )
+        ),
+        root_model=True,
+    )
+
+    v = SchemaValidator(schema).validate_python(123)
+    cls = type(v)
+    s = SchemaSerializer(schema)
+    # necessary to ensure that type inference will pick up the serializer
+    cls.__pydantic_serializer__ = s
+
+    assert s.to_python(v, serialize_as_any=False) == 246
+    assert s.to_python(v, serialize_as_any=True) == 246
+    assert s.to_json(v, serialize_as_any=False) == b'246'
+    assert s.to_json(v, serialize_as_any=True) == b'246'
