@@ -314,7 +314,7 @@ impl GeneralFieldsSerializer {
     }
 
     /// Gets the serializer to use for a field, applying `serialize_as_any` logic and applying any
-    /// field-level exclusionsg
+    /// field-level exclusions
     fn prepare_value<'s>(
         value: &Bound<'_, PyAny>,
         field: &'s SerField,
