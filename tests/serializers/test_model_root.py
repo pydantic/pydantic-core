@@ -1,6 +1,7 @@
 import json
+import os
 import platform
-from pathlib import PosixPath
+from pathlib import Path
 from typing import Any, Union
 
 import pytest
@@ -196,11 +197,21 @@ def test_not_root_model():
     assert s.to_python(v) == '123'
     assert s.to_json(v) == b'"123"'
 
-    with pytest.warns(UserWarning, match=r'PydanticSerializationUnexpectedValue\(Expected `RootModel`'):
-        assert s.to_python(PosixPath('/a/b')) == PosixPath('/a/b')
+    # Path is chosen because it has a .root property
+    # which could look like a root model in bad implementations
+
+    if os.name == 'nt':
+        path_value = Path('C:\\a\\b')
+        path_bytes = b'"C:\\a\\b"'
+    else:
+        path_value = Path('/a/b')
+        path_bytes = b'"/a/b"'
 
     with pytest.warns(UserWarning, match=r'PydanticSerializationUnexpectedValue\(Expected `RootModel`'):
-        assert s.to_json(PosixPath('/a/b')) == b'"/a/b"'
+        assert s.to_python(path_value) == path_value
 
-    assert s.to_python(PosixPath('/a/b'), warnings=False) == PosixPath('/a/b')
-    assert s.to_json(PosixPath('/a/b'), warnings=False) == b'"/a/b"'
+    with pytest.warns(UserWarning, match=r'PydanticSerializationUnexpectedValue\(Expected `RootModel`'):
+        assert s.to_json(path_value) == path_bytes
+
+    assert s.to_python(path_value, warnings=False) == path_value
+    assert s.to_json(path_value, warnings=False) == path_bytes
