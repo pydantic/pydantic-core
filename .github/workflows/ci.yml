@@ -564,7 +564,7 @@ jobs:
           interpreter: ${{ matrix.interpreter }}
           rust-toolchain: ${{ steps.rust-toolchain.outputs.name }}
 
-      - run: ${{ matrix.ls || 'ls -lh' }} dist/
+      - run: ${{ (startsWith(matrix.platform.os, 'windows') && 'dir') || 'ls -lh' }} dist/
 
       - uses: actions/upload-artifact@v4
         with:
