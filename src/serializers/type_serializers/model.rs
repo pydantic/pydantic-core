@@ -140,16 +140,16 @@ fn has_extra(schema: &Bound<'_, PyDict>, config: Option<&Bound<'_, PyDict>>) -> 
 }
 
 impl ModelSerializer {
-    fn allow_value(&self, value: &Bound<'_, PyAny>, extra: &Extra) -> PyResult<bool> {
-        match extra.check {
+    fn allow_value(&self, value: &Bound<'_, PyAny>, check: SerCheck) -> PyResult<bool> {
+        match check {
             SerCheck::Strict => Ok(value.get_type().is(&self.class)),
             SerCheck::Lax => value.is_instance(self.class.bind(value.py())),
             SerCheck::None => value.hasattr(intern!(value.py(), "__dict__")),
         }
     }
 
-    fn allow_value_root_model(&self, value: &Bound<'_, PyAny>, extra: &Extra) -> PyResult<bool> {
-        match extra.check {
+    fn allow_value_root_model(&self, value: &Bound<'_, PyAny>, check: SerCheck) -> PyResult<bool> {
+        match check {
             SerCheck::Strict => Ok(value.get_type().is(&self.class)),
             SerCheck::Lax | SerCheck::None => value.is_instance(self.class.bind(value.py())),
         }
@@ -170,16 +170,14 @@ impl ModelSerializer {
         &self,
         value: &Bound<'_, PyAny>,
         extra: &Extra,
-        do_serialize: impl FnOnce(Option<(&Arc<CombinedSerializer>, &Bound<'_, PyAny>)>, &Extra) -> Result<T, E>,
+        do_serialize: impl FnOnce(Option<(&Arc<CombinedSerializer>, &Bound<'_, PyAny>, &Extra)>) -> Result<T, E>,
     ) -> Result<T, E> {
-        let model = Some(value);
-        let model_extra = Extra { model, ..*extra };
-
         match self.root_model {
-            true if self.allow_value_root_model(value, &model_extra)? => {
+            true if self.allow_value_root_model(value, extra.check)? => {
                 let root_extra = Extra {
                     field_name: Some(ROOT_FIELD),
-                    ..model_extra.clone()
+                    model: Some(value),
+                    ..extra.clone()
                 };
                 let root = value.getattr(intern!(value.py(), ROOT_FIELD))?;
 
@@ -200,13 +198,17 @@ impl ModelSerializer {
                     &self.serializer
                 };
 
-                do_serialize(Some((serializer, &root)), &root_extra)
+                do_serialize(Some((serializer, &root, &root_extra)))
             }
-            false if self.allow_value(value, &model_extra)? => {
+            false if self.allow_value(value, extra.check)? => {
+                let model_extra = Extra {
+                    model: Some(value),
+                    ..extra.clone()
+                };
                 let inner_value = self.get_inner_value(value, &model_extra)?;
-                do_serialize(Some((&self.serializer, &inner_value)), &model_extra)
+                do_serialize(Some((&self.serializer, &inner_value, &model_extra)))
             }
-            _ => do_serialize(None, &model_extra),
+            _ => do_serialize(None),
         }
     }
 
@@ -247,8 +249,8 @@ impl TypeSerializer for ModelSerializer {
         exclude: Option<&Bound<'_, PyAny>>,
         extra: &Extra,
     ) -> PyResult<Py<PyAny>> {
-        self.serialize(value, extra, |resolved, extra| match resolved {
-            Some((serializer, value)) => serializer.to_python_no_infer(value, include, exclude, extra),
+        self.serialize(value, extra, |resolved| match resolved {
+            Some((serializer, value, extra)) => serializer.to_python_no_infer(value, include, exclude, extra),
             None => {
                 extra.warnings.on_fallback_py(self.get_name(), value, extra)?;
                 infer_to_python(value, include, exclude, extra)
@@ -258,7 +260,7 @@ impl TypeSerializer for ModelSerializer {
 
     fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
         // FIXME: root model in json key position should serialize as inner value?
-        if self.allow_value(key, extra)? {
+        if self.allow_value(key, extra.check)? {
             infer_json_key_known(ObType::PydanticSerializable, key, extra)
         } else {
             extra.warnings.on_fallback_py(&self.name, key, extra)?;
@@ -274,8 +276,8 @@ impl TypeSerializer for ModelSerializer {
         exclude: Option<&Bound<'_, PyAny>>,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
-        self.serialize(value, extra, |resolved, extra| match resolved {
-            Some((cs, value)) => cs
+        self.serialize(value, extra, |resolved| match resolved {
+            Some((cs, value, extra)) => cs
                 .serde_serialize_no_infer(value, serializer, include, exclude, extra)
                 .map_err(WrappedSerError),
             None => {
