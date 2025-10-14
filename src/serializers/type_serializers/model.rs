@@ -15,6 +15,7 @@ use super::{
 };
 use crate::build_tools::py_schema_err;
 use crate::build_tools::{py_schema_error_type, ExtraBehavior};
+use crate::config::CoreConfig;
 use crate::definitions::DefinitionsBuilder;
 use crate::serializers::type_serializers::any::AnySerializer;
 use crate::serializers::type_serializers::function::FunctionPlainSerializer;
@@ -135,7 +136,11 @@ impl BuildSerializer for ModelSerializer {
 
 fn has_extra(schema: &Bound<'_, PyDict>, config: Option<&Bound<'_, PyDict>>) -> PyResult<bool> {
     let py = schema.py();
-    let extra_behaviour = ExtraBehavior::from_schema_or_config(py, schema, config, ExtraBehavior::Ignore)?;
+    let typed_config: CoreConfig = match config {
+        Some(config) => config.extract()?,
+        None => CoreConfig::default(),
+    };
+    let extra_behaviour = ExtraBehavior::from_schema_or_config(py, schema, &typed_config, ExtraBehavior::Ignore)?;
     Ok(matches!(extra_behaviour, ExtraBehavior::Allow))
 }
 

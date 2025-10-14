@@ -22,7 +22,7 @@ impl BuildValidator for NullableValidator {
 
     fn build(
         schema: &Bound<'_, PyDict>,
-        config: Option<&Bound<'_, PyDict>>,
+        config: &CoreConfig,
         definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
     ) -> PyResult<Arc<CombinedValidator>> {
         let schema = schema.get_as_req(intern!(schema.py(), "schema"))?;

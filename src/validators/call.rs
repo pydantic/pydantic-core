@@ -6,6 +6,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyString;
 use pyo3::types::{PyDict, PyTuple};
 
+use crate::config::CoreConfig;
 use crate::errors::ValResult;
 use crate::input::Input;
 
@@ -27,7 +28,7 @@ impl BuildValidator for CallValidator {
 
     fn build(
         schema: &Bound<'_, PyDict>,
-        config: Option<&Bound<'_, PyDict>>,
+        config: &CoreConfig,
         definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
     ) -> PyResult<Arc<CombinedValidator>> {
         let py = schema.py();
