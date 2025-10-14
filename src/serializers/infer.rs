@@ -4,8 +4,9 @@ use pyo3::exceptions::PyTypeError;
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::pybacked::PyBackedStr;
-use pyo3::types::PyComplex;
-use pyo3::types::{PyByteArray, PyBytes, PyDict, PyFrozenSet, PyIterator, PyList, PySet, PyString, PyTuple};
+use pyo3::types::{
+    PyByteArray, PyBytes, PyComplex, PyDict, PyFrozenSet, PyIterator, PyList, PyModule, PySet, PyString, PyTuple,
+};
 
 use pyo3::IntoPyObjectExt;
 use serde::ser::{Error, Serialize, SerializeMap, SerializeSeq, Serializer};
@@ -240,6 +241,10 @@ pub(crate) fn infer_to_python_known(
                 let v = value.downcast::<PyComplex>()?;
                 let complex_str = type_serializers::complex::complex_to_str(v);
                 complex_str.into_py_any(py)?
+            }
+            ObType::Module => {
+                let v = value.downcast::<PyModule>()?;
+                v.name()?.into()
             }
             ObType::Path => value.str()?.into_py_any(py)?,
             ObType::Pattern => value.getattr(intern!(py, "pattern"))?.unbind(),
@@ -554,6 +559,11 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
                 .map_err(py_err_se_err)?;
             serializer.serialize_str(&s)
         }
+        ObType::Module => {
+            let v = value.downcast::<PyModule>().map_err(py_err_se_err)?;
+            let s: PyBackedStr = v.name().and_then(|name| name.extract()).map_err(py_err_se_err)?;
+            serializer.serialize_str(&s)
+        }
         ObType::Unknown => {
             if let Some(fallback) = extra.fallback {
                 let next_value = fallback.call1((value,)).map_err(py_err_se_err)?;
@@ -677,6 +687,10 @@ pub(crate) fn infer_json_key_known<'a>(
         ObType::Complex => {
             let v = key.downcast::<PyComplex>()?;
             Ok(type_serializers::complex::complex_to_str(v).into())
+        }
+        ObType::Module => {
+            let v = key.downcast::<PyModule>()?;
+            Ok(Cow::Owned(v.name()?.to_string_lossy().into_owned()))
         }
         ObType::Pattern => Ok(Cow::Owned(
             key.getattr(intern!(key.py(), "pattern"))?
