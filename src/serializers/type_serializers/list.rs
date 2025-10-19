@@ -59,7 +59,7 @@ impl TypeSerializer for ListSerializer {
         exclude: Option<&Bound<'_, PyAny>>,
         extra: &Extra,
     ) -> PyResult<Py<PyAny>> {
-        match value.downcast::<PyList>() {
+        match value.cast::<PyList>() {
             Ok(py_list) => {
                 let py = value.py();
                 let item_serializer = self.item_serializer.as_ref();
@@ -97,7 +97,7 @@ impl TypeSerializer for ListSerializer {
         exclude: Option<&Bound<'_, PyAny>>,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
-        match value.downcast::<PyList>() {
+        match value.cast::<PyList>() {
             Ok(py_list) => {
                 let mut seq = serializer.serialize_seq(Some(py_list.len()))?;
                 let item_serializer = self.item_serializer.as_ref();

@@ -62,7 +62,7 @@ pub(crate) fn infer_to_python_known(
     macro_rules! serialize_seq {
         ($t:ty) => {
             value
-                .downcast::<$t>()?
+                .cast::<$t>()?
                 .iter()
                 .map(|v| infer_to_python(&v, None, None, extra))
                 .collect::<PyResult<Vec<Py<PyAny>>>>()?
@@ -71,7 +71,7 @@ pub(crate) fn infer_to_python_known(
 
     macro_rules! serialize_seq_filter {
         ($t:ty) => {{
-            let py_seq = value.downcast::<$t>()?;
+            let py_seq = value.cast::<$t>()?;
             let mut items = Vec::with_capacity(py_seq.len());
             let filter = AnyFilter::new();
             let len = value.len().ok();
@@ -137,14 +137,14 @@ pub(crate) fn infer_to_python_known(
                 v.into_py_any(py)?
             }
             ObType::Decimal => value.to_string().into_py_any(py)?,
-            ObType::StrSubclass => PyString::new(py, value.downcast::<PyString>()?.to_str()?).into(),
+            ObType::StrSubclass => PyString::new(py, value.cast::<PyString>()?.to_str()?).into(),
             ObType::Bytes => extra
                 .config
                 .bytes_mode
-                .bytes_to_string(py, value.downcast::<PyBytes>()?.as_bytes())?
+                .bytes_to_string(py, value.cast::<PyBytes>()?.as_bytes())?
                 .into_py_any(py)?,
             ObType::Bytearray => {
-                let py_byte_array = value.downcast::<PyByteArray>()?;
+                let py_byte_array = value.cast::<PyByteArray>()?;
                 pyo3::sync::with_critical_section(py_byte_array, || {
                     // SAFETY: `py_byte_array` is protected by a critical section,
                     // which guarantees no mutation, and `bytes_to_string` does not
@@ -171,24 +171,21 @@ pub(crate) fn infer_to_python_known(
                 PyList::new(py, elements)?.into()
             }
             ObType::Dict => {
-                let dict = value.downcast::<PyDict>()?;
+                let dict = value.cast::<PyDict>()?;
                 serialize_pairs_python(py, dict.iter().map(Ok), include, exclude, extra, |k| {
                     Ok(PyString::new(py, &infer_json_key(&k, extra)?).into_any())
                 })?
             }
             ObType::Datetime => {
-                let datetime = extra
-                    .config
-                    .temporal_mode
-                    .datetime_to_json(value.py(), value.downcast()?)?;
+                let datetime = extra.config.temporal_mode.datetime_to_json(value.py(), value.cast()?)?;
                 datetime.into_py_any(py)?
             }
             ObType::Date => {
-                let date = extra.config.temporal_mode.date_to_json(value.py(), value.downcast()?)?;
+                let date = extra.config.temporal_mode.date_to_json(value.py(), value.cast()?)?;
                 date.into_py_any(py)?
             }
             ObType::Time => {
-                let time = extra.config.temporal_mode.time_to_json(value.py(), value.downcast()?)?;
+                let time = extra.config.temporal_mode.time_to_json(value.py(), value.cast()?)?;
                 time.into_py_any(py)?
             }
             ObType::Timedelta => {
@@ -218,7 +215,7 @@ pub(crate) fn infer_to_python_known(
                 infer_to_python(&v, include, exclude, extra)?
             }
             ObType::Generator => {
-                let py_seq = value.downcast::<PyIterator>()?;
+                let py_seq = value.cast::<PyIterator>()?;
                 let mut items = Vec::new();
                 let filter = AnyFilter::new();
 
@@ -237,7 +234,7 @@ pub(crate) fn infer_to_python_known(
                 PyList::new(py, items)?.into()
             }
             ObType::Complex => {
-                let v = value.downcast::<PyComplex>()?;
+                let v = value.cast::<PyComplex>()?;
                 let complex_str = type_serializers::complex::complex_to_str(v);
                 complex_str.into_py_any(py)?
             }
@@ -273,14 +270,14 @@ pub(crate) fn infer_to_python_known(
                 PyFrozenSet::new(py, &elements)?.into()
             }
             ObType::Dict => {
-                let dict = value.downcast::<PyDict>()?;
+                let dict = value.cast::<PyDict>()?;
                 serialize_pairs_python(py, dict.iter().map(Ok), include, exclude, extra, Ok)?
             }
             ObType::PydanticSerializable => serialize_with_serializer()?,
             ObType::Dataclass => serialize_pairs_python(py, any_dataclass_iter(value)?.0, include, exclude, extra, Ok)?,
             ObType::Generator => {
                 let iter = super::type_serializers::generator::SerializationIterator::new(
-                    value.downcast()?,
+                    value.cast()?,
                     super::type_serializers::any::AnySerializer::get(),
                     SchemaFilter::default(),
                     include,
@@ -290,7 +287,7 @@ pub(crate) fn infer_to_python_known(
                 iter.into_py_any(py)?
             }
             ObType::Complex => {
-                let v = value.downcast::<PyComplex>()?;
+                let v = value.cast::<PyComplex>()?;
                 v.into_py_any(py)?
             }
             ObType::Unknown => {
@@ -386,7 +383,7 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
 
     macro_rules! serialize_seq {
         ($t:ty) => {{
-            let py_seq = value.downcast::<$t>().map_err(py_err_se_err)?;
+            let py_seq = value.cast::<$t>().map_err(py_err_se_err)?;
             let mut seq = serializer.serialize_seq(Some(py_seq.len()))?;
             for element in py_seq.iter() {
                 let item_serializer = SerializeInfer::new(&element, include, exclude, extra);
@@ -398,7 +395,7 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
 
     macro_rules! serialize_seq_filter {
         ($t:ty) => {{
-            let py_seq = value.downcast::<$t>().map_err(py_err_se_err)?;
+            let py_seq = value.cast::<$t>().map_err(py_err_se_err)?;
             let mut seq = serializer.serialize_seq(Some(py_seq.len()))?;
             let filter = AnyFilter::new();
             let len = value.len().ok();
@@ -422,7 +419,7 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
         ObType::Int | ObType::IntSubclass => serialize!(Int),
         ObType::Bool => serialize!(bool),
         ObType::Complex => {
-            let v = value.downcast::<PyComplex>().map_err(py_err_se_err)?;
+            let v = value.cast::<PyComplex>().map_err(py_err_se_err)?;
             let complex_str = type_serializers::complex::complex_to_str(v);
             Ok(serializer.collect_str::<String>(&complex_str)?)
         }
@@ -432,15 +429,15 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
         }
         ObType::Decimal => value.to_string().serialize(serializer),
         ObType::Str | ObType::StrSubclass => {
-            let py_str = value.downcast::<PyString>().map_err(py_err_se_err)?;
+            let py_str = value.cast::<PyString>().map_err(py_err_se_err)?;
             super::type_serializers::string::serialize_py_str(py_str, serializer)
         }
         ObType::Bytes => {
-            let py_bytes = value.downcast::<PyBytes>().map_err(py_err_se_err)?;
+            let py_bytes = value.cast::<PyBytes>().map_err(py_err_se_err)?;
             extra.config.bytes_mode.serialize_bytes(py_bytes.as_bytes(), serializer)
         }
         ObType::Bytearray => {
-            let py_byte_array = value.downcast::<PyByteArray>().map_err(py_err_se_err)?;
+            let py_byte_array = value.cast::<PyByteArray>().map_err(py_err_se_err)?;
             pyo3::sync::with_critical_section(py_byte_array, || {
                 // SAFETY: `py_byte_array` is protected by a critical section,
                 // which guarantees no mutation, and `serialize_bytes` does not
@@ -451,7 +448,7 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
             })
         }
         ObType::Dict => {
-            let dict = value.downcast::<PyDict>().map_err(py_err_se_err)?;
+            let dict = value.cast::<PyDict>().map_err(py_err_se_err)?;
             serialize_pairs_json(dict.iter().map(Ok), dict.len(), serializer, include, exclude, extra)
         }
         ObType::List => serialize_seq_filter!(PyList),
@@ -459,15 +456,15 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
         ObType::Set => serialize_seq!(PySet),
         ObType::Frozenset => serialize_seq!(PyFrozenSet),
         ObType::Datetime => {
-            let py_datetime = value.downcast().map_err(py_err_se_err)?;
+            let py_datetime = value.cast().map_err(py_err_se_err)?;
             extra.config.temporal_mode.datetime_serialize(py_datetime, serializer)
         }
         ObType::Date => {
-            let py_date = value.downcast().map_err(py_err_se_err)?;
+            let py_date = value.cast().map_err(py_err_se_err)?;
             extra.config.temporal_mode.date_serialize(py_date, serializer)
         }
         ObType::Time => {
-            let py_time = value.downcast().map_err(py_err_se_err)?;
+            let py_time = value.cast().map_err(py_err_se_err)?;
             extra.config.temporal_mode.time_serialize(py_time, serializer)
         }
         ObType::Timedelta => {
@@ -524,7 +521,7 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
             infer_serialize(&v, serializer, include, exclude, extra)
         }
         ObType::Generator => {
-            let py_seq = value.downcast::<PyIterator>().map_err(py_err_se_err)?;
+            let py_seq = value.cast::<PyIterator>().map_err(py_err_se_err)?;
             let mut seq = serializer.serialize_seq(None)?;
             let filter = AnyFilter::new();
             for (index, r) in py_seq.try_iter().map_err(py_err_se_err)?.enumerate() {
@@ -614,13 +611,13 @@ pub(crate) fn infer_json_key_known<'a>(
         }
         ObType::Decimal => Ok(Cow::Owned(key.to_string())),
         ObType::Bool => super::type_serializers::simple::bool_json_key(key),
-        ObType::Str | ObType::StrSubclass => key.downcast::<PyString>()?.to_cow(),
+        ObType::Str | ObType::StrSubclass => key.cast::<PyString>()?.to_cow(),
         ObType::Bytes => extra
             .config
             .bytes_mode
-            .bytes_to_string(key.py(), key.downcast::<PyBytes>()?.as_bytes()),
+            .bytes_to_string(key.py(), key.cast::<PyBytes>()?.as_bytes()),
         ObType::Bytearray => {
-            let py_byte_array = key.downcast::<PyByteArray>()?;
+            let py_byte_array = key.cast::<PyByteArray>()?;
             pyo3::sync::with_critical_section(py_byte_array, || {
                 // SAFETY: `py_byte_array` is protected by a critical section,
                 // which guarantees no mutation, and `bytes_to_string` does not
@@ -631,9 +628,9 @@ pub(crate) fn infer_json_key_known<'a>(
             })
             .map(|cow| Cow::Owned(cow.into_owned()))
         }
-        ObType::Datetime => extra.config.temporal_mode.datetime_json_key(key.downcast()?),
-        ObType::Date => extra.config.temporal_mode.date_json_key(key.downcast()?),
-        ObType::Time => extra.config.temporal_mode.time_json_key(key.downcast()?),
+        ObType::Datetime => extra.config.temporal_mode.datetime_json_key(key.cast()?),
+        ObType::Date => extra.config.temporal_mode.date_json_key(key.cast()?),
+        ObType::Time => extra.config.temporal_mode.time_json_key(key.cast()?),
         ObType::Uuid => {
             let uuid = super::type_serializers::uuid::uuid_to_string(key)?;
             Ok(Cow::Owned(uuid))
@@ -652,7 +649,7 @@ pub(crate) fn infer_json_key_known<'a>(
         }
         ObType::Tuple => {
             let mut key_build = super::type_serializers::tuple::KeyBuilder::new();
-            for element in key.downcast::<PyTuple>()?.iter_borrowed() {
+            for element in key.cast::<PyTuple>()?.iter_borrowed() {
                 key_build.push(&infer_json_key(&element, extra)?);
             }
             Ok(Cow::Owned(key_build.finish()))
@@ -675,7 +672,7 @@ pub(crate) fn infer_json_key_known<'a>(
             Ok(Cow::Owned(key.str()?.to_string_lossy().into_owned()))
         }
         ObType::Complex => {
-            let v = key.downcast::<PyComplex>()?;
+            let v = key.cast::<PyComplex>()?;
             Ok(type_serializers::complex::complex_to_str(v).into())
         }
         ObType::Pattern => Ok(Cow::Owned(

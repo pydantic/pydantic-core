@@ -334,7 +334,7 @@ pub(crate) fn iterate_attributes<'a, 'py>(
         // or we get to the end of the list of attributes
         let name = attributes_iterator.next()?;
         // from benchmarks this is 14x faster than using the python `startswith` method
-        let name_cow = match name.downcast::<PyString>() {
+        let name_cow = match name.cast::<PyString>() {
             Ok(name) => name.to_string_lossy(),
             Err(e) => return Some(Err(e.into())),
         };
@@ -706,9 +706,11 @@ impl Rem for &Int {
     }
 }
 
-impl FromPyObject<'_> for Int {
-    fn extract_bound(obj: &Bound<'_, PyAny>) -> PyResult<Self> {
-        match extract_int(obj) {
+impl FromPyObject<'_, '_> for Int {
+    type Error = PyErr;
+
+    fn extract(obj: Borrowed<'_, '_, PyAny>) -> PyResult<Self> {
+        match extract_int(&obj) {
             Some(i) => Ok(i),
             None => py_err!(PyTypeError; "Expected int, got {}", obj.get_type()),
         }

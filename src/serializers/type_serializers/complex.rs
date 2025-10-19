@@ -36,7 +36,7 @@ impl TypeSerializer for ComplexSerializer {
         extra: &Extra,
     ) -> PyResult<Py<PyAny>> {
         let py = value.py();
-        match value.downcast::<PyComplex>() {
+        match value.cast::<PyComplex>() {
             Ok(py_complex) => match extra.mode {
                 SerMode::Json => complex_to_str(py_complex).into_py_any(py),
                 _ => Ok(value.clone().unbind()),
@@ -60,7 +60,7 @@ impl TypeSerializer for ComplexSerializer {
         exclude: Option<&Bound<'_, PyAny>>,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
-        match value.downcast::<PyComplex>() {
+        match value.cast::<PyComplex>() {
             Ok(py_complex) => {
                 let s = complex_to_str(py_complex);
                 Ok(serializer.collect_str::<String>(&s)?)
