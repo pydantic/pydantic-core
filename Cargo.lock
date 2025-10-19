@@ -288,7 +288,7 @@ checksum = "49f1f14873335454500d59611f1cf4a4b0f786f9ac11f4312a78e4cf2566695b"
 [[package]]
 name = "jiter"
 version = "0.11.0"
-source = "git+https://github.com/pydantic/jiter.git?branch=dh/pyo3-0.27#747950a735f0ae44f77cda4ea01f5c772ecea59e"
+source = "git+https://github.com/pydantic/jiter.git?branch=dh/pyo3-0.27#c74454182da301c82d5c3f660a267a3ef5e1d972"
 dependencies = [
  "ahash",
  "bitvec",
@@ -457,13 +457,14 @@ dependencies = [
 
 [[package]]
 name = "pyo3"
-version = "0.26.0"
-source = "git+https://github.com/pyo3/pyo3.git#da618c7c90b1f55c66c14353c9f014c9ae7c52df"
+version = "0.27.0"
+source = "git+https://github.com/pyo3/pyo3.git?branch=release-0.27.0#a5cadba2c71748e0918762d951798812d96fc8eb"
 dependencies = [
  "indoc",
  "libc",
  "memoffset",
  "num-bigint",
+ "num-traits",
  "once_cell",
  "portable-atomic",
  "pyo3-build-config",
@@ -474,8 +475,8 @@ dependencies = [
 
 [[package]]
 name = "pyo3-build-config"
-version = "0.26.0"
-source = "git+https://github.com/pyo3/pyo3.git#da618c7c90b1f55c66c14353c9f014c9ae7c52df"
+version = "0.27.0"
+source = "git+https://github.com/pyo3/pyo3.git?branch=release-0.27.0#a5cadba2c71748e0918762d951798812d96fc8eb"
 dependencies = [
  "python3-dll-a",
  "target-lexicon",
@@ -483,8 +484,8 @@ dependencies = [
 
 [[package]]
 name = "pyo3-ffi"
-version = "0.26.0"
-source = "git+https://github.com/pyo3/pyo3.git#da618c7c90b1f55c66c14353c9f014c9ae7c52df"
+version = "0.27.0"
+source = "git+https://github.com/pyo3/pyo3.git?branch=release-0.27.0#a5cadba2c71748e0918762d951798812d96fc8eb"
 dependencies = [
  "libc",
  "pyo3-build-config",
@@ -492,8 +493,8 @@ dependencies = [
 
 [[package]]
 name = "pyo3-macros"
-version = "0.26.0"
-source = "git+https://github.com/pyo3/pyo3.git#da618c7c90b1f55c66c14353c9f014c9ae7c52df"
+version = "0.27.0"
+source = "git+https://github.com/pyo3/pyo3.git?branch=release-0.27.0#a5cadba2c71748e0918762d951798812d96fc8eb"
 dependencies = [
  "proc-macro2",
  "pyo3-macros-backend",
@@ -503,8 +504,8 @@ dependencies = [
 
 [[package]]
 name = "pyo3-macros-backend"
-version = "0.26.0"
-source = "git+https://github.com/pyo3/pyo3.git#da618c7c90b1f55c66c14353c9f014c9ae7c52df"
+version = "0.27.0"
+source = "git+https://github.com/pyo3/pyo3.git?branch=release-0.27.0#a5cadba2c71748e0918762d951798812d96fc8eb"
 dependencies = [
  "heck",
  "proc-macro2",

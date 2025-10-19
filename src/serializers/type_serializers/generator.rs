@@ -56,7 +56,7 @@ impl TypeSerializer for GeneratorSerializer {
         exclude: Option<&Bound<'_, PyAny>>,
         extra: &Extra,
     ) -> PyResult<Py<PyAny>> {
-        match value.downcast::<PyIterator>() {
+        match value.cast::<PyIterator>() {
             Ok(py_iter) => {
                 let py = value.py();
                 match extra.mode {
@@ -113,7 +113,7 @@ impl TypeSerializer for GeneratorSerializer {
         exclude: Option<&Bound<'_, PyAny>>,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
-        match value.downcast::<PyIterator>() {
+        match value.cast::<PyIterator>() {
             Ok(py_iter) => {
                 let len = value.len().ok();
                 let mut seq = serializer.serialize_seq(len)?;

@@ -526,7 +526,7 @@ impl FromPyObject<'_, '_> for UrlHostParts {
 
     fn extract(ob: Borrowed<'_, '_, PyAny>) -> PyResult<Self> {
         let py = ob.py();
-        let dict = ob.downcast::<PyDict>()?;
+        let dict = ob.cast::<PyDict>()?;
         Ok(UrlHostParts {
             username: dict.get_as(intern!(py, "username"))?,
             password: dict.get_as(intern!(py, "password"))?,

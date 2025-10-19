@@ -49,7 +49,7 @@ impl TypeSerializer for StrSerializer {
         match extra.ob_type_lookup.is_type(value, ObType::Str) {
             IsType::Exact => Ok(value.clone().unbind()),
             IsType::Subclass => match extra.mode {
-                SerMode::Json => value.downcast::<PyString>()?.to_str()?.into_py_any(py),
+                SerMode::Json => value.cast::<PyString>()?.to_str()?.into_py_any(py),
                 _ => Ok(value.clone().unbind()),
             },
             IsType::False => {
@@ -60,7 +60,7 @@ impl TypeSerializer for StrSerializer {
     }
 
     fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
-        if let Ok(py_str) = key.downcast::<PyString>() {
+        if let Ok(py_str) = key.cast::<PyString>() {
             // FIXME py cow to avoid the copy
             Ok(Cow::Owned(py_str.to_string_lossy().into_owned()))
         } else {
@@ -77,7 +77,7 @@ impl TypeSerializer for StrSerializer {
         exclude: Option<&Bound<'_, PyAny>>,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
-        match value.downcast::<PyString>() {
+        match value.cast::<PyString>() {
             Ok(py_str) => serialize_py_str(py_str, serializer),
             Err(_) => {
                 extra.warnings.on_fallback_ser::<S>(self.get_name(), value, extra)?;

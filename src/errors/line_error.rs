@@ -2,8 +2,8 @@ use std::convert::Infallible;
 
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
-use pyo3::DowncastError;
-use pyo3::DowncastIntoError;
+use pyo3::CastError;
+use pyo3::CastIntoError;
 
 use jiter::JsonValue;
 
@@ -45,15 +45,15 @@ impl From<PyErr> for ValError {
     }
 }
 
-impl From<DowncastError<'_, '_>> for ValError {
-    fn from(py_downcast: DowncastError) -> Self {
-        Self::InternalErr(PyTypeError::new_err(py_downcast.to_string()))
+impl From<CastError<'_, '_>> for ValError {
+    fn from(py_cast: CastError) -> Self {
+        Self::InternalErr(PyTypeError::new_err(py_cast.to_string()))
     }
 }
 
-impl From<DowncastIntoError<'_>> for ValError {
-    fn from(py_downcast: DowncastIntoError) -> Self {
-        Self::InternalErr(PyTypeError::new_err(py_downcast.to_string()))
+impl From<CastIntoError<'_>> for ValError {
+    fn from(py_cast: CastIntoError) -> Self {
+        Self::InternalErr(PyTypeError::new_err(py_cast.to_string()))
     }
 }
 
