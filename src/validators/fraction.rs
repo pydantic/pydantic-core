@@ -6,13 +6,11 @@ use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyDict, PyString, PyType};
 use pyo3::{prelude::*, PyTypeInfo};
 
-use crate::build_tools::{is_strict, schema_or_config_same};
-use crate::errors::ErrorType;
+use crate::build_tools::is_strict;
 use crate::errors::ValResult;
-use crate::errors::{ErrorTypeDefaults, Number};
+use crate::errors::ErrorTypeDefaults;
 use crate::errors::{ToErrorValue, ValError};
 use crate::input::Input;
-use crate::tools::SchemaDict;
 
 use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
 
@@ -63,8 +61,6 @@ impl BuildValidator for FractionValidator {
         _definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
     ) -> PyResult<Arc<CombinedValidator>> {
         let py = schema.py();
-
-        let allow_inf_nan = schema_or_config_same(schema, config, intern!(py, "allow_inf_nan"))?.unwrap_or(false);
 
         Ok(CombinedValidator::Fraction(Self {
             strict: is_strict(schema, config)?,

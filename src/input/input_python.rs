@@ -280,7 +280,7 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
                 } else if let Ok(decimal) = self.validate_decimal(true, self.py()) {
                     decimal_as_int(self, &decimal.into_inner())
                 } else if let Ok(fraction) = self.validate_fraction(true, self.py()) {
-                    fraction_as_int(self)
+                    fraction_as_int(self, &fraction.into_inner())
                 } else if let Ok(float) = self.extract::<f64>() {
                     float_as_int(self, float)
                 } else if let Some(enum_val) = maybe_as_enum(self) {
