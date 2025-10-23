@@ -1319,7 +1319,7 @@ def test_multi_url_build() -> None:
 
 
 @pytest.mark.parametrize('url_type', [Url, MultiHostUrl])
-def test_url_build_encodes_credentials(url_type: type[Url | MultiHostUrl]) -> None:
+def test_url_build_encodes_credentials(url_type: type[Union[Url, MultiHostUrl]]) -> None:
     url = url_type.build(
         scheme='postgresql',
         username='user name',
