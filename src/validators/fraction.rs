@@ -3,7 +3,7 @@ use std::sync::Arc;
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::intern;
 use pyo3::sync::PyOnceLock;
-use pyo3::types::{IntoPyDict, PyDict, PyString, PyTuple, PyType};
+use pyo3::types::{PyDict, PyString, PyType};
 use pyo3::{prelude::*, PyTypeInfo};
 
 use crate::build_tools::{is_strict, schema_or_config_same};
@@ -77,12 +77,7 @@ impl BuildValidator for FractionValidator {
     }
 }
 
-impl_py_gc_traverse!(FractionValidator {
-    le,
-    lt,
-    ge,
-    gt
-});
+impl_py_gc_traverse!(FractionValidator { le, lt, ge, gt });
 
 fn extract_fraction_as_ints(fraction: &Bound<'_, PyAny>) -> ValResult<(i64, i64)> {
     let py = fraction.py();

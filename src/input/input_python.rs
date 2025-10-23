@@ -49,7 +49,7 @@ use super::{
     Input,
 };
 
-static FRACTION_TYPE: PyOnceLock<Py<PyType>> = PyOnceLock::new();
+
 
 pub(crate) fn downcast_python_input<'py, T: PyTypeCheck>(input: &(impl Input<'py> + ?Sized)) -> Option<&Bound<'py, T>> {
     input.as_python().and_then(|any| any.downcast::<T>().ok())
@@ -59,7 +59,6 @@ pub(crate) fn input_as_python_instance<'a, 'py>(
     input: &'a (impl Input<'py> + ?Sized),
     class: &Bound<'py, PyType>,
 ) -> Option<&'a Bound<'py, PyAny>> {
-    println!("input_as_python_instance: class={:?}", class);
     input.as_python().filter(|any| any.is_instance(class).unwrap_or(false))
 }
 
@@ -158,7 +157,6 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
         strict: bool,
         coerce_numbers_to_str: bool,
     ) -> ValResult<ValidationMatch<EitherString<'_, 'py>>> {
-        println!("[RUST]: Call validate_str with {:?}, and strict {:?}", self, strict);
         if let Ok(py_str) = self.downcast_exact::<PyString>() {
             return Ok(ValidationMatch::exact(py_str.clone().into()));
         } else if let Ok(py_str) = self.downcast::<PyString>() {
@@ -275,7 +273,6 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
 
         'lax: {
             if !strict {
-                println!("[RUST]: validate_int lax path for {:?}", self);
                 return if let Some(s) = maybe_as_string(self, ErrorTypeDefaults::IntParsing)? {
                     str_as_int(self, s)
                 } else if self.is_exact_instance_of::<PyFloat>() {
@@ -342,7 +339,6 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
     }
 
     fn validate_fraction(&self, strict: bool, py: Python<'py>) -> ValMatch<Bound<'py, PyAny>> {
-        println!("[RUST]: Call validate_fraction with {:?}, and strict {:?}", self, strict);
         let fraction_type = get_fraction_type(py);
 
         // Fast path for existing decimal objects
@@ -383,7 +379,6 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
     }
 
     fn validate_decimal(&self, strict: bool, py: Python<'py>) -> ValMatch<Bound<'py, PyAny>> {
-        println!("[RUST]: Call validate_decimal with {:?}, and strict {:?}", self, strict);
         let decimal_type = get_decimal_type(py);
 
         // Fast path for existing decimal objects

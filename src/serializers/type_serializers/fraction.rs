@@ -16,10 +16,11 @@ use super::{
 #[derive(Debug)]
 pub struct FractionSerializer {}
 
-static FRACTION_SERIALIZER: LazyLock<Arc<CombinedSerializer>> = LazyLock::new(|| Arc::new(FractionSerializer {}.into()));
+static FRACTION_SERIALIZER: LazyLock<Arc<CombinedSerializer>> =
+    LazyLock::new(|| Arc::new(FractionSerializer {}.into()));
 
 impl BuildSerializer for FractionSerializer {
-    const EXPECTED_TYPE: &'static str = "decimal";
+    const EXPECTED_TYPE: &'static str = "fraction";
 
     fn build(
         _schema: &Bound<'_, PyDict>,
@@ -41,7 +42,6 @@ impl TypeSerializer for FractionSerializer {
         extra: &Extra,
     ) -> PyResult<Py<PyAny>> {
         let _py = value.py();
-        println!("[RUST] FractionSerializer to_python called");
         match extra.ob_type_lookup.is_type(value, ObType::Fraction) {
             IsType::Exact | IsType::Subclass => infer_to_python_known(ObType::Fraction, value, include, exclude, extra),
             IsType::False => {
