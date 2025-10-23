@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use pyo3::exceptions::{PyTypeError, PyValueError, PyZeroDivisionError};
+use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::intern;
 use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyDict, PyString, PyType};
@@ -37,7 +37,7 @@ fn validate_as_fraction(
         Some(value) => match value.validate_fraction(false, py) {
             Ok(v) => Ok(Some(v.into_inner().unbind())),
             Err(_) => Err(PyValueError::new_err(format!(
-                "'{key}' must be coercible to a Decimal instance",
+                "'{key}' must be coercible to a Fraction instance",
             ))),
         },
         None => Ok(None),
@@ -147,13 +147,13 @@ impl Validator for FractionValidator {
 
 pub(crate) fn create_fraction<'py>(arg: &Bound<'py, PyAny>, input: impl ToErrorValue) -> ValResult<Bound<'py, PyAny>> {
     let py = arg.py();
-    get_fraction_type(py).call1((arg,)).map_err(|e| {
-        handle_fraction_new_error(input, e)
-    })
+    get_fraction_type(py)
+        .call1((arg,))
+        .map_err(|e| handle_fraction_new_error(input, e))
 }
 
 fn handle_fraction_new_error(input: impl ToErrorValue, error: PyErr) -> ValError {
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         if error.matches(py, PyValueError::type_object(py)).unwrap_or(false) {
             ValError::new(ErrorTypeDefaults::FractionParsing, input)
         } else if error.matches(py, PyTypeError::type_object(py)).unwrap_or(false) {

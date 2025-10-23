@@ -234,6 +234,7 @@ pub fn fraction_as_int<'py>(
 ) -> ValResult<EitherInt<'py>> {
     let py = fraction.py();
 
+    // as_integer_ratio was added in Python 3.8, so this should be fine
     let (numerator, denominator) = fraction
         .call_method0(intern!(py, "as_integer_ratio"))?
         .extract::<(Bound<'_, PyAny>, Bound<'_, PyAny>)>()?;

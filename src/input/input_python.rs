@@ -343,21 +343,8 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
             return Ok(ValidationMatch::exact(self.to_owned().clone()));
         }
 
-        if !strict {
-            if self.is_instance_of::<PyString>() || (self.is_instance_of::<PyInt>() && !self.is_instance_of::<PyBool>())
-            {
-                // Checking isinstance for str / int / bool is fast compared to decimal / float
-                return create_fraction(self, self).map(ValidationMatch::lax);
-            }
-
-            if self.is_instance_of::<PyFloat>() {
-                return create_fraction(self.str()?.as_any(), self).map(ValidationMatch::lax);
-            }
-        }
-
-        if self.is_instance(fraction_type)? {
-            // Upcast subclasses to decimal
-            return create_decimal(self, self).map(ValidationMatch::strict);
+        if !strict && self.is_instance_of::<PyString>() {
+            return create_fraction(self, self).map(ValidationMatch::lax);
         }
 
         let error_type = if strict {
@@ -365,7 +352,7 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
                 class: fraction_type
                     .qualname()
                     .and_then(|name| name.extract())
-                    .unwrap_or_else(|_| "Decimal".to_owned()),
+                    .unwrap_or_else(|_| "Fraction".to_owned()),
                 context: None,
             }
         } else {

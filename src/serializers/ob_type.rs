@@ -63,7 +63,6 @@ pub enum IsType {
 
 impl ObTypeLookup {
     fn new(py: Python) -> Self {
-        // todo: delete before PR ready
         Self {
             none: PyNone::type_object_raw(py) as usize,
             int: PyInt::type_object_raw(py) as usize,
