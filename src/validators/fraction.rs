@@ -7,8 +7,8 @@ use pyo3::types::{PyDict, PyString, PyType};
 use pyo3::{prelude::*, PyTypeInfo};
 
 use crate::build_tools::is_strict;
-use crate::errors::ValResult;
 use crate::errors::ErrorTypeDefaults;
+use crate::errors::ValResult;
 use crate::errors::{ToErrorValue, ValError};
 use crate::input::Input;
 
@@ -74,15 +74,6 @@ impl BuildValidator for FractionValidator {
 }
 
 impl_py_gc_traverse!(FractionValidator { le, lt, ge, gt });
-
-fn extract_fraction_as_ints(fraction: &Bound<'_, PyAny>) -> ValResult<(i64, i64)> {
-    let py = fraction.py();
-    // just call fraction.numerator and fraction.denominator
-    let numerator: i64 = fraction.getattr(intern!(py, "numerator"))?.extract()?;
-    let denominator: i64 = fraction.getattr(intern!(py, "denominator"))?.extract()?;
-
-    Ok((numerator, denominator))
-}
 
 impl Validator for FractionValidator {
     fn validate<'py>(

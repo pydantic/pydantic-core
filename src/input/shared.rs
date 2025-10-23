@@ -231,7 +231,7 @@ pub fn decimal_as_int<'py>(
 pub fn fraction_as_int<'py>(
     input: &(impl Input<'py> + ?Sized),
     fraction: &Bound<'py, PyAny>,
-    ) -> ValResult<EitherInt<'py>> {
+) -> ValResult<EitherInt<'py>> {
     let py = fraction.py();
 
     let (numerator, denominator) = fraction
@@ -241,5 +241,4 @@ pub fn fraction_as_int<'py>(
         return Err(ValError::new(ErrorTypeDefaults::IntFromFloat, input));
     }
     Ok(EitherInt::Py(numerator))
-
 }
