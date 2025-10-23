@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use pyo3::exceptions::{PyTypeError, PyValueError};
+use pyo3::exceptions::{PyTypeError, PyValueError, PyZeroDivisionError};
 use pyo3::intern;
 use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyDict, PyString, PyType};
@@ -148,24 +148,20 @@ impl Validator for FractionValidator {
 pub(crate) fn create_fraction<'py>(arg: &Bound<'py, PyAny>, input: impl ToErrorValue) -> ValResult<Bound<'py, PyAny>> {
     let py = arg.py();
     get_fraction_type(py).call1((arg,)).map_err(|e| {
-        let fraction_exception = match py
-            .import("fractions")
-            .and_then(|fraction_module| fraction_module.getattr("FractionException"))
-        {
-            Ok(fraction_exception) => fraction_exception,
-            Err(e) => return ValError::InternalErr(e),
-        };
-        handle_fraction_new_error(input, e, fraction_exception)
+        handle_fraction_new_error(input, e)
     })
 }
 
-fn handle_fraction_new_error(input: impl ToErrorValue, error: PyErr, fraction_exception: Bound<'_, PyAny>) -> ValError {
-    let py = fraction_exception.py();
-    if error.matches(py, fraction_exception).unwrap_or(false) {
-        ValError::new(ErrorTypeDefaults::FractionParsing, input)
-    } else if error.matches(py, PyTypeError::type_object(py)).unwrap_or(false) {
-        ValError::new(ErrorTypeDefaults::FractionType, input)
-    } else {
-        ValError::InternalErr(error)
-    }
+fn handle_fraction_new_error(input: impl ToErrorValue, error: PyErr) -> ValError {
+    Python::with_gil(|py| {
+        if error.matches(py, PyValueError::type_object(py)).unwrap_or(false) {
+            ValError::new(ErrorTypeDefaults::FractionParsing, input)
+        } else if error.matches(py, PyTypeError::type_object(py)).unwrap_or(false) {
+            ValError::new(ErrorTypeDefaults::FractionType, input)
+        } else {
+            // Let ZeroDivisionError and other exceptions bubble up as InternalErr
+            // which will be shown to the user with the original Python error message
+            ValError::InternalErr(error)
+        }
+    })
 }
