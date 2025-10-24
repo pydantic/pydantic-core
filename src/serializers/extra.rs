@@ -2,7 +2,6 @@ use std::convert::Infallible;
 use std::ffi::CString;
 use std::fmt;
 use std::string::ToString;
-use std::sync::Mutex;
 
 use pyo3::exceptions::{PyTypeError, PyUserWarning, PyValueError};
 use pyo3::prelude::*;
@@ -311,36 +310,27 @@ impl From<bool> for WarningsMode {
 }
 
 #[cfg_attr(debug_assertions, derive(Debug))]
+#[derive(Clone)]
 pub(crate) struct CollectWarnings {
     mode: WarningsMode,
-    // FIXME: mutex is to satisfy PyO3 0.23, we should be able to refactor this away
-    warnings: Mutex<Vec<PydanticSerializationUnexpectedValue>>,
-}
-
-impl Clone for CollectWarnings {
-    fn clone(&self) -> Self {
-        Self {
-            mode: self.mode,
-            warnings: Mutex::new(self.warnings.lock().expect("lock poisoned").clone()),
-        }
-    }
+    warnings: Vec<PydanticSerializationUnexpectedValue>,
 }
 
 impl CollectWarnings {
     pub(crate) fn new(mode: WarningsMode) -> Self {
         Self {
             mode,
-            warnings: Mutex::new(Vec::new()),
+            warnings: Vec::new(),
         }
     }
 
-    pub fn register_warning(&self, warning: PydanticSerializationUnexpectedValue) {
+    pub fn register_warning(&mut self, warning: PydanticSerializationUnexpectedValue) {
         if self.mode != WarningsMode::None {
-            self.warnings.lock().expect("lock poisoned").push(warning);
+            self.warnings.push(warning);
         }
     }
 
-    pub fn on_fallback_py(&self, field_type: &str, value: &Bound<'_, PyAny>, extra: &Extra) -> PyResult<()> {
+    pub fn on_fallback_py(&mut self, field_type: &str, value: &Bound<'_, PyAny>, extra: &Extra) -> PyResult<()> {
         // special case for None as it's very common e.g. as a default value
         if value.is_none() {
             Ok(())
@@ -358,7 +348,7 @@ impl CollectWarnings {
     }
 
     pub fn on_fallback_ser<S: serde::ser::Serializer>(
-        &self,
+        &mut self,
         field_type: &str,
         value: &Bound<'_, PyAny>,
         extra: &Extra,
@@ -377,7 +367,7 @@ impl CollectWarnings {
         }
     }
 
-    fn fallback_warning(&self, field_name: Option<&str>, field_type: &str, value: &Bound<'_, PyAny>) {
+    fn fallback_warning(&mut self, field_name: Option<&str>, field_type: &str, value: &Bound<'_, PyAny>) {
         if self.mode != WarningsMode::None {
             self.register_warning(PydanticSerializationUnexpectedValue::new_from_parts(
                 field_name.map(ToString::to_string),
@@ -391,13 +381,12 @@ impl CollectWarnings {
         if self.mode == WarningsMode::None {
             return Ok(());
         }
-        let warnings = self.warnings.lock().expect("lock poisoned");
 
-        if warnings.is_empty() {
+        if self.warnings.is_empty() {
             return Ok(());
         }
 
-        let formatted_warnings: Vec<String> = warnings.iter().map(|w| w.__repr__(py).to_string()).collect();
+        let formatted_warnings: Vec<String> = self.warnings.iter().map(|w| w.__repr__(py).to_string()).collect();
 
         let message = format!("Pydantic serializer warnings:\n  {}", formatted_warnings.join("\n  "));
         if self.mode == WarningsMode::Warn {
