@@ -21,6 +21,7 @@ use crate::serializers::shared::DoSerialize;
 use crate::serializers::type_serializers::any::AnySerializer;
 use crate::serializers::type_serializers::function::FunctionPlainSerializer;
 use crate::serializers::type_serializers::function::FunctionWrapSerializer;
+use crate::serializers::SerializationState;
 use crate::tools::SchemaDict;
 
 const ROOT_FIELD: &str = "root";
@@ -167,15 +168,16 @@ impl ModelSerializer {
     fn serialize<T, E: From<PyErr>>(
         &self,
         value: &Bound<'_, PyAny>,
+        state: &mut SerializationState,
         extra: &Extra,
         do_serialize: impl DoSerialize<T, E>,
     ) -> Result<T, E> {
         if self.root_model {
-            return self.serialize_root_model(value, extra, do_serialize);
+            return self.serialize_root_model(value, extra, state, do_serialize);
         }
 
         if !self.allow_value(value, extra.check)? {
-            return do_serialize.serialize_fallback(self.get_name(), value, extra);
+            return do_serialize.serialize_fallback(self.get_name(), value, state, extra);
         }
 
         let model_extra = Extra {
@@ -183,17 +185,18 @@ impl ModelSerializer {
             ..extra.clone()
         };
         let inner_value = self.get_inner_value(value, &model_extra)?;
-        do_serialize.serialize_no_infer(&self.serializer, &inner_value, &model_extra)
+        do_serialize.serialize_no_infer(&self.serializer, &inner_value, state, &model_extra)
     }
 
     fn serialize_root_model<T, E: From<PyErr>>(
         &self,
         value: &Bound<'_, PyAny>,
         extra: &Extra,
+        state: &mut SerializationState,
         do_serialize: impl DoSerialize<T, E>,
     ) -> Result<T, E> {
         if !self.allow_value_root_model(value, extra.check)? {
-            return do_serialize.serialize_fallback(self.get_name(), value, extra);
+            return do_serialize.serialize_fallback(self.get_name(), value, state, extra);
         }
 
         let root_extra = Extra {
@@ -220,7 +223,7 @@ impl ModelSerializer {
             &self.serializer
         };
 
-        do_serialize.serialize_no_infer(serializer, &root, &root_extra)
+        do_serialize.serialize_no_infer(serializer, &root, state, &root_extra)
     }
 
     fn get_inner_value<'py>(&self, model: &Bound<'py, PyAny>, extra: &Extra) -> PyResult<Bound<'py, PyAny>> {
@@ -258,18 +261,24 @@ impl TypeSerializer for ModelSerializer {
         value: &Bound<'_, PyAny>,
         include: Option<&Bound<'_, PyAny>>,
         exclude: Option<&Bound<'_, PyAny>>,
+        state: &mut SerializationState,
         extra: &Extra,
     ) -> PyResult<Py<PyAny>> {
-        self.serialize(value, extra, serialize_to_python(include, exclude))
+        self.serialize(value, state, extra, serialize_to_python(include, exclude))
     }
 
-    fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
+    fn json_key<'a>(
+        &self,
+        key: &'a Bound<'_, PyAny>,
+        state: &mut SerializationState,
+        extra: &Extra,
+    ) -> PyResult<Cow<'a, str>> {
         // FIXME: root model in json key position should serialize as inner value?
         if self.allow_value(key, extra.check)? {
-            infer_json_key_known(ObType::PydanticSerializable, key, extra)
+            infer_json_key_known(ObType::PydanticSerializable, key, state, extra)
         } else {
-            extra.warnings.on_fallback_py(&self.name, key, extra)?;
-            infer_json_key(key, extra)
+            state.warnings.on_fallback_py(&self.name, key, extra)?;
+            infer_json_key(key, state, extra)
         }
     }
 
@@ -279,9 +288,10 @@ impl TypeSerializer for ModelSerializer {
         serializer: S,
         include: Option<&Bound<'_, PyAny>>,
         exclude: Option<&Bound<'_, PyAny>>,
+        state: &mut SerializationState,
         extra: &Extra,
     ) -> Result<S::Ok, S::Error> {
-        self.serialize(value, extra, serialize_to_json(serializer, include, exclude))
+        self.serialize(value, state, extra, serialize_to_json(serializer, include, exclude))
             .map_err(|e| e.0)
     }
 
