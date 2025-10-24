@@ -172,44 +172,57 @@ impl ModelSerializer {
         extra: &Extra,
         do_serialize: impl FnOnce(Option<(&Arc<CombinedSerializer>, &Bound<'_, PyAny>, &Extra)>) -> Result<T, E>,
     ) -> Result<T, E> {
-        match self.root_model {
-            true if self.allow_value_root_model(value, extra.check)? => {
-                let root_extra = Extra {
-                    field_name: Some(ROOT_FIELD),
-                    model: Some(value),
-                    ..extra.clone()
-                };
-                let root = value.getattr(intern!(value.py(), ROOT_FIELD))?;
-
-                // for root models, `serialize_as_any` may apply unless a `field_serializer` is used
-                let serializer = if root_extra.serialize_as_any
-                    && !matches!(
-                        self.serializer.as_ref(),
-                        CombinedSerializer::Function(FunctionPlainSerializer {
-                            is_field_serializer: true,
-                            ..
-                        }) | CombinedSerializer::FunctionWrap(FunctionWrapSerializer {
-                            is_field_serializer: true,
-                            ..
-                        }),
-                    ) {
-                    AnySerializer::get()
-                } else {
-                    &self.serializer
-                };
-
-                do_serialize(Some((serializer, &root, &root_extra)))
-            }
-            false if self.allow_value(value, extra.check)? => {
-                let model_extra = Extra {
-                    model: Some(value),
-                    ..extra.clone()
-                };
-                let inner_value = self.get_inner_value(value, &model_extra)?;
-                do_serialize(Some((&self.serializer, &inner_value, &model_extra)))
-            }
-            _ => do_serialize(None),
+        if self.root_model {
+            return self.serialize_root_model(value, extra, do_serialize);
         }
+
+        if !self.allow_value(value, extra.check)? {
+            return do_serialize(None);
+        }
+
+        let model_extra = Extra {
+            model: Some(value),
+            ..extra.clone()
+        };
+        let inner_value = self.get_inner_value(value, &model_extra)?;
+        do_serialize(Some((&self.serializer, &inner_value, &model_extra)))
+    }
+
+    fn serialize_root_model<T, E: From<PyErr>>(
+        &self,
+        value: &Bound<'_, PyAny>,
+        extra: &Extra,
+        do_serialize: impl FnOnce(Option<(&Arc<CombinedSerializer>, &Bound<'_, PyAny>, &Extra)>) -> Result<T, E>,
+    ) -> Result<T, E> {
+        if !self.allow_value_root_model(value, extra.check)? {
+            return do_serialize(None);
+        }
+
+        let root_extra = Extra {
+            field_name: Some(ROOT_FIELD),
+            model: Some(value),
+            ..extra.clone()
+        };
+        let root = value.getattr(intern!(value.py(), ROOT_FIELD))?;
+
+        // for root models, `serialize_as_any` may apply unless a `field_serializer` is used
+        let serializer = if root_extra.serialize_as_any
+            && !matches!(
+                self.serializer.as_ref(),
+                CombinedSerializer::Function(FunctionPlainSerializer {
+                    is_field_serializer: true,
+                    ..
+                }) | CombinedSerializer::FunctionWrap(FunctionWrapSerializer {
+                    is_field_serializer: true,
+                    ..
+                }),
+            ) {
+            AnySerializer::get()
+        } else {
+            &self.serializer
+        };
+
+        do_serialize(Some((serializer, &root, &root_extra)))
     }
 
     fn get_inner_value<'py>(&self, model: &Bound<'py, PyAny>, extra: &Extra) -> PyResult<Bound<'py, PyAny>> {
