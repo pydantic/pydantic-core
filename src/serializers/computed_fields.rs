@@ -79,7 +79,7 @@ impl ComputedFields {
                     include.as_ref(),
                     exclude.as_ref(),
                     state,
-                    &field_extra,
+                    field_extra,
                 )?;
                 output_dict.set_item(key, value)
             },
@@ -123,7 +123,7 @@ impl ComputedFields {
                     include.as_ref(),
                     exclude.as_ref(),
                     state,
-                    &field_extra,
+                    field_extra,
                 );
                 map.serialize_entry(key, &s)
             },

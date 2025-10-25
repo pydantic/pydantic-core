@@ -197,7 +197,7 @@ impl GeneralFieldsSerializer {
             let state = &mut state.scoped_set(|s| &mut s.field_name, Some(field_name));
             if let Some((next_include, next_exclude)) = self.filter.key_filter(&key, include, exclude)? {
                 let (key, serializer) = if let Some(field) = op_field {
-                    let serializer = Self::prepare_value(&value, field, &extra)?;
+                    let serializer = Self::prepare_value(&value, field, extra)?;
 
                     if field.required {
                         used_req_fields += 1;
@@ -207,7 +207,7 @@ impl GeneralFieldsSerializer {
                         continue;
                     };
 
-                    (field.get_key_py(output_dict.py(), &extra), serializer)
+                    (field.get_key_py(output_dict.py(), extra), serializer)
                 } else if self.mode == FieldsMode::TypedDictAllow {
                     let serializer = self
                         .extra_serializer
@@ -234,7 +234,7 @@ impl GeneralFieldsSerializer {
                     next_include.as_ref(),
                     next_exclude.as_ref(),
                     state,
-                    &extra,
+                    extra,
                 )?;
                 output_dict.set_item(key, value)?;
             }

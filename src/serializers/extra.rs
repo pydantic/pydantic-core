@@ -500,7 +500,7 @@ where
     value: T,
 }
 
-impl<'a, 'py, P, T> Drop for ScopedSetState<'_, 'py, P, T>
+impl<'py, P, T> Drop for ScopedSetState<'_, 'py, P, T>
 where
     P: for<'drop> Fn(&'drop mut SerializationState<'py>) -> &'drop mut T,
 {
@@ -509,7 +509,7 @@ where
     }
 }
 
-impl<'a, 'py, P, T> Deref for ScopedSetState<'_, 'py, P, T>
+impl<'py, P, T> Deref for ScopedSetState<'_, 'py, P, T>
 where
     P: for<'p> Fn(&'p mut SerializationState<'py>) -> &'p mut T,
 {
@@ -520,7 +520,7 @@ where
     }
 }
 
-impl<'a, 'py, P, T> DerefMut for ScopedSetState<'_, 'py, P, T>
+impl<'py, P, T> DerefMut for ScopedSetState<'_, 'py, P, T>
 where
     P: for<'p> Fn(&'p mut SerializationState<'py>) -> &'p mut T,
 {

@@ -72,7 +72,7 @@ impl SchemaSerializer {
     #[pyo3(signature = (value, *, mode = None, include = None, exclude = None, by_alias = None,
         exclude_unset = false, exclude_defaults = false, exclude_none = false, exclude_computed_fields = false,
         round_trip = false, warnings = WarningsArg::Bool(true), fallback = None, serialize_as_any = false, context = None))]
-    pub fn to_python<'py>(
+    pub fn to_python(
         &self,
         py: Python,
         value: &Bound<'_, PyAny>,
