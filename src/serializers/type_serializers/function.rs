@@ -244,6 +244,7 @@ macro_rules! function_type_serializer {
                 extra: &Extra<'_, 'py>,
             ) -> PyResult<Cow<'a, str>> {
                 let py = key.py();
+                let state = &mut state.scoped_include_exclude(None, None);
                 match self.call(key, state, extra) {
                     Ok((true, v)) => self
                         .return_serializer

@@ -89,11 +89,15 @@ impl TypeSerializer for DictSerializer {
                 for (key, value) in py_dict.iter() {
                     let op_next = self.filter.key_filter(&key, state)?;
                     if let Some((next_include, next_exclude)) = op_next {
-                        let state = &mut state.scoped_include_exclude(next_include, next_exclude);
-                        let key = match extra.mode {
-                            SerMode::Json => self.key_serializer.json_key(&key, state, extra)?.into_py_any(py)?,
-                            _ => self.key_serializer.to_python(&key, state, extra)?,
+                        let key = {
+                            // disable include/exclude for keys
+                            let state = &mut state.scoped_include_exclude(None, None);
+                            match extra.mode {
+                                SerMode::Json => self.key_serializer.json_key(&key, state, extra)?.into_py_any(py)?,
+                                _ => self.key_serializer.to_python(&key, state, extra)?,
+                            }
                         };
+                        let state = &mut state.scoped_include_exclude(next_include, next_exclude);
                         let value = value_serializer.to_python(&value, state, extra)?;
                         new_dict.set_item(key, value)?;
                     }
