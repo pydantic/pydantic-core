@@ -338,7 +338,7 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
     fn validate_fraction(&self, strict: bool, py: Python<'py>) -> ValMatch<Bound<'py, PyAny>> {
         let fraction_type = get_fraction_type(py);
 
-        // Fast path for existing decimal objects
+        // Fast path for existing fraction objects
         if self.is_exact_instance(fraction_type) {
             return Ok(ValidationMatch::exact(self.to_owned().clone()));
         }
