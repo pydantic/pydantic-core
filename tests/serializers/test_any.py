@@ -1,4 +1,5 @@
 import dataclasses
+import ipaddress
 import json
 import platform
 import re
@@ -722,3 +723,17 @@ def test_simple_any_ser_schema():
     assert v.to_json({MyEnum.A: 'x'}) == b'{"1":"x"}'
     assert v.to_python(1) == 1
     assert v.to_json(1) == b'1'
+
+
+def test_ip_address_type_inference(any_serializer):
+    ip_v4 = ipaddress.IPv4Address('192.168.1.1')
+    ip_v6 = ipaddress.IPv6Address('2001:0db8:85a3:0000:0000:8a2e:0370:7334')
+
+    assert any_serializer.to_python(ip_v4) == ip_v4
+    assert any_serializer.to_python(ip_v6) == ip_v6
+
+    assert any_serializer.to_python(ip_v4, mode='json') == '192.168.1.1'
+    assert any_serializer.to_python(ip_v6, mode='json') == '2001:db8:85a3::8a2e:370:7334'
+
+    assert any_serializer.to_json(ip_v4) == b'"192.168.1.1"'
+    assert any_serializer.to_json(ip_v6) == b'"2001:db8:85a3::8a2e:370:7334"'
