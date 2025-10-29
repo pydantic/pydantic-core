@@ -48,6 +48,7 @@ pub struct ObTypeLookup {
     pattern_object: Py<PyAny>,
     // uuid type
     uuid_object: Py<PyAny>,
+    // `complex` builtin
     complex: usize,
 }
 
@@ -157,8 +158,8 @@ impl ObTypeLookup {
             ObType::Path => self.path_object.as_ptr() as usize == ob_type,
             ObType::Pattern => self.path_object.as_ptr() as usize == ob_type,
             ObType::Uuid => self.uuid_object.as_ptr() as usize == ob_type,
-            ObType::Unknown => false,
             ObType::Complex => self.complex == ob_type,
+            ObType::Unknown => false,
         };
 
         if ans {
@@ -414,9 +415,10 @@ pub enum ObType {
     Pattern,
     // Uuid
     Uuid,
+    // complex builtin
+    Complex,
     // unknown type
     Unknown,
-    Complex,
 }
 
 impl PartialEq for ObType {

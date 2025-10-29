@@ -5,10 +5,10 @@ use std::io::{self, Write};
 use std::sync::Arc;
 
 use pyo3::exceptions::PyTypeError;
-use pyo3::prelude::*;
 use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyDict, PyString};
 use pyo3::{intern, PyTraverseError, PyVisit};
+use pyo3::{prelude::*, IntoPyObjectExt};
 
 use enum_dispatch::enum_dispatch;
 use serde::{Serialize, Serializer};
@@ -625,6 +625,8 @@ pub trait DoSerialize<'py, OutputT, ErrorT> {
         value: &Bound<'py, PyAny>,
         state: &mut SerializationState<'_, 'py>,
     ) -> Result<OutputT, ErrorT>;
+
+    fn serialize_str(self, value: &Bound<'py, PyString>) -> Result<OutputT, ErrorT>;
 }
 
 /// Helper to create a `SerializeToPython` instance
@@ -660,6 +662,10 @@ impl<'py> DoSerialize<'py, Py<PyAny>, PyErr> for SerializeToPython {
         state.warn_fallback_py(name, value)?;
         infer_to_python(value, state)
     }
+
+    fn serialize_str(self, value: &Bound<'py, PyString>) -> Result<Py<PyAny>, PyErr> {
+        value.into_py_any(value.py())
+    }
 }
 
 pub struct SerializeToJson<S> {
@@ -686,5 +692,10 @@ impl<'py, S: Serializer> DoSerialize<'py, S::Ok, WrappedSerError<S::Error>> for 
     ) -> Result<S::Ok, WrappedSerError<S::Error>> {
         state.warn_fallback_ser::<S>(name, value).map_err(WrappedSerError)?;
         infer_serialize(value, self.serializer, state).map_err(WrappedSerError)
+    }
+
+    fn serialize_str(self, value: &Bound<'py, PyString>) -> Result<S::Ok, WrappedSerError<S::Error>> {
+        let s = value.to_str()?;
+        self.serializer.serialize_str(s).map_err(WrappedSerError)
     }
 }
