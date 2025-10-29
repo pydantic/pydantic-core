@@ -603,9 +603,6 @@ fn is_punnycode_domain(lib_url: &Url, domain: &str) -> bool {
 }
 
 /// See <https://url.spec.whatwg.org/#userinfo-percent-encode-set>
-///
-/// Note that this doesn't actually include % itself - see the note in
-/// https://url.spec.whatwg.org/#string-percent-encode-after-encoding
 const USERINFO_ENCODE_SET: &AsciiSet = &CONTROLS
     // query percent-encodes is controls plus the below
     .add(b' ')
@@ -628,7 +625,10 @@ const USERINFO_ENCODE_SET: &AsciiSet = &CONTROLS
     .add(b'[')
     .add(b'\\')
     .add(b']')
-    .add(b'|');
+    .add(b'|')
+    // https://datatracker.ietf.org/doc/html/rfc3986.html#section-2.4
+    // we must also percent-encode '%'
+    .add(b'%');
 
 fn encode_userinfo_component(value: &str) -> Cow<'_, str> {
     let encoded = percent_encode(value.as_bytes(), USERINFO_ENCODE_SET).to_string();

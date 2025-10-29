@@ -1345,11 +1345,11 @@ def test_multi_url_build_hosts_encodes_credentials() -> None:
     ]
     url = MultiHostUrl.build(scheme='postgresql', hosts=hosts)
     assert (
-        str(url) == 'postgresql://user%20name:p%40ss%2Fword%3F%23__@example.com:5431,other:p%40%ss__@example.org:5432'
+        str(url) == 'postgresql://user%20name:p%40ss%2Fword%3F%23__@example.com:5431,other:p%40%25ss__@example.org:5432'
     )
     assert url.hosts() == [
         {'username': 'user%20name', 'password': 'p%40ss%2Fword%3F%23__', 'host': 'example.com', 'port': 5431},
-        {'username': 'other', 'password': 'p%40%ss__', 'host': 'example.org', 'port': 5432},
+        {'username': 'other', 'password': 'p%40%25ss__', 'host': 'example.org', 'port': 5432},
     ]
 
 
