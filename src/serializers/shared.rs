@@ -199,17 +199,19 @@ impl CombinedSerializer {
                     )
                     .map_err(|err| py_schema_error_type!("Error building `function-wrap` serializer:\n  {}", err));
                 }
-                // applies to lists tuples and dicts, does not override the main schema `type`
-                Some("include-exclude-sequence" | "include-exclude-dict") => (),
-                // applies specifically to bytes, does not override the main schema `type`
-                Some("base64") => (),
+                Some(
+                    // applies to lists tuples and dicts, does not override the main schema `type`
+                    "include-exclude-sequence" | "include-exclude-dict"
+                    // applies specifically to bytes, does not override the main schema `type`
+                    | "base64"
+                )
+                // if `schema.serialization.type` is None, fall back to `schema.type`
+                | None => (),
                 Some(ser_type) => {
                     // otherwise if `schema.serialization.type` is defined, use that with `find_serializer`
                     // instead of `schema.type`. In this case it's an error if a serializer isn't found.
                     return Self::find_serializer(ser_type, &ser_schema, config, definitions);
                 }
-                // if `schema.serialization.type` is None, fall back to `schema.type`
-                None => (),
             };
         }
 

@@ -168,8 +168,7 @@ pub(crate) fn infer_to_python_known<'py>(
                 let either_delta = EitherTimedelta::try_from(value)?;
                 state.config.temporal_mode.timedelta_to_json(value.py(), either_delta)?
             }
-            ObType::Url => serialize_via_str(value, serialize_to_python())?,
-            ObType::MultiHostUrl => serialize_via_str(value, serialize_to_python())?,
+            ObType::Url | ObType::MultiHostUrl | ObType::Path => serialize_via_str(value, serialize_to_python())?,
             ObType::Uuid => {
                 let uuid = super::type_serializers::uuid::uuid_to_string(value)?;
                 uuid.into_py_any(py)?
@@ -202,7 +201,6 @@ pub(crate) fn infer_to_python_known<'py>(
                 let complex_str = type_serializers::complex::complex_to_str(v);
                 complex_str.into_py_any(py)?
             }
-            ObType::Path => serialize_via_str(value, serialize_to_python())?,
             ObType::Pattern => serialize_pattern(value, serialize_to_python())?,
             ObType::Unknown => {
                 if let Some(fallback) = state.extra.fallback {
@@ -415,8 +413,9 @@ pub(crate) fn infer_serialize_known<'py, S: Serializer>(
             let either_delta = EitherTimedelta::try_from(value).map_err(py_err_se_err)?;
             state.config.temporal_mode.timedelta_serialize(either_delta, serializer)
         }
-        ObType::Url => serialize_via_str(value, serialize_to_json(serializer)).map_err(unwrap_ser_error),
-        ObType::MultiHostUrl => serialize_via_str(value, serialize_to_json(serializer)).map_err(unwrap_ser_error),
+        ObType::Url | ObType::MultiHostUrl | ObType::Path => {
+            serialize_via_str(value, serialize_to_json(serializer)).map_err(unwrap_ser_error)
+        }
         ObType::PydanticSerializable => {
             call_pydantic_serializer(value, state, serialize_to_json(serializer)).map_err(unwrap_ser_error)
         }
@@ -447,7 +446,6 @@ pub(crate) fn infer_serialize_known<'py, S: Serializer>(
             }
             seq.end()
         }
-        ObType::Path => serialize_via_str(value, serialize_to_json(serializer)).map_err(unwrap_ser_error),
         ObType::Pattern => serialize_pattern(value, serialize_to_json(serializer)).map_err(unwrap_ser_error),
         ObType::Unknown => {
             if let Some(fallback) = state.extra.fallback {
