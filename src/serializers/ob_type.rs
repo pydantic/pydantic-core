@@ -50,6 +50,9 @@ pub struct ObTypeLookup {
     uuid_object: Py<PyAny>,
     // `complex` builtin
     complex: usize,
+    // ip address types
+    ipv4_address: Py<PyAny>,
+    ipv6_address: Py<PyAny>,
 }
 
 static TYPE_LOOKUP: PyOnceLock<ObTypeLookup> = PyOnceLock::new();
@@ -89,6 +92,8 @@ impl ObTypeLookup {
             pattern_object: py.import("re").unwrap().getattr("Pattern").unwrap().unbind(),
             uuid_object: py.import("uuid").unwrap().getattr("UUID").unwrap().unbind(),
             complex: PyComplex::type_object_raw(py) as usize,
+            ipv4_address: py.import("ipaddress").unwrap().getattr("IPv4Address").unwrap().unbind(),
+            ipv6_address: py.import("ipaddress").unwrap().getattr("IPv6Address").unwrap().unbind(),
         }
     }
 
@@ -159,6 +164,8 @@ impl ObTypeLookup {
             ObType::Pattern => self.pattern_object.as_ptr() as usize == ob_type,
             ObType::Uuid => self.uuid_object.as_ptr() as usize == ob_type,
             ObType::Complex => self.complex == ob_type,
+            ObType::Ipv4Address => self.ipv4_address.as_ptr() as usize == ob_type,
+            ObType::Ipv6Address => self.ipv6_address.as_ptr() as usize == ob_type,
             ObType::Unknown => false,
         };
 
@@ -254,6 +261,10 @@ impl ObTypeLookup {
             ObType::Path
         } else if ob_type == self.pattern_object.as_ptr() as usize {
             ObType::Pattern
+        } else if ob_type == self.ipv4_address.as_ptr() as usize {
+            ObType::Ipv4Address
+        } else if ob_type == self.ipv6_address.as_ptr() as usize {
+            ObType::Ipv6Address
         } else {
             // this allows for subtypes of the supported class types,
             // if `ob_type` didn't match any member of self, we try again with the next base type pointer
@@ -417,6 +428,9 @@ pub enum ObType {
     Uuid,
     // complex builtin
     Complex,
+    // ip address types
+    Ipv4Address,
+    Ipv6Address,
     // unknown type
     Unknown,
 }
