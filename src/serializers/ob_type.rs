@@ -345,6 +345,12 @@ impl ObTypeLookup {
             ObType::Path
         } else if value.is_instance(self.pattern_object.bind(py)).unwrap_or(false) {
             ObType::Pattern
+        } else if value.is_instance_of::<PyComplex>() {
+            ObType::Complex
+        } else if value.is_instance(self.ipv4_address.bind(py)).unwrap_or(false) {
+            ObType::Ipv4Address
+        } else if value.is_instance(self.ipv6_address.bind(py)).unwrap_or(false) {
+            ObType::Ipv6Address
         } else {
             ObType::Unknown
         }

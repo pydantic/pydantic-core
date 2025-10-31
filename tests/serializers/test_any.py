@@ -725,15 +725,26 @@ def test_simple_any_ser_schema():
     assert v.to_json(1) == b'1'
 
 
-def test_ip_address_type_inference(any_serializer):
-    ip_v4 = ipaddress.IPv4Address('192.168.1.1')
-    ip_v6 = ipaddress.IPv6Address('2001:0db8:85a3:0000:0000:8a2e:0370:7334')
+class SubIpV4(ipaddress.IPv4Address):
+    def __str__(self):
+        return super().__str__() + '_subclassed'
 
-    assert any_serializer.to_python(ip_v4) == ip_v4
-    assert any_serializer.to_python(ip_v6) == ip_v6
 
-    assert any_serializer.to_python(ip_v4, mode='json') == '192.168.1.1'
-    assert any_serializer.to_python(ip_v6, mode='json') == '2001:db8:85a3::8a2e:370:7334'
+class SubIpV6(ipaddress.IPv6Address):
+    def __str__(self):
+        return super().__str__() + '_subclassed'
 
-    assert any_serializer.to_json(ip_v4) == b'"192.168.1.1"'
-    assert any_serializer.to_json(ip_v6) == b'"2001:db8:85a3::8a2e:370:7334"'
+
+@pytest.mark.parametrize(
+    ('value', 'expected_json'),
+    [
+        (ipaddress.IPv4Address('192.168.1.1'), '192.168.1.1'),
+        (ipaddress.IPv6Address('2001:0db8:85a3:0000:0000:8a2e:0370:7334'), '2001:db8:85a3::8a2e:370:7334'),
+        (SubIpV4('192.168.1.1'), '192.168.1.1_subclassed'),
+        (SubIpV6('2001:0db8:85a3:0000:0000:8a2e:0370:7334'), '2001:db8:85a3::8a2e:370:7334_subclassed'),
+    ],
+)
+def test_ip_address_type_inference(any_serializer, value, expected_json):
+    assert any_serializer.to_python(value) == value
+    assert any_serializer.to_python(value, mode='json') == expected_json
+    assert any_serializer.to_json(value) == f'"{expected_json}"'.encode()
