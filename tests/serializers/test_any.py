@@ -735,6 +735,26 @@ class SubIpV6(ipaddress.IPv6Address):
         return super().__str__() + '_subclassed'
 
 
+class SubNetV4(ipaddress.IPv4Network):
+    def __str__(self):
+        return super().__str__() + '_subclassed'
+
+
+class SubNetV6(ipaddress.IPv6Network):
+    def __str__(self):
+        return super().__str__() + '_subclassed'
+
+
+class SubInterfaceV4(ipaddress.IPv4Interface):
+    def __str__(self):
+        return super().__str__() + '_subclassed'
+
+
+class SubInterfaceV6(ipaddress.IPv6Interface):
+    def __str__(self):
+        return super().__str__() + '_subclassed'
+
+
 @pytest.mark.parametrize(
     ('value', 'expected_json'),
     [
@@ -742,9 +762,17 @@ class SubIpV6(ipaddress.IPv6Address):
         (ipaddress.IPv6Address('2001:0db8:85a3:0000:0000:8a2e:0370:7334'), '2001:db8:85a3::8a2e:370:7334'),
         (SubIpV4('192.168.1.1'), '192.168.1.1_subclassed'),
         (SubIpV6('2001:0db8:85a3:0000:0000:8a2e:0370:7334'), '2001:db8:85a3::8a2e:370:7334_subclassed'),
+        (ipaddress.IPv4Network('192.168.1.0/24'), '192.168.1.0/24'),
+        (ipaddress.IPv6Network('2001:0db8:85a3:0000:0000:8a2e:0370:7334'), '2001:db8:85a3::8a2e:370:7334/128'),
+        (SubNetV4('192.168.1.0/24'), '192.168.1.0/24_subclassed'),
+        (SubNetV6('2001:0db8:85a3:0000:0000:8a2e:0370:7334'), '2001:db8:85a3::8a2e:370:7334/128_subclassed'),
+        (ipaddress.IPv4Interface('192.168.1.1/24'), '192.168.1.1/24'),
+        (ipaddress.IPv6Interface('2001:0db8:85a3:0000:0000:8a2e:0370:7334'), '2001:db8:85a3::8a2e:370:7334/128'),
+        (SubInterfaceV4('192.168.1.1/24'), '192.168.1.1/24_subclassed'),
+        (SubInterfaceV6('2001:0db8:85a3:0000:0000:8a2e:0370:7334'), '2001:db8:85a3::8a2e:370:7334/128_subclassed'),
     ],
 )
-def test_ip_address_type_inference(any_serializer, value, expected_json):
+def test_ipaddress_type_inference(any_serializer, value, expected_json):
     assert any_serializer.to_python(value) == value
     assert any_serializer.to_python(value, mode='json') == expected_json
     assert any_serializer.to_json(value) == f'"{expected_json}"'.encode()

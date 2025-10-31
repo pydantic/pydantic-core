@@ -53,6 +53,8 @@ pub struct ObTypeLookup {
     // ip address types
     ipv4_address: Py<PyAny>,
     ipv6_address: Py<PyAny>,
+    ipv4_network: Py<PyAny>,
+    ipv6_network: Py<PyAny>,
 }
 
 static TYPE_LOOKUP: PyOnceLock<ObTypeLookup> = PyOnceLock::new();
@@ -94,6 +96,8 @@ impl ObTypeLookup {
             complex: PyComplex::type_object_raw(py) as usize,
             ipv4_address: py.import("ipaddress").unwrap().getattr("IPv4Address").unwrap().unbind(),
             ipv6_address: py.import("ipaddress").unwrap().getattr("IPv6Address").unwrap().unbind(),
+            ipv4_network: py.import("ipaddress").unwrap().getattr("IPv4Network").unwrap().unbind(),
+            ipv6_network: py.import("ipaddress").unwrap().getattr("IPv6Network").unwrap().unbind(),
         }
     }
 
@@ -166,6 +170,8 @@ impl ObTypeLookup {
             ObType::Complex => self.complex == ob_type,
             ObType::Ipv4Address => self.ipv4_address.as_ptr() as usize == ob_type,
             ObType::Ipv6Address => self.ipv6_address.as_ptr() as usize == ob_type,
+            ObType::Ipv4Network => self.ipv4_network.as_ptr() as usize == ob_type,
+            ObType::Ipv6Network => self.ipv6_network.as_ptr() as usize == ob_type,
             ObType::Unknown => false,
         };
 
@@ -351,6 +357,10 @@ impl ObTypeLookup {
             ObType::Ipv4Address
         } else if value.is_instance(self.ipv6_address.bind(py)).unwrap_or(false) {
             ObType::Ipv6Address
+        } else if value.is_instance(self.ipv4_network.bind(py)).unwrap_or(false) {
+            ObType::Ipv4Network
+        } else if value.is_instance(self.ipv6_network.bind(py)).unwrap_or(false) {
+            ObType::Ipv6Network
         } else {
             ObType::Unknown
         }
@@ -437,6 +447,8 @@ pub enum ObType {
     // ip address types
     Ipv4Address,
     Ipv6Address,
+    Ipv4Network,
+    Ipv6Network,
     // unknown type
     Unknown,
 }
