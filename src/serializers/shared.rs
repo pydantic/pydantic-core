@@ -224,7 +224,7 @@ impl CombinedSerializer {
         let type_ = type_.to_str()?;
 
         if use_prebuilt {
-            // if we have a SchemaValidator on the type already, use it
+            // if we have a SchemaSerializer on the type already, use it
             if let Ok(Some(prebuilt_serializer)) =
                 super::prebuilt::PrebuiltSerializer::try_get_from_schema(type_, schema)
             {

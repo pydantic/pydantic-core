@@ -4,6 +4,7 @@ use pyo3::{prelude::*, types::PyType};
 
 use crate::serializers::{
     errors::unwrap_ser_error,
+    extra::SerCheck,
     infer::call_pydantic_serializer,
     shared::{serialize_to_json, serialize_to_python, DoSerialize, TypeSerializer},
     CombinedSerializer, SerializationState,
@@ -14,22 +15,16 @@ use crate::serializers::{
 ///
 /// This exists as a separate structure to allow for cases such as model serializers where the
 /// inner serializer may just be a function serializer and so cannot handle polymorphism itself.
+#[derive(Debug)]
 pub struct PolymorphismTrampoline {
     class: Py<PyType>,
     /// Inner serializer used when the type is not a subclass (responsible for any fallback etc)
-    serializer: Arc<CombinedSerializer>,
+    pub(crate) serializer: Arc<CombinedSerializer>,
     /// Whether polymorphic serialization is enabled from config
     enabled_from_config: bool,
 }
 
 impl_py_gc_traverse!(PolymorphismTrampoline { class, serializer });
-
-impl std::fmt::Debug for PolymorphismTrampoline {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // to avoid breaking the repr from before we inserted the trampoline
-        self.serializer.fmt(f)
-    }
-}
 
 impl PolymorphismTrampoline {
     pub fn new(class: Py<PyType>, serializer: Arc<CombinedSerializer>, enabled_from_config: bool) -> Self {
@@ -51,7 +46,10 @@ impl PolymorphismTrampoline {
         do_serialize: impl DoSerialize<'py, T, E>,
     ) -> Result<T, E> {
         let runtime_polymorphic = state.extra.polymorphic_serialization;
-        if runtime_polymorphic.unwrap_or(self.enabled_from_config) && self.is_subclass(value)? {
+        if state.check != SerCheck::Strict // strict disables polymorphism
+            && runtime_polymorphic.unwrap_or(self.enabled_from_config)
+            && self.is_subclass(value)?
+        {
             call_pydantic_serializer(value, state, do_serialize)
         } else {
             do_serialize.serialize_no_infer(&self.serializer, value, state)
@@ -90,5 +88,9 @@ impl TypeSerializer for PolymorphismTrampoline {
 
     fn get_name(&self) -> &str {
         self.serializer.get_name()
+    }
+
+    fn retry_with_lax_check(&self) -> bool {
+        self.serializer.retry_with_lax_check()
     }
 }

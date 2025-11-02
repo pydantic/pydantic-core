@@ -100,6 +100,7 @@ class SubclassA(ModelA):
 
 @pytest.mark.parametrize('input_value', [ModelA(b'bite', 2.3456), SubclassA(b'bite', 2.3456)])
 def test_model_a(model_serializer: SchemaSerializer, input_value):
+    print(model_serializer, input_value)
     assert model_serializer.to_python(input_value) == {'a': b'bite', 'b': '2.3'}
     assert model_serializer.to_python(input_value, mode='json') == {'a': 'bite', 'b': '2.3'}
     assert model_serializer.to_json(input_value) == b'{"a":"bite","b":"2.3"}'

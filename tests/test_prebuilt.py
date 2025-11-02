@@ -99,6 +99,9 @@ def test_prebuilt_not_used_for_wrap_serializer_functions() -> None:
 
     outer_serializer = SchemaSerializer(outer_schema)
 
+    print(inner_serializer)
+    print(outer_serializer)
+
     # the custom serialization function does apply for the inner model
     inner_instance = InnerModel(x='hello')
     assert inner_serializer.to_python(inner_instance) == {'x': 'hello modified'}
