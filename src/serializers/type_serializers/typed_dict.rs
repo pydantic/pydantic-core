@@ -133,7 +133,7 @@ impl TypeSerializer for TypedDictSerializer {
         )
     }
 
-    fn get_name(&self) -> &str {
+    fn get_name(&self) -> &'static str {
         "typed-dict"
     }
 }
