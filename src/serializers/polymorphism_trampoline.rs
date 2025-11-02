@@ -50,8 +50,8 @@ impl PolymorphismTrampoline {
         state: &mut SerializationState<'_, 'py>,
         do_serialize: impl DoSerialize<'py, T, E>,
     ) -> Result<T, E> {
-        // FIXME: allow per-call override of polymorphic serialization?
-        if self.enabled_from_config && self.is_subclass(value)? {
+        let runtime_polymorphic = state.extra.polymorphic_serialization;
+        if runtime_polymorphic.unwrap_or(self.enabled_from_config) && self.is_subclass(value)? {
             call_pydantic_serializer(value, state, do_serialize)
         } else {
             do_serialize.serialize_no_infer(&self.serializer, value, state)

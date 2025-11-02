@@ -244,12 +244,13 @@ impl CombinedSerializer {
         let type_ = type_.to_str()?;
 
         if type_ == "model" || type_ == "dataclass" {
-            // Get polymorphic serialization config
+            // Get polymorphic serialization from config
             let config = schema.get_as::<Bound<'_, PyDict>>(intern!(py, "config"))?;
             let polymorphic_serialization: bool = config
                 .and_then(|cfg| cfg.get_as(intern!(py, "polymorphic_serialization")).transpose())
                 .unwrap_or(Ok(false))?;
 
+            // Unconditionally wrap in PolymorphismTrampoline, because runtime flag might still enable it
             Ok(Arc::new(
                 PolymorphismTrampoline::new(
                     schema.get_as_req(intern!(py, "cls"))?,
