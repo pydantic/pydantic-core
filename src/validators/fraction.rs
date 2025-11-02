@@ -84,14 +84,6 @@ impl Validator for FractionValidator {
     ) -> ValResult<Py<PyAny>> {
         let fraction = input.validate_fraction(state.strict_or(self.strict), py)?.unpack(state);
 
-        // let mut is_nan: Option<bool> = None;
-        // let mut is_nan = || -> PyResult<bool> {
-        //     match is_nan {
-        //         Some(is_nan) => Ok(is_nan),
-        //         None => Ok(*is_nan.insert(decimal.call_method0(intern!(py, "is_nan"))?.extract()?)),
-        //     }
-        // };
-
         if let Some(le) = &self.le {
             if !fraction.le(le)? {
                 return Err(ValError::new(
