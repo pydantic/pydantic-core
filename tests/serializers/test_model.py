@@ -1286,7 +1286,7 @@ def test_by_alias_and_name_config_interaction(config, runtime, expected) -> None
     assert s.to_python(Model(1), by_alias=runtime) == expected
 
 
-@pytest.mark.parametrize('config', [True, False])
+@pytest.mark.parametrize('config', [True, False, None])
 @pytest.mark.parametrize('runtime', [True, False, None])
 def test_polymorphic_serialization(config: bool, runtime: bool) -> None:
     class ModelA:
@@ -1298,10 +1298,12 @@ def test_polymorphic_serialization(config: bool, runtime: bool) -> None:
             super().__init__(a)
             self.b = b
 
+    model_config = core_schema.CoreConfig(polymorphic_serialization=config) if config is not None else None
+
     schema_a = core_schema.model_schema(
         ModelA,
         core_schema.model_fields_schema({'a': core_schema.model_field(core_schema.int_schema())}),
-        config=core_schema.CoreConfig(polymorphic_serialization=config),
+        config=model_config,
     )
 
     schema_b = core_schema.model_schema(
@@ -1333,7 +1335,7 @@ def test_polymorphic_serialization(config: bool, runtime: bool) -> None:
         assert ModelA.__pydantic_serializer__.to_json(ModelB(123, 'test'), **kwargs) == b'{"a":123}'
 
 
-@pytest.mark.parametrize('config', [True, False])
+@pytest.mark.parametrize('config', [True, False, None])
 @pytest.mark.parametrize('runtime', [True, False, None])
 def test_polymorphic_serialization_with_model_serializer(config: bool, runtime: bool) -> None:
     class ModelA:
@@ -1353,10 +1355,12 @@ def test_polymorphic_serialization_with_model_serializer(config: bool, runtime: 
             assert info.polymorphic_serialization is runtime
             return 'ModelB'
 
+    model_config = core_schema.CoreConfig(polymorphic_serialization=config) if config is not None else None
+
     schema_a = core_schema.model_schema(
         ModelA,
         core_schema.model_fields_schema({'a': core_schema.model_field(core_schema.int_schema())}),
-        config=core_schema.CoreConfig(polymorphic_serialization=config),
+        config=model_config,
         serialization=core_schema.plain_serializer_function_ser_schema(ModelA.serialize, info_arg=True),
     )
 
