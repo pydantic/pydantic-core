@@ -9,11 +9,12 @@ use serde::ser::SerializeMap;
 
 use crate::build_tools::{py_schema_error_type, ExtraBehavior};
 use crate::definitions::DefinitionsBuilder;
+use crate::serializers::SerializationState;
 use crate::tools::SchemaDict;
 
 use super::{
     infer_json_key, infer_json_key_known, infer_serialize, infer_to_python, py_err_se_err, BuildSerializer,
-    CombinedSerializer, ComputedFields, Extra, FieldsMode, GeneralFieldsSerializer, ObType, SerCheck, SerField,
+    CombinedSerializer, ComputedFields, FieldsMode, GeneralFieldsSerializer, ObType, SerCheck, SerField,
     TypeSerializer,
 };
 
@@ -121,8 +122,8 @@ impl BuildSerializer for DataclassSerializer {
 }
 
 impl DataclassSerializer {
-    fn allow_value(&self, value: &Bound<'_, PyAny>, extra: &Extra) -> PyResult<bool> {
-        match extra.check {
+    fn allow_value(&self, value: &Bound<'_, PyAny>, state: &SerializationState<'_, '_>) -> PyResult<bool> {
+        match state.check {
             SerCheck::Strict => Ok(value.get_type().is(self.class.bind(value.py()))),
             SerCheck::Lax => value.is_instance(self.class.bind(value.py())),
             SerCheck::None => value.hasattr(intern!(value.py(), "__dataclass_fields__")),
@@ -144,78 +145,70 @@ impl DataclassSerializer {
 impl_py_gc_traverse!(DataclassSerializer { class, serializer });
 
 impl TypeSerializer for DataclassSerializer {
-    fn to_python(
+    fn to_python<'py>(
         &self,
-        value: &Bound<'_, PyAny>,
-        include: Option<&Bound<'_, PyAny>>,
-        exclude: Option<&Bound<'_, PyAny>>,
-        extra: &Extra,
+        value: &Bound<'py, PyAny>,
+        state: &mut SerializationState<'_, 'py>,
     ) -> PyResult<Py<PyAny>> {
-        let model = Some(value);
-        let dc_extra = Extra { model, ..*extra };
-        if self.allow_value(value, &dc_extra)? {
+        let state = &mut state.scoped_set(|s| &mut s.model, Some(value.clone()));
+        if self.allow_value(value, state)? {
             let py = value.py();
             if let CombinedSerializer::Fields(ref fields_serializer) = *self.serializer {
-                let output_dict: Bound<PyDict> = fields_serializer.main_to_python(
-                    py,
-                    known_dataclass_iter(&self.fields, value),
-                    include,
-                    exclude,
-                    dc_extra,
-                )?;
+                let output_dict: Bound<PyDict> =
+                    fields_serializer.main_to_python(py, known_dataclass_iter(&self.fields, value), state)?;
 
-                fields_serializer.add_computed_fields_python(model, &output_dict, include, exclude, extra)?;
+                fields_serializer.add_computed_fields_python(value, &output_dict, state)?;
                 Ok(output_dict.into())
             } else {
                 let inner_value = self.get_inner_value(value)?;
-                self.serializer.to_python(&inner_value, include, exclude, &dc_extra)
+                self.serializer.to_python(&inner_value, state)
             }
         } else {
-            extra.warnings.on_fallback_py(self.get_name(), value, &dc_extra)?;
-            infer_to_python(value, include, exclude, &dc_extra)
+            // FIXME: probably don't want to have state.model set here, should move the scoped_set above?
+            state.warn_fallback_py(self.get_name(), value)?;
+            infer_to_python(value, state)
         }
     }
 
-    fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
-        if self.allow_value(key, extra)? {
-            infer_json_key_known(ObType::Dataclass, key, extra)
-        } else {
-            extra.warnings.on_fallback_py(&self.name, key, extra)?;
-            infer_json_key(key, extra)
-        }
-    }
-
-    fn serde_serialize<S: serde::ser::Serializer>(
+    fn json_key<'a, 'py>(
         &self,
-        value: &Bound<'_, PyAny>,
+        key: &'a Bound<'py, PyAny>,
+        state: &mut SerializationState<'_, 'py>,
+    ) -> PyResult<Cow<'a, str>> {
+        if self.allow_value(key, state)? {
+            infer_json_key_known(ObType::Dataclass, key, state)
+        } else {
+            state.warn_fallback_py(&self.name, key)?;
+            infer_json_key(key, state)
+        }
+    }
+
+    fn serde_serialize<'py, S: serde::ser::Serializer>(
+        &self,
+        value: &Bound<'py, PyAny>,
         serializer: S,
-        include: Option<&Bound<'_, PyAny>>,
-        exclude: Option<&Bound<'_, PyAny>>,
-        extra: &Extra,
+        state: &mut SerializationState<'_, 'py>,
     ) -> Result<S::Ok, S::Error> {
-        let model = Some(value);
-        let dc_extra = Extra { model, ..*extra };
-        if self.allow_value(value, &dc_extra).map_err(py_err_se_err)? {
+        let state = &mut state.scoped_set(|s| &mut s.model, Some(value.clone()));
+        if self.allow_value(value, state).map_err(py_err_se_err)? {
             if let CombinedSerializer::Fields(ref fields_serializer) = *self.serializer {
                 let expected_len = self.fields.len() + fields_serializer.computed_field_count();
                 let mut map = fields_serializer.main_serde_serialize(
                     known_dataclass_iter(&self.fields, value),
                     expected_len,
                     serializer,
-                    include,
-                    exclude,
-                    dc_extra,
+                    state,
                 )?;
-                fields_serializer.add_computed_fields_json::<S>(model, &mut map, include, exclude, extra)?;
+                fields_serializer.add_computed_fields_json::<S>(value, &mut map, state)?;
                 map.end()
             } else {
                 let inner_value = self.get_inner_value(value).map_err(py_err_se_err)?;
-                self.serializer
-                    .serde_serialize(&inner_value, serializer, include, exclude, &dc_extra)
+                self.serializer.serde_serialize(&inner_value, serializer, state)
             }
         } else {
-            extra.warnings.on_fallback_ser::<S>(self.get_name(), value, &dc_extra)?;
-            infer_serialize(value, serializer, include, exclude, &dc_extra)
+            // FIXME: probably don't want to have state.model set here, should move the scoped_set above?
+            state.warn_fallback_ser::<S>(self.get_name(), value)?;
+            infer_serialize(value, serializer, state)
         }
     }
 

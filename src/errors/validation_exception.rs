@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::cell::RefCell;
 use std::fmt;
 use std::fmt::{Display, Write};
 use std::str::from_utf8;
@@ -18,7 +19,7 @@ use crate::build_tools::py_schema_error_type;
 use crate::errors::LocItem;
 use crate::get_pydantic_version;
 use crate::input::InputType;
-use crate::serializers::{Extra, SerMode, SerializationState};
+use crate::serializers::{Extra, SerMode, SerializationConfig, SerializationState, WarningsMode};
 use crate::tools::{safe_repr, write_truncated_to_limited_bytes, SchemaDict};
 
 use super::line_error::ValLineError;
@@ -176,10 +177,7 @@ impl ValidationError {
                 use pyo3::exceptions::PyImportError;
                 match py.import("exceptiongroup") {
                     Ok(py_mod) => match py_mod.getattr("ExceptionGroup") {
-                        Ok(group_cls) => match group_cls.call1((title, user_py_errs)) {
-                            Ok(group_instance) => Some(group_instance),
-                            Err(_) => None,
-                        },
+                        Ok(group_cls) => group_cls.call1((title, user_py_errs)).ok(),
                         Err(_) => None,
                     },
                     Err(_) => return Some(PyImportError::new_err("validation_error_cause flag requires the exceptiongroup module backport to be installed when used on Python <3.11.")),
@@ -340,15 +338,29 @@ impl ValidationError {
         include_context: bool,
         include_input: bool,
     ) -> PyResult<Bound<'py, PyString>> {
-        let state = SerializationState::new("iso8601", "iso8601", "utf8", "constants")?;
-        let extra = state.extra(py, &SerMode::Json, None, false, false, true, None, false, None);
-        let serializer = ValidationErrorSerializer {
+        let config = SerializationConfig::from_args("iso8601", "iso8601", "utf8", "constants")?;
+        let extra = Extra::new(
+            py,
+            &SerMode::Json,
+            None,
+            false,
+            false,
+            false,
+            false,
+            false,
+            true,
+            None,
+            false,
+            None,
+        );
+        let mut state = SerializationState::new(config, WarningsMode::None, None, None, extra)?;
+        let mut serializer = ValidationErrorSerializer {
             py,
             line_errors: &self.line_errors,
             url_prefix: get_url_prefix(py, include_url),
             include_context,
             include_input,
-            extra: &extra,
+            state: &mut state,
             input_type: &self.input_type,
         };
 
@@ -528,7 +540,8 @@ impl PyLineError {
         };
         write!(output, "  {message} [type={}", self.error_type.type_string())?;
 
-        if !hide_input {
+        // special case: don't show input for DefaultFactoryNotCalled errors - there is no valid input
+        if !hide_input && !matches!(self.error_type, ErrorType::DefaultFactoryNotCalled { .. }) {
             let input_value = self.input_value.bind(py);
             let input_str = safe_repr(input_value);
             write!(output, ", input_value=")?;
@@ -570,18 +583,18 @@ where
     S::Error::custom(error.to_string())
 }
 
-struct ValidationErrorSerializer<'py> {
+struct ValidationErrorSerializer<'slf, 'a, 'py> {
     py: Python<'py>,
     line_errors: &'py [PyLineError],
     url_prefix: Option<&'py str>,
     include_context: bool,
     include_input: bool,
-    extra: &'py Extra<'py>,
+    state: &'slf mut SerializationState<'a, 'py>,
     input_type: &'py InputType,
 }
 
-impl Serialize for ValidationErrorSerializer<'_> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+impl ValidationErrorSerializer<'_, '_, '_> {
+    fn serialize<S>(&mut self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -593,7 +606,7 @@ impl Serialize for ValidationErrorSerializer<'_> {
                 url_prefix: self.url_prefix,
                 include_context: self.include_context,
                 include_input: self.include_input,
-                extra: self.extra,
+                state: RefCell::new(self.state),
                 input_type: self.input_type,
             };
             seq.serialize_element(&line_s)?;
@@ -602,17 +615,17 @@ impl Serialize for ValidationErrorSerializer<'_> {
     }
 }
 
-struct PyLineErrorSerializer<'py> {
+struct PyLineErrorSerializer<'slf, 'a, 'py> {
     py: Python<'py>,
     line_error: &'py PyLineError,
     url_prefix: Option<&'py str>,
     include_context: bool,
     include_input: bool,
-    extra: &'py Extra<'py>,
+    state: RefCell<&'slf mut SerializationState<'a, 'py>>,
     input_type: &'py InputType,
 }
 
-impl Serialize for PyLineErrorSerializer<'_> {
+impl Serialize for PyLineErrorSerializer<'_, '_, '_> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -623,6 +636,7 @@ impl Serialize for PyLineErrorSerializer<'_> {
             .filter(|b| *b)
             .count();
         let mut map = serializer.serialize_map(Some(size))?;
+        let mut state = self.state.borrow_mut();
 
         map.serialize_entry("type", &self.line_error.error_type.type_string())?;
 
@@ -636,15 +650,12 @@ impl Serialize for PyLineErrorSerializer<'_> {
         map.serialize_entry("msg", &msg)?;
 
         if self.include_input {
-            map.serialize_entry(
-                "input",
-                &self.extra.serialize_infer(self.line_error.input_value.bind(py)),
-            )?;
+            map.serialize_entry("input", &state.serialize_infer(self.line_error.input_value.bind(py)))?;
         }
 
         if self.include_context {
             if let Some(context) = self.line_error.error_type.py_dict(py).map_err(py_err_json::<S>)? {
-                map.serialize_entry("ctx", &self.extra.serialize_infer(context.bind(py)))?;
+                map.serialize_entry("ctx", &state.serialize_infer(context.bind(py)))?;
             }
         }
         if let Some(url_prefix) = self.url_prefix {

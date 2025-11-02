@@ -9,11 +9,12 @@ use pyo3::IntoPyObjectExt;
 use serde::ser::SerializeSeq;
 
 use crate::definitions::DefinitionsBuilder;
+use crate::serializers::SerializationState;
 use crate::tools::SchemaDict;
 
 use super::any::AnySerializer;
 use super::{
-    infer_serialize, infer_to_python, py_err_se_err, BuildSerializer, CombinedSerializer, Extra, PydanticSerializer,
+    infer_serialize, infer_to_python, py_err_se_err, BuildSerializer, CombinedSerializer, PydanticSerializer,
     SchemaFilter, TypeSerializer,
 };
 
@@ -52,12 +53,10 @@ impl BuildSerializer for ListSerializer {
 impl_py_gc_traverse!(ListSerializer { item_serializer });
 
 impl TypeSerializer for ListSerializer {
-    fn to_python(
+    fn to_python<'py>(
         &self,
-        value: &Bound<'_, PyAny>,
-        include: Option<&Bound<'_, PyAny>>,
-        exclude: Option<&Bound<'_, PyAny>>,
-        extra: &Extra,
+        value: &Bound<'py, PyAny>,
+        state: &mut SerializationState<'_, 'py>,
     ) -> PyResult<Py<PyAny>> {
         match value.downcast::<PyList>() {
             Ok(py_list) => {
@@ -66,36 +65,34 @@ impl TypeSerializer for ListSerializer {
 
                 let mut items = Vec::with_capacity(py_list.len());
                 for (index, element) in py_list.iter().enumerate() {
-                    let op_next = self.filter.index_filter(index, include, exclude, value.len().ok())?;
+                    let op_next = self.filter.index_filter(index, state, value.len().ok())?;
                     if let Some((next_include, next_exclude)) = op_next {
-                        items.push(item_serializer.to_python(
-                            &element,
-                            next_include.as_ref(),
-                            next_exclude.as_ref(),
-                            extra,
-                        )?);
+                        let state = &mut state.scoped_include_exclude(next_include, next_exclude);
+                        items.push(item_serializer.to_python(&element, state)?);
                     }
                 }
                 items.into_py_any(py)
             }
             Err(_) => {
-                extra.warnings.on_fallback_py(self.get_name(), value, extra)?;
-                infer_to_python(value, include, exclude, extra)
+                state.warn_fallback_py(self.get_name(), value)?;
+                infer_to_python(value, state)
             }
         }
     }
 
-    fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
-        self.invalid_as_json_key(key, extra, Self::EXPECTED_TYPE)
+    fn json_key<'a, 'py>(
+        &self,
+        key: &'a Bound<'py, PyAny>,
+        state: &mut SerializationState<'_, 'py>,
+    ) -> PyResult<Cow<'a, str>> {
+        self.invalid_as_json_key(key, state, Self::EXPECTED_TYPE)
     }
 
-    fn serde_serialize<S: serde::ser::Serializer>(
+    fn serde_serialize<'py, S: serde::ser::Serializer>(
         &self,
-        value: &Bound<'_, PyAny>,
+        value: &Bound<'py, PyAny>,
         serializer: S,
-        include: Option<&Bound<'_, PyAny>>,
-        exclude: Option<&Bound<'_, PyAny>>,
-        extra: &Extra,
+        state: &mut SerializationState<'_, 'py>,
     ) -> Result<S::Ok, S::Error> {
         match value.downcast::<PyList>() {
             Ok(py_list) => {
@@ -105,24 +102,19 @@ impl TypeSerializer for ListSerializer {
                 for (index, element) in py_list.iter().enumerate() {
                     let op_next = self
                         .filter
-                        .index_filter(index, include, exclude, Some(py_list.len()))
+                        .index_filter(index, state, Some(py_list.len()))
                         .map_err(py_err_se_err)?;
                     if let Some((next_include, next_exclude)) = op_next {
-                        let item_serialize = PydanticSerializer::new(
-                            &element,
-                            item_serializer,
-                            next_include.as_ref(),
-                            next_exclude.as_ref(),
-                            extra,
-                        );
+                        let state = &mut state.scoped_include_exclude(next_include, next_exclude);
+                        let item_serialize = PydanticSerializer::new(&element, item_serializer, state);
                         seq.serialize_element(&item_serialize)?;
                     }
                 }
                 seq.end()
             }
             Err(_) => {
-                extra.warnings.on_fallback_ser::<S>(self.get_name(), value, extra)?;
-                infer_serialize(value, serializer, include, exclude, extra)
+                state.warn_fallback_ser::<S>(self.get_name(), value)?;
+                infer_serialize(value, serializer, state)
             }
         }
     }

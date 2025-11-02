@@ -11,7 +11,7 @@ use pyo3::PyVisit;
 use super::{build_validator, BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
 use crate::build_tools::py_schema_err;
 use crate::build_tools::schema_or_config_same;
-use crate::errors::{LocItem, ValError, ValResult};
+use crate::errors::{ErrorTypeDefaults, LocItem, ValError, ValResult};
 use crate::input::Input;
 use crate::py_gc::PyGcTraverse;
 use crate::tools::SchemaDict;
@@ -113,7 +113,7 @@ impl BuildValidator for WithDefaultValidator {
             .map(|s| s.to_str())
             .transpose()?
         {
-            Some("raise") => OnError::Raise,
+            Some("raise") | None => OnError::Raise,
             Some("omit") => OnError::Omit,
             Some("default") => {
                 if matches!(default, DefaultType::None) {
@@ -121,7 +121,6 @@ impl BuildValidator for WithDefaultValidator {
                 }
                 OnError::Default
             }
-            None => OnError::Raise,
             // schema validation means other values are impossible
             _ => unreachable!(),
         };
@@ -144,7 +143,7 @@ impl BuildValidator for WithDefaultValidator {
             validate_default: schema_or_config_same(schema, config, intern!(py, "validate_default"))?.unwrap_or(false),
             copy_default,
             name,
-            undefined: PydanticUndefinedType::new(py).into_any(),
+            undefined: PydanticUndefinedType::get(py).clone_ref(schema.py()).into_any(),
         })
         .into())
     }
@@ -182,6 +181,18 @@ impl Validator for WithDefaultValidator {
         outer_loc: Option<impl Into<LocItem>>,
         state: &mut ValidationState<'_, 'py>,
     ) -> ValResult<Option<Py<PyAny>>> {
+        if matches!(self.default, DefaultType::DefaultFactory(_, true)) && state.has_field_error {
+            // The default factory might use data from fields that failed to validate, and this results
+            // in an unhelpul error.
+            let mut err = ValError::new(
+                ErrorTypeDefaults::DefaultFactoryNotCalled,
+                PydanticUndefinedType::get(py).bind(py).clone().into_any(),
+            );
+            if let Some(outer_loc) = outer_loc {
+                err = err.with_outer_location(outer_loc);
+            }
+            return Err(err);
+        }
         match self.default.default_value(py, state.extra().data.as_ref())? {
             Some(stored_dft) => {
                 let dft: Py<PyAny> = if self.copy_default {

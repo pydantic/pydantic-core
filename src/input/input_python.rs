@@ -421,15 +421,17 @@ impl<'py> Input<'py> for Bound<'py, PyAny> {
         Self: 'a;
 
     fn strict_dict<'a>(&'a self) -> ValResult<GenericPyMapping<'a, 'py>> {
-        if let Ok(dict) = self.downcast::<PyDict>() {
+        if let Ok(dict) = self.downcast_exact::<PyDict>() {
             Ok(GenericPyMapping::Dict(dict))
+        } else if self.is_instance_of::<PyDict>() {
+            Ok(GenericPyMapping::Mapping(self.downcast::<PyMapping>()?))
         } else {
             Err(ValError::new(ErrorTypeDefaults::DictType, self))
         }
     }
 
     fn lax_dict<'a>(&'a self) -> ValResult<GenericPyMapping<'a, 'py>> {
-        if let Ok(dict) = self.downcast::<PyDict>() {
+        if let Ok(dict) = self.downcast_exact::<PyDict>() {
             Ok(GenericPyMapping::Dict(dict))
         } else if let Ok(mapping) = self.downcast::<PyMapping>() {
             Ok(GenericPyMapping::Mapping(mapping))
@@ -857,7 +859,7 @@ impl<'py> KeywordArgs<'py> for PyKwargs<'py> {
         &self,
         key: &'k crate::lookup_key::LookupKey,
     ) -> ValResult<Option<(&'k crate::lookup_key::LookupPath, Self::Item<'_>)>> {
-        key.py_get_dict_item(&self.0)
+        key.py_get_dict_item(&self.0).map_err(Into::into)
     }
 
     fn iter(&self) -> impl Iterator<Item = ValResult<(Self::Key<'_>, Self::Item<'_>)>> {
@@ -888,8 +890,8 @@ impl<'py> ValidatedDict<'py> for GenericPyMapping<'_, 'py> {
         key: &'k crate::lookup_key::LookupKey,
     ) -> ValResult<Option<(&'k crate::lookup_key::LookupPath, Self::Item<'_>)>> {
         match self {
-            Self::Dict(dict) => key.py_get_dict_item(dict),
-            Self::Mapping(mapping) => key.py_get_mapping_item(mapping),
+            Self::Dict(dict) => key.py_get_dict_item(dict).map_err(Into::into),
+            Self::Mapping(mapping) => key.py_get_mapping_item(mapping).map_err(Into::into),
             Self::GetAttr(obj, dict) => key.py_get_attr(obj, dict.as_ref()),
         }
     }

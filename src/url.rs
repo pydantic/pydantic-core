@@ -7,6 +7,7 @@ use std::sync::OnceLock;
 
 use idna::punycode::decode_to_string;
 use jiter::{PartialMode, StringCacheMode};
+use percent_encoding::{percent_encode, AsciiSet, CONTROLS};
 use pyo3::exceptions::PyValueError;
 use pyo3::pyclass::CompareOp;
 use pyo3::sync::OnceLockExt;
@@ -536,9 +537,14 @@ impl FromPyObject<'_> for UrlHostParts {
 impl fmt::Display for UrlHostParts {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match (&self.username, &self.password) {
-            (Some(username), None) => write!(f, "{username}@")?,
-            (None, Some(password)) => write!(f, ":{password}@")?,
-            (Some(username), Some(password)) => write!(f, "{username}:{password}@")?,
+            (Some(username), None) => write!(f, "{}@", encode_userinfo_component(username))?,
+            (None, Some(password)) => write!(f, ":{}@", encode_userinfo_component(password))?,
+            (Some(username), Some(password)) => write!(
+                f,
+                "{}:{}@",
+                encode_userinfo_component(username),
+                encode_userinfo_component(password)
+            )?,
             (None, None) => {}
         }
         if let Some(host) = &self.host {
@@ -596,6 +602,42 @@ fn is_punnycode_domain(lib_url: &Url, domain: &str) -> bool {
     scheme_is_special(lib_url.scheme()) && domain.split('.').any(|part| part.starts_with(PUNYCODE_PREFIX))
 }
 
+/// See <https://url.spec.whatwg.org/#userinfo-percent-encode-set>
+const USERINFO_ENCODE_SET: &AsciiSet = &CONTROLS
+    // query percent-encodes is controls plus the below
+    .add(b' ')
+    .add(b'"')
+    .add(b'#')
+    .add(b'<')
+    .add(b'>')
+    // path percent-encodes is query percent-encodes plus the below
+    .add(b'?')
+    .add(b'^')
+    .add(b'`')
+    .add(b'{')
+    .add(b'}')
+    // userinfo percent-encodes is path percent-encodes plus the below
+    .add(b'/')
+    .add(b':')
+    .add(b';')
+    .add(b'=')
+    .add(b'@')
+    .add(b'[')
+    .add(b'\\')
+    .add(b']')
+    .add(b'|')
+    // https://datatracker.ietf.org/doc/html/rfc3986.html#section-2.4
+    // we must also percent-encode '%'
+    .add(b'%');
+
+fn encode_userinfo_component(value: &str) -> Cow<'_, str> {
+    let encoded = percent_encode(value.as_bytes(), USERINFO_ENCODE_SET).to_string();
+    if encoded == value {
+        Cow::Borrowed(value)
+    } else {
+        Cow::Owned(encoded)
+    }
+}
 // based on https://github.com/servo/rust-url/blob/1c1e406874b3d2aa6f36c5d2f3a5c2ea74af9efb/url/src/parser.rs#L161-L167
 pub fn scheme_is_special(scheme: &str) -> bool {
     matches!(scheme, "http" | "https" | "ws" | "wss" | "ftp" | "file")

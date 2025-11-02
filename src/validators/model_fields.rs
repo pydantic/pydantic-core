@@ -179,6 +179,7 @@ impl Validator for ModelFieldsValidator {
 
         {
             let state = &mut state.rebind_extra(|extra| extra.data = Some(model_dict.clone()));
+            let state = &mut state.scoped_set(|state| &mut state.has_field_error, false);
 
             for field in &self.fields {
                 let lookup_key = field
@@ -194,6 +195,9 @@ impl Validator for ModelFieldsValidator {
                     }
                     Err(err) => return Err(err),
                 };
+
+                let state = &mut state.rebind_extra(|extra| extra.field_name = Some(field.name_py.bind(py).clone()));
+
                 if let Some((lookup_path, value)) = op_key_value {
                     if let Some(ref mut used_keys) = used_keys {
                         // key is "used" whether or not validation passes, since we want to skip this key in
@@ -201,22 +205,24 @@ impl Validator for ModelFieldsValidator {
                         used_keys.insert(lookup_path.first_key());
                     }
 
-                    let state =
-                        &mut state.rebind_extra(|extra| extra.field_name = Some(field.name_py.bind(py).clone()));
-
                     match field.validator.validate(py, value.borrow_input(), state) {
                         Ok(value) => {
                             model_dict.set_item(&field.name_py, value)?;
                             fields_set_vec.push(field.name_py.clone_ref(py));
                             fields_set_count += 1;
                         }
-                        Err(ValError::Omit) => continue,
-                        Err(ValError::LineErrors(line_errors)) => {
-                            for err in line_errors {
-                                errors.push(lookup_path.apply_error_loc(err, self.loc_by_alias, &field.name));
+                        Err(e) => {
+                            state.has_field_error = true;
+                            match e {
+                                ValError::Omit => continue,
+                                ValError::LineErrors(line_errors) => {
+                                    for err in line_errors {
+                                        errors.push(lookup_path.apply_error_loc(err, self.loc_by_alias, &field.name));
+                                    }
+                                }
+                                err => return Err(err),
                             }
                         }
-                        Err(err) => return Err(err),
                     }
                     continue;
                 }
@@ -237,6 +243,7 @@ impl Validator for ModelFieldsValidator {
                     }
                     Err(ValError::Omit) => {}
                     Err(ValError::LineErrors(line_errors)) => {
+                        state.has_field_error = true;
                         for err in line_errors {
                             // Note: this will always use the field name even if there is an alias
                             // However, we don't mind so much because this error can only happen if the
@@ -426,7 +433,7 @@ impl Validator for ModelFieldsValidator {
                     return Err(ValError::new_with_loc(
                         ErrorTypeDefaults::FrozenField,
                         field_value,
-                        field.name.to_string(),
+                        &field.name,
                     ));
                 }
 

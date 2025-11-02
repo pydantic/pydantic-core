@@ -10,11 +10,9 @@ use type_serializers::any::AnySerializer;
 use crate::definitions::{Definitions, DefinitionsBuilder};
 use crate::py_gc::PyGcTraverse;
 
-pub(crate) use config::BytesMode;
-use config::SerializationConfig;
+pub(crate) use config::{BytesMode, SerializationConfig};
 pub use errors::{PydanticSerializationError, PydanticSerializationUnexpectedValue};
-use extra::{CollectWarnings, SerRecursionState, WarningsMode};
-pub(crate) use extra::{Extra, SerMode, SerializationState};
+pub(crate) use extra::{Extra, SerMode, SerializationState, WarningsMode};
 use shared::to_json_bytes;
 pub use shared::CombinedSerializer;
 
@@ -50,45 +48,6 @@ pub struct SchemaSerializer {
     py_config: Option<Py<PyDict>>,
 }
 
-impl SchemaSerializer {
-    #[allow(clippy::too_many_arguments)]
-    pub(crate) fn build_extra<'b, 'a: 'b>(
-        &'b self,
-        py: Python<'a>,
-        mode: &'a SerMode,
-        by_alias: Option<bool>,
-        warnings: &'a CollectWarnings,
-        exclude_unset: bool,
-        exclude_defaults: bool,
-        exclude_none: bool,
-        exclude_computed_fields: bool,
-        round_trip: bool,
-        rec_guard: &'a SerRecursionState,
-        serialize_unknown: bool,
-        fallback: Option<&'a Bound<'a, PyAny>>,
-        serialize_as_any: bool,
-        context: Option<&'a Bound<'a, PyAny>>,
-    ) -> Extra<'b> {
-        Extra::new(
-            py,
-            mode,
-            by_alias,
-            warnings,
-            exclude_unset,
-            exclude_defaults,
-            exclude_none,
-            exclude_computed_fields,
-            round_trip,
-            &self.config,
-            rec_guard,
-            serialize_unknown,
-            fallback,
-            serialize_as_any,
-            context,
-        )
-    }
-}
-
 #[pymethods]
 impl SchemaSerializer {
     #[new]
@@ -118,8 +77,8 @@ impl SchemaSerializer {
         py: Python,
         value: &Bound<'_, PyAny>,
         mode: Option<&str>,
-        include: Option<&Bound<'_, PyAny>>,
-        exclude: Option<&Bound<'_, PyAny>>,
+        include: Option<Bound<'_, PyAny>>,
+        exclude: Option<Bound<'_, PyAny>>,
         by_alias: Option<bool>,
         exclude_unset: bool,
         exclude_defaults: bool,
@@ -136,26 +95,23 @@ impl SchemaSerializer {
             WarningsArg::Bool(b) => b.into(),
             WarningsArg::Literal(mode) => mode,
         };
-        let warnings = CollectWarnings::new(warnings_mode);
-        let rec_guard = SerRecursionState::default();
-        let extra = self.build_extra(
+        let extra = Extra::new(
             py,
             &mode,
             by_alias,
-            &warnings,
             exclude_unset,
             exclude_defaults,
             exclude_none,
             exclude_computed_fields,
             round_trip,
-            &rec_guard,
             false,
             fallback,
             serialize_as_any,
             context,
         );
-        let v = self.serializer.to_python(value, include, exclude, &extra)?;
-        warnings.final_check(py)?;
+        let mut state = SerializationState::new(self.config, warnings_mode, include, exclude, extra)?;
+        let v = self.serializer.to_python(value, &mut state)?;
+        state.warnings.final_check(py)?;
         Ok(v)
     }
 
@@ -169,8 +125,8 @@ impl SchemaSerializer {
         value: &Bound<'_, PyAny>,
         indent: Option<usize>,
         ensure_ascii: Option<bool>,
-        include: Option<&Bound<'_, PyAny>>,
-        exclude: Option<&Bound<'_, PyAny>>,
+        include: Option<Bound<'_, PyAny>>,
+        exclude: Option<Bound<'_, PyAny>>,
         by_alias: Option<bool>,
         exclude_unset: bool,
         exclude_defaults: bool,
@@ -186,36 +142,31 @@ impl SchemaSerializer {
             WarningsArg::Bool(b) => b.into(),
             WarningsArg::Literal(mode) => mode,
         };
-        let warnings = CollectWarnings::new(warnings_mode);
-        let rec_guard = SerRecursionState::default();
-        let extra = self.build_extra(
+        let extra = Extra::new(
             py,
             &SerMode::Json,
             by_alias,
-            &warnings,
             exclude_unset,
             exclude_defaults,
             exclude_none,
             exclude_computed_fields,
             round_trip,
-            &rec_guard,
             false,
             fallback,
             serialize_as_any,
             context,
         );
+        let mut state = SerializationState::new(self.config, warnings_mode, include, exclude, extra)?;
         let bytes = to_json_bytes(
             value,
             &self.serializer,
-            include,
-            exclude,
-            &extra,
+            &mut state,
             indent,
             ensure_ascii.unwrap_or(false),
             self.expected_json_size.load(Ordering::Relaxed),
         )?;
 
-        warnings.final_check(py)?;
+        state.warnings.final_check(py)?;
 
         self.expected_json_size.store(bytes.len(), Ordering::Relaxed);
         let py_bytes = PyBytes::new(py, &bytes);
@@ -256,8 +207,8 @@ pub fn to_json(
     value: &Bound<'_, PyAny>,
     indent: Option<usize>,
     ensure_ascii: Option<bool>,
-    include: Option<&Bound<'_, PyAny>>,
-    exclude: Option<&Bound<'_, PyAny>>,
+    include: Option<Bound<'_, PyAny>>,
+    exclude: Option<Bound<'_, PyAny>>,
     by_alias: bool,
     exclude_none: bool,
     round_trip: bool,
@@ -270,24 +221,26 @@ pub fn to_json(
     serialize_as_any: bool,
     context: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<Py<PyAny>> {
-    let state = SerializationState::new(timedelta_mode, temporal_mode, bytes_mode, inf_nan_mode)?;
-    let extra = state.extra(
+    let config = SerializationConfig::from_args(timedelta_mode, temporal_mode, bytes_mode, inf_nan_mode)?;
+    let extra = Extra::new(
         py,
         &SerMode::Json,
         Some(by_alias),
+        false,
+        false,
         exclude_none,
+        false,
         round_trip,
         serialize_unknown,
         fallback,
         serialize_as_any,
         context,
     );
+    let mut state = SerializationState::new(config, WarningsMode::None, include, exclude, extra)?;
     let bytes = to_json_bytes(
         value,
         AnySerializer::get(),
-        include,
-        exclude,
-        &extra,
+        &mut state,
         indent,
         ensure_ascii.unwrap_or(false),
         1024,
@@ -305,8 +258,8 @@ pub fn to_json(
 pub fn to_jsonable_python(
     py: Python,
     value: &Bound<'_, PyAny>,
-    include: Option<&Bound<'_, PyAny>>,
-    exclude: Option<&Bound<'_, PyAny>>,
+    include: Option<Bound<'_, PyAny>>,
+    exclude: Option<Bound<'_, PyAny>>,
     by_alias: bool,
     exclude_none: bool,
     round_trip: bool,
@@ -319,19 +272,23 @@ pub fn to_jsonable_python(
     serialize_as_any: bool,
     context: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<Py<PyAny>> {
-    let state = SerializationState::new(timedelta_mode, temporal_mode, bytes_mode, inf_nan_mode)?;
-    let extra = state.extra(
+    let config = SerializationConfig::from_args(timedelta_mode, temporal_mode, bytes_mode, inf_nan_mode)?;
+    let extra = Extra::new(
         py,
         &SerMode::Json,
         Some(by_alias),
+        false,
+        false,
         exclude_none,
+        false,
         round_trip,
         serialize_unknown,
         fallback,
         serialize_as_any,
         context,
     );
-    let v = infer::infer_to_python(value, include, exclude, &extra)?;
+    let mut state = SerializationState::new(config, WarningsMode::None, include, exclude, extra)?;
+    let v = infer::infer_to_python(value, &mut state)?;
     state.final_check(py)?;
     Ok(v)
 }

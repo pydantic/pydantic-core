@@ -107,7 +107,7 @@ pub fn build_info() -> String {
 }
 
 #[pymodule(gil_used = false)]
-mod _pydantic_core {
+pub mod _pydantic_core {
     #[allow(clippy::wildcard_imports)]
     use super::*;
 
@@ -125,7 +125,7 @@ mod _pydantic_core {
         m.add("build_profile", env!("PROFILE"))?;
         m.add("build_info", build_info())?;
         m.add("_recursion_limit", recursion_guard::RECURSION_GUARD_LIMIT)?;
-        m.add("PydanticUndefined", PydanticUndefinedType::new(m.py()))?;
+        m.add("PydanticUndefined", PydanticUndefinedType::get(m.py()))?;
         Ok(())
     }
 }

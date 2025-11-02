@@ -9,12 +9,13 @@ use serde::Serializer;
 use crate::build_tools::LazyLock;
 use crate::definitions::DefinitionsBuilder;
 use crate::serializers::config::InfNanMode;
+use crate::serializers::SerializationState;
 use crate::tools::SchemaDict;
 
 use super::simple::to_str_json_key;
 use super::{
-    infer_json_key, infer_serialize, infer_to_python, BuildSerializer, CombinedSerializer, Extra, IsType, ObType,
-    SerCheck, SerMode, TypeSerializer,
+    infer_json_key, infer_serialize, infer_to_python, BuildSerializer, CombinedSerializer, IsType, ObType, SerCheck,
+    SerMode, TypeSerializer,
 };
 use crate::serializers::errors::PydanticSerializationUnexpectedValue;
 
@@ -89,54 +90,53 @@ impl BuildSerializer for FloatSerializer {
 impl_py_gc_traverse!(FloatSerializer {});
 
 impl TypeSerializer for FloatSerializer {
-    fn to_python(
+    fn to_python<'py>(
         &self,
-        value: &Bound<'_, PyAny>,
-        include: Option<&Bound<'_, PyAny>>,
-        exclude: Option<&Bound<'_, PyAny>>,
-        extra: &Extra,
+        value: &Bound<'py, PyAny>,
+        state: &mut SerializationState<'_, 'py>,
     ) -> PyResult<Py<PyAny>> {
         let py = value.py();
-        match extra.ob_type_lookup.is_type(value, ObType::Float) {
+        match state.extra.ob_type_lookup.is_type(value, ObType::Float) {
             IsType::Exact => Ok(value.clone().unbind()),
-            IsType::Subclass => match extra.check {
+            IsType::Subclass => match state.check {
                 SerCheck::Strict => Err(PydanticSerializationUnexpectedValue::new_from_msg(None).to_py_err()),
-                SerCheck::Lax | SerCheck::None => match extra.mode {
+                SerCheck::Lax | SerCheck::None => match state.extra.mode {
                     SerMode::Json => value.extract::<f64>()?.into_py_any(py),
-                    _ => infer_to_python(value, include, exclude, extra),
+                    _ => infer_to_python(value, state),
                 },
             },
             IsType::False => {
-                extra.warnings.on_fallback_py(self.get_name(), value, extra)?;
-                infer_to_python(value, include, exclude, extra)
+                state.warn_fallback_py(self.get_name(), value)?;
+                infer_to_python(value, state)
             }
         }
     }
 
-    fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
-        match extra.ob_type_lookup.is_type(key, ObType::Float) {
+    fn json_key<'a, 'py>(
+        &self,
+        key: &'a Bound<'py, PyAny>,
+        state: &mut SerializationState<'_, 'py>,
+    ) -> PyResult<Cow<'a, str>> {
+        match state.extra.ob_type_lookup.is_type(key, ObType::Float) {
             IsType::Exact | IsType::Subclass => to_str_json_key(key),
             IsType::False => {
-                extra.warnings.on_fallback_py(self.get_name(), key, extra)?;
-                infer_json_key(key, extra)
+                state.warn_fallback_py(self.get_name(), key)?;
+                infer_json_key(key, state)
             }
         }
     }
 
-    fn serde_serialize<S: Serializer>(
+    fn serde_serialize<'py, S: Serializer>(
         &self,
-        value: &Bound<'_, PyAny>,
+        value: &Bound<'py, PyAny>,
         serializer: S,
-        include: Option<&Bound<'_, PyAny>>,
-        exclude: Option<&Bound<'_, PyAny>>,
-        // TODO: Merge extra.config into self.inf_nan_mode?
-        extra: &Extra,
+        state: &mut SerializationState<'_, 'py>,
     ) -> Result<S::Ok, S::Error> {
         match value.extract::<f64>() {
             Ok(v) => serialize_f64(v, serializer, self.inf_nan_mode),
             Err(_) => {
-                extra.warnings.on_fallback_ser::<S>(self.get_name(), value, extra)?;
-                infer_serialize(value, serializer, include, exclude, extra)
+                state.warn_fallback_ser::<S>(self.get_name(), value)?;
+                infer_serialize(value, serializer, state)
             }
         }
     }

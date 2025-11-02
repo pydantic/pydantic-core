@@ -34,9 +34,8 @@ pub(super) enum Revalidate {
 impl Revalidate {
     pub fn from_str(s: Option<&str>) -> PyResult<Self> {
         match s {
-            None => Ok(Self::Never),
             Some("always") => Ok(Self::Always),
-            Some("never") => Ok(Self::Never),
+            Some("never") | None => Ok(Self::Never),
             Some("subclass-instances") => Ok(Self::SubclassInstances),
             Some(s) => py_schema_err!("Invalid revalidate_instances value: {}", s),
         }
@@ -101,7 +100,7 @@ impl BuildValidator for ModelValidator {
             frozen: schema.get_as(intern!(py, "frozen"))?.unwrap_or(false),
             custom_init: schema.get_as(intern!(py, "custom_init"))?.unwrap_or(false),
             root_model: schema.get_as(intern!(py, "root_model"))?.unwrap_or(false),
-            undefined: PydanticUndefinedType::new(py).into_any(),
+            undefined: PydanticUndefinedType::get(py).clone_ref(schema.py()).into_any(),
             // Get the class's `__name__`, not using `class.qualname()`
             name,
         })
@@ -331,7 +330,7 @@ impl ModelValidator {
         py: Python<'py>,
         instance: Bound<'_, PyAny>,
         input: &(impl Input<'py> + ?Sized),
-        extra: &Extra,
+        extra: &Extra<'_, 'py>,
     ) -> ValResult<Py<PyAny>> {
         if let Some(ref post_init) = self.post_init {
             instance

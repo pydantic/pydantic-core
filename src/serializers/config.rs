@@ -18,7 +18,7 @@ use crate::tools::SchemaDict;
 
 use super::errors::py_err_se_err;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 #[allow(clippy::struct_field_names)]
 pub(crate) struct SerializationConfig {
     pub temporal_mode: TemporalMode,
@@ -191,7 +191,7 @@ impl TemporalMode {
 
     pub fn datetime_json_key<'py>(self, datetime: &Bound<'_, PyDateTime>) -> PyResult<Cow<'py, str>> {
         match self {
-            Self::Iso8601 => Ok(datetime_to_string(datetime)?.to_string().into()),
+            Self::Iso8601 => Ok(datetime_to_string(datetime)?.into()),
             Self::Seconds => Ok(datetime_to_seconds(datetime)?.to_string().into()),
             Self::Milliseconds => Ok(datetime_to_milliseconds(datetime)?.to_string().into()),
         }
@@ -199,7 +199,7 @@ impl TemporalMode {
 
     pub fn date_json_key<'py>(self, date: &Bound<'_, PyDate>) -> PyResult<Cow<'py, str>> {
         match self {
-            Self::Iso8601 => Ok(date_to_string(date)?.to_string().into()),
+            Self::Iso8601 => Ok(date_to_string(date)?.into()),
             Self::Seconds => Ok(date_to_seconds(date)?.to_string().into()),
             Self::Milliseconds => Ok(date_to_milliseconds(date)?.to_string().into()),
         }
@@ -207,7 +207,7 @@ impl TemporalMode {
 
     pub fn time_json_key<'py>(self, time: &Bound<'_, PyTime>) -> PyResult<Cow<'py, str>> {
         match self {
-            Self::Iso8601 => Ok(time_to_string(time)?.to_string().into()),
+            Self::Iso8601 => Ok(time_to_string(time)?.into()),
             Self::Seconds => Ok(time_to_seconds(time)?.to_string().into()),
             Self::Milliseconds => Ok(time_to_milliseconds(time)?.to_string().into()),
         }

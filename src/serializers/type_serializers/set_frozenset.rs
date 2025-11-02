@@ -8,12 +8,12 @@ use pyo3::{intern, IntoPyObjectExt};
 use serde::ser::SerializeSeq;
 
 use crate::definitions::DefinitionsBuilder;
+use crate::serializers::SerializationState;
 use crate::tools::SchemaDict;
 
 use super::any::AnySerializer;
 use super::{
-    infer_serialize, infer_to_python, BuildSerializer, CombinedSerializer, Extra, PydanticSerializer, SerMode,
-    TypeSerializer,
+    infer_serialize, infer_to_python, BuildSerializer, CombinedSerializer, PydanticSerializer, SerMode, TypeSerializer,
 };
 
 macro_rules! build_serializer {
@@ -51,12 +51,10 @@ macro_rules! build_serializer {
         impl_py_gc_traverse!($struct_name { item_serializer });
 
         impl TypeSerializer for $struct_name {
-            fn to_python(
+            fn to_python<'py>(
                 &self,
-                value: &Bound<'_, PyAny>,
-                include: Option<&Bound<'_, PyAny>>,
-                exclude: Option<&Bound<'_, PyAny>>,
-                extra: &Extra,
+                value: &Bound<'py, PyAny>,
+                state: &mut SerializationState<'_, 'py>,
             ) -> PyResult<Py<PyAny>> {
                 let py = value.py();
                 match value.downcast::<$py_type>() {
@@ -65,31 +63,33 @@ macro_rules! build_serializer {
 
                         let mut items = Vec::with_capacity(py_set.len());
                         for element in py_set.iter() {
-                            items.push(item_serializer.to_python(&element, include, exclude, extra)?);
+                            items.push(item_serializer.to_python(&element, state)?);
                         }
-                        match extra.mode {
+                        match state.extra.mode {
                             SerMode::Json => Ok(PyList::new(py, items)?.into()),
                             _ => <$py_type>::new(py, &items)?.into_py_any(py),
                         }
                     }
                     Err(_) => {
-                        extra.warnings.on_fallback_py(self.get_name(), value, extra)?;
-                        infer_to_python(value, include, exclude, extra)
+                        state.warn_fallback_py(self.get_name(), value)?;
+                        infer_to_python(value, state)
                     }
                 }
             }
 
-            fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
-                self.invalid_as_json_key(key, extra, Self::EXPECTED_TYPE)
+            fn json_key<'a, 'py>(
+                &self,
+                key: &'a Bound<'py, PyAny>,
+                state: &mut SerializationState<'_, 'py>,
+            ) -> PyResult<Cow<'a, str>> {
+                self.invalid_as_json_key(key, state, Self::EXPECTED_TYPE)
             }
 
-            fn serde_serialize<S: serde::ser::Serializer>(
+            fn serde_serialize<'py, S: serde::ser::Serializer>(
                 &self,
-                value: &Bound<'_, PyAny>,
+                value: &Bound<'py, PyAny>,
                 serializer: S,
-                include: Option<&Bound<'_, PyAny>>,
-                exclude: Option<&Bound<'_, PyAny>>,
-                extra: &Extra,
+                state: &mut SerializationState<'_, 'py>,
             ) -> Result<S::Ok, S::Error> {
                 match value.downcast::<$py_type>() {
                     Ok(py_set) => {
@@ -97,17 +97,14 @@ macro_rules! build_serializer {
                         let item_serializer = self.item_serializer.as_ref();
 
                         for value in py_set.iter() {
-                            let item_serialize =
-                                PydanticSerializer::new(&value, item_serializer, include, exclude, extra);
+                            let item_serialize = PydanticSerializer::new(&value, item_serializer, state);
                             seq.serialize_element(&item_serialize)?;
                         }
                         seq.end()
                     }
                     Err(_) => {
-                        extra
-                            .warnings
-                            .on_fallback_ser::<S>(self.get_name(), value, extra)?;
-                        infer_serialize(value, serializer, include, exclude, extra)
+                        state.warn_fallback_ser::<S>(self.get_name(), value)?;
+                        infer_serialize(value, serializer, state)
                     }
                 }
             }
