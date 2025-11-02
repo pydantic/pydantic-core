@@ -24,6 +24,7 @@ mod fields;
 mod filter;
 mod infer;
 mod ob_type;
+mod polymorphism_trampoline;
 mod prebuilt;
 pub mod ser;
 mod shared;

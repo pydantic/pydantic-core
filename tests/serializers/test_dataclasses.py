@@ -286,3 +286,46 @@ def test_by_alias_and_name_config_interaction(config, runtime, expected) -> None
     )
     s = SchemaSerializer(schema)
     assert s.to_python(Foo(my_field='hello'), by_alias=runtime) == expected
+
+
+@pytest.mark.parametrize('config', [True, False])
+@pytest.mark.parametrize('runtime', [True, False])
+def test_polymorphic_serialization(config: bool, runtime: bool) -> None:
+    @dataclasses.dataclass
+    class ClassA:
+        a: int
+
+    @dataclasses.dataclass
+    class ClassB(ClassA):
+        b: str
+
+    schema_a = core_schema.dataclass_schema(
+        ClassA,
+        core_schema.dataclass_args_schema(
+            'ClassA', [core_schema.dataclass_field(name='a', schema=core_schema.int_schema())]
+        ),
+        ['a'],
+        config=core_schema.CoreConfig(polymorphic_serialization=config),
+    )
+
+    schema_b = core_schema.dataclass_schema(
+        ClassB,
+        core_schema.dataclass_args_schema(
+            'ClassB',
+            [
+                core_schema.dataclass_field(name='a', schema=core_schema.int_schema()),
+                core_schema.dataclass_field(name='b', schema=core_schema.str_schema()),
+            ],
+        ),
+        ['a', 'b'],
+    )
+
+    ClassA.__pydantic_serializer__ = SchemaSerializer(schema_a)
+    ClassB.__pydantic_serializer__ = SchemaSerializer(schema_b)
+
+    assert ClassA.__pydantic_serializer__.to_python(ClassA(123)) == {'a': 123}
+
+    if config:
+        assert ClassA.__pydantic_serializer__.to_python(ClassB(123, 'test')) == {'a': 123, 'b': 'test'}
+    else:
+        assert ClassA.__pydantic_serializer__.to_python(ClassB(123, 'test')) == {'a': 123}
