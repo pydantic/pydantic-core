@@ -9,7 +9,7 @@ use pyo3::{prelude::*, PyTypeInfo};
 use crate::build_tools::is_strict;
 use crate::errors::ErrorTypeDefaults;
 use crate::errors::ValResult;
-use crate::errors::{ToErrorValue, ValError, Number, ErrorType};
+use crate::errors::{ErrorType, Number, ToErrorValue, ValError};
 use crate::input::Input;
 
 use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
