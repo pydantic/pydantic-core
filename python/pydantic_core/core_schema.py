@@ -812,10 +812,10 @@ def decimal_schema(
 
 class FractionSchema(TypedDict, total=False):
     type: Required[Literal['decimal']]
-    le: Decimal
-    ge: Decimal
-    lt: Decimal
-    gt: Decimal
+    le: Fraction
+    ge: Fraction
+    lt: Fraction
+    gt: Fraction
     strict: bool
     ref: str
     metadata: dict[str, Any]

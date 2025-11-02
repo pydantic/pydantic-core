@@ -3,13 +3,13 @@ use std::sync::Arc;
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::intern;
 use pyo3::sync::PyOnceLock;
-use pyo3::types::{PyDict, PyString, PyType};
+use pyo3::types::{IntoPyDict, PyDict, PyString, PyType};
 use pyo3::{prelude::*, PyTypeInfo};
 
 use crate::build_tools::is_strict;
 use crate::errors::ErrorTypeDefaults;
 use crate::errors::ValResult;
-use crate::errors::{ToErrorValue, ValError};
+use crate::errors::{ToErrorValue, ValError, Number, ErrorType};
 use crate::input::Input;
 
 use super::{BuildValidator, CombinedValidator, DefinitionsBuilder, ValidationState, Validator};
@@ -92,50 +92,50 @@ impl Validator for FractionValidator {
         //     }
         // };
 
-        // if let Some(le) = &self.le {
-        //     if is_nan()? || !decimal.le(le)? {
-        //         return Err(ValError::new(
-        //             ErrorType::LessThanEqual {
-        //                 le: Number::String(le.to_string()),
-        //                 context: Some([("le", le)].into_py_dict(py)?.into()),
-        //             },
-        //             input,
-        //         ));
-        //     }
-        // }
-        // if let Some(lt) = &self.lt {
-        //     if is_nan()? || !decimal.lt(lt)? {
-        //         return Err(ValError::new(
-        //             ErrorType::LessThan {
-        //                 lt: Number::String(lt.to_string()),
-        //                 context: Some([("lt", lt)].into_py_dict(py)?.into()),
-        //             },
-        //             input,
-        //         ));
-        //     }
-        // }
-        // if let Some(ge) = &self.ge {
-        //     if is_nan()? || !decimal.ge(ge)? {
-        //         return Err(ValError::new(
-        //             ErrorType::GreaterThanEqual {
-        //                 ge: Number::String(ge.to_string()),
-        //                 context: Some([("ge", ge)].into_py_dict(py)?.into()),
-        //             },
-        //             input,
-        //         ));
-        //     }
-        // }
-        // if let Some(gt) = &self.gt {
-        //     if is_nan()? || !decimal.gt(gt)? {
-        //         return Err(ValError::new(
-        //             ErrorType::GreaterThan {
-        //                 gt: Number::String(gt.to_string()),
-        //                 context: Some([("gt", gt)].into_py_dict(py)?.into()),
-        //             },
-        //             input,
-        //         ));
-        //     }
-        // }
+        if let Some(le) = &self.le {
+            if !fraction.le(le)? {
+                return Err(ValError::new(
+                    ErrorType::LessThanEqual {
+                        le: Number::String(le.to_string()),
+                        context: Some([("le", le)].into_py_dict(py)?.into()),
+                    },
+                    input,
+                ));
+            }
+        }
+        if let Some(lt) = &self.lt {
+            if !fraction.lt(lt)? {
+                return Err(ValError::new(
+                    ErrorType::LessThan {
+                        lt: Number::String(lt.to_string()),
+                        context: Some([("lt", lt)].into_py_dict(py)?.into()),
+                    },
+                    input,
+                ));
+            }
+        }
+        if let Some(ge) = &self.ge {
+            if !fraction.ge(ge)? {
+                return Err(ValError::new(
+                    ErrorType::GreaterThanEqual {
+                        ge: Number::String(ge.to_string()),
+                        context: Some([("ge", ge)].into_py_dict(py)?.into()),
+                    },
+                    input,
+                ));
+            }
+        }
+        if let Some(gt) = &self.gt {
+            if !fraction.gt(gt)? {
+                return Err(ValError::new(
+                    ErrorType::GreaterThan {
+                        gt: Number::String(gt.to_string()),
+                        context: Some([("gt", gt)].into_py_dict(py)?.into()),
+                    },
+                    input,
+                ));
+            }
+        }
 
         Ok(fraction.into())
     }

@@ -202,10 +202,13 @@ impl<'py, 'data> Input<'py> for JsonValue<'data> {
 
     fn validate_fraction(&self, _strict: bool, py: Python<'py>) -> ValMatch<Bound<'py, PyAny>> {
         match self {
+            JsonValue::Float(f) => {
+                create_fraction(&PyString::new(py, &f.to_string()), self).map(ValidationMatch::strict)
+            }
             JsonValue::Str(..) | JsonValue::Int(..) | JsonValue::BigInt(..) => {
                 create_fraction(&self.into_pyobject(py)?, self).map(ValidationMatch::strict)
             }
-            _ => Err(ValError::new(ErrorTypeDefaults::DecimalType, self)),
+            _ => Err(ValError::new(ErrorTypeDefaults::FractionType, self)),
         }
     }
 

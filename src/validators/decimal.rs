@@ -37,7 +37,7 @@ fn validate_as_decimal(
 ) -> PyResult<Option<Py<PyAny>>> {
     match schema.get_item(key)? {
         Some(value) => match value.validate_decimal(false, py) {
-            Ok(v) => Ok(Some(v.into_inner().unbind())),
+            Ok(v) => { return Ok(Some(v.into_inner().unbind()))},
             Err(_) => Err(PyValueError::new_err(format!(
                 "'{key}' must be coercible to a Decimal instance",
             ))),

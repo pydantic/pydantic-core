@@ -582,8 +582,8 @@ impl ErrorType {
             Self::DecimalMaxDigits {..} => "Decimal input should have no more than {max_digits} digit{expected_plural} in total",
             Self::DecimalMaxPlaces {..} => "Decimal input should have no more than {decimal_places} decimal place{expected_plural}",
             Self::DecimalWholeDigits {..} => "Decimal input should have no more than {whole_digits} digit{expected_plural} before the decimal point",
-            Self::FractionParsing {..} => "Fraction input should be a tuple of two integers, a string or a Fraction object",
-            Self::FractionType {..} => "Fraction input should be a tuple of two integers, or a string or Fraction object",
+            Self::FractionParsing {..} => "Input should be a valid fraction",
+            Self::FractionType {..} => "Fraction input should be an integer, float, string or Fraction object",
             Self::ComplexType {..} => "Input should be a valid python complex object, a number, or a valid complex string following the rules at https://docs.python.org/3/library/functions.html#complex",
             Self::ComplexStrParsing {..} => "Input should be a valid complex string following the rules at https://docs.python.org/3/library/functions.html#complex",
         }
