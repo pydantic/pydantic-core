@@ -407,4 +407,4 @@ def test_nested_typed_dict_field_serializers():
     outer_s = SchemaSerializer(outer_schema)
     # if the inner field serializer incorrectly receives OuterModel as self, the keys
     # will be ['model'] instead of ['x']
-    assert outer_s.to_python(OuterModel({'model': Model({'x': None})})) == {'model': {'x': "['x']"}}
+    assert outer_s.to_python(OuterModel(model=Model(x=None))) == {'model': {'x': "['x']"}}
