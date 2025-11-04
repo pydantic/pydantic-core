@@ -217,9 +217,28 @@ impl PyUrl {
     }
 
     #[classmethod]
-    #[pyo3(signature=(*, scheme, host, username=None, password=None, port=None, path=None, query=None, fragment=None, encode_credentials=false))]
+    #[pyo3(signature=(*, scheme, host, username=None, password=None, port=None, path=None, query=None, fragment=None))]
     #[allow(clippy::too_many_arguments)]
     pub fn build<'py>(
+        cls: &Bound<'py, PyType>,
+        scheme: &str,
+        host: &str,
+        username: Option<&str>,
+        password: Option<&str>,
+        port: Option<u16>,
+        path: Option<&str>,
+        query: Option<&str>,
+        fragment: Option<&str>,
+        // encode_credentials: bool, // TODO: re-enable this
+    ) -> PyResult<Bound<'py, PyAny>> {
+        Self::build_inner(
+            cls, scheme, host, username, password, port, path, query, fragment, false,
+        )
+    }
+}
+
+impl PyUrl {
+    fn build_inner<'py>(
         cls: &Bound<'py, PyType>,
         scheme: &str,
         host: &str,
@@ -448,9 +467,31 @@ impl PyMultiHostUrl {
     }
 
     #[classmethod]
-    #[pyo3(signature=(*, scheme, hosts=None, path=None, query=None, fragment=None, host=None, username=None, password=None, port=None, encode_credentials=false))]
+    #[pyo3(signature=(*, scheme, hosts=None, path=None, query=None, fragment=None, host=None, username=None, password=None, port=None))]
     #[allow(clippy::too_many_arguments)]
     fn build<'py>(
+        cls: &Bound<'py, PyType>,
+        scheme: &str,
+        hosts: Option<Vec<UrlHostParts>>,
+        path: Option<&str>,
+        query: Option<&str>,
+        fragment: Option<&str>,
+        // convenience parameters to build with a single host
+        host: Option<&str>,
+        username: Option<&str>,
+        password: Option<&str>,
+        port: Option<u16>,
+        // encode_credentials: bool, // TODO: re-enable this
+    ) -> PyResult<Bound<'py, PyAny>> {
+        Self::build_inner(
+            cls, scheme, hosts, path, query, fragment, host, username, password, port,
+            false, // TODO: re-enable this
+        )
+    }
+}
+
+impl PyMultiHostUrl {
+    fn build_inner<'py>(
         cls: &Bound<'py, PyType>,
         scheme: &str,
         hosts: Option<Vec<UrlHostParts>>,

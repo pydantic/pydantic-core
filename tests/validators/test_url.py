@@ -1319,7 +1319,18 @@ def test_multi_url_build() -> None:
 
 
 @pytest.mark.parametrize('url_type', [Url, MultiHostUrl])
-@pytest.mark.parametrize('include_kwarg', [True, False])
+@pytest.mark.parametrize(
+    'include_kwarg',
+    [
+        pytest.param(
+            True,
+            marks=pytest.mark.xfail(
+                reason='semantics of `encode_credentials` need to be fully decided, not enabled yet'
+            ),
+        ),
+        False,
+    ],
+)
 def test_url_build_not_encode_credentials(url_type: type[Union[Url, MultiHostUrl]], include_kwarg: bool) -> None:
     kwargs = {}
     if include_kwarg:
@@ -1356,6 +1367,7 @@ def test_url_build_not_encode_credentials(url_type: type[Union[Url, MultiHostUrl
     assert url.fragment == '__@example.com:5432'
 
 
+@pytest.mark.xfail(reason='semantics of `encode_credentials` need to be fully decided, not enabled yet')
 @pytest.mark.parametrize('url_type', [Url, MultiHostUrl])
 def test_url_build_encode_credentials(url_type: type[Union[Url, MultiHostUrl]]) -> None:
     url = url_type.build(
@@ -1377,7 +1389,18 @@ def test_url_build_encode_credentials(url_type: type[Union[Url, MultiHostUrl]]) 
         ]
 
 
-@pytest.mark.parametrize('include_kwarg', [True, False])
+@pytest.mark.parametrize(
+    'include_kwarg',
+    [
+        pytest.param(
+            True,
+            marks=pytest.mark.xfail(
+                reason='semantics of `encode_credentials` need to be fully decided, not enabled yet'
+            ),
+        ),
+        False,
+    ],
+)
 def test_multi_url_build_hosts_not_encode_credentials(include_kwarg: bool) -> None:
     kwargs = {}
     if include_kwarg:
@@ -1400,6 +1423,7 @@ def test_multi_url_build_hosts_not_encode_credentials(include_kwarg: bool) -> No
     assert url.fragment == '__@example.com:5431,other:p@%ss__@example.org:5432'
 
 
+@pytest.mark.xfail(reason='semantics of `encode_credentials` need to be fully decided, not enabled yet')
 def test_multi_url_build_hosts_encode_credentials() -> None:
     hosts = [
         {'host': 'example.com', 'password': 'p@ss/word?#__', 'username': 'user name', 'port': 5431},
