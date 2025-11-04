@@ -238,6 +238,7 @@ impl PyUrl {
 }
 
 impl PyUrl {
+    #[allow(clippy::too_many_arguments)]
     fn build_inner<'py>(
         cls: &Bound<'py, PyType>,
         scheme: &str,
@@ -491,6 +492,7 @@ impl PyMultiHostUrl {
 }
 
 impl PyMultiHostUrl {
+    #[allow(clippy::too_many_arguments)]
     fn build_inner<'py>(
         cls: &Bound<'py, PyType>,
         scheme: &str,
@@ -540,7 +542,7 @@ impl PyMultiHostUrl {
                 .expect("writing to string should not fail");
         } else {
             return Err(PyValueError::new_err("expected either `host` or `hosts` to be set"));
-        };
+        }
 
         if let Some(path) = path {
             url.push('/');
