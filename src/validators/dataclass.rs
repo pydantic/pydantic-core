@@ -403,7 +403,7 @@ impl Validator for DataclassArgsValidator {
                 return Err(ValError::new_with_loc(
                     ErrorTypeDefaults::FrozenField,
                     field_value,
-                    field.name.to_string(),
+                    &field.name,
                 ));
             }
             // by using dict but removing the field in question, we match V1 behaviour
@@ -680,7 +680,7 @@ impl DataclassValidator {
                 dc.call_method0(post_init)
             } else {
                 let args = post_init_kwargs.downcast::<PyTuple>()?;
-                dc.call_method1(post_init, args.clone()) // FIXME should not need clone here
+                dc.call_method1(post_init, args)
             };
             r.map_err(|e| convert_err(py, e, input))?;
         }

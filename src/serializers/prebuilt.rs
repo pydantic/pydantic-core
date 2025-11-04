@@ -4,9 +4,9 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use crate::common::prebuilt::get_prebuilt;
+use crate::serializers::SerializationState;
 use crate::SchemaSerializer;
 
-use super::extra::Extra;
 use super::shared::{CombinedSerializer, TypeSerializer};
 
 #[derive(Debug)]
@@ -32,35 +32,32 @@ impl PrebuiltSerializer {
 impl_py_gc_traverse!(PrebuiltSerializer { schema_serializer });
 
 impl TypeSerializer for PrebuiltSerializer {
-    fn to_python(
+    fn to_python<'py>(
         &self,
-        value: &Bound<'_, PyAny>,
-        include: Option<&Bound<'_, PyAny>>,
-        exclude: Option<&Bound<'_, PyAny>>,
-        extra: &Extra,
+        value: &Bound<'py, PyAny>,
+        state: &mut SerializationState<'_, 'py>,
     ) -> PyResult<Py<PyAny>> {
-        self.schema_serializer
-            .get()
-            .serializer
-            .to_python_no_infer(value, include, exclude, extra)
+        self.schema_serializer.get().serializer.to_python_no_infer(value, state)
     }
 
-    fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
-        self.schema_serializer.get().serializer.json_key_no_infer(key, extra)
-    }
-
-    fn serde_serialize<S: serde::ser::Serializer>(
+    fn json_key<'a, 'py>(
         &self,
-        value: &Bound<'_, PyAny>,
+        key: &'a Bound<'py, PyAny>,
+        state: &mut SerializationState<'_, 'py>,
+    ) -> PyResult<Cow<'a, str>> {
+        self.schema_serializer.get().serializer.json_key_no_infer(key, state)
+    }
+
+    fn serde_serialize<'py, S: serde::ser::Serializer>(
+        &self,
+        value: &Bound<'py, PyAny>,
         serializer: S,
-        include: Option<&Bound<'_, PyAny>>,
-        exclude: Option<&Bound<'_, PyAny>>,
-        extra: &Extra,
+        state: &mut SerializationState<'_, 'py>,
     ) -> Result<S::Ok, S::Error> {
         self.schema_serializer
             .get()
             .serializer
-            .serde_serialize_no_infer(value, serializer, include, exclude, extra)
+            .serde_serialize_no_infer(value, serializer, state)
     }
 
     fn get_name(&self) -> &str {

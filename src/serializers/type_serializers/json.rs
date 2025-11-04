@@ -10,12 +10,12 @@ use pyo3::types::PyString;
 use serde::ser::Error;
 
 use crate::definitions::DefinitionsBuilder;
+use crate::serializers::SerializationState;
 use crate::tools::SchemaDict;
 
 use super::any::AnySerializer;
 use super::{
-    infer_json_key, py_err_se_err, to_json_bytes, utf8_py_error, BuildSerializer, CombinedSerializer, Extra,
-    TypeSerializer,
+    infer_json_key, py_err_se_err, to_json_bytes, utf8_py_error, BuildSerializer, CombinedSerializer, TypeSerializer,
 };
 
 #[derive(Debug)]
@@ -44,52 +44,50 @@ impl BuildSerializer for JsonSerializer {
 impl_py_gc_traverse!(JsonSerializer { serializer });
 
 impl TypeSerializer for JsonSerializer {
-    fn to_python(
+    fn to_python<'py>(
         &self,
-        value: &Bound<'_, PyAny>,
-        include: Option<&Bound<'_, PyAny>>,
-        exclude: Option<&Bound<'_, PyAny>>,
-        extra: &Extra,
+        value: &Bound<'py, PyAny>,
+        state: &mut SerializationState<'_, 'py>,
     ) -> PyResult<Py<PyAny>> {
-        if extra.round_trip {
-            let bytes = to_json_bytes(value, &self.serializer, include, exclude, extra, None, false, 0)?;
+        if state.extra.round_trip {
+            let bytes = to_json_bytes(value, &self.serializer, state, None, false, 0)?;
             let py = value.py();
             let s = from_utf8(&bytes).map_err(|e| utf8_py_error(py, e, &bytes))?;
             Ok(PyString::new(py, s).into())
         } else {
-            self.serializer.to_python(value, include, exclude, extra)
+            self.serializer.to_python(value, state)
         }
     }
 
-    fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
-        if extra.round_trip {
-            let bytes = to_json_bytes(key, &self.serializer, None, None, extra, None, false, 0)?;
+    fn json_key<'a, 'py>(
+        &self,
+        key: &'a Bound<'py, PyAny>,
+        state: &mut SerializationState<'_, 'py>,
+    ) -> PyResult<Cow<'a, str>> {
+        if state.extra.round_trip {
+            let bytes = to_json_bytes(key, &self.serializer, state, None, false, 0)?;
             let py = key.py();
             let s = from_utf8(&bytes).map_err(|e| utf8_py_error(py, e, &bytes))?;
             Ok(Cow::Owned(s.to_string()))
         } else {
-            infer_json_key(key, extra)
+            infer_json_key(key, state)
         }
     }
 
-    fn serde_serialize<S: serde::ser::Serializer>(
+    fn serde_serialize<'py, S: serde::ser::Serializer>(
         &self,
-        value: &Bound<'_, PyAny>,
+        value: &Bound<'py, PyAny>,
         serializer: S,
-        include: Option<&Bound<'_, PyAny>>,
-        exclude: Option<&Bound<'_, PyAny>>,
-        extra: &Extra,
+        state: &mut SerializationState<'_, 'py>,
     ) -> Result<S::Ok, S::Error> {
-        if extra.round_trip {
-            let bytes = to_json_bytes(value, &self.serializer, include, exclude, extra, None, false, 0)
-                .map_err(py_err_se_err)?;
+        if state.extra.round_trip {
+            let bytes = to_json_bytes(value, &self.serializer, state, None, false, 0).map_err(py_err_se_err)?;
             match from_utf8(&bytes) {
                 Ok(s) => serializer.serialize_str(s),
                 Err(e) => Err(Error::custom(e.to_string())),
             }
         } else {
-            self.serializer
-                .serde_serialize(value, serializer, include, exclude, extra)
+            self.serializer.serde_serialize(value, serializer, state)
         }
     }
 

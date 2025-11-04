@@ -6,10 +6,11 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use crate::definitions::DefinitionsBuilder;
+use crate::serializers::SerializationState;
 use crate::tools::SchemaDict;
 use crate::validators::DefaultType;
 
-use super::{BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
+use super::{BuildSerializer, CombinedSerializer, TypeSerializer};
 
 #[derive(Debug)]
 pub struct WithDefaultSerializer {
@@ -38,30 +39,29 @@ impl BuildSerializer for WithDefaultSerializer {
 impl_py_gc_traverse!(WithDefaultSerializer { default, serializer });
 
 impl TypeSerializer for WithDefaultSerializer {
-    fn to_python(
+    fn to_python<'py>(
         &self,
-        value: &Bound<'_, PyAny>,
-        include: Option<&Bound<'_, PyAny>>,
-        exclude: Option<&Bound<'_, PyAny>>,
-        extra: &Extra,
+        value: &Bound<'py, PyAny>,
+        state: &mut SerializationState<'_, 'py>,
     ) -> PyResult<Py<PyAny>> {
-        self.serializer.to_python(value, include, exclude, extra)
+        self.serializer.to_python(value, state)
     }
 
-    fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
-        self.serializer.json_key(key, extra)
-    }
-
-    fn serde_serialize<S: serde::ser::Serializer>(
+    fn json_key<'a, 'py>(
         &self,
-        value: &Bound<'_, PyAny>,
+        key: &'a Bound<'py, PyAny>,
+        state: &mut SerializationState<'_, 'py>,
+    ) -> PyResult<Cow<'a, str>> {
+        self.serializer.json_key(key, state)
+    }
+
+    fn serde_serialize<'py, S: serde::ser::Serializer>(
+        &self,
+        value: &Bound<'py, PyAny>,
         serializer: S,
-        include: Option<&Bound<'_, PyAny>>,
-        exclude: Option<&Bound<'_, PyAny>>,
-        extra: &Extra,
+        state: &mut SerializationState<'_, 'py>,
     ) -> Result<S::Ok, S::Error> {
-        self.serializer
-            .serde_serialize(value, serializer, include, exclude, extra)
+        self.serializer.serde_serialize(value, serializer, state)
     }
 
     fn get_name(&self) -> &str {

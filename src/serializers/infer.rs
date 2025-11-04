@@ -1,9 +1,9 @@
 use std::borrow::Cow;
+use std::cell::RefCell;
 
 use pyo3::exceptions::PyTypeError;
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::pybacked::PyBackedStr;
 use pyo3::types::PyComplex;
 use pyo3::types::{PyByteArray, PyBytes, PyDict, PyFrozenSet, PyIterator, PyList, PySet, PyString, PyTuple};
 
@@ -11,43 +11,44 @@ use pyo3::IntoPyObjectExt;
 use serde::ser::{Error, Serialize, SerializeMap, SerializeSeq, Serializer};
 
 use crate::input::{EitherTimedelta, Int};
+use crate::serializers::errors::unwrap_ser_error;
+use crate::serializers::shared::serialize_to_json;
+use crate::serializers::shared::serialize_to_python;
+use crate::serializers::shared::DoSerialize;
 use crate::serializers::type_serializers;
+use crate::serializers::type_serializers::format::serialize_via_str;
+use crate::serializers::SerializationState;
 use crate::tools::{extract_int, py_err, safe_repr};
-use crate::url::{PyMultiHostUrl, PyUrl};
 
 use super::config::InfNanMode;
 use super::errors::SERIALIZATION_ERR_MARKER;
 use super::errors::{py_err_se_err, PydanticSerializationError};
-use super::extra::{Extra, SerMode};
+use super::extra::SerMode;
 use super::filter::{AnyFilter, SchemaFilter};
 use super::ob_type::ObType;
 use super::shared::any_dataclass_iter;
 use super::SchemaSerializer;
 
-pub(crate) fn infer_to_python(
-    value: &Bound<'_, PyAny>,
-    include: Option<&Bound<'_, PyAny>>,
-    exclude: Option<&Bound<'_, PyAny>>,
-    extra: &Extra,
+pub(crate) fn infer_to_python<'py>(
+    value: &Bound<'py, PyAny>,
+    state: &mut SerializationState<'_, 'py>,
 ) -> PyResult<Py<PyAny>> {
-    infer_to_python_known(extra.ob_type_lookup.get_type(value), value, include, exclude, extra)
+    infer_to_python_known(state.extra.ob_type_lookup.get_type(value), value, state)
 }
 
 // arbitrary ids to identify that we recursed through infer_to_{python,json}_known
 // We just need them to be different from definition ref slot ids, which start at 0
 const INFER_DEF_REF_ID: usize = usize::MAX;
 
-pub(crate) fn infer_to_python_known(
+pub(crate) fn infer_to_python_known<'py>(
     ob_type: ObType,
-    value: &Bound<'_, PyAny>,
-    include: Option<&Bound<'_, PyAny>>,
-    exclude: Option<&Bound<'_, PyAny>>,
-    mut extra: &Extra,
+    value: &Bound<'py, PyAny>,
+    state: &mut SerializationState<'_, 'py>,
 ) -> PyResult<Py<PyAny>> {
     let py = value.py();
 
-    let mode = extra.mode;
-    let mut guard = match extra.recursion_guard(value, INFER_DEF_REF_ID) {
+    let mode = state.extra.mode;
+    let mut guard = match state.recursion_guard(value, INFER_DEF_REF_ID) {
         Ok(v) => v,
         Err(e) => {
             return match mode {
@@ -57,16 +58,17 @@ pub(crate) fn infer_to_python_known(
             };
         }
     };
-    let extra = guard.state();
+    let state = guard.state();
 
     macro_rules! serialize_seq {
-        ($t:ty) => {
+        ($t:ty) => {{
+            let state = &mut state.scoped_include_exclude(None, None);
             value
                 .downcast::<$t>()?
                 .iter()
-                .map(|v| infer_to_python(&v, None, None, extra))
+                .map(|v| infer_to_python(&v, state))
                 .collect::<PyResult<Vec<Py<PyAny>>>>()?
-        };
+        }};
     }
 
     macro_rules! serialize_seq_filter {
@@ -77,47 +79,17 @@ pub(crate) fn infer_to_python_known(
             let len = value.len().ok();
 
             for (index, element) in py_seq.iter().enumerate() {
-                let op_next = filter.index_filter(index, include, exclude, len)?;
+                let op_next = filter.index_filter(index, state, len)?;
                 if let Some((next_include, next_exclude)) = op_next {
-                    items.push(infer_to_python(
-                        &element,
-                        next_include.as_ref(),
-                        next_exclude.as_ref(),
-                        extra,
-                    )?);
+                    let state = &mut state.scoped_include_exclude(next_include, next_exclude);
+                    items.push(infer_to_python(&element, state)?);
                 }
             }
             items
         }};
     }
 
-    let serialize_with_serializer = || {
-        let py_serializer = value.getattr(intern!(py, "__pydantic_serializer__"))?;
-        let serializer: PyRef<SchemaSerializer> = py_serializer.extract()?;
-        let extra = serializer.build_extra(
-            py,
-            extra.mode,
-            extra.by_alias,
-            extra.warnings,
-            extra.exclude_unset,
-            extra.exclude_defaults,
-            extra.exclude_none,
-            extra.exclude_computed_fields,
-            extra.round_trip,
-            extra.rec_guard,
-            extra.serialize_unknown,
-            extra.fallback,
-            extra.serialize_as_any,
-            extra.context,
-        );
-        // Avoid falling immediately back into inference because we need to use the serializer
-        // to drive the next step of serialization
-        serializer
-            .serializer
-            .to_python_no_infer(value, include, exclude, &extra)
-    };
-
-    let value = match extra.mode {
+    let value = match state.extra.mode {
         SerMode::Json => match ob_type {
             // `bool` and `None` can't be subclasses, `ObType::Int`, `ObType::Float`, `ObType::Str` refer to exact types
             ObType::None | ObType::Bool | ObType::Int | ObType::Str => value.clone().unbind(),
@@ -131,14 +103,14 @@ pub(crate) fn infer_to_python_known(
             }
             ObType::Float | ObType::FloatSubclass => {
                 let v = value.extract::<f64>()?;
-                if (v.is_nan() || v.is_infinite()) && extra.config.inf_nan_mode == InfNanMode::Null {
+                if (v.is_nan() || v.is_infinite()) && state.config.inf_nan_mode == InfNanMode::Null {
                     return Ok(py.None());
                 }
                 v.into_py_any(py)?
             }
             ObType::Decimal => value.to_string().into_py_any(py)?,
             ObType::StrSubclass => PyString::new(py, value.downcast::<PyString>()?.to_str()?).into(),
-            ObType::Bytes => extra
+            ObType::Bytes => state
                 .config
                 .bytes_mode
                 .bytes_to_string(py, value.downcast::<PyBytes>()?.as_bytes())?
@@ -151,7 +123,7 @@ pub(crate) fn infer_to_python_known(
                     // run any code which could cause the critical section to be
                     // released.
                     let bytes = unsafe { py_byte_array.as_bytes() };
-                    extra.config.bytes_mode.bytes_to_string(py, bytes)?.into_py_any(py)
+                    state.config.bytes_mode.bytes_to_string(py, bytes)?.into_py_any(py)
                 })?
             }
             ObType::Tuple => {
@@ -172,50 +144,47 @@ pub(crate) fn infer_to_python_known(
             }
             ObType::Dict => {
                 let dict = value.downcast::<PyDict>()?;
-                serialize_pairs_python(py, dict.iter().map(Ok), include, exclude, extra, |k| {
-                    Ok(PyString::new(py, &infer_json_key(&k, extra)?).into_any())
+                serialize_pairs_python(py, dict.iter().map(Ok), state, |k, state| {
+                    Ok(PyString::new(py, &infer_json_key(&k, state)?).into_any())
                 })?
             }
             ObType::Datetime => {
-                let datetime = extra
+                let datetime = state
                     .config
                     .temporal_mode
                     .datetime_to_json(value.py(), value.downcast()?)?;
                 datetime.into_py_any(py)?
             }
             ObType::Date => {
-                let date = extra.config.temporal_mode.date_to_json(value.py(), value.downcast()?)?;
+                let date = state.config.temporal_mode.date_to_json(value.py(), value.downcast()?)?;
                 date.into_py_any(py)?
             }
             ObType::Time => {
-                let time = extra.config.temporal_mode.time_to_json(value.py(), value.downcast()?)?;
+                let time = state.config.temporal_mode.time_to_json(value.py(), value.downcast()?)?;
                 time.into_py_any(py)?
             }
             ObType::Timedelta => {
                 let either_delta = EitherTimedelta::try_from(value)?;
-                extra.config.temporal_mode.timedelta_to_json(value.py(), either_delta)?
+                state.config.temporal_mode.timedelta_to_json(value.py(), either_delta)?
             }
-            ObType::Url => {
-                let py_url: PyUrl = value.extract()?;
-                py_url.__str__(py).into_py_any(py)?
-            }
-            ObType::MultiHostUrl => {
-                let py_url: PyMultiHostUrl = value.extract()?;
-                py_url.__str__(py).into_py_any(py)?
-            }
+            ObType::Url
+            | ObType::MultiHostUrl
+            | ObType::Path
+            | ObType::Ipv4Address
+            | ObType::Ipv6Address
+            | ObType::Ipv4Network
+            | ObType::Ipv6Network => serialize_via_str(value, serialize_to_python())?,
             ObType::Uuid => {
                 let uuid = super::type_serializers::uuid::uuid_to_string(value)?;
                 uuid.into_py_any(py)?
             }
-            ObType::PydanticSerializable => serialize_with_serializer()?,
-            ObType::Dataclass => {
-                serialize_pairs_python(py, any_dataclass_iter(value)?.0, include, exclude, extra, |k| {
-                    Ok(PyString::new(py, &infer_json_key(&k, extra)?).into_any())
-                })?
-            }
+            ObType::PydanticSerializable => call_pydantic_serializer(value, state, serialize_to_python())?,
+            ObType::Dataclass => serialize_pairs_python(py, any_dataclass_iter(value)?.0, state, |k, state| {
+                Ok(PyString::new(py, &infer_json_key(&k, state)?).into_any())
+            })?,
             ObType::Enum => {
                 let v = value.getattr(intern!(py, "value"))?;
-                infer_to_python(&v, include, exclude, extra)?
+                infer_to_python(&v, state)?
             }
             ObType::Generator => {
                 let py_seq = value.downcast::<PyIterator>()?;
@@ -224,14 +193,10 @@ pub(crate) fn infer_to_python_known(
 
                 for (index, r) in py_seq.try_iter()?.enumerate() {
                     let element = r?;
-                    let op_next = filter.index_filter(index, include, exclude, None)?;
+                    let op_next = filter.index_filter(index, state, None)?;
                     if let Some((next_include, next_exclude)) = op_next {
-                        items.push(infer_to_python(
-                            &element,
-                            next_include.as_ref(),
-                            next_exclude.as_ref(),
-                            extra,
-                        )?);
+                        let state = &mut state.scoped_include_exclude(next_include, next_exclude);
+                        items.push(infer_to_python(&element, state)?);
                     }
                 }
                 PyList::new(py, items)?.into()
@@ -241,14 +206,13 @@ pub(crate) fn infer_to_python_known(
                 let complex_str = type_serializers::complex::complex_to_str(v);
                 complex_str.into_py_any(py)?
             }
-            ObType::Path => value.str()?.into_py_any(py)?,
-            ObType::Pattern => value.getattr(intern!(py, "pattern"))?.unbind(),
+            ObType::Pattern => serialize_pattern(value, serialize_to_python())?,
             ObType::Unknown => {
-                if let Some(fallback) = extra.fallback {
+                if let Some(fallback) = state.extra.fallback {
                     let next_value = fallback.call1((value,))?;
-                    let next_result = infer_to_python(&next_value, include, exclude, extra);
+                    let next_result = infer_to_python(&next_value, state);
                     return next_result;
-                } else if extra.serialize_unknown {
+                } else if state.extra.serialize_unknown {
                     serialize_unknown(value).into_py_any(py)?
                 } else {
                     return Err(unknown_type_error(value));
@@ -274,18 +238,16 @@ pub(crate) fn infer_to_python_known(
             }
             ObType::Dict => {
                 let dict = value.downcast::<PyDict>()?;
-                serialize_pairs_python(py, dict.iter().map(Ok), include, exclude, extra, Ok)?
+                serialize_pairs_python(py, dict.iter().map(Ok), state, |k, _| Ok(k))?
             }
-            ObType::PydanticSerializable => serialize_with_serializer()?,
-            ObType::Dataclass => serialize_pairs_python(py, any_dataclass_iter(value)?.0, include, exclude, extra, Ok)?,
+            ObType::PydanticSerializable => call_pydantic_serializer(value, state, serialize_to_python())?,
+            ObType::Dataclass => serialize_pairs_python(py, any_dataclass_iter(value)?.0, state, |k, _| Ok(k))?,
             ObType::Generator => {
                 let iter = super::type_serializers::generator::SerializationIterator::new(
                     value.downcast()?,
                     super::type_serializers::any::AnySerializer::get(),
                     SchemaFilter::default(),
-                    include,
-                    exclude,
-                    extra,
+                    state,
                 );
                 iter.into_py_any(py)?
             }
@@ -294,9 +256,9 @@ pub(crate) fn infer_to_python_known(
                 v.into_py_any(py)?
             }
             ObType::Unknown => {
-                if let Some(fallback) = extra.fallback {
+                if let Some(fallback) = state.extra.fallback {
                     let next_value = fallback.call1((value,))?;
-                    let next_result = infer_to_python(&next_value, include, exclude, extra);
+                    let next_result = infer_to_python(&next_value, state);
                     return next_result;
                 }
                 value.clone().unbind()
@@ -307,63 +269,44 @@ pub(crate) fn infer_to_python_known(
     Ok(value)
 }
 
-pub(crate) struct SerializeInfer<'py> {
-    value: &'py Bound<'py, PyAny>,
-    include: Option<&'py Bound<'py, PyAny>>,
-    exclude: Option<&'py Bound<'py, PyAny>>,
-    extra: &'py Extra<'py>,
+pub(crate) struct SerializeInfer<'slf, 'a, 'py> {
+    value: &'slf Bound<'py, PyAny>,
+    state: RefCell<&'slf mut SerializationState<'a, 'py>>,
 }
 
-impl<'py> SerializeInfer<'py> {
-    pub(crate) fn new(
-        value: &'py Bound<'py, PyAny>,
-        include: Option<&'py Bound<'py, PyAny>>,
-        exclude: Option<&'py Bound<'py, PyAny>>,
-        extra: &'py Extra,
-    ) -> Self {
+impl<'slf, 'a, 'py> SerializeInfer<'slf, 'a, 'py> {
+    pub(crate) fn new(value: &'slf Bound<'py, PyAny>, state: &'slf mut SerializationState<'a, 'py>) -> Self {
         Self {
             value,
-            include,
-            exclude,
-            extra,
+            state: RefCell::new(state),
         }
     }
 }
 
-impl Serialize for SerializeInfer<'_> {
+impl Serialize for SerializeInfer<'_, '_, '_> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let ob_type = self.extra.ob_type_lookup.get_type(self.value);
-        infer_serialize_known(ob_type, self.value, serializer, self.include, self.exclude, self.extra)
+        let state = &mut self.state.borrow_mut();
+        let ob_type = state.extra.ob_type_lookup.get_type(self.value);
+        infer_serialize_known(ob_type, self.value, serializer, state)
     }
 }
 
-pub(crate) fn infer_serialize<S: Serializer>(
-    value: &Bound<'_, PyAny>,
+pub(crate) fn infer_serialize<'py, S: Serializer>(
+    value: &Bound<'py, PyAny>,
     serializer: S,
-    include: Option<&Bound<'_, PyAny>>,
-    exclude: Option<&Bound<'_, PyAny>>,
-    extra: &Extra,
+    state: &mut SerializationState<'_, 'py>,
 ) -> Result<S::Ok, S::Error> {
-    infer_serialize_known(
-        extra.ob_type_lookup.get_type(value),
-        value,
-        serializer,
-        include,
-        exclude,
-        extra,
-    )
+    infer_serialize_known(state.extra.ob_type_lookup.get_type(value), value, serializer, state)
 }
 
-pub(crate) fn infer_serialize_known<S: Serializer>(
+pub(crate) fn infer_serialize_known<'py, S: Serializer>(
     ob_type: ObType,
-    value: &Bound<'_, PyAny>,
+    value: &Bound<'py, PyAny>,
     serializer: S,
-    include: Option<&Bound<'_, PyAny>>,
-    exclude: Option<&Bound<'_, PyAny>>,
-    mut extra: &Extra,
+    state: &mut SerializationState<'_, 'py>,
 ) -> Result<S::Ok, S::Error> {
-    let extra_serialize_unknown = extra.serialize_unknown;
-    let mut guard = match extra.recursion_guard(value, INFER_DEF_REF_ID) {
+    let extra_serialize_unknown = state.extra.serialize_unknown;
+    let mut guard = match state.recursion_guard(value, INFER_DEF_REF_ID) {
         Ok(v) => v,
         Err(e) => {
             return if extra_serialize_unknown {
@@ -373,7 +316,7 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
             };
         }
     };
-    let extra = guard.state();
+    let state = guard.state();
 
     macro_rules! serialize {
         ($t:ty) => {
@@ -386,10 +329,11 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
 
     macro_rules! serialize_seq {
         ($t:ty) => {{
+            let state = &mut state.scoped_include_exclude(None, None);
             let py_seq = value.downcast::<$t>().map_err(py_err_se_err)?;
             let mut seq = serializer.serialize_seq(Some(py_seq.len()))?;
             for element in py_seq.iter() {
-                let item_serializer = SerializeInfer::new(&element, include, exclude, extra);
+                let item_serializer = SerializeInfer::new(&element, state);
                 seq.serialize_element(&item_serializer)?
             }
             seq.end()
@@ -404,12 +348,10 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
             let len = value.len().ok();
 
             for (index, element) in py_seq.iter().enumerate() {
-                let op_next = filter
-                    .index_filter(index, include, exclude, len)
-                    .map_err(py_err_se_err)?;
+                let op_next = filter.index_filter(index, state, len).map_err(py_err_se_err)?;
                 if let Some((next_include, next_exclude)) = op_next {
-                    let item_serializer =
-                        SerializeInfer::new(&element, next_include.as_ref(), next_exclude.as_ref(), extra);
+                    let state = &mut state.scoped_include_exclude(next_include, next_exclude);
+                    let item_serializer = SerializeInfer::new(&element, state);
                     seq.serialize_element(&item_serializer)?
                 }
             }
@@ -428,16 +370,18 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
         }
         ObType::Float | ObType::FloatSubclass => {
             let v = value.extract::<f64>().map_err(py_err_se_err)?;
-            type_serializers::float::serialize_f64(v, serializer, extra.config.inf_nan_mode)
+            type_serializers::float::serialize_f64(v, serializer, state.config.inf_nan_mode)
         }
         ObType::Decimal => value.to_string().serialize(serializer),
         ObType::Str | ObType::StrSubclass => {
             let py_str = value.downcast::<PyString>().map_err(py_err_se_err)?;
-            super::type_serializers::string::serialize_py_str(py_str, serializer)
+            serialize_to_json(serializer)
+                .serialize_str(py_str)
+                .map_err(unwrap_ser_error)
         }
         ObType::Bytes => {
             let py_bytes = value.downcast::<PyBytes>().map_err(py_err_se_err)?;
-            extra.config.bytes_mode.serialize_bytes(py_bytes.as_bytes(), serializer)
+            state.config.bytes_mode.serialize_bytes(py_bytes.as_bytes(), serializer)
         }
         ObType::Bytearray => {
             let py_byte_array = value.downcast::<PyByteArray>().map_err(py_err_se_err)?;
@@ -447,12 +391,12 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
                 // run any code which could cause the critical section to be
                 // released.
                 let bytes = unsafe { py_byte_array.as_bytes() };
-                extra.config.bytes_mode.serialize_bytes(bytes, serializer)
+                state.config.bytes_mode.serialize_bytes(bytes, serializer)
             })
         }
         ObType::Dict => {
             let dict = value.downcast::<PyDict>().map_err(py_err_se_err)?;
-            serialize_pairs_json(dict.iter().map(Ok), dict.len(), serializer, include, exclude, extra)
+            serialize_pairs_json(dict.iter().map(Ok), dict.len(), serializer, state)
         }
         ObType::List => serialize_seq_filter!(PyList),
         ObType::Tuple => serialize_seq_filter!(PyTuple),
@@ -460,60 +404,33 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
         ObType::Frozenset => serialize_seq!(PyFrozenSet),
         ObType::Datetime => {
             let py_datetime = value.downcast().map_err(py_err_se_err)?;
-            extra.config.temporal_mode.datetime_serialize(py_datetime, serializer)
+            state.config.temporal_mode.datetime_serialize(py_datetime, serializer)
         }
         ObType::Date => {
             let py_date = value.downcast().map_err(py_err_se_err)?;
-            extra.config.temporal_mode.date_serialize(py_date, serializer)
+            state.config.temporal_mode.date_serialize(py_date, serializer)
         }
         ObType::Time => {
             let py_time = value.downcast().map_err(py_err_se_err)?;
-            extra.config.temporal_mode.time_serialize(py_time, serializer)
+            state.config.temporal_mode.time_serialize(py_time, serializer)
         }
         ObType::Timedelta => {
             let either_delta = EitherTimedelta::try_from(value).map_err(py_err_se_err)?;
-            extra.config.temporal_mode.timedelta_serialize(either_delta, serializer)
+            state.config.temporal_mode.timedelta_serialize(either_delta, serializer)
         }
-        ObType::Url => {
-            let py_url: PyUrl = value.extract().map_err(py_err_se_err)?;
-            serializer.serialize_str(py_url.__str__(value.py()))
-        }
-        ObType::MultiHostUrl => {
-            let py_url: PyMultiHostUrl = value.extract().map_err(py_err_se_err)?;
-            serializer.serialize_str(&py_url.__str__(value.py()))
-        }
+        ObType::Url
+        | ObType::MultiHostUrl
+        | ObType::Path
+        | ObType::Ipv4Address
+        | ObType::Ipv6Address
+        | ObType::Ipv4Network
+        | ObType::Ipv6Network => serialize_via_str(value, serialize_to_json(serializer)).map_err(unwrap_ser_error),
         ObType::PydanticSerializable => {
-            let py = value.py();
-            let py_serializer = value
-                .getattr(intern!(py, "__pydantic_serializer__"))
-                .map_err(py_err_se_err)?;
-            let extracted_serializer: PyRef<SchemaSerializer> = py_serializer.extract().map_err(py_err_se_err)?;
-
-            let extra = extracted_serializer.build_extra(
-                py,
-                extra.mode,
-                extra.by_alias,
-                extra.warnings,
-                extra.exclude_unset,
-                extra.exclude_defaults,
-                extra.exclude_none,
-                extra.exclude_computed_fields,
-                extra.round_trip,
-                extra.rec_guard,
-                extra.serialize_unknown,
-                extra.fallback,
-                extra.serialize_as_any,
-                extra.context,
-            );
-            // Avoid falling immediately back into inference because we need to use the serializer
-            // to drive the next step of serialization
-            extracted_serializer
-                .serializer
-                .serde_serialize_no_infer(value, serializer, include, exclude, &extra)
+            call_pydantic_serializer(value, state, serialize_to_json(serializer)).map_err(unwrap_ser_error)
         }
         ObType::Dataclass => {
             let (pairs_iter, fields_dict) = any_dataclass_iter(value).map_err(py_err_se_err)?;
-            serialize_pairs_json(pairs_iter, fields_dict.len(), serializer, include, exclude, extra)
+            serialize_pairs_json(pairs_iter, fields_dict.len(), serializer, state)
         }
         ObType::Uuid => {
             let uuid = super::type_serializers::uuid::uuid_to_string(value).map_err(py_err_se_err)?;
@@ -521,7 +438,7 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
         }
         ObType::Enum => {
             let v = value.getattr(intern!(value.py(), "value")).map_err(py_err_se_err)?;
-            infer_serialize(&v, serializer, include, exclude, extra)
+            infer_serialize(&v, serializer, state)
         }
         ObType::Generator => {
             let py_seq = value.downcast::<PyIterator>().map_err(py_err_se_err)?;
@@ -529,37 +446,22 @@ pub(crate) fn infer_serialize_known<S: Serializer>(
             let filter = AnyFilter::new();
             for (index, r) in py_seq.try_iter().map_err(py_err_se_err)?.enumerate() {
                 let element = r.map_err(py_err_se_err)?;
-                let op_next = filter
-                    .index_filter(index, include, exclude, None)
-                    .map_err(py_err_se_err)?;
+                let op_next = filter.index_filter(index, state, None).map_err(py_err_se_err)?;
                 if let Some((next_include, next_exclude)) = op_next {
-                    let item_serializer =
-                        SerializeInfer::new(&element, next_include.as_ref(), next_exclude.as_ref(), extra);
+                    let state = &mut state.scoped_include_exclude(next_include, next_exclude);
+                    let item_serializer = SerializeInfer::new(&element, state);
                     seq.serialize_element(&item_serializer)?;
                 }
             }
             seq.end()
         }
-        ObType::Path => {
-            let s: PyBackedStr = value
-                .str()
-                .and_then(|value_str| value_str.extract())
-                .map_err(py_err_se_err)?;
-            serializer.serialize_str(&s)
-        }
-        ObType::Pattern => {
-            let s: PyBackedStr = value
-                .getattr(intern!(value.py(), "pattern"))
-                .and_then(|pattern| pattern.str()?.extract())
-                .map_err(py_err_se_err)?;
-            serializer.serialize_str(&s)
-        }
+        ObType::Pattern => serialize_pattern(value, serialize_to_json(serializer)).map_err(unwrap_ser_error),
         ObType::Unknown => {
-            if let Some(fallback) = extra.fallback {
+            if let Some(fallback) = state.extra.fallback {
                 let next_value = fallback.call1((value,)).map_err(py_err_se_err)?;
-                let next_result = infer_serialize(&next_value, serializer, include, exclude, extra);
+                let next_result = infer_serialize(&next_value, serializer, state);
                 return next_result;
-            } else if extra.serialize_unknown {
+            } else if state.extra.serialize_unknown {
                 serializer.serialize_str(&serialize_unknown(value))
             } else {
                 let msg = format!(
@@ -581,6 +483,14 @@ fn unknown_type_error(value: &Bound<'_, PyAny>) -> PyErr {
     ))
 }
 
+fn serialize_pattern<'py, T, E: From<PyErr>>(
+    value: &Bound<'py, PyAny>,
+    do_serialize: impl DoSerialize<'py, T, E>,
+) -> Result<T, E> {
+    let pattern = value.getattr(intern!(value.py(), "pattern"))?;
+    serialize_via_str(&pattern, do_serialize)
+}
+
 fn serialize_unknown<'py>(value: &Bound<'py, PyAny>) -> Cow<'py, str> {
     if let Ok(s) = value.str() {
         s.to_string_lossy().into_owned().into()
@@ -591,22 +501,25 @@ fn serialize_unknown<'py>(value: &Bound<'py, PyAny>) -> Cow<'py, str> {
     }
 }
 
-pub(crate) fn infer_json_key<'a>(key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
-    let ob_type = extra.ob_type_lookup.get_type(key);
-    infer_json_key_known(ob_type, key, extra)
+pub(crate) fn infer_json_key<'a, 'py>(
+    key: &'a Bound<'py, PyAny>,
+    state: &mut SerializationState<'_, 'py>,
+) -> PyResult<Cow<'a, str>> {
+    let ob_type = state.extra.ob_type_lookup.get_type(key);
+    infer_json_key_known(ob_type, key, state)
 }
 
-pub(crate) fn infer_json_key_known<'a>(
+pub(crate) fn infer_json_key_known<'a, 'py>(
     ob_type: ObType,
-    key: &'a Bound<'_, PyAny>,
-    extra: &Extra,
+    key: &'a Bound<'py, PyAny>,
+    state: &mut SerializationState<'_, 'py>,
 ) -> PyResult<Cow<'a, str>> {
     match ob_type {
         ObType::None => super::type_serializers::simple::none_json_key(),
         ObType::Int | ObType::IntSubclass => super::type_serializers::simple::to_str_json_key(key),
         ObType::Float | ObType::FloatSubclass => {
             let v = key.extract::<f64>()?;
-            if (v.is_nan() || v.is_infinite()) && extra.config.inf_nan_mode == InfNanMode::Null {
+            if (v.is_nan() || v.is_infinite()) && state.config.inf_nan_mode == InfNanMode::Null {
                 super::type_serializers::simple::none_json_key()
             } else {
                 super::type_serializers::simple::to_str_json_key(key)
@@ -615,7 +528,7 @@ pub(crate) fn infer_json_key_known<'a>(
         ObType::Decimal => Ok(Cow::Owned(key.to_string())),
         ObType::Bool => super::type_serializers::simple::bool_json_key(key),
         ObType::Str | ObType::StrSubclass => key.downcast::<PyString>()?.to_cow(),
-        ObType::Bytes => extra
+        ObType::Bytes => state
             .config
             .bytes_mode
             .bytes_to_string(key.py(), key.downcast::<PyBytes>()?.as_bytes()),
@@ -627,33 +540,35 @@ pub(crate) fn infer_json_key_known<'a>(
                 // run any code which could cause the critical section to be
                 // released.
                 let bytes = unsafe { py_byte_array.as_bytes() };
-                extra.config.bytes_mode.bytes_to_string(key.py(), bytes)
+                state.config.bytes_mode.bytes_to_string(key.py(), bytes)
             })
             .map(|cow| Cow::Owned(cow.into_owned()))
         }
-        ObType::Datetime => extra.config.temporal_mode.datetime_json_key(key.downcast()?),
-        ObType::Date => extra.config.temporal_mode.date_json_key(key.downcast()?),
-        ObType::Time => extra.config.temporal_mode.time_json_key(key.downcast()?),
+        ObType::Datetime => state.config.temporal_mode.datetime_json_key(key.downcast()?),
+        ObType::Date => state.config.temporal_mode.date_json_key(key.downcast()?),
+        ObType::Time => state.config.temporal_mode.time_json_key(key.downcast()?),
         ObType::Uuid => {
             let uuid = super::type_serializers::uuid::uuid_to_string(key)?;
             Ok(Cow::Owned(uuid))
         }
         ObType::Timedelta => {
             let either_delta = EitherTimedelta::try_from(key)?;
-            extra.config.temporal_mode.timedelta_json_key(&either_delta)
+            state.config.temporal_mode.timedelta_json_key(&either_delta)
         }
-        ObType::Url => {
-            let py_url: PyUrl = key.extract()?;
-            Ok(Cow::Owned(py_url.__str__(key.py()).to_string()))
-        }
-        ObType::MultiHostUrl => {
-            let py_url: PyMultiHostUrl = key.extract()?;
-            Ok(Cow::Owned(py_url.__str__(key.py()).to_string()))
+        ObType::Url
+        | ObType::MultiHostUrl
+        | ObType::Path
+        | ObType::Ipv4Address
+        | ObType::Ipv6Address
+        | ObType::Ipv4Network
+        | ObType::Ipv6Network => {
+            // FIXME it would be nice to have a "PyCow" which carries ownership of the Python type too
+            Ok(Cow::Owned(key.str()?.to_string_lossy().into_owned()))
         }
         ObType::Tuple => {
             let mut key_build = super::type_serializers::tuple::KeyBuilder::new();
             for element in key.downcast::<PyTuple>()?.iter_borrowed() {
-                key_build.push(&infer_json_key(&element, extra)?);
+                key_build.push(&infer_json_key(&element, state)?);
             }
             Ok(Cow::Owned(key_build.finish()))
         }
@@ -668,11 +583,7 @@ pub(crate) fn infer_json_key_known<'a>(
         }
         ObType::Enum => {
             let k = key.getattr(intern!(key.py(), "value"))?;
-            infer_json_key(&k, extra).map(|cow| Cow::Owned(cow.into_owned()))
-        }
-        ObType::Path => {
-            // FIXME it would be nice to have a "PyCow" which carries ownership of the Python type too
-            Ok(Cow::Owned(key.str()?.to_string_lossy().into_owned()))
+            infer_json_key(&k, state).map(|cow| Cow::Owned(cow.into_owned()))
         }
         ObType::Complex => {
             let v = key.downcast::<PyComplex>()?;
@@ -685,10 +596,10 @@ pub(crate) fn infer_json_key_known<'a>(
                 .into_owned(),
         )),
         ObType::Unknown => {
-            if let Some(fallback) = extra.fallback {
+            if let Some(fallback) = state.extra.fallback {
                 let next_key = fallback.call1((key,))?;
-                infer_json_key(&next_key, extra).map(|cow| Cow::Owned(cow.into_owned()))
-            } else if extra.serialize_unknown {
+                infer_json_key(&next_key, state).map(|cow| Cow::Owned(cow.into_owned()))
+            } else if state.extra.serialize_unknown {
                 Ok(serialize_unknown(key))
             } else {
                 Err(unknown_type_error(key))
@@ -697,23 +608,49 @@ pub(crate) fn infer_json_key_known<'a>(
     }
 }
 
+/// Serialize `value` as if it had a `__pydantic_serializer__` attribute
+///
+/// `do_serialize` should be a closure which performs serialization without type inference
+pub(crate) fn call_pydantic_serializer<'py, T, E: From<PyErr>>(
+    value: &Bound<'py, PyAny>,
+    state: &mut SerializationState<'_, 'py>,
+    do_serialize: impl DoSerialize<'py, T, E>,
+) -> Result<T, E> {
+    let py = value.py();
+    let py_serializer = value.getattr(intern!(py, "__pydantic_serializer__"))?;
+    let extracted_serializer: PyRef<SchemaSerializer> = py_serializer.extract()?;
+    let mut state = SerializationState {
+        warnings: state.warnings.clone(),
+        rec_guard: state.rec_guard.clone(),
+        config: extracted_serializer.config,
+        model: state.model.clone(),
+        field_name: state.field_name.clone(),
+        include_exclude: state.include_exclude.clone(),
+        check: state.check,
+        extra: state.extra.clone(),
+    };
+
+    // Avoid falling immediately back into inference because we need to use the serializer
+    // to drive the next step of serialization
+    do_serialize.serialize_no_infer(&extracted_serializer.serializer, value, &mut state)
+}
+
 fn serialize_pairs_python<'py>(
     py: Python,
     pairs_iter: impl Iterator<Item = PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)>>,
-    include: Option<&Bound<'_, PyAny>>,
-    exclude: Option<&Bound<'_, PyAny>>,
-    extra: &Extra,
-    key_transform: impl Fn(Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>>,
+    state: &mut SerializationState<'_, 'py>,
+    key_transform: impl Fn(Bound<'py, PyAny>, &mut SerializationState<'_, 'py>) -> PyResult<Bound<'py, PyAny>>,
 ) -> PyResult<Py<PyAny>> {
     let new_dict = PyDict::new(py);
     let filter = AnyFilter::new();
 
     for result in pairs_iter {
         let (k, v) = result?;
-        let op_next = filter.key_filter(&k, include, exclude)?;
+        let op_next = filter.key_filter(&k, state)?;
         if let Some((next_include, next_exclude)) = op_next {
-            let k = key_transform(k)?;
-            let v = infer_to_python(&v, next_include.as_ref(), next_exclude.as_ref(), extra)?;
+            let state = &mut state.scoped_include_exclude(next_include, next_exclude);
+            let k = key_transform(k, state)?;
+            let v = infer_to_python(&v, state)?;
             new_dict.set_item(k, v)?;
         }
     }
@@ -724,9 +661,7 @@ fn serialize_pairs_json<'py, S: Serializer>(
     pairs_iter: impl Iterator<Item = PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)>>,
     iter_size: usize,
     serializer: S,
-    include: Option<&Bound<'_, PyAny>>,
-    exclude: Option<&Bound<'_, PyAny>>,
-    extra: &Extra,
+    state: &mut SerializationState<'_, 'py>,
 ) -> Result<S::Ok, S::Error> {
     let mut map = serializer.serialize_map(Some(iter_size))?;
     let filter = AnyFilter::new();
@@ -734,10 +669,11 @@ fn serialize_pairs_json<'py, S: Serializer>(
     for result in pairs_iter {
         let (key, value) = result.map_err(py_err_se_err)?;
 
-        let op_next = filter.key_filter(&key, include, exclude).map_err(py_err_se_err)?;
+        let op_next = filter.key_filter(&key, state).map_err(py_err_se_err)?;
         if let Some((next_include, next_exclude)) = op_next {
-            let key = infer_json_key(&key, extra).map_err(py_err_se_err)?;
-            let value_serializer = SerializeInfer::new(&value, next_include.as_ref(), next_exclude.as_ref(), extra);
+            let state = &mut state.scoped_include_exclude(next_include, next_exclude);
+            let key = infer_json_key(&key, state).map_err(py_err_se_err)?;
+            let value_serializer = SerializeInfer::new(&value, state);
             map.serialize_entry(&key, &value_serializer)?;
         }
     }

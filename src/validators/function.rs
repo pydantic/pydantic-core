@@ -536,8 +536,15 @@ pub struct ValidationInfo {
     mode: InputType,
 }
 
+impl_py_gc_traverse!(ValidationInfo {
+    config,
+    context,
+    data,
+    field_name
+});
+
 impl ValidationInfo {
-    fn new(py: Python, extra: &Extra, config: &Py<PyAny>, field_name: Option<Py<PyString>>) -> Self {
+    fn new(py: Python, extra: &Extra<'_, '_>, config: &Py<PyAny>, field_name: Option<Py<PyString>>) -> Self {
         Self {
             config: config.clone_ref(py),
             context: extra.context.map(|ctx| ctx.clone().into()),
@@ -548,11 +555,7 @@ impl ValidationInfo {
     }
 
     fn __traverse__(&self, visit: PyVisit<'_>) -> Result<(), PyTraverseError> {
-        visit.call(&self.config)?;
-        if let Some(context) = &self.context {
-            visit.call(context)?;
-        }
-        Ok(())
+        self.py_gc_traverse(&visit)
     }
 
     fn __clear__(&mut self) {

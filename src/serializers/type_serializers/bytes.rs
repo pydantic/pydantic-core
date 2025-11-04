@@ -7,10 +7,10 @@ use pyo3::{prelude::*, IntoPyObjectExt};
 use crate::build_tools::LazyLock;
 use crate::definitions::DefinitionsBuilder;
 use crate::serializers::config::{BytesMode, FromConfig};
+use crate::serializers::SerializationState;
 
 use super::{
-    infer_json_key, infer_serialize, infer_to_python, BuildSerializer, CombinedSerializer, Extra, SerMode,
-    TypeSerializer,
+    infer_json_key, infer_serialize, infer_to_python, BuildSerializer, CombinedSerializer, SerMode, TypeSerializer,
 };
 
 #[derive(Debug)]
@@ -65,16 +65,14 @@ impl BuildSerializer for BytesSerializer {
 impl_py_gc_traverse!(BytesSerializer {});
 
 impl TypeSerializer for BytesSerializer {
-    fn to_python(
+    fn to_python<'py>(
         &self,
-        value: &Bound<'_, PyAny>,
-        include: Option<&Bound<'_, PyAny>>,
-        exclude: Option<&Bound<'_, PyAny>>,
-        extra: &Extra,
+        value: &Bound<'py, PyAny>,
+        state: &mut SerializationState<'_, 'py>,
     ) -> PyResult<Py<PyAny>> {
         let py = value.py();
         match value.downcast::<PyBytes>() {
-            Ok(py_bytes) => match extra.mode {
+            Ok(py_bytes) => match state.extra.mode {
                 SerMode::Json => self
                     .bytes_mode
                     .bytes_to_string(py, py_bytes.as_bytes())?
@@ -82,35 +80,37 @@ impl TypeSerializer for BytesSerializer {
                 _ => Ok(value.clone().unbind()),
             },
             Err(_) => {
-                extra.warnings.on_fallback_py(self.get_name(), value, extra)?;
-                infer_to_python(value, include, exclude, extra)
+                state.warn_fallback_py(self.get_name(), value)?;
+                infer_to_python(value, state)
             }
         }
     }
 
-    fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
+    fn json_key<'a, 'py>(
+        &self,
+        key: &'a Bound<'py, PyAny>,
+        state: &mut SerializationState<'_, 'py>,
+    ) -> PyResult<Cow<'a, str>> {
         match key.downcast::<PyBytes>() {
             Ok(py_bytes) => self.bytes_mode.bytes_to_string(key.py(), py_bytes.as_bytes()),
             Err(_) => {
-                extra.warnings.on_fallback_py(self.get_name(), key, extra)?;
-                infer_json_key(key, extra)
+                state.warn_fallback_py(self.get_name(), key)?;
+                infer_json_key(key, state)
             }
         }
     }
 
-    fn serde_serialize<S: serde::ser::Serializer>(
+    fn serde_serialize<'py, S: serde::ser::Serializer>(
         &self,
-        value: &Bound<'_, PyAny>,
+        value: &Bound<'py, PyAny>,
         serializer: S,
-        include: Option<&Bound<'_, PyAny>>,
-        exclude: Option<&Bound<'_, PyAny>>,
-        extra: &Extra,
+        state: &mut SerializationState<'_, 'py>,
     ) -> Result<S::Ok, S::Error> {
         match value.downcast::<PyBytes>() {
             Ok(py_bytes) => self.bytes_mode.serialize_bytes(py_bytes.as_bytes(), serializer),
             Err(_) => {
-                extra.warnings.on_fallback_ser::<S>(self.get_name(), value, extra)?;
-                infer_serialize(value, serializer, include, exclude, extra)
+                state.warn_fallback_ser::<S>(self.get_name(), value)?;
+                infer_serialize(value, serializer, state)
             }
         }
     }

@@ -13,10 +13,11 @@ use pyo3::types::PyDict;
 use serde::ser::Error;
 
 use crate::definitions::DefinitionsBuilder;
+use crate::serializers::SerializationState;
 use crate::PydanticSerializationUnexpectedValue;
 use crate::{build_tools::LazyLock, common::missing_sentinel::get_missing_sentinel_object};
 
-use super::{BuildSerializer, CombinedSerializer, Extra, TypeSerializer};
+use super::{BuildSerializer, CombinedSerializer, TypeSerializer};
 
 #[derive(Debug)]
 pub struct MissingSentinelSerializer {}
@@ -39,13 +40,7 @@ impl BuildSerializer for MissingSentinelSerializer {
 impl_py_gc_traverse!(MissingSentinelSerializer {});
 
 impl TypeSerializer for MissingSentinelSerializer {
-    fn to_python(
-        &self,
-        value: &Bound<'_, PyAny>,
-        _include: Option<&Bound<'_, PyAny>>,
-        _exclude: Option<&Bound<'_, PyAny>>,
-        _extra: &Extra,
-    ) -> PyResult<Py<PyAny>> {
+    fn to_python(&self, value: &Bound<'_, PyAny>, _state: &mut SerializationState<'_, '_>) -> PyResult<Py<PyAny>> {
         let missing_sentinel = get_missing_sentinel_object(value.py());
 
         if value.is(missing_sentinel) {
@@ -58,17 +53,19 @@ impl TypeSerializer for MissingSentinelSerializer {
         }
     }
 
-    fn json_key<'a>(&self, key: &'a Bound<'_, PyAny>, extra: &Extra) -> PyResult<Cow<'a, str>> {
-        self.invalid_as_json_key(key, extra, Self::EXPECTED_TYPE)
+    fn json_key<'a, 'py>(
+        &self,
+        key: &'a Bound<'py, PyAny>,
+        state: &mut SerializationState<'_, 'py>,
+    ) -> PyResult<Cow<'a, str>> {
+        self.invalid_as_json_key(key, state, Self::EXPECTED_TYPE)
     }
 
     fn serde_serialize<S: serde::ser::Serializer>(
         &self,
         _value: &Bound<'_, PyAny>,
         _serializer: S,
-        _include: Option<&Bound<'_, PyAny>>,
-        _exclude: Option<&Bound<'_, PyAny>>,
-        _extra: &Extra,
+        _state: &mut SerializationState<'_, '_>,
     ) -> Result<S::Ok, S::Error> {
         Err(Error::custom("'MISSING' can't be serialized to JSON".to_string()))
     }
