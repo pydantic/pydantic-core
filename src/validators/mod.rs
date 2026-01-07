@@ -44,6 +44,7 @@ mod generator;
 mod int;
 mod is_instance;
 mod is_subclass;
+mod iterable;
 mod json;
 mod json_or_python;
 mod lax_or_strict;
@@ -648,6 +649,8 @@ fn build_validator_inner(
         json_or_python::JsonOrPython,
         // generator validators
         generator::GeneratorValidator,
+        // iterables
+        iterable::IterableValidator,
         // custom error
         custom_error::CustomErrorValidator,
         // json data
@@ -825,6 +828,8 @@ pub enum CombinedValidator {
     LaxOrStrict(lax_or_strict::LaxOrStrictValidator),
     // generator validators
     Generator(generator::GeneratorValidator),
+    // iterables
+    Iterable(iterable::IterableValidator),
     // custom error
     CustomError(custom_error::CustomErrorValidator),
     // json data
