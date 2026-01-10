@@ -131,7 +131,7 @@ impl_py_gc_traverse!(SchemaValidator {
 #[pymethods]
 impl SchemaValidator {
     #[new]
-    #[pyo3(signature = (schema, config=None, *, rebuild=false))]
+    #[pyo3(signature = (schema, config=None, rebuild=false))]
     pub fn py_new(py: Python, schema: &Bound<'_, PyAny>, config: Option<&Bound<'_, PyDict>>, rebuild: bool) -> PyResult<Self> {
         // use_prebuilt=true by default, but false during rebuilds to avoid stale references
         // to old validators (see issue #1894)

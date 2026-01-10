@@ -58,7 +58,7 @@ impl_py_gc_traverse!(SchemaSerializer {
 #[pymethods]
 impl SchemaSerializer {
     #[new]
-    #[pyo3(signature = (schema, config=None, *, rebuild=false))]
+    #[pyo3(signature = (schema, config=None, rebuild=false))]
     pub fn py_new(schema: Bound<'_, PyDict>, config: Option<&Bound<'_, PyDict>>, rebuild: bool) -> PyResult<Self> {
         // use_prebuilt=true by default, but false during rebuilds to avoid stale references
         // to old serializers (see issue #1894)
@@ -184,7 +184,8 @@ impl SchemaSerializer {
     }
 
     pub fn __reduce__<'py>(slf: &Bound<'py, Self>) -> PyResult<(Bound<'py, PyType>, Bound<'py, PyTuple>)> {
-        let init_args = (&slf.get().py_schema, &slf.get().py_config).into_pyobject(slf.py())?;
+        // Pass rebuild=true to avoid reusing prebuilt serializers when unpickling
+        let init_args = (&slf.get().py_schema, &slf.get().py_config, true).into_pyobject(slf.py())?;
         Ok((slf.get_type(), init_args))
     }
 
