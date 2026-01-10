@@ -13,8 +13,8 @@ use crate::py_gc::PyGcTraverse;
 pub(crate) use config::{BytesMode, SerializationConfig};
 pub use errors::{PydanticSerializationError, PydanticSerializationUnexpectedValue};
 pub(crate) use extra::{Extra, SerMode, SerializationState, WarningsMode};
-use shared::to_json_bytes;
-pub use shared::CombinedSerializer;
+use shared::{BuildSerializer, to_json_bytes};
+pub use shared::{CombinedSerializer};
 
 mod computed_fields;
 mod config;
@@ -60,8 +60,11 @@ impl SchemaSerializer {
     #[new]
     #[pyo3(signature = (schema, config=None))]
     pub fn py_new(schema: Bound<'_, PyDict>, config: Option<&Bound<'_, PyDict>>) -> PyResult<Self> {
-        let mut definitions_builder = DefinitionsBuilder::new();
-        let serializer = CombinedSerializer::build_base(schema.downcast()?, config, &mut definitions_builder)?;
+        // use_prebuilt=false: When creating a new SchemaSerializer from Python, we never want to
+        // reuse prebuilt serializers. This is either a fresh build (no prebuilt exists) or a rebuild
+        // (where we explicitly don't want stale references to old serializers).
+        let mut definitions_builder = DefinitionsBuilder::new(false);
+        let serializer = CombinedSerializer::build(schema.downcast()?, config, &mut definitions_builder)?;
         Ok(Self {
             serializer,
             definitions: definitions_builder.finish()?,

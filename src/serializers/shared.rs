@@ -155,16 +155,6 @@ combined_serializer! {
 }
 
 impl CombinedSerializer {
-    // Used when creating the base serializer instance, to avoid reusing the instance
-    // when unpickling:
-    pub fn build_base(
-        schema: &Bound<'_, PyDict>,
-        config: Option<&Bound<'_, PyDict>>,
-        definitions: &mut DefinitionsBuilder<Arc<CombinedSerializer>>,
-    ) -> PyResult<Arc<CombinedSerializer>> {
-        Self::_build(schema, config, definitions, false)
-    }
-
     fn _build(
         schema: &Bound<'_, PyDict>,
         config: Option<&Bound<'_, PyDict>>,
@@ -308,7 +298,10 @@ impl BuildSerializer for CombinedSerializer {
         config: Option<&Bound<'_, PyDict>>,
         definitions: &mut DefinitionsBuilder<Arc<CombinedSerializer>>,
     ) -> PyResult<Arc<CombinedSerializer>> {
-        Self::_build(schema, config, definitions, true)
+        // Read use_prebuilt from the definitions builder - this ensures all nested
+        // serializers respect the same setting as the top-level build
+        let use_prebuilt = definitions.use_prebuilt();
+        Self::_build(schema, config, definitions, use_prebuilt)
     }
 }
 

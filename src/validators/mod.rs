@@ -133,9 +133,12 @@ impl SchemaValidator {
     #[new]
     #[pyo3(signature = (schema, config=None))]
     pub fn py_new(py: Python, schema: &Bound<'_, PyAny>, config: Option<&Bound<'_, PyDict>>) -> PyResult<Self> {
-        let mut definitions_builder = DefinitionsBuilder::new();
+        // use_prebuilt=false: When creating a new SchemaValidator from Python, we never want to
+        // reuse prebuilt validators. This is either a fresh build (no prebuilt exists) or a rebuild
+        // (where we explicitly don't want stale references to old validators).
+        let mut definitions_builder = DefinitionsBuilder::new(false);
 
-        let validator = build_validator_base(schema, config, &mut definitions_builder)?;
+        let validator = build_validator(schema, config, &mut definitions_builder)?;
         let definitions = definitions_builder.finish()?;
         let py_schema = schema.clone().unbind();
         let py_config = match config {
@@ -530,22 +533,15 @@ macro_rules! validator_match {
     };
 }
 
-// Used when creating the base validator instance, to avoid reusing the instance
-// when unpickling:
-pub fn build_validator_base(
-    schema: &Bound<'_, PyAny>,
-    config: Option<&Bound<'_, PyDict>>,
-    definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
-) -> PyResult<Arc<CombinedValidator>> {
-    build_validator_inner(schema, config, definitions, false)
-}
-
 pub fn build_validator(
     schema: &Bound<'_, PyAny>,
     config: Option<&Bound<'_, PyDict>>,
     definitions: &mut DefinitionsBuilder<Arc<CombinedValidator>>,
 ) -> PyResult<Arc<CombinedValidator>> {
-    build_validator_inner(schema, config, definitions, true)
+    // Read use_prebuilt from the definitions builder - this ensures all nested
+    // validators respect the same setting as the top-level build
+    let use_prebuilt = definitions.use_prebuilt();
+    build_validator_inner(schema, config, definitions, use_prebuilt)
 }
 
 fn build_validator_inner(
