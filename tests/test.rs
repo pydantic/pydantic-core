@@ -54,6 +54,51 @@ mod tests {
     }
 
     #[test]
+    fn test_build_schema_serializer_with_rebuild() {
+        Python::attach(|py| {
+            let code = c_str!(
+                r"{
+                'type': 'typed-dict',
+                'fields': {
+                    'name': {
+                        'type': 'typed-dict-field',
+                        'schema': {
+                            'type': 'str',
+                        },
+                    },
+                },
+            }"
+            );
+            let schema: Bound<'_, PyDict> = py.eval(code, None, None).unwrap().extract().unwrap();
+            // Test with rebuild=true to cover the use_prebuilt=false branch
+            SchemaSerializer::py_new(schema, None, true).unwrap();
+        });
+    }
+
+    #[test]
+    fn test_schema_validator_with_rebuild() {
+        Python::attach(|py| {
+            let code = c_str!(
+                r#"schema = {
+    "type": "dict",
+    "keys_schema": {
+        "type": "str",
+    },
+    "values_schema": {
+        "type": "str",
+    },
+    "strict": False,
+}"#
+            );
+            let locals = PyDict::new(py);
+            py.run(code, None, Some(&locals)).unwrap();
+            let schema = locals.get_item("schema").unwrap().unwrap();
+            // Test with rebuild=true to cover the use_prebuilt=false branch
+            SchemaValidator::py_new(py, &schema, None, true).unwrap();
+        });
+    }
+
+    #[test]
     fn test_literal_schema() {
         Python::attach(|py| {
             let code = c_str!(

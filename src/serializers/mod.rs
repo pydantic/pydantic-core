@@ -13,8 +13,8 @@ use crate::py_gc::PyGcTraverse;
 pub(crate) use config::{BytesMode, SerializationConfig};
 pub use errors::{PydanticSerializationError, PydanticSerializationUnexpectedValue};
 pub(crate) use extra::{Extra, SerMode, SerializationState, WarningsMode};
-use shared::{BuildSerializer, to_json_bytes};
-pub use shared::{CombinedSerializer};
+pub use shared::CombinedSerializer;
+use shared::{to_json_bytes, BuildSerializer};
 
 mod computed_fields;
 mod config;
