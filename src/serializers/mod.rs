@@ -58,12 +58,12 @@ impl_py_gc_traverse!(SchemaSerializer {
 #[pymethods]
 impl SchemaSerializer {
     #[new]
-    #[pyo3(signature = (schema, config=None))]
-    pub fn py_new(schema: Bound<'_, PyDict>, config: Option<&Bound<'_, PyDict>>) -> PyResult<Self> {
-        // use_prebuilt=false: When creating a new SchemaSerializer from Python, we never want to
-        // reuse prebuilt serializers. This is either a fresh build (no prebuilt exists) or a rebuild
-        // (where we explicitly don't want stale references to old serializers).
-        let mut definitions_builder = DefinitionsBuilder::new(false);
+    #[pyo3(signature = (schema, config=None, *, rebuild=false))]
+    pub fn py_new(schema: Bound<'_, PyDict>, config: Option<&Bound<'_, PyDict>>, rebuild: bool) -> PyResult<Self> {
+        // use_prebuilt=true by default, but false during rebuilds to avoid stale references
+        // to old serializers (see issue #1894)
+        let use_prebuilt = !rebuild;
+        let mut definitions_builder = DefinitionsBuilder::new(use_prebuilt);
         let serializer = CombinedSerializer::build(schema.downcast()?, config, &mut definitions_builder)?;
         Ok(Self {
             serializer,
