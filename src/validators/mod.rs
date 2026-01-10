@@ -394,7 +394,8 @@ impl SchemaValidator {
     }
 
     pub fn __reduce__<'py>(slf: &Bound<'py, Self>) -> PyResult<(Bound<'py, PyType>, Bound<'py, PyTuple>)> {
-        let init_args = (&slf.get().py_schema, &slf.get().py_config).into_pyobject(slf.py())?;
+        // Pass rebuild=true to avoid reusing prebuilt serializers when unpickling
+        let init_args = (&slf.get().py_schema, &slf.get().py_config, true).into_pyobject(slf.py())?;
         Ok((slf.get_type(), init_args))
     }
 
