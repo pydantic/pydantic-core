@@ -149,10 +149,6 @@ impl<'a, 'py> SerializationState<'a, 'py> {
         self.include_exclude.1.as_ref()
     }
 
-    pub(crate) fn model_type_name(&self) -> Option<Bound<'py, PyString>> {
-        self.model.as_ref().and_then(|model| model.get_type().name().ok())
-    }
-
     pub fn serialize_infer<'slf>(
         &'slf mut self,
         value: &'slf Bound<'py, PyAny>,
@@ -260,6 +256,14 @@ pub(crate) struct ExtraOwned {
     include: Option<Py<PyAny>>,
     exclude: Option<Py<PyAny>>,
 }
+
+impl_py_gc_traverse!(ExtraOwned {
+    model,
+    fallback,
+    context,
+    include,
+    exclude,
+});
 
 #[derive(Clone)]
 enum FieldNameOwned {
