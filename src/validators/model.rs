@@ -215,7 +215,6 @@ impl Validator for ModelValidator {
         if let Ok(old_extra) = model.getattr(intern!(py, DUNDER_MODEL_EXTRA_KEY))?.downcast::<PyDict>() {
             input_dict.update(old_extra.as_mapping())?;
         }
-        input_dict.set_item(field_name, field_value)?;
 
         let output = self
             .validator
